@@ -5,8 +5,8 @@ use macroquad::color::Color;
 
 use crate::draw::fill_rect;
 
-pub use blip_font::FONT;
-use blip_font::glyph_index as char_to_glyph;
+pub use crate::glyphs::FONT;
+use crate::glyphs::glyph_index as char_to_glyph;
 
 const OUTLINE_OFFSETS: [(f32, f32); 8] = [
     (-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0),

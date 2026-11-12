@@ -5,14 +5,12 @@ use blip::wav::{
     encode_pcm16_half, encode_pcm16_mono, encode_pcm16_music, env, fade_out, low_pass, ms_to_samples,
     soft_limit_to_pcm16, tame, warm, Rng, MIX_KNEE, SAMPLE_RATE,
 };
-use blip::xm::{heard, heard_hz, tempo, Part, HAT, KICK, SNARE};
 use blip::Asset;
 
 const SRF: f32 = SAMPLE_RATE as f32;
 
 /// Plucked string using Karplus–Strong averaging; upper harmonics decay first.
 pub(super) fn pluck(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, rng: &mut Rng) {
-    heard_hz(off, freq, Part::Tune);
     let freq = tame(freq);
     let period = (SAMPLE_RATE as f32 / freq).max(2.0) as usize;
     let n = ms_to_samples(ms).min(buf.len().saturating_sub(off));
@@ -45,7 +43,6 @@ pub(super) fn pluck(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, 
 /// A taiko: a low body tone falling in pitch as the head relaxes, a noise
 /// crack for the stick, and a room-length tail.
 pub(super) fn taiko(buf: &mut [f32], off: usize, freq: f32, gain: f32, rng: &mut Rng) {
-    heard(off, KICK, Part::Drums);
     let n = ms_to_samples(460.0).min(buf.len().saturating_sub(off));
     let mut phase = 0.0f32;
     for i in 0..n {
@@ -60,7 +57,6 @@ pub(super) fn taiko(buf: &mut [f32], off: usize, freq: f32, gain: f32, rng: &mut
 
 /// The rim — a dry wooden click, the sound of the stick on the hoop.
 pub(super) fn rim(buf: &mut [f32], off: usize, gain: f32, rng: &mut Rng) {
-    heard(off, SNARE, Part::Drums);
     let n = ms_to_samples(45.0).min(buf.len().saturating_sub(off));
     let mut prev = 0.0f32;
     for i in 0..n {
@@ -75,7 +71,6 @@ pub(super) fn rim(buf: &mut [f32], off: usize, gain: f32, rng: &mut Rng) {
 
 /// A short, metallic hat: filtered noise with inharmonic cymbal partials.
 fn hi_hat(buf: &mut [f32], off: usize, gain: f32, rng: &mut Rng) {
-    heard(off, HAT, Part::Drums);
     let n = ms_to_samples(38.0).min(buf.len().saturating_sub(off));
     let (mut prev, mut phase) = (0.0f32, 0.0f32);
     for i in 0..n {
@@ -110,7 +105,6 @@ pub(super) fn degree(scale: &[f32; 5], root: f32, step: i32) -> f32 {
 /// A shakuhachi: a breathy tone that swells in, wavers once it is held and
 /// dies away, with the air of the player's breath round it.
 pub(super) fn flute(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, rng: &mut Rng) {
-    heard_hz(off, freq, Part::Tune);
     let n = ms_to_samples(ms).min(buf.len().saturating_sub(off));
     let (mut ph, mut air) = (0.0f32, 0.0f32);
     for i in 0..n {
@@ -130,7 +124,6 @@ pub(super) fn flute(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, 
 /// A struck glass: one clear partial and its octave, gone in half a second.
 /// Not tamed like the koto, so it can sit above the tune.
 fn chime(buf: &mut [f32], off: usize, freq: f32, gain: f32) {
-    heard_hz(off, freq, Part::Harmony);
     let n = ms_to_samples(520.0).min(buf.len().saturating_sub(off));
     for i in 0..n {
         let t = i as f32 / SRF;
@@ -172,7 +165,6 @@ enum Feel {
 impl Theme<'_> {
     fn pcm(&self) -> Vec<i16> {
         let Theme { bpm, root, scale, phrases, bass, order, drive, feel } = *self;
-        tempo(bpm);
         let step = (SAMPLE_RATE as f32 * 60.0 / bpm / 4.0) as usize; // 16ths
         let bars = 4 * order.len();
         let steps = bars * 16;
@@ -1236,7 +1228,6 @@ pub fn walkout_wav() -> Vec<u8> {
     const BARS: usize = 16;
     const HOOK: [(usize, i32); 8] = [(0, 62), (3, 69), (7, 65), (10, 67),
         (16, 60), (22, 65), (26, 64), (30, 57)];
-    tempo(BPM);
     let step = (SRF * 60.0 / BPM / 4.0) as usize;
     let body = step * BARS * 16;
     let mut buf = vec![0.0; body + ms_to_samples(1800.0)];
@@ -1251,7 +1242,6 @@ pub fn walkout_wav() -> Vec<u8> {
         }
         if matches!(beat, 4 | 12) {
             rim(&mut buf, off, 0.9, &mut rng);
-            heard(off, SNARE, Part::Drums);
             let n = ms_to_samples(135.0);
             for i in 0..n {
                 let t = i as f32 / n as f32;
@@ -1259,7 +1249,6 @@ pub fn walkout_wav() -> Vec<u8> {
             }
         }
         if tick % 2 == 0 {
-            heard(off, HAT, Part::Drums);
             let n = ms_to_samples(26.0);
             for i in 0..n {
                 let t = i as f32 / n as f32;
@@ -1269,7 +1258,6 @@ pub fn walkout_wav() -> Vec<u8> {
         if matches!(beat, 0 | 7 | 10) {
             let note = [38, 38, 36, 41][tick / 16 % 4];
             let freq = hz(note);
-            heard_hz(off, freq, Part::Bass);
             let n = step * if beat == 0 { 6 } else { 3 };
             for i in 0..n {
                 let phase = std::f32::consts::TAU * freq * i as f32 / SRF;
@@ -1288,9 +1276,9 @@ pub fn walkout_wav() -> Vec<u8> {
     encode_pcm16_music(&soft_limit_to_pcm16(&buf[..body], MIX_KNEE))
 }
 
-/// The music: each tune as a WAV to play and an XM of its notes for TUNE.
+/// The music: each tune as a WAV to play.
 pub fn music() -> Vec<(String, Vec<u8>)> {
-    blip::xm::tunes(&[
+    blip::wav::tunes(&[
         ("DOCK", &|| theme_wav(0)),
         ("TEMPLE", &|| theme_wav(1)),
         ("SELECT", &|| theme_wav(2)),

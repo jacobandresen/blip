@@ -162,8 +162,8 @@ pub(crate) fn draw_title(blip: &Blip, g: &Game) {
     blip.draw_centered(if keys { "W S CHOOSE     F OR SPACE START" } else { "UP DOWN CHOOSE     PUNCH START" }, 376.0, 2.0, dim);
     // The record to beat, when the kiosk knows of one.
     let hi = web::high_score();
-    if hi.score > 0 {
-        blip.draw_centered(&hi.label("HI"), 320.0, 2.0, BlipColor { r: 0.98, g: 0.90, b: 0.40, a: 1.0 });
+    if hi > 0 {
+        blip.draw_centered(&format!("HI {hi}"), 320.0, 2.0, BlipColor { r: 0.98, g: 0.90, b: 0.40, a: 1.0 });
     }
 }
 
@@ -502,7 +502,7 @@ pub(crate) fn draw_ending(blip: &Blip, g: &Game) {
         n => format!("{n} CONTINUES"),
     };
     // A run that beats the kiosk's record says so.
-    let hi = web::high_score().score;
+    let hi = web::high_score();
     let s = if hi > 0 && g.sess.score > hi { format!("NEW RECORD {}", g.sess.score) }
             else { format!("SCORE {}", g.sess.score) };
     stamp(blip, &s, 126.0, 2.0, BLIP_WHITE);

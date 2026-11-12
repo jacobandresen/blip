@@ -124,7 +124,7 @@ await access(binary);
 const env = {
   ...process.env,
   BLIP_SILENT: '1',
-  BLIP_EXPORT_BASIC: 'crates/brawler/art',
+  BLIP_EXPORT_ART: 'crates/brawler/art',
   BLIP_CRT: '0',
 };
 
@@ -134,7 +134,6 @@ async function runNative(gameEnv) {
 }
 
 await runNative(env);
-await run(process.execPath, ['tools/sync_brawler_art.mjs']);
 await run('cargo', ['build', '--release', '-p', 'brawler']);
 
 const captures = await mkdtemp(join(tmpdir(), 'blip-brawler-card-'));
@@ -156,4 +155,4 @@ await run(process.execPath, ['tools/make_game_icons.mjs']);
 await run('cargo', ['build', '--release', '--target', 'wasm32-unknown-unknown', '-p', 'brawler']);
 await copyFile(join(root, 'target', 'wasm32-unknown-unknown', 'release', 'brawler.wasm'),
   join(root, 'web', 'brawler', 'index.wasm'));
-await copyFile(join(root, 'web', 'shell.html'), join(root, 'web', 'brawler', 'index.html'));
+await copyFile(join(root, 'web', 'game.html'), join(root, 'web', 'brawler', 'index.html'));

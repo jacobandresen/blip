@@ -98,21 +98,8 @@ fn impact_glint() -> Vec<u8> {
 }
 
 pub fn generate() -> Vec<Asset> {
-    let mut assets = vec![
+    vec![
         ("images/impact_glint.png", impact_glint()),
         ("images/film_poster.png", film_poster()),
-    ];
-    // Captures are refreshed by tools/make_brawler_art.mjs, then packaged like other art.
-    for path in [
-        "images/ryuka.png", "images/brutus.png", "images/kestrel.png", "images/giotto.png",
-        "images/titian.png", "images/vermeer.png", "images/bosch.png", "images/webber.png",
-        "images/gamma.png", "images/zenith.png", "images/jade.png", "images/regent.png",
-        "images/kite.png", "images/aurelia.png", "images/stage_1.png", "images/stage_2.png",
-        "images/stage_3.png", "images/stage_4.png", "images/stage_5.png", "images/stage_6.png",
-        "images/stage_7.png", "images/mack.png", "images/stage_8.png", "images/portraits.png",
-    ] {
-        let file = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("art").join(path.rsplit('/').next().unwrap());
-        if let Ok(bytes) = std::fs::read(file) { assets.push((path, bytes)); }
-    }
-    assets
+    ]
 }

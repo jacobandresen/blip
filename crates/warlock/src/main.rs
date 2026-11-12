@@ -1950,7 +1950,7 @@ fn draw_over(blip: &Blip, g: &Game) {
     let hi = web::high_score();
     blip.draw_game_over(
         g.sess.score,
-        &hi,
+        hi,
         WARLOCK_C,
         BLIP_YELLOW,
         BLIP_WHITE,
@@ -1973,21 +1973,21 @@ async fn main() {
     // Leave the second station available for a mid-game co-op join.
     web::set_players(2);
     g.sfx = Some(Sounds {
-        bolt: blip::audio::load_sound(blip::wav!("bolt")).await,
-        reveal: blip::audio::load_sound(blip::wav!("reveal")).await,
-        cleanse: blip::audio::load_sound(blip::wav!("cleanse")).await,
-        kill: blip::audio::load_sound(blip::wav!("kill")).await,
-        death: blip::audio::load_sound(blip::wav!("death")).await,
-        over: blip::audio::load_sound(blip::wav!("over")).await,
-        chamber: blip::audio::load_sound(blip::wav!("chamber")).await,
-        ward: blip::audio::load_sound(blip::wav!("ward")).await,
-        warlock: blip::audio::load_sound(blip::wav!("warlock")).await,
-        fire: blip::audio::load_sound(blip::wav!("fire")).await,
-        pulse: blip::audio::load_sound(blip::wav!("pulse")).await,
-        whelp: blip::audio::load_sound(blip::wav!("whelp")).await,
-        potion: blip::audio::load_sound(blip::wav!("potion")).await,
+        bolt: blip::sound!("bolt"),
+        reveal: blip::sound!("reveal"),
+        cleanse: blip::sound!("cleanse"),
+        kill: blip::sound!("kill"),
+        death: blip::sound!("death"),
+        over: blip::sound!("over"),
+        chamber: blip::sound!("chamber"),
+        ward: blip::sound!("ward"),
+        warlock: blip::sound!("warlock"),
+        fire: blip::sound!("fire"),
+        pulse: blip::sound!("pulse"),
+        whelp: blip::sound!("whelp"),
+        potion: blip::sound!("potion"),
     });
-    let mut music = Jukebox::new("WARLOCK", &["DUNGEON", "TOWER", "THEME", "DEPTHS"]);
+    let mut music = Jukebox::new("warlock", &["DUNGEON", "TOWER", "THEME", "DEPTHS"]);
     let mut art = art::Art::new();
     // the title shows the first cellar, torchlit and empty
     g.load_room();

@@ -26,45 +26,6 @@ pub fn distance(x0: f32, y0: f32, x1: f32, y1: f32) -> f32 {
     (x1 - x0).hypot(y1 - y0)
 }
 
-/// Order each roster entry once, separating adjacent home groups and keeping
-/// the requested finalists at the end. Fall back to the roster ring if needed.
-pub fn ordered_ladder(pick: usize, homes: &[usize], finalists: &[usize]) -> Vec<usize> {
-    fn place(ring: &[usize], homes: &[usize], finals: &[usize], out: &mut Vec<usize>) -> bool {
-        if out.len() == ring.len() {
-            return true;
-        }
-        let early = ring.len() - finals.len();
-        for &who in ring {
-            let fits = if out.len() < early { !finals.contains(&who) } else { finals[out.len() - early] == who };
-            if !fits || out.contains(&who) {
-                continue;
-            }
-            if out.last().is_some_and(|&prev| homes[prev] == homes[who]) {
-                continue;
-            }
-            out.push(who);
-            if place(ring, homes, finals, out) {
-                return true;
-            }
-            out.pop();
-        }
-        false
-    }
-
-    if homes.is_empty() {
-        return Vec::new();
-    }
-    let pick = pick % homes.len();
-    let ring = (1..homes.len()).map(|step| (pick + step) % homes.len()).collect::<Vec<_>>();
-    let finals = finalists.iter().copied().filter(|who| ring.contains(who)).collect::<Vec<_>>();
-    let mut ladder = Vec::with_capacity(ring.len());
-    if place(&ring, homes, &finals, &mut ladder) {
-        ladder
-    } else {
-        ring
-    }
-}
-
 /// Wrap `v` into `[lo, hi)`, including values multiple spans away.
 /// Returns `lo` when `hi <= lo`.
 #[inline]
@@ -176,26 +137,9 @@ pub fn scatter(k: usize, salt: u32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        angle_diff, ease_out_cubic, ordered_ladder, rand_range_f32, rand_seed, scatter, segment_circle_overlap,
+        angle_diff, ease_out_cubic, rand_range_f32, rand_seed, scatter, segment_circle_overlap,
         segment_rect_overlap, smoothstep01, wrap,
     };
-
-    #[test]
-    fn roster_order_visits_each_other_entry_and_keeps_finalists_last() {
-        let homes = [1, 0, 2, 3, 3, 3, 3, 6, 4, 5];
-        let finalists = [8, 9];
-        for pick in 0..homes.len() {
-            let order = ordered_ladder(pick, &homes, &finalists);
-            let expected = (1..homes.len()).map(|step| (pick + step) % homes.len()).collect::<Vec<_>>();
-            assert_eq!(order.len(), homes.len() - 1);
-            assert_eq!(order.iter().copied().collect::<std::collections::HashSet<_>>().len(), order.len());
-            assert!(!order.contains(&pick));
-            assert!(order.windows(2).all(|pair| homes[pair[0]] != homes[pair[1]]));
-            let ends = finalists.iter().copied().filter(|who| expected.contains(who)).collect::<Vec<_>>();
-            assert_eq!(&order[order.len() - ends.len()..], &ends);
-        }
-        assert!(ordered_ladder(0, &[], &finalists).is_empty());
-    }
 
     #[test]
     fn point_distance_handles_coincident_negative_and_large_coordinates() {

@@ -1548,7 +1548,7 @@ impl Art {
         self.additive(true);
         self.streak(WIN_W as f32 / 2.0, ty0 + 57.0, 380.0, 14.0, 0.0, c(1.0, 0.6, 0.25, 0.35 + 0.1 * (t * 2.0).sin()));
         self.additive(false);
-        blip.draw_hi(&web::high_score(), ty0 + 66.0, BLIP_YELLOW);
+        blip.draw_hi(web::high_score(), ty0 + 66.0, BLIP_YELLOW);
 
         // his greeting, on a scrap of parchment
         const SAYS: [(&str, &str); 4] = [

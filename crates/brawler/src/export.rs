@@ -1,4 +1,5 @@
-//! Capture BASIC's art from the same bodies, poses and stages the game draws.
+//! Capture the fighters' pose sheets, which the film poster is cut from, from the
+//! same bodies and poses the game draws.
 
 use super::*;
 use blip::macroquad::prelude::{
@@ -9,10 +10,10 @@ use std::path::Path;
 const CELL_W: f32 = 320.0;
 const CELL_H: f32 = 256.0;
 const FEET: f32 = 244.0;
-pub(crate) const FRAMES: usize = 6;
+const FRAMES: usize = 6;
 
-/// Row order is BASIC's pose table; move names and timing come from `moves.rs`.
-pub(crate) const POSES: [(Act, MoveId); 19] = [
+/// The rows of a pose sheet; move names and timing come from `moves.rs`.
+const POSES: [(Act, MoveId); 19] = [
     (Act::Idle, MoveId::LowPunch),
     (Act::Walk, MoveId::LowPunch),
     (Act::Crouch, MoveId::LowPunch),
@@ -34,9 +35,8 @@ pub(crate) const POSES: [(Act, MoveId); 19] = [
     (Act::Attack, MoveId::HighKick),
 ];
 
-pub(crate) fn tape_art(blip: &Blip, folder: &Path) {
-    std::fs::create_dir_all(folder).expect("BASIC art folder");
-    let mut metadata = Vec::new();
+pub(crate) fn pose_art(blip: &Blip, folder: &Path) {
+    std::fs::create_dir_all(folder).expect("art folder");
     for (who, arch) in FIGHTERS.iter().enumerate() {
         let target = render_target((CELL_W as usize * FRAMES) as u32, CELL_H as u32 * POSES.len() as u32);
         let mut camera = Camera2D::from_display_rect(Rect::new(0.0, 0.0, target.texture.width(), target.texture.height()));
@@ -56,60 +56,14 @@ pub(crate) fn tape_art(blip: &Blip, folder: &Path) {
         }
         set_default_camera();
         let raw = target.texture.get_texture_data();
-        let (w, h, feet, png) = pack(&raw);
+        let (w, h, png) = pack(&raw);
         std::fs::write(folder.join(format!("{}.png", arch.name.to_ascii_lowercase())), png).expect("fighter PNG");
-        let trim = format!("#{:02X}{:02X}{:02X}",
-            (arch.trim.0 * 255.0).round() as u8,
-            (arch.trim.1 * 255.0).round() as u8,
-            (arch.trim.2 * 255.0).round() as u8);
-        metadata.push(format!("{{\"name\":\"{}\",\"width\":{w},\"height\":{h},\"feet\":{feet},\"frames\":{FRAMES},\"rate\":{},\"bulk\":{},\"size\":{},\"trim\":\"{trim}\",\"boss\":{}}}",
-            arch.name, draw::STYLES[who].rate, arch.bulk, arch.size, arch.boss));
         println!("[art] {}: {w}x{h} cells, {FRAMES} frames", arch.name);
     }
-    std::fs::write(folder.join("atlas.json"), format!("[{}]\n", metadata.join(","))).expect("atlas metadata");
-    portraits(blip, folder);
-    for stage in 0..STAGES {
-        let target = render_target(WIN_W as u32, WIN_H as u32);
-        let mut camera = Camera2D::from_display_rect(Rect::new(0.0, 0.0, WIN_W as f32, WIN_H as f32));
-        camera.render_target = Some(target.clone());
-        set_camera(&camera);
-        clear_background(BLIP_BLACK);
-        let g = Game { stage, now: 2.0, ..Game::new() };
-        draw::draw_stage(blip, &g);
-        set_default_camera();
-        target.texture.get_texture_data().export_png(folder.join(format!("stage_{}.png", stage + 1)).to_str().expect("art path"));
-        println!("[art] {}", STAGE_NAMES[stage]);
-    }
-}
-
-fn portraits(blip: &Blip, folder: &Path) {
-    let target = render_target(30, 30);
-    let mut camera = Camera2D::from_display_rect(Rect::new(0.0, 0.0, 30.0, 30.0));
-    camera.render_target = Some(target.clone());
-    let mut sheet = blip::image::Image::new(FIGHTERS.len() as u32 * 30, 90);
-    for (who, arch) in FIGHTERS.iter().enumerate() {
-        for (row, mood) in [draw::Mood::Calm, draw::Mood::Hurt, draw::Mood::Happy].into_iter().enumerate() {
-            set_camera(&camera);
-            clear_background(blip::shade(draw::rgb(arch.color), 0.45));
-            let look = draw::Look { bulk: arch.bulk * 0.82, size: 0.82, wind: (0.0, 0.5), ..draw::look_of(arch, 0.0) };
-            let head = draw::V(17.0, 13.0);
-            draw::draw_head(blip, &look, 1.0, head, draw::V(15.0, 26.0), mood);
-            set_default_camera();
-            let raw = target.texture.get_texture_data();
-            for y in 0..30usize {
-                for x in 0..30usize {
-                    let offset = ((29 - y) * 30 + x) * 4;
-                    sheet.set_rgba((who * 30 + x) as i32, (row * 30 + y) as i32,
-                        raw.bytes[offset], raw.bytes[offset + 1], raw.bytes[offset + 2], raw.bytes[offset + 3]);
-                }
-            }
-        }
-    }
-    std::fs::write(folder.join("portraits.png"), sheet.encode_png()).expect("portrait sheet");
 }
 
 /// One tight, symmetric crop for every cell preserves the feet and mirroring anchors.
-fn pack(raw: &blip::macroquad::texture::Image) -> (u32, u32, u32, Vec<u8>) {
+fn pack(raw: &blip::macroquad::texture::Image) -> (u32, u32, Vec<u8>) {
     let (cw, ch) = (CELL_W as usize, CELL_H as usize);
     let mut half = 0usize;
     let (mut top, mut bottom) = (ch, 0usize);
@@ -139,11 +93,11 @@ fn pack(raw: &blip::macroquad::texture::Image) -> (u32, u32, u32, Vec<u8>) {
             }
         }
     }
-    (w as u32, h as u32, FEET as u32 - top as u32, packed.encode_png())
+    (w as u32, h as u32, packed.encode_png())
 }
 
-/// A pose sample shared by the tape exporter and screenshot comparisons.
-pub(crate) fn sample(who: usize, row: usize, frame: usize) -> Fighter {
+/// One cell of a pose sheet: fighter `who` in pose `row` at `frame`.
+fn sample(who: usize, row: usize, frame: usize) -> Fighter {
     let (act, mv) = POSES[row];
     let arch = FIGHTERS[who];
     let mut f = Fighter::new(who, 0.0, 1.0);

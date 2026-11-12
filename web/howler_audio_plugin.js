@@ -5,7 +5,7 @@ if (typeof Howler !== 'undefined') {
   Howler.autoSuspend = false;
   // Disable Howler's built-in unlock: it calls unload() when ctx.sampleRate !== 44100,
   // which destroys all WASM-loaded sounds permanently (iOS often reports 48000 Hz).
-  // kiosk.js handles unlock via a permanent gesture listener instead.
+  // cabinet.js handles unlock via a permanent gesture listener instead.
   Howler.autoUnlock = false;
 }
 

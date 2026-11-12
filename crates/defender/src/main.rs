@@ -1145,6 +1145,121 @@ fn drop_bombs(g: &mut Game, dt: f32) {
     }
 }
 
+/// The top left of shield block `r`, `c`.
+fn shield_block_xy(shield: &Shield, r: usize, c: usize) -> (f32, f32) {
+    (shield.x + (c as i32 * SHIELD_BLOCK) as f32, shield.y + (r as i32 * SHIELD_BLOCK) as f32)
+}
+
+/// Player bullets against the formation: the lowest alien in a bullet's path falls, for points that grow with a streak.
+fn shoot_aliens(g: &mut Game, bullet_starts: &[(f32, f32); N_BULLETS], sfx: &Sounds) {
+    for bi in 0..MAX_PLAYER_BULLETS {
+        if !g.bullets[bi].active { continue; }
+        'rows: for row in (0..g.active_rows).rev() {
+            for col in 0..g.active_cols {
+                let ai = (row * g.active_cols + col) as usize;
+                if !g.aliens[ai].alive { continue; }
+                if !bullet_hits_rect(bullet_starts[bi], (g.bullets[bi].x, g.bullets[bi].y),
+                                     g.aliens[ai].x, g.aliens[ai].y,
+                                     ALIEN_W as f32, ALIEN_H as f32) {
+                    continue;
+                }
+                play_sfx(&sfx.explosion);
+                let (ax, ay, kind) = (g.aliens[ai].x, g.aliens[ai].y, g.aliens[ai].kind);
+                g.spawn_explosion(ax, ay);
+                g.aliens[ai].alive = false;
+                g.bullets[bi].active = false;
+                blip::bot::add("invaders", 1.0);
+                g.streak += 1;
+                let times = streak_multiple(g.streak);
+                let pts = match kind { 0 => 30, 1 => 20, _ => 10 } * g.sess.level * times;
+                g.sess.add_score(pts);
+                let (cx, cy) = (ax + ALIEN_W as f32 / 2.0, ay + ALIEN_H as f32 / 2.0);
+                g.fx.burst(cx, cy, 10, 110.0, alien_color(kind));
+                if times > 1 {
+                    g.fx.popup(cx, cy - 6.0, &format!("{pts} X{times}"), BLIP_YELLOW);
+                } else {
+                    g.fx.popup(cx, cy - 6.0, &format!("{pts}"), alien_color(kind));
+                }
+                break 'rows;
+            }
+        }
+    }
+}
+
+/// Player bullets against the diver: double points.
+fn shoot_diver(g: &mut Game, bullet_starts: &[(f32, f32); N_BULLETS], sfx: &Sounds) {
+    if let Some(d) = g.diver {
+        for bi in 0..MAX_PLAYER_BULLETS {
+            if !g.bullets[bi].active { continue; }
+            if bullet_hits_rect(bullet_starts[bi], (g.bullets[bi].x, g.bullets[bi].y),
+                                d.x, d.y, ALIEN_W as f32, ALIEN_H as f32) {
+                g.bullets[bi].active = false;
+                g.diver = None;
+                blip::bot::add("divers", 1.0);
+                play_sfx(&sfx.explosion);
+                g.spawn_explosion(d.x, d.y);
+                g.streak += 1;
+                let pts = match d.kind { 0 => 30, 1 => 20, _ => 10 } * g.sess.level * 2;
+                g.sess.add_score(pts);
+                let (cx, cy) = (d.x + ALIEN_W as f32 / 2.0, d.y + ALIEN_H as f32 / 2.0);
+                g.fx.burst(cx, cy, 14, 130.0, alien_color(d.kind));
+                g.fx.popup(cx, cy - 6.0, &format!("DIVER {pts}"), BLIP_YELLOW);
+                break;
+            }
+        }
+    }
+}
+
+/// Any bullet against the shields: it takes out one block.
+fn hit_shields(g: &mut Game, bullet_starts: &[(f32, f32); N_BULLETS], bullet_was_active: &[bool; N_BULLETS]) {
+    for bi in 0..N_BULLETS {
+        if !g.bullets[bi].active { continue; }
+        'outer: for s in 0..SHIELDS {
+            for r in 0..SHIELD_ROWS {
+                for c in 0..SHIELD_COLS {
+                    if !g.shields[s].alive[r][c] { continue; }
+                    let (bx, by) = shield_block_xy(&g.shields[s], r, c);
+                    let end = (g.bullets[bi].x, g.bullets[bi].y);
+                    let hit = if bullet_was_active[bi] {
+                        bullet_hits_rect(bullet_starts[bi], end, bx, by,
+                            SHIELD_BLOCK as f32, SHIELD_BLOCK as f32)
+                    } else {
+                        rects_overlap(end.0, end.1, 8.0, 16.0, bx, by,
+                            SHIELD_BLOCK as f32, SHIELD_BLOCK as f32)
+                    };
+                    if hit {
+                        g.shields[s].alive[r][c] = false;
+                        g.bullets[bi].active = false;
+                        g.fx.burst(bx + SHIELD_BLOCK as f32 / 2.0, by + SHIELD_BLOCK as f32 / 2.0, 5, 50.0, BLIP_GREEN);
+                        break 'outer;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// The formation plows through any shield blocks in its path as it marches down, as in the classic game.
+fn plow_shields(g: &mut Game) {
+    for a in g.aliens.iter() {
+        if !a.alive { continue; }
+        for s in 0..SHIELDS {
+            for r in 0..SHIELD_ROWS {
+                for c in 0..SHIELD_COLS {
+                    if !g.shields[s].alive[r][c] { continue; }
+                    let (bx, by) = shield_block_xy(&g.shields[s], r, c);
+                    if rects_overlap(
+                        a.x, a.y, ALIEN_W as f32, ALIEN_H as f32,
+                        bx, by, SHIELD_BLOCK as f32, SHIELD_BLOCK as f32,
+                    ) {
+                        g.shields[s].alive[r][c] = false;
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     let player_x_before = g.player_x;
     let ufo_start_x = g.ufo_x;
@@ -1180,110 +1295,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     drop_bombs(g, dt);
 
-    // Player bullet vs aliens
-    for bi in 0..MAX_PLAYER_BULLETS {
-        if !g.bullets[bi].active { continue; }
-        'rows: for row in (0..g.active_rows).rev() {
-            for col in 0..g.active_cols {
-                let ai = (row * g.active_cols + col) as usize;
-                if !g.aliens[ai].alive { continue; }
-                if !bullet_hits_rect(bullet_starts[bi], (g.bullets[bi].x, g.bullets[bi].y),
-                                     g.aliens[ai].x, g.aliens[ai].y,
-                                     ALIEN_W as f32, ALIEN_H as f32) {
-                    continue;
-                }
-                play_sfx(&sfx.explosion);
-                let (ax, ay, kind) = (g.aliens[ai].x, g.aliens[ai].y, g.aliens[ai].kind);
-                g.spawn_explosion(ax, ay);
-                g.aliens[ai].alive = false;
-                g.bullets[bi].active = false;
-                blip::bot::add("invaders", 1.0);
-                g.streak += 1;
-                let times = streak_multiple(g.streak);
-                let pts = match kind { 0 => 30, 1 => 20, _ => 10 } * g.sess.level * times;
-                g.sess.add_score(pts);
-                let (cx, cy) = (ax + ALIEN_W as f32 / 2.0, ay + ALIEN_H as f32 / 2.0);
-                g.fx.burst(cx, cy, 10, 110.0, alien_color(kind));
-                if times > 1 {
-                    g.fx.popup(cx, cy - 6.0, &format!("{pts} X{times}"), BLIP_YELLOW);
-                } else {
-                    g.fx.popup(cx, cy - 6.0, &format!("{pts}"), alien_color(kind));
-                }
-                break 'rows;
-            }
-        }
-    }
-
-    // Player bullet vs the diver: double.
-    if let Some(d) = g.diver {
-        for bi in 0..MAX_PLAYER_BULLETS {
-            if !g.bullets[bi].active { continue; }
-            if bullet_hits_rect(bullet_starts[bi], (g.bullets[bi].x, g.bullets[bi].y),
-                                d.x, d.y, ALIEN_W as f32, ALIEN_H as f32) {
-                g.bullets[bi].active = false;
-                g.diver = None;
-                blip::bot::add("divers", 1.0);
-                play_sfx(&sfx.explosion);
-                g.spawn_explosion(d.x, d.y);
-                g.streak += 1;
-                let pts = match d.kind { 0 => 30, 1 => 20, _ => 10 } * g.sess.level * 2;
-                g.sess.add_score(pts);
-                let (cx, cy) = (d.x + ALIEN_W as f32 / 2.0, d.y + ALIEN_H as f32 / 2.0);
-                g.fx.burst(cx, cy, 14, 130.0, alien_color(d.kind));
-                g.fx.popup(cx, cy - 6.0, &format!("DIVER {pts}"), BLIP_YELLOW);
-                break;
-            }
-        }
-    }
-
-    // Bullets vs shields
-    for bi in 0..N_BULLETS {
-        if !g.bullets[bi].active { continue; }
-        'outer: for s in 0..SHIELDS {
-            for r in 0..SHIELD_ROWS {
-                for c in 0..SHIELD_COLS {
-                    if !g.shields[s].alive[r][c] { continue; }
-                    let bx = g.shields[s].x + (c as i32 * SHIELD_BLOCK) as f32;
-                    let by = g.shields[s].y + (r as i32 * SHIELD_BLOCK) as f32;
-                    let end = (g.bullets[bi].x, g.bullets[bi].y);
-                    let hit = if bullet_was_active[bi] {
-                        bullet_hits_rect(bullet_starts[bi], end, bx, by,
-                            SHIELD_BLOCK as f32, SHIELD_BLOCK as f32)
-                    } else {
-                        rects_overlap(end.0, end.1, 8.0, 16.0, bx, by,
-                            SHIELD_BLOCK as f32, SHIELD_BLOCK as f32)
-                    };
-                    if hit {
-                        g.shields[s].alive[r][c] = false;
-                        g.bullets[bi].active = false;
-                        g.fx.burst(bx + SHIELD_BLOCK as f32 / 2.0, by + SHIELD_BLOCK as f32 / 2.0, 5, 50.0, BLIP_GREEN);
-                        break 'outer;
-                    }
-                }
-            }
-        }
-    }
-
-    // Aliens vs shields — as the formation marches down it plows straight
-    // through any barrier blocks in its path, same as the classic game.
-    for a in g.aliens.iter() {
-        if !a.alive { continue; }
-        for s in 0..SHIELDS {
-            for r in 0..SHIELD_ROWS {
-                for c in 0..SHIELD_COLS {
-                    if !g.shields[s].alive[r][c] { continue; }
-                    let bx = g.shields[s].x + (c as i32 * SHIELD_BLOCK) as f32;
-                    let by = g.shields[s].y + (r as i32 * SHIELD_BLOCK) as f32;
-                    if rects_overlap(
-                        a.x, a.y, ALIEN_W as f32, ALIEN_H as f32,
-                        bx, by, SHIELD_BLOCK as f32, SHIELD_BLOCK as f32,
-                    ) {
-                        g.shields[s].alive[r][c] = false;
-                    }
-                }
-            }
-        }
-    }
+    shoot_aliens(g, &bullet_starts, sfx);
+    shoot_diver(g, &bullet_starts, sfx);
+    hit_shields(g, &bullet_starts, &bullet_was_active);
+    plow_shields(g);
 
     // Bombs vs player
     for bi in MAX_PLAYER_BULLETS..N_BULLETS {
@@ -1531,7 +1546,7 @@ fn streak_label(streak: i32) -> String {
     format!("{streak} IN A ROW  X{times}  {to_next} FOR X{}", times + 1)
 }
 
-fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: &web::HighScore) {
+fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: i32) {
     blip.draw_centered("DEFENDER", (WIN_H / 5 + 14) as f32, 6.0, BLIP_MAGENTA);
     // The title is 6 x 7 = 42px tall: the high score clears it by a real margin.
     blip.draw_hi(hi, (WIN_H / 5 + 93) as f32, BLIP_YELLOW);
@@ -1595,23 +1610,23 @@ async fn main() {
     let saucer = load_png(blip::png!("ufo_saucer"));
 
     let sfx = Sounds {
-        shoot:       blip::audio::load_sound(blip::wav!("shoot")).await,
-        explosion:   blip::audio::load_sound(blip::wav!("explosion")).await,
-        dive:        blip::audio::load_sound(blip::wav!("dive")).await,
-        level_clear: blip::audio::load_sound(blip::wav!("level_clear")).await,
-        ufo_siren:   blip::audio::load_sound(blip::wav!("ufo_siren")).await,
+        shoot:       blip::sound!("shoot"),
+        explosion:   blip::sound!("explosion"),
+        dive:        blip::sound!("dive"),
+        level_clear: blip::sound!("level_clear"),
+        ufo_siren:   blip::sound!("ufo_siren"),
         march: [
-            blip::audio::load_sound(blip::wav!("march1")).await,
-            blip::audio::load_sound(blip::wav!("march2")).await,
-            blip::audio::load_sound(blip::wav!("march3")).await,
-            blip::audio::load_sound(blip::wav!("march4")).await,
+            blip::sound!("march1"),
+            blip::sound!("march2"),
+            blip::sound!("march3"),
+            blip::sound!("march4"),
         ],
-        laser_charge: blip::audio::load_sound(blip::wav!("laser_charge")).await,
-        laser_blast:  blip::audio::load_sound(blip::wav!("laser_blast")).await,
-        game_over:    blip::audio::load_sound(blip::wav!("game_over")).await,
+        laser_charge: blip::sound!("laser_charge"),
+        laser_blast:  blip::sound!("laser_blast"),
+        game_over:    blip::sound!("game_over"),
     };
     // The invasion tune, and the mothership's on boss levels.
-    let mut music = Jukebox::new("DEFENDER", &["INVASION", "MOTHERSHIP"]);
+    let mut music = Jukebox::new("defender", &["INVASION", "MOTHERSHIP"]);
 
     if blip.screenshot_mode {
         g.start_game();
@@ -1639,9 +1654,9 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title => draw_title(&blip, &alien, &web::high_score()),
+            State::Title => draw_title(&blip, &alien, web::high_score()),
             State::Win   => draw_clear(&blip, g.sess.level),
-            State::Over  => blip.draw_game_over(g.sess.score, &web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active()),
+            State::Over  => blip.draw_game_over(g.sess.score, web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active()),
             State::Play | State::Dead => {
                 draw_play(&blip, &g, &player, &alien, &explosion, &shield, &bullet, &saucer);
             }

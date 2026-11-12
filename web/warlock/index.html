@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="game-page">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -15,8 +15,8 @@
   <link rel="icon" type="image/svg+xml" href="../favicon.svg?v=3">
   <link rel="apple-touch-icon" href="icon-180.png?v=2">
   <script>if(new URLSearchParams(location.search).get('cabinet')==='1') document.documentElement.setAttribute('data-cabinet-screen','');</script>
-  <!-- Stepped into from the arcade: nothing is painted until shell.js has laid the page out, so the browser keeps the
-       arcade's last frame up meanwhile (data-launching, cleared by shell.js). -->
+  <!-- Stepped into from the arcade: nothing is painted until game.js has laid the page out, so the browser keeps the
+       arcade's last frame up meanwhile (data-launching, cleared by game.js). -->
   <script>
     try {
       var l=JSON.parse(sessionStorage.getItem('blip-cabinet-launch')||'null');
@@ -33,7 +33,7 @@
   </script>
   <style>:root[data-launching] body{visibility:hidden}</style>
   <script src="../howler.min.js"></script>
-  <script src="../blip_core.js?v=11"></script>
+  <script src="../blip_core.js?v=13"></script>
   <script>(function () {
     var g = blipGameFromPath(location.pathname);
     if (!g) return;
@@ -42,18 +42,14 @@
     document.title = name + ' \u00b7 BLIP';
     document.querySelector('meta[name=apple-mobile-web-app-title]').content = name;
   }());</script>
-  <script src="../kiosk.js?v=102"></script>
-  <link rel="stylesheet" href="../marquee.css?v=2">
-  <link rel="stylesheet" href="../kiosk.css?v=163">
-  <link rel="stylesheet" href="../shell.css?v=113">
-  <link rel="stylesheet" href="../wear.css?v=14">
-  <link rel="stylesheet" href="../machine.css?v=7">
-  <script>if (document.documentElement.hasAttribute('data-appstyle')) document.querySelector('link[href*="wear.css"]').disabled = true;</script>
-  <script src="../shell.js?v=142" defer blocking="render"></script>
+  <script src="../cabinet.js?v=105"></script>
+  <link rel="stylesheet" href="../deck.css?v=8">
+  <link rel="stylesheet" href="../blip.css?v=173">
+  <script src="../game.js?v=5" defer blocking="render"></script>
 </head>
 <body class="cabinet-page">
 
-  <a class="blip-logo led-logo" href="../index.html" aria-label="BLIP — cabinet"><img class="blip-logo-mark" src="../blip-logo.svg" alt=""></a>
+  <a class="blip-logo" href="../index.html" aria-label="BLIP — cabinet"><img class="blip-logo-mark" src="../blip-logo.svg" alt=""></a>
 
   <!-- deck.js mounts the shared coin mechanism beside the controls. -->
   <button id="insert-coin-btn" class="kiosk-btn"></button>
@@ -71,7 +67,7 @@
    <div class="deck-panel">
     <!-- Paddle dials: rally only. Mounted in the deck like the stick —
          two spinner knobs on the tilted panel, P1 left / P2 right.
-         shell.js reveals them and wires the touch spin. -->
+         game.js reveals them and wires the touch spin. -->
     <div id="paddle-dial">
       <div class="dial-cap"><div id="dial-hand"></div></div>
       <div id="dial-label">P1</div>
@@ -83,7 +79,7 @@
    </div>
 
   </div>
-  <script src="../deck.js?v=20"></script>
+  <script src="../deck.js?v=24"></script>
 
   <div id="need-coin-overlay">
     <div class="nco-panel">
@@ -94,7 +90,7 @@
     </div>
   </div>
 
-  <!-- #marquee-bar (per-game backlit name sign) is injected by shell.js -->
+  <!-- #marquee-bar (per-game backlit name sign) is injected by game.js -->
   <span class="machine-speaker" aria-hidden="true"></span>
   <div class="cab-rail left"></div>
   <div class="cab-rail right"></div>
@@ -105,13 +101,8 @@
   <div class="cabinet-glass"></div>
   <canvas id="glcanvas" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
 
-  <script src="../blip_controller.js?v=12"></script>
-  <script src="../vendor/supabase.js?v=1"></script>
-  <script src="../blip_config.js?v=1"></script>
-  <script src="../blip_scores.js?v=9"></script>
   <script src="../mq_js_bundle.js?v=1"></script>
   <script src="../howler_audio_plugin.js"></script>
-  <script src="../blip_bridge.js?v=20"></script>
   <script>document.addEventListener('DOMContentLoaded',function(){load("index.wasm");},{once:true});</script>
 
 </body>

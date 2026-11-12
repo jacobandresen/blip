@@ -1863,7 +1863,7 @@ fn soft(blip: &Blip, text: &str, x: f32, y: f32, sz: f32, c: (u8, u8, u8), a: f3
     blip.draw_text(text, x, y, sz, col(c, a));
 }
 
-fn draw_scores(blip: &Blip, g: &Game, _hi: &web::HighScore) {
+fn draw_scores(blip: &Blip, g: &Game) {
     // one row: P1 on the left, the round in the middle, P2 on the right
     blip.fill_rect(0.0, 0.0, WIN_W as f32, HUD, col((26, 10, 34), 0.92));
     blip.fill_rect(0.0, HUD - 2.0, WIN_W as f32, 2.0, col(PINK, 0.25));
@@ -1900,7 +1900,7 @@ fn draw_scores(blip: &Blip, g: &Game, _hi: &web::HighScore) {
     soft(blip, &round, (WIN_W as f32 - text_w(&round, sz)) / 2.0, y, sz, PEACH, 1.0);
 }
 
-fn draw_title(blip: &Blip, art: &art::Art, g: &Game, hi: &web::HighScore) {
+fn draw_title(blip: &Blip, art: &art::Art, g: &Game, hi: i32) {
     let t = now();
     art.title_background(blip);
     draw_bokeh(blip, &PALETTES[0]);
@@ -1926,8 +1926,8 @@ fn draw_title(blip: &Blip, art: &art::Art, g: &Game, hi: &web::HighScore) {
     }
     let glow = 0.65 + 0.35 * (t * 2.5).sin().abs();
     art.title_panels(blip, web::controls(), glow);
-    if hi.score > 0 {
-        let h = hi.label("HI");
+    if hi > 0 {
+        let h = format!("HI {hi}");
         soft(blip, &h, (WIN_W as f32 - text_w(&h, 2.0)) / 2.0, 428.0 + DY, 2.0, PEACH, 1.0);
     }
     let _ = g;
@@ -2044,25 +2044,24 @@ async fn main() {
     let mut g = Game::new();
     web::set_players(2);
 
-    let load = |b: &'static [u8]| async move { blip::audio::load_sound(b).await };
     let sfx = Sounds {
-        blow: load(blip::wav!("blow")).await,
-        pop: load(blip::wav!("pop")).await,
-        trap: load(blip::wav!("trap")).await,
-        kill: load(blip::wav!("defeated")).await,
-        fruit: load(blip::wav!("fruit")).await,
-        jump: load(blip::wav!("jump")).await,
-        lose: load(blip::wav!("lost")).await,
-        bounce: load(blip::wav!("bounce")).await,
-        sparkle: load(blip::wav!("sparkle")).await,
-        round: load(blip::wav!("jingle_round")).await,
-        clear: load(blip::wav!("jingle_clear")).await,
-        hurry: load(blip::wav!("jingle_hurry")).await,
-        over: load(blip::wav!("jingle_over")).await,
-        won: load(blip::wav!("jingle_won")).await,
+        blow: blip::sound!("blow"),
+        pop: blip::sound!("pop"),
+        trap: blip::sound!("trap"),
+        kill: blip::sound!("defeated"),
+        fruit: blip::sound!("fruit"),
+        jump: blip::sound!("jump"),
+        lose: blip::sound!("lost"),
+        bounce: blip::sound!("bounce"),
+        sparkle: blip::sound!("sparkle"),
+        round: blip::sound!("jingle_round"),
+        clear: blip::sound!("jingle_clear"),
+        hurry: blip::sound!("jingle_hurry"),
+        over: blip::sound!("jingle_over"),
+        won: blip::sound!("jingle_won"),
     };
     // The theme, and the same tune faster for HURRY UP.
-    let mut music = Jukebox::new("BUBBLER", &["THEME", "HURRY"]);
+    let mut music = Jukebox::new("bubbler", &["THEME", "HURRY"]);
     let mut shot_frame = 0u32;
     #[cfg(not(target_arch = "wasm32"))]
     let mut scene_set = false;
@@ -2101,81 +2100,7 @@ async fn main() {
         let p2_start = key_pressed(BLIP_KEY_J) || key_pressed(BLIP_KEY_K);
 
         if !frozen {
-            match g.state {
-                State::Title => {
-                    // A game is paid for as it starts: one coin, two for two players.
-                    if p2_start {
-                        g.start_game(true);
-                        web::spend_coin();
-                        web::spend_coin();
-                    } else if inp[0].blow || inp[0].jump || key_pressed(BLIP_KEY_SPACE) {
-                        g.start_game(false);
-                        web::spend_coin();
-                    }
-                }
-                State::Intro => {
-                    if g.state_t < dt * 1.5 {
-                        play_sfx(&sfx.round);
-                    }
-                    for e in g.enemies.iter_mut() {
-                        e.pop_in = (g.state_t / 1.2).min(0.999);
-                    }
-                    if g.state_t > 1.8 {
-                        g.state = State::Play;
-                        g.state_t = 0.0;
-                        for e in g.enemies.iter_mut() {
-                            e.pop_in = 1.0;
-                        }
-                    }
-                }
-                State::Play => {
-                    if !g.p[1].joined && (key_pressed(BLIP_KEY_J) || key_pressed(BLIP_KEY_K)) {
-                        g.join_player_two();
-                    }
-                    if !blip.screenshot_mode || shot_frame > 400 {
-                        update_play(&mut g, dt, inp, &sfx);
-                    }
-                }
-                State::Clear => {
-                    let player_starts = std::array::from_fn(|i| (g.p[i].cx(), g.p[i].cy()));
-                    move_players(&mut g, inp, dt, &sfx);
-                    move_bubbles(&mut g, dt, inp, &sfx, &[], player_starts);
-                    move_candies(&mut g, dt, &sfx, player_starts);
-                    // leftover bubbles pop one by one, for a little applause
-                    if g.state_t > 1.0 {
-                        if let Some(i) = g.bubbles.iter().position(|b| b.active) {
-                            if (g.state_t * 8.0) as i32 != ((g.state_t - dt) * 8.0) as i32 {
-                                let b = g.bubbles[i];
-                                g.bubbles[i].active = false;
-                                g.burst(b.x, b.y, 8, rgba(1.0, 1.0, 1.0, 0.8), 80.0, false);
-                                play_sfx_volume(&sfx.pop, 0.4);
-                            }
-                        }
-                        g.bubbles.retain(|b| b.active);
-                    }
-                    if g.state_t > 3.4 {
-                        if g.round + 1 >= ROUNDS {
-                            g.state = State::Won;
-                            g.state_t = 0.0;
-                            report_score(&g);
-                            play_sfx(&sfx.won);
-                        } else {
-                            g.load_round(g.round + 1);
-                            g.state = State::Intro;
-                            g.state_t = 0.0;
-                        }
-                    }
-                }
-                State::Over | State::Won => {
-                    if g.state_t > 2.5 && (inp[0].blow || inp[0].jump || key_pressed(BLIP_KEY_SPACE) || p2_start) {
-                        g.state = State::Title;
-                        g.two_up = false;
-                        web::set_players(2);
-                    }
-                }
-            }
-        }
-        if !frozen {
+            update_screen(&mut g, dt, inp, p2_start, &sfx, !blip.screenshot_mode || shot_frame > 400);
             update_fx(&mut g, dt);
         }
 
@@ -2186,148 +2111,231 @@ async fn main() {
             music.stop();
         }
 
-        blip.clear(BlipColor::new(0.0, 0.0, 0.0, 1.0));
-        match g.state {
-            State::Title => draw_title(&blip, &art, &g, &hi),
-            _ => {
-                draw_world(&blip, &art, &g);
-                draw_scores(&blip, &g, &hi);
-                let st = g.state_t;
-                // the end screens dim the world so their words sit on calm
-                if matches!(g.state, State::Over | State::Won) {
-                    blip.fill_rect(
-                        0.0,
-                        HUD,
-                        WIN_W as f32,
-                        WIN_H as f32 - HUD,
-                        col((20, 8, 28), 0.55 * (st * 2.0).min(1.0)),
-                    );
-                }
-                match g.state {
-                    State::Intro => {
-                        cosy(
-                            &blip,
-                            &format!("ROUND {}", g.round + 1),
-                            170.0 + DY,
-                            3.5,
-                            PEACH,
-                            PEACH,
-                            st * 3.0,
-                            (st * 4.0).min(1.0),
-                        );
-                        if st > 0.7 {
-                            cosy(
-                                &blip,
-                                "READY!",
-                                236.0 + DY,
-                                2.2,
-                                CREAM,
-                                MINT,
-                                (st - 0.7) * 3.0,
-                                ((st - 0.7) * 4.0).min(1.0),
-                            );
-                        }
-                    }
-                    State::Play if g.hurry && g.round_t < hurry_at(g.round) + 2.4 => {
-                        let a = 0.6 + 0.4 * (g.round_t * 8.0).sin().abs();
-                        cosy(&blip, "HURRY UP!", 196.0 + DY, 3.2, (255, 150, 150), (255, 110, 120), 1.0, a);
-                    }
-                    _ => {}
-                }
-                if g.chain.1 > 0.0 {
-                    let text = format!("{} CHAIN!", g.chain.0);
-                    cosy(&blip, &text, 262.0 + DY, 2.6, CREAM, PINK, (1.2 - g.chain.1) * 5.0, g.chain.1.min(1.0));
-                }
-                // bubble wipe: out at the end of a round, back in at the start of the next
-                let wipe = match g.state {
-                    State::Clear => ((g.state_t - 2.6) / 0.8).clamp(0.0, 1.0),
-                    State::Intro => 1.0 - (g.state_t / 0.7).clamp(0.0, 1.0),
-                    _ => 0.0,
-                };
-                if wipe > 0.0 {
-                    let pal = &PALETTES[g.round];
-                    for i in 0..12 {
-                        for j in 0..12 {
-                            let (cx, cy) = (i as f32 * 60.0, j as f32 * 57.0);
-                            let r = wipe * 46.0 * (0.8 + 0.2 * ((i * 7 + j * 3) % 5) as f32 / 4.0);
-                            blip::macroquad::shapes::draw_circle(cx, cy, r, col(pal.sky0, 1.0));
-                            blip::macroquad::shapes::draw_circle_lines(cx, cy, r, 2.0, col(pal.glow, 0.5 * wipe));
-                        }
-                    }
-                }
-                match g.state {
-                    State::Clear => {
-                        cosy(&blip, "CLEAR!", 186.0 + DY, 4.0, CREAM, MINT, st * 3.0, (st * 4.0).min(1.0));
-                        if g.extend && st > 0.6 {
-                            cosy(
-                                &blip,
-                                "EXTEND  +1 LIFE",
-                                246.0 + DY,
-                                1.8,
-                                PEACH,
-                                PINK,
-                                (st - 0.6) * 3.0,
-                                ((st - 0.6) * 4.0).min(1.0),
-                            );
-                        }
-                    }
-                    State::Over => {
-                        cosy(&blip, "GAME OVER", 160.0 + DY, 3.8, PINK, PINK, st * 2.0, (st * 3.0).min(1.0));
-                        if hi.score > 0 {
-                            cosy(
-                                &blip,
-                                &hi.label("HI"),
-                                222.0 + DY,
-                                1.5,
-                                PEACH,
-                                PEACH,
-                                1.0,
-                                (st - 1.0).clamp(0.0, 1.0),
-                            );
-                        }
-                        if st > 2.5 {
-                            cosy(
-                                &blip,
-                                "PRESS BUBBLE",
-                                276.0 + DY,
-                                2.0,
-                                CREAM,
-                                MINT,
-                                1.0,
-                                0.65 + 0.35 * (st * 2.5).sin().abs(),
-                            );
-                        }
-                    }
-                    State::Won => {
-                        cosy(&blip, "ALL ROUNDS CLEAR!", 120.0 + DY, 2.6, CREAM, MINT, st * 2.0, (st * 3.0).min(1.0));
-                        cosy(
-                            &blip,
-                            "HAPPY END",
-                            192.0 + DY,
-                            3.8,
-                            PEACH,
-                            PINK,
-                            (st - 0.5) * 2.0,
-                            ((st - 0.5) * 3.0).clamp(0.0, 1.0),
-                        );
-                        if st > 2.5 {
-                            cosy(
-                                &blip,
-                                "PRESS BUBBLE",
-                                276.0 + DY,
-                                2.0,
-                                CREAM,
-                                MINT,
-                                1.0,
-                                0.65 + 0.35 * (st * 2.5).sin().abs(),
-                            );
-                        }
-                    }
-                    _ => {}
+        draw(&blip, &art, &g, hi);
+        blip.next_frame(60).await;
+    }
+}
+
+/// The screen's rules this frame: start a game, the round's intro, play, the clear, the end screens.
+/// `play` is false while a screenshot holds the board still.
+fn update_screen(g: &mut Game, dt: f32, inp: [Input; 2], p2_start: bool, sfx: &Sounds, play: bool) {
+    match g.state {
+        State::Title => {
+            // A game is paid for as it starts: one coin, two for two players.
+            if p2_start {
+                g.start_game(true);
+                web::spend_coin();
+                web::spend_coin();
+            } else if inp[0].blow || inp[0].jump || key_pressed(BLIP_KEY_SPACE) {
+                g.start_game(false);
+                web::spend_coin();
+            }
+        }
+        State::Intro => {
+            if g.state_t < dt * 1.5 {
+                play_sfx(&sfx.round);
+            }
+            for e in g.enemies.iter_mut() {
+                e.pop_in = (g.state_t / 1.2).min(0.999);
+            }
+            if g.state_t > 1.8 {
+                g.state = State::Play;
+                g.state_t = 0.0;
+                for e in g.enemies.iter_mut() {
+                    e.pop_in = 1.0;
                 }
             }
         }
-        blip.next_frame(60).await;
+        State::Play => {
+            if !g.p[1].joined && (key_pressed(BLIP_KEY_J) || key_pressed(BLIP_KEY_K)) {
+                g.join_player_two();
+            }
+            if play {
+                update_play(g, dt, inp, sfx);
+            }
+        }
+        State::Clear => {
+            let player_starts = std::array::from_fn(|i| (g.p[i].cx(), g.p[i].cy()));
+            move_players(g, inp, dt, sfx);
+            move_bubbles(g, dt, inp, sfx, &[], player_starts);
+            move_candies(g, dt, sfx, player_starts);
+            // leftover bubbles pop one by one, for a little applause
+            if g.state_t > 1.0 {
+                if let Some(i) = g.bubbles.iter().position(|b| b.active) {
+                    if (g.state_t * 8.0) as i32 != ((g.state_t - dt) * 8.0) as i32 {
+                        let b = g.bubbles[i];
+                        g.bubbles[i].active = false;
+                        g.burst(b.x, b.y, 8, rgba(1.0, 1.0, 1.0, 0.8), 80.0, false);
+                        play_sfx_volume(&sfx.pop, 0.4);
+                    }
+                }
+                g.bubbles.retain(|b| b.active);
+            }
+            if g.state_t > 3.4 {
+                if g.round + 1 >= ROUNDS {
+                    g.state = State::Won;
+                    g.state_t = 0.0;
+                    report_score(g);
+                    play_sfx(&sfx.won);
+                } else {
+                    g.load_round(g.round + 1);
+                    g.state = State::Intro;
+                    g.state_t = 0.0;
+                }
+            }
+        }
+        State::Over | State::Won => {
+            if g.state_t > 2.5 && (inp[0].blow || inp[0].jump || key_pressed(BLIP_KEY_SPACE) || p2_start) {
+                g.state = State::Title;
+                g.two_up = false;
+                web::set_players(2);
+            }
+        }
+    }
+}
+
+/// Draw the frame: the title, or the world with the words of its moment over it.
+fn draw(blip: &Blip, art: &art::Art, g: &Game, hi: i32) {
+    blip.clear(BlipColor::new(0.0, 0.0, 0.0, 1.0));
+    match g.state {
+        State::Title => draw_title(blip, art, g, hi),
+        _ => {
+            draw_world(blip, art, g);
+            draw_scores(blip, g);
+            let st = g.state_t;
+            // the end screens dim the world so their words sit on calm
+            if matches!(g.state, State::Over | State::Won) {
+                blip.fill_rect(
+                    0.0,
+                    HUD,
+                    WIN_W as f32,
+                    WIN_H as f32 - HUD,
+                    col((20, 8, 28), 0.55 * (st * 2.0).min(1.0)),
+                );
+            }
+            match g.state {
+                State::Intro => {
+                    cosy(
+                        blip,
+                        &format!("ROUND {}", g.round + 1),
+                        170.0 + DY,
+                        3.5,
+                        PEACH,
+                        PEACH,
+                        st * 3.0,
+                        (st * 4.0).min(1.0),
+                    );
+                    if st > 0.7 {
+                        cosy(
+                            blip,
+                            "READY!",
+                            236.0 + DY,
+                            2.2,
+                            CREAM,
+                            MINT,
+                            (st - 0.7) * 3.0,
+                            ((st - 0.7) * 4.0).min(1.0),
+                        );
+                    }
+                }
+                State::Play if g.hurry && g.round_t < hurry_at(g.round) + 2.4 => {
+                    let a = 0.6 + 0.4 * (g.round_t * 8.0).sin().abs();
+                    cosy(blip, "HURRY UP!", 196.0 + DY, 3.2, (255, 150, 150), (255, 110, 120), 1.0, a);
+                }
+                _ => {}
+            }
+            if g.chain.1 > 0.0 {
+                let text = format!("{} CHAIN!", g.chain.0);
+                cosy(blip, &text, 262.0 + DY, 2.6, CREAM, PINK, (1.2 - g.chain.1) * 5.0, g.chain.1.min(1.0));
+            }
+            // bubble wipe: out at the end of a round, back in at the start of the next
+            let wipe = match g.state {
+                State::Clear => ((g.state_t - 2.6) / 0.8).clamp(0.0, 1.0),
+                State::Intro => 1.0 - (g.state_t / 0.7).clamp(0.0, 1.0),
+                _ => 0.0,
+            };
+            if wipe > 0.0 {
+                let pal = &PALETTES[g.round];
+                for i in 0..12 {
+                    for j in 0..12 {
+                        let (cx, cy) = (i as f32 * 60.0, j as f32 * 57.0);
+                        let r = wipe * 46.0 * (0.8 + 0.2 * ((i * 7 + j * 3) % 5) as f32 / 4.0);
+                        blip::macroquad::shapes::draw_circle(cx, cy, r, col(pal.sky0, 1.0));
+                        blip::macroquad::shapes::draw_circle_lines(cx, cy, r, 2.0, col(pal.glow, 0.5 * wipe));
+                    }
+                }
+            }
+            match g.state {
+                State::Clear => {
+                    cosy(blip, "CLEAR!", 186.0 + DY, 4.0, CREAM, MINT, st * 3.0, (st * 4.0).min(1.0));
+                    if g.extend && st > 0.6 {
+                        cosy(
+                            blip,
+                            "EXTEND  +1 LIFE",
+                            246.0 + DY,
+                            1.8,
+                            PEACH,
+                            PINK,
+                            (st - 0.6) * 3.0,
+                            ((st - 0.6) * 4.0).min(1.0),
+                        );
+                    }
+                }
+                State::Over => {
+                    cosy(blip, "GAME OVER", 160.0 + DY, 3.8, PINK, PINK, st * 2.0, (st * 3.0).min(1.0));
+                    if hi > 0 {
+                        cosy(
+                            blip,
+                            &format!("HI {hi}"),
+                            222.0 + DY,
+                            1.5,
+                            PEACH,
+                            PEACH,
+                            1.0,
+                            (st - 1.0).clamp(0.0, 1.0),
+                        );
+                    }
+                    if st > 2.5 {
+                        cosy(
+                            blip,
+                            "PRESS BUBBLE",
+                            276.0 + DY,
+                            2.0,
+                            CREAM,
+                            MINT,
+                            1.0,
+                            0.65 + 0.35 * (st * 2.5).sin().abs(),
+                        );
+                    }
+                }
+                State::Won => {
+                    cosy(blip, "ALL ROUNDS CLEAR!", 120.0 + DY, 2.6, CREAM, MINT, st * 2.0, (st * 3.0).min(1.0));
+                    cosy(
+                        blip,
+                        "HAPPY END",
+                        192.0 + DY,
+                        3.8,
+                        PEACH,
+                        PINK,
+                        (st - 0.5) * 2.0,
+                        ((st - 0.5) * 3.0).clamp(0.0, 1.0),
+                    );
+                    if st > 2.5 {
+                        cosy(
+                            blip,
+                            "PRESS BUBBLE",
+                            276.0 + DY,
+                            2.0,
+                            CREAM,
+                            MINT,
+                            1.0,
+                            0.65 + 0.35 * (st * 2.5).sin().abs(),
+                        );
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 }
 

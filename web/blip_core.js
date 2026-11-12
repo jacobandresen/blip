@@ -1,6 +1,6 @@
 /* What every BLIP page shares: the games, coins,
  * the layout rule, sound on/off, fullscreen and the front-end choice. Load
- * it before kiosk.js; the home screen loads it alone. */
+ * it before cabinet.js; the home screen loads it alone. */
 var BLIP_CORE_SRC = document.currentScript ? document.currentScript.src : location.href;
 var MAX_COINS = 5;
 
@@ -54,9 +54,7 @@ function blipFrontendControls() {
   }
   // Rally and non-touch devices keep their established deck selection.
   if (asked === 'stick' || asked === 'pad' || asked === 'touch') return asked;
-  if (blipAmstradMode() || /\/basic\.html$/.test(location.pathname)) return 'pad';
-  if (!blipFreePlay()) return 'stick';
-  return blipFrontend() === 'basic' && !blipAppMode() ? 'pad' : 'touch';
+  return blipFreePlay() ? 'touch' : 'stick';
 }
 
 /** Apply the front end's controller as <html data-controls> (+ data-touch). */
@@ -71,7 +69,7 @@ function blipApplyControls() {
 }
 /* The whole room moves with a machine between the arcade and its page: scaled about its screen, so the cabinet's
  * screen (from) lands on the game page's (to). The arcade grows onto the game going in, and shrinks from it
- * coming back. Read by machine.css's root view-transition animations. */
+ * coming back. Read by blip.css's root view-transition animations. */
 function blipMachineZoom(from, to, leaving) {
   var k = to.w / from.w, fx = from.x + from.w / 2, fy = from.y + from.h / 2, tx = to.x + to.w / 2, ty = to.y + to.h / 2;
   var grow = 'translate(' + (tx - k * fx) + 'px,' + (ty - k * fy) + 'px) scale(' + k + ')';
@@ -164,9 +162,7 @@ var BLIP_GAMES = {
 function blipGameFromPath(pathname) {
   var m = /\/([a-z_]+)\/(?:index\.html)?$/i.exec(pathname || '');
   var g = m && BLIP_GAMES[m[1]];
-  return g ? { slug: m[1], name: g.name, accent: g.accent, controls: g.controls, touchControls: g.touchControls, buttons: g.buttons,
-               keys: g.keys, players: g.players || 1, stick: g.stick, capLabel: g.capLabel,
-               touch: g.touch || null, cabinetTitle: !!g.cabinetTitle } : null;
+  return g ? Object.assign({ slug: m[1], players: 1, touch: null, cabinetTitle: false }, g) : null;
 }
 
 // Before first paint, so no controller flashes. data-has-touch shows the
@@ -306,15 +302,15 @@ if (blipMuted()) {
 }());
 
 
-/* ---- Front ends ---- The cabinet, home screen or BASIC computer. */
+/* ---- Front ends ---- The cabinet or the home screen. */
 function blipFrontend() {
   try {
     var which = localStorage.getItem('blip-frontend');
-    return which === 'home' || which === 'basic' ? which : 'cabinet';
+    return which === 'home' ? which : 'cabinet';
   } catch (e) { return 'cabinet'; }
 }
 function blipSetFrontend(which) {
-  which = which === 'home' || which === 'basic' ? which : 'cabinet';
+  which = which === 'home' ? which : 'cabinet';
   try { localStorage.setItem('blip-frontend', which); } catch (e) {}
   try {
     sessionStorage.setItem('blip-freeplay', which === 'cabinet' ? '0' : '1');
@@ -344,17 +340,11 @@ function blipAppMode() {
   return !document.referrer && !visited;
 }
 
-/** A game running inside the Amstrad front end's monitor. */
-function blipAmstradMode() {
-  return new URLSearchParams(location.search).has('amstrad') && !!blipGameFromPath(location.pathname);
-}
-
 /** App mode, free to play: any game can start this way. Its own icon,
  * a link with ?app, a launch from the home screen, or any visit while the
- * home screen or BASIC is the front end chosen. A session that has the cabinet open
+ * home screen is the front end chosen. A session that has the cabinet open
  * ('blip-freeplay' 0) keeps coins, and the cabinet's preview always does. */
 function blipFreePlay() {
-  if (blipAmstradMode()) return true;
   if (blipAppMode()) return true;
   var q = new URLSearchParams(location.search);
   if (q.get('cabinet') === '1') return false;
@@ -371,13 +361,12 @@ function blipFrontendUrl() {
   if (blipAppMode()) return './?app';
   if (blipGameFromPath(location.pathname) && new URLSearchParams(location.search).get('from') === 'api') return '../api.html';
   if (!blipFreePlay()) return '../index.html';
-  return blipFrontend() === 'basic' ? '../basic.html' : '../home.html';
+  return '../home.html';
 }
 
 (function () {
   var root = document.documentElement;
   if (blipGameFromPath(location.pathname)) {
-    if (blipAmstradMode()) root.setAttribute('data-amstrad', '');
     // Opened as an app (home screen, or its own icon): an app's look, not the cabinet's.
     if (blipFreePlay()) { root.setAttribute('data-freeplay', ''); root.setAttribute('data-appstyle', ''); }
     // An app on a PC plays from the keyboard or a gamepad: no deck on screen.

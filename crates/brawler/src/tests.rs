@@ -14,7 +14,6 @@ mod balance;
 mod anatomy;
 mod versus;
 mod sound;
-mod tape;
 
 pub(crate) use ladder::*;
 pub(crate) use balance::*;

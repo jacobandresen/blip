@@ -2,22 +2,16 @@
   "name": "blip",
   "private": true,
   "scripts": {
+    "build:web": "node tools/build_web.mjs",
     "test:all": "node test/run-all.mjs",
-    "test": "node --test test/fill-canvas.test.mjs test/basic-language.test.mjs test/aisle.test.mjs",
+    "test": "node --test test/fill-canvas.test.mjs test/aisle.test.mjs",
     "test:web": "node test/run-web.mjs",
     "test:visual": "node test/run-visual.mjs",
     "test:layout": "node test/shard.mjs 4 test/layout.mjs",
     "test:shell": "node --test --test-concurrency=1 test/shell.mjs",
-    "test:paint": "node --test test/paint.mjs",
-    "test:tune": "node --test test/tune.mjs",
-    "test:playthrough": "node --test --test-concurrency=1 test/playthroughs.mjs",
-    "test:scores": "node test/shard.mjs 3 test/highscore-entry.mjs",
-    "test:scores-db": "node --test test/highscores.mjs",
-    "supabase": "supabase"
+    "test:playthrough": "node --test --test-concurrency=1 test/playthroughs.mjs"
   },
   "devDependencies": {
-    "@supabase/supabase-js": "^2.116.0",
-    "playwright": "^1.63.0",
-    "supabase": "^2.117.0"
+    "playwright": "^1.63.0"
   }
 }

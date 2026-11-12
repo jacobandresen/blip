@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-// Logic extracted from shell.html fillCanvas().
+// Logic extracted from game.html fillCanvas().
 // Canvas has position:fixed top:50% left:50% with transform-origin:0 0.
 // The transform places the canvas top-left at (vw/2, vh/2) then shifts it.
 function computeTransform(canvasW, canvasH, viewportW, viewportH) {

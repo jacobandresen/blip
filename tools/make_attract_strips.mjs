@@ -22,7 +22,7 @@ import { GAME_SLUGS as GAMES } from '../test/lib/games.mjs';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FRAMES = 12, EVERY = 0.25, WIDTH = 240, LIMIT = 60 * 1024;
 // Where the loop starts, past each game's title screen and into play.
-const FROM = { rally: 6, bouncer: 6, defender: 8, bubbler: 8, raider: 8, meteors: 3, serpent: 6, brawler: 10, adder: 8, warlock: 5 };
+const FROM = { rally: 6, bouncer: 6, defender: 8, bubbler: 8, raider: 8, meteors: 3, serpent: 6, brawler: 10, adder: 3, warlock: 5 };
 // Games whose loop opens on their title screen: that many frames of it, then play.
 // The game's bot waits on the title (BLIP_BOT_TITLE) while they are taken; the
 // middle title frame is also the cabinet's still, web/<game>/card.png.

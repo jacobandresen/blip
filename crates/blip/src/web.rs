@@ -1,4 +1,4 @@
-//! Wrappers for the browser bridge in `web/blip_bridge.js`.
+//! Wrappers for the browser bridge in `web/game.js`.
 //! They call JavaScript on wasm and do nothing in native builds.
 
 #[cfg(target_arch = "wasm32")]
@@ -8,7 +8,6 @@ extern "C" {
     fn blip_paddles(left: f32, right: f32);
     fn blip_game_over(score: i32);
     fn blip_high_score() -> i32;
-    fn blip_high_name(ptr: *mut u8, cap: i32) -> i32;
     fn blip_touch_down(slot: i32) -> i32;
     fn blip_touch_pos(slot: i32, axis: i32) -> f32;
     fn blip_haptic();
@@ -16,20 +15,6 @@ extern "C" {
     fn blip_picture(width: i32, height: i32);
     fn blip_crt() -> i32;
     fn blip_glitch() -> i32;
-    fn blip_input_pressed(key: i32) -> i32;
-    fn blip_input_clear();
-}
-
-pub(crate) fn buffered_key_pressed(key: macroquad::input::KeyCode) -> bool {
-    #[cfg(target_arch = "wasm32")]
-    unsafe { blip_input_pressed(key as i32) != 0 }
-    #[cfg(not(target_arch = "wasm32"))]
-    { let _ = key; false }
-}
-
-pub(crate) fn clear_buffered_keys() {
-    #[cfg(target_arch = "wasm32")]
-    unsafe { blip_input_clear(); }
 }
 
 /// Whether the picture gets the CRT treatment: curved glass, bloom, scanlines
@@ -149,9 +134,8 @@ pub fn picture(width: i32, height: i32) {
     let _ = (width, height);
 }
 
-/// Report the final score to the shell for the high-score board
-/// (`web/blip_scores.js`). Call once on entering game over; a no-op natively
-/// and without a backend.
+/// Report the final score to the shell, which keeps this browser's best.
+/// Call once on entering game over; natively it ends a bot run.
 pub fn report_score(score: i32) {
     #[cfg(target_arch = "wasm32")]
     unsafe { blip_game_over(score); }
@@ -162,61 +146,12 @@ pub fn report_score(score: i32) {
     }
 }
 
-/// The leading score for the current game and who holds it, as tracked by
-/// `web/blip_scores.js` (the cached leaderboard #1, falling back to this
-/// browser's local best + claimed handle).
-#[derive(Clone, Default)]
-pub struct HighScore {
-    /// The top score. 0 when nothing is known — no backend configured, no
-    /// local best yet, and always on native builds. Gate any "HI" display
-    /// on `score > 0`.
-    pub score: i32,
-    /// The record holder's handle, uppercased for the bitmap font. Empty
-    /// when unknown (e.g. a local best set before a handle was claimed).
-    pub name: String,
-}
-
-impl HighScore {
-    /// A one-line label for a title / game-over screen: `"HI 180940 JACOB"`,
-    /// or `"HI 180940"` when the holder is unknown. `prefix` is typically
-    /// `"HI"` or `"BEST"`.
-    pub fn label(&self, prefix: &str) -> String {
-        if self.name.is_empty() {
-            format!("{prefix} {}", self.score)
-        } else {
-            format!("{prefix} {} {}", self.score, self.name)
-        }
-    }
-}
-
-/// Fetch the current [`HighScore`] from the kiosk shell. Cheap enough to
-/// call each frame on a title / game-over screen; returns an all-zero
-/// value on native builds.
-pub fn high_score() -> HighScore {
+/// This browser's best score for the current game, kept by the shell. 0 when
+/// none is known, which is always the case natively unless `BLIP_HI=180940`
+/// fakes one so the HUD's centre field can be checked.
+pub fn high_score() -> i32 {
     #[cfg(target_arch = "wasm32")]
-    unsafe {
-        let mut buf = [0u8; 48];
-        let n = blip_high_name(buf.as_mut_ptr(), buf.len() as i32);
-        let name = if n > 0 {
-            core::str::from_utf8(&buf[..n as usize]).unwrap_or("").to_string()
-        } else {
-            String::new()
-        };
-        HighScore { score: blip_high_score(), name }
-    }
+    unsafe { blip_high_score() }
     #[cfg(not(target_arch = "wasm32"))]
-    {
-        // Dev / screenshot hook: `BLIP_HI=180940` or `BLIP_HI=180940:JACOB`
-        // fakes a record so the HUD's centre field can be checked natively.
-        match std::env::var("BLIP_HI") {
-            Ok(v) if !v.is_empty() => {
-                let (num, name) = v.split_once(':').unwrap_or((&v, ""));
-                HighScore {
-                    score: num.trim().parse().unwrap_or(0),
-                    name: name.trim().to_uppercase(),
-                }
-            }
-            _ => HighScore::default(),
-        }
-    }
+    std::env::var("BLIP_HI").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(0)
 }

@@ -1,7 +1,7 @@
 // Expand one-line CSS rules longer than a screen into one declaration per line.
 // Leaves every shorter line, and the meaning of the file, as it is.
 //
-//   node tools/format_css.mjs web/basic.css [more.css ...]
+//   node tools/format_css.mjs web/blip.css [more.css ...]
 
 import { readFileSync, writeFileSync } from 'node:fs';
 

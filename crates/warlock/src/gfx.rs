@@ -985,7 +985,7 @@ fn sprites() -> Vec<u8> {
     at(&mut sheet, 4, 5, &banner());
     stamp(&mut sheet, &dragon_skull(), (5 * CELL) as i32, (5 * CELL) as i32);
     stamp(&mut sheet, &mirror(&dragon_skull()), 0, (7 * CELL) as i32);
-    // mirrored side views (facing left) on row 6, so the BASIC tape can use them directly
+    // mirrored side views (facing left) on row 6
     for (col, src) in [(0, wizard_side(P1, 0, false)), (1, wizard_side(P1, 1, false)), (2, wizard_side(P2, 0, false)), (3, wizard_side(P2, 1, false)), (4, hound(0)), (5, hound(1)), (6, hound(2)), (7, whelp(1))] {
         at(&mut sheet, col, 6, &mirror(&src));
     }

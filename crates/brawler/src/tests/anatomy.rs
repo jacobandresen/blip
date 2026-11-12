@@ -1286,7 +1286,7 @@ pub(crate) fn a_run_of_punches_ends_in_a_hook_and_two_quick_kicks_in_a_roundhous
 pub(crate) fn down_tapped_twice_changes_the_front_leg() {
     let mut f = at(0, 300.0, 1.0);
     let front = f.far_leads;
-    let mut press = |f: &mut Fighter, frames: usize| {
+    let press = |f: &mut Fighter, frames: usize| {
         apply_input(f, Input { down: true, ..Input::default() }, false, F);
         for _ in 0..frames { apply_input(f, Input::default(), false, F); advance(f, F); }
     };

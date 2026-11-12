@@ -94,7 +94,7 @@ test(`the BLIP logo stays on the marquee and the deck carries no coin box`, asyn
         await cdp.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/${rel}` });
         await waitFor(cdp, "document.readyState === 'complete'", 20000);
         await evaluate(cdp, FREEZE_ANIMATIONS);
-        // The game pages build their marquee from shell.js after load.
+        // The game pages build their marquee from game.js after load.
         await waitFor(cdp, `!!(document.querySelector('#marquee-bar') || document.querySelector('.top-marquee-bar'))`, 15000);
         if (rel !== 'index.html') await waitFor(cdp, `!!document.querySelector('.deck-housing')`, 15000); // the arcade has no deck
         await sleep(120); // let the strip's own layout settle before measuring

@@ -1,6 +1,6 @@
 // Writes web/room-tiles.svg: the arcade wall's maze mosaic, as a standalone image for the game page, which
 // shows the same wall around the machine up close. The source is index.html's #room-tiles template; its tile
-// colours come from arcade-room.css's --room-tile-* properties.
+// colours come from arcade.css's --room-tile-* properties.
 //
 //   node tools/make_room_tiles.mjs
 
@@ -9,13 +9,13 @@ import { fileURLToPath } from 'node:url';
 
 const web = (file) => fileURLToPath(new URL(`../web/${file}`, import.meta.url));
 const html = await readFile(web('index.html'), 'utf8');
-const css = await readFile(web('arcade-room.css'), 'utf8');
+const css = await readFile(web('arcade.css'), 'utf8');
 
 const template = html.match(/<template id="room-tiles">[\s\S]*?(<svg[\s\S]*?<\/svg>)/);
 if (!template) throw new Error('index.html has no #room-tiles template');
 const colour = (name) => {
   const found = css.match(new RegExp(`--room-${name}:\\s*(#[0-9a-f]{3,8})`, 'i'));
-  if (!found) throw new Error(`arcade-room.css has no --room-${name}`);
+  if (!found) throw new Error(`arcade.css has no --room-${name}`);
   return found[1];
 };
 const fills = ['black', 'white', 'purple', 'red', 'yellow', 'blue', 'cyan']

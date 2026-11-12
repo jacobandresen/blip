@@ -1,10 +1,10 @@
-// The arcade room behind the cabinets (web/arcade-room.css, issue #65): decoration that stays out of the
+// The arcade room behind the cabinets (web/arcade.css, issue #65): decoration that stays out of the
 // cabinets' way, keeps still unless you walk, has a lite mode, and scrolls without a jump round the loop.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { openPage, gameReady } from './lib/harness.mjs';
+import { openPage, gameReady, arrivedAt } from './lib/harness.mjs';
 import { holdHalfway, imageDifference } from './lib/arcade-room.mjs';
 
 // Every room layer and where it shows, by #66's visibility contract: phone portrait, landscape, the rest.
@@ -445,7 +445,7 @@ test('OPEN lights with a credit and goes dark again once a game spends it', asyn
     !document.querySelector('.aisle-open').getAnimations().length);
   assert.equal(await openLit(page), 1, 'lit with a credit');
   await page.locator('.card-focused .machine-start').click();
-  await page.waitForURL(`${origin}/rally/index.html`);
+  await arrivedAt(page, `${origin}/rally/index.html`);
   await gameReady(page);
   await page.goto(`${origin}/index.html`);
   await arcade();

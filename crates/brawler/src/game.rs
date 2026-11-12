@@ -349,7 +349,7 @@ impl Game {
         let mut ends: Vec<usize> =
             (0..n).filter(|&w| FIGHTERS[w].boss || FIGHTERS[w].build == Build::Giant).collect();
         ends.sort_by_key(|&w| FIGHTERS[w].boss);
-        blip::ordered_ladder(self.pick, &homes, &ends).try_into().expect("the ladder contains every opponent")
+        ordered_ladder(self.pick, &homes, &ends).try_into().expect("the ladder contains every opponent")
     }
 
     /// Two players, one match, no ladder and no difficulty dial.
@@ -602,5 +602,44 @@ impl Game {
             }
         }
         self.hitspark[0] = fresh;
+    }
+}
+
+/// Order each roster entry once, separating adjacent home groups and keeping
+/// the requested finalists at the end. Fall back to the roster ring if needed.
+pub(crate) fn ordered_ladder(pick: usize, homes: &[usize], finalists: &[usize]) -> Vec<usize> {
+    fn place(ring: &[usize], homes: &[usize], finals: &[usize], out: &mut Vec<usize>) -> bool {
+        if out.len() == ring.len() {
+            return true;
+        }
+        let early = ring.len() - finals.len();
+        for &who in ring {
+            let fits = if out.len() < early { !finals.contains(&who) } else { finals[out.len() - early] == who };
+            if !fits || out.contains(&who) {
+                continue;
+            }
+            if out.last().is_some_and(|&prev| homes[prev] == homes[who]) {
+                continue;
+            }
+            out.push(who);
+            if place(ring, homes, finals, out) {
+                return true;
+            }
+            out.pop();
+        }
+        false
+    }
+
+    if homes.is_empty() {
+        return Vec::new();
+    }
+    let pick = pick % homes.len();
+    let ring = (1..homes.len()).map(|step| (pick + step) % homes.len()).collect::<Vec<_>>();
+    let finals = finalists.iter().copied().filter(|who| ring.contains(who)).collect::<Vec<_>>();
+    let mut ladder = Vec::with_capacity(ring.len());
+    if place(&ring, homes, &finals, &mut ladder) {
+        ladder
+    } else {
+        ring
     }
 }

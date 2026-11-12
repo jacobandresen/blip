@@ -117,7 +117,7 @@ fn synth_beep_wav(freq: f32, duration_ms: f32) -> Vec<u8> {
     crate::wav::encode_at(&samples, SR)
 }
 
-/// Plays a game's tunes from its tape folder. Each loads in the background the
+/// Plays a game's tunes from its music folder. Each loads in the background the
 /// first time it is wanted, and starts once it has: a WAV is megabytes, and the
 /// game must not wait on it.
 pub struct Jukebox {
@@ -131,9 +131,9 @@ pub struct Jukebox {
 }
 
 impl Jukebox {
-    /// `game`'s tunes `names`, as `web/TAPE/<GAME>/ASSETS/<NAME>.WAV`.
+    /// `game`'s tunes `names`, as `web/<game>/music/<NAME>.wav`.
     pub fn new(game: &str, names: &[&str]) -> Self {
-        let files = names.iter().map(|name| tape_file(game, &format!("{name}.WAV"))).collect();
+        let files = names.iter().map(|name| music_file(game, name)).collect();
         Self { files, tracks: vec![None; names.len()], loading: names.iter().map(|_| None).collect(),
             playing: None, wanted: None, left: 0.0 }
     }
@@ -199,13 +199,12 @@ impl Jukebox {
     }
 }
 
-/// Where a game's generated file is: its tape folder, which on the web is beside
-/// the game's own page.
-pub fn tape_file(game: &str, name: &str) -> String {
+/// Where a game's tune is: its music folder, beside the game's own page.
+fn music_file(game: &str, name: &str) -> String {
     if cfg!(target_arch = "wasm32") {
-        format!("../TAPE/{game}/ASSETS/{name}")
+        format!("music/{name}.wav")
     } else {
-        format!("{}/../../web/TAPE/{game}/ASSETS/{name}", env!("CARGO_MANIFEST_DIR"))
+        format!("{}/../../web/{game}/music/{name}.wav", env!("CARGO_MANIFEST_DIR"))
     }
 }
 
@@ -243,8 +242,8 @@ mod tests {
 
     #[test]
     fn jukebox_gain_balances_track_loudness_without_large_boosts() {
-        let quiet = crate::wav::encode_at(&vec![4_000i16; 100], 22_050);
-        let loud = crate::wav::encode_at(&vec![8_000i16; 100], 22_050);
+        let quiet = crate::wav::encode_at(&[4_000i16; 100], 22_050);
+        let loud = crate::wav::encode_at(&[8_000i16; 100], 22_050);
         let q = super::music_gain(&quiet);
         let l = super::music_gain(&loud);
         assert!((q / l - 2.0).abs() < 0.02, "the louder track should receive half the gain: {q} vs {l}");

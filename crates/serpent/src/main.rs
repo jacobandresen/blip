@@ -692,7 +692,7 @@ fn draw_shears(blip: &Blip, g: &Game) {
     blip.fill_circle(cx, cy, 2.0, BLIP_WHITE);
 }
 
-fn draw_title(blip: &Blip, hi: &web::HighScore) {
+fn draw_title(blip: &Blip, hi: i32) {
     blip.draw_centered("SERPENT",            (WIN_H / 4) as f32,       6.0, BLIP_GREEN);
     // SERPENT is sz=6 (42px tall) — clear its bottom by a real margin.
     blip.draw_hi(hi, (WIN_H / 4 + 50) as f32, BLIP_YELLOW);
@@ -722,7 +722,7 @@ fn draw_title_snake(blip: &Blip, t: f32) {
     blip.fill_circle(hx + 4.0, hy - 4.0, 1.3, BLIP_BLACK);
 }
 
-fn draw_over(blip: &Blip, g: &Game, hi: &web::HighScore) {
+fn draw_over(blip: &Blip, g: &Game, hi: i32) {
     let (title, colour) = if g.snake_len + g.obstacle_count == MAX_LEN { ("FIELD CLEARED", BLIP_GREEN) } else { ("GAME OVER", BLIP_RED) };
     blip.draw_end_screen(title, g.sess.score, hi, colour, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active());
     blip.draw_game_over_note(&format!("LEVEL {}   LENGTH {}", g.sess.level, g.snake_len), BLIP_GRAY);
@@ -741,13 +741,13 @@ async fn main() {
     let food = load_png(blip::png!("food"));
 
     let sfx = Sounds {
-        eat:       blip::audio::load_sound(blip::wav!("eat")).await,
-        game_over: blip::audio::load_sound(blip::wav!("game_over")).await,
-        bonus:     blip::audio::load_sound(blip::wav!("bonus")).await,
-        bonus_eat: blip::audio::load_sound(blip::wav!("bonus_eat")).await,
-        level:     blip::audio::load_sound(blip::wav!("level")).await,
+        eat:       blip::sound!("eat"),
+        game_over: blip::sound!("game_over"),
+        bonus:     blip::sound!("bonus"),
+        bonus_eat: blip::sound!("bonus_eat"),
+        level:     blip::sound!("level"),
     };
-    let mut music = Jukebox::new("SERPENT", &["SLITHER", "FRENZY"]);
+    let mut music = Jukebox::new("serpent", &["SLITHER", "FRENZY"]);
 
     if blip.screenshot_mode {
         g.start_game();
@@ -770,8 +770,8 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title => draw_title(&blip, &web::high_score()),
-            State::Over  => draw_over(&blip, &g, &web::high_score()),
+            State::Title => draw_title(&blip, web::high_score()),
+            State::Over  => draw_over(&blip, &g, web::high_score()),
             State::Play | State::Dead => draw_play(&blip, &g, &food),
         }
 

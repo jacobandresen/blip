@@ -25,7 +25,6 @@ pub fn hurry_wav() -> Vec<u8> {
 }
 
 fn theme(bpm: f32) -> Vec<u8> {
-    blip::xm::tempo(bpm);
     let lead: [[i32; 8]; 16] = [
         [76, H, 79, H, 84, H, 79, 76],
         [81, H, 76, H, 72, H, 76, 81],
@@ -264,7 +263,7 @@ pub fn sfx_wav(which: usize) -> Vec<u8> {
     }
 }
 
-/// The music: each tune as a WAV to play and an XM of its notes for TUNE.
+/// The music: each tune as a WAV to play.
 pub fn music() -> Vec<(String, Vec<u8>)> {
-    blip::xm::tunes(&[("THEME", &theme_wav), ("HURRY", &hurry_wav)])
+    blip::wav::tunes(&[("THEME", &theme_wav), ("HURRY", &hurry_wav)])
 }

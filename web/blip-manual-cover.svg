@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 140" role="img" aria-labelledby="title">
   <title id="title">BLIP Arcade operator's manual cover</title>
-  <!-- A companion to the BASIC book's cover: the same cloth, frame, name plate and stripes, with a navy band and a cabinet. -->
+  <!-- The manual's cover: tan cloth, a frame, the name plate and stripes, with a navy band and a cabinet. -->
   <defs>
     <linearGradient id="cloth" x2=".2" y2="1"><stop stop-color="#ecd9a6"/><stop offset=".55" stop-color="#dcc38a"/><stop offset="1" stop-color="#c2a66b"/></linearGradient>
     <linearGradient id="band" x2="1"><stop stop-color="#1f3047"/><stop offset=".5" stop-color="#2f4a66"/><stop offset="1" stop-color="#243a52"/></linearGradient>

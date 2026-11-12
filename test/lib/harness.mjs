@@ -1,85 +1,17 @@
 // Shared plumbing for the browser-driven suites: a static server over web/,
 // headless browsers, and a CDP-shaped adapter to drive them.
 
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { evaluate, waitFor, sleep } from './playwright-utils.mjs';
 import { launchEngine } from './engine.mjs';
+import { createFileServer, listenOn, WEB_DIR } from './server.mjs';
 
-export { evaluate, waitFor, sleep };
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const WEB_DIR = path.join(__dirname, '..', '..', 'web');
+export { evaluate, waitFor, sleep, createFileServer, listenOn, WEB_DIR };
 export let HTTP_PORT = 8098; // Updated to the isolated port for each browser suite.
 
-const MIME = {
-  '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
-  '.wasm': 'application/wasm', '.json': 'application/json', '.png': 'image/png',
-  '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2',
-};
-
-/** Start a server and resolve once it is listening. A bare
- * `server.listen(port, r)` never settles when the port is taken, and under
- * `node --test` that is a suite that prints nothing and hangs. */
-export function listenOn(server, port) {
-  return new Promise((resolve, reject) => {
-    const onError = (err) => {
-      server.removeListener('listening', onListening);
-      reject(new Error(`could not listen on port ${port}: ${err.code || err.message}` +
-        (err.code === 'EADDRINUSE' ? ' — another server (or a previous test run) is holding it' : '')));
-    };
-    const onListening = () => {
-      server.removeListener('error', onError);
-      resolve(server);
-    };
-    server.once('error', onError);
-    server.once('listening', onListening);
-    server.listen(port);
-  });
-}
-
-export function createFileServer({ overrides = {}, basePath = '/', blankMissingConfig = false } = {}) {
-  return createServer(async (req, res) => {
-    try {
-      let p = decodeURIComponent(req.url.split('?')[0]);
-      if (basePath !== '/') {
-        if (p !== basePath && !p.startsWith(`${basePath}/`)) { res.writeHead(404); res.end(); return; }
-        p = p.slice(basePath.length) || '/';
-      }
-      if (Object.hasOwn(overrides, p)) {
-        const value = overrides[p];
-        const body = typeof value === 'function' ? await value() : value;
-        res.writeHead(200, { 'Content-Type': MIME[path.extname(p)] || 'application/javascript' });
-        res.end(body);
-        return;
-      }
-      let file = p;
-      if (file.endsWith('/')) file += 'index.html';
-      const full = path.resolve(WEB_DIR, `.${file}`);
-      if (!full.startsWith(`${WEB_DIR}${path.sep}`)) { res.writeHead(403); res.end(); return; }
-      if (blankMissingConfig && p === '/blip_config.js') {
-        try { await readFile(full); } catch { res.writeHead(200, { 'Content-Type': 'application/javascript' }); res.end(''); return; }
-      }
-      const data = await readFile(full);
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(full)] || 'application/octet-stream' });
-      res.end(data);
-    } catch (e) {
-      res.writeHead(404);
-      res.end('not found');
-    }
-  });
-}
-
+/** Open Rally with a credit inserted, so its controls answer. */
 export async function loadRally(cdp) {
-  return loadRallyAt(cdp, `http://127.0.0.1:${HTTP_PORT}`);
-}
-
-/** Same as loadRally() but against an explicit origin. */
-export async function loadRallyAt(cdp, origin) {
   await evaluate(cdp, 'true'); // ensure Runtime is ready before navigating
-  await cdp.send('Page.navigate', { url: `${origin}/rally/index.html` });
+  await cdp.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/rally/index.html` });
   await waitFor(cdp, "document.readyState === 'complete'", 15000);
   await waitFor(cdp, "typeof window.BlipController === 'object'", 15000);
   // Game controls stay gated until a real credit is inserted.
@@ -89,12 +21,31 @@ export async function loadRallyAt(cdp, origin) {
   }
 }
 
-/** Wait until a game page's wasm has drawn its first frame. */
-export function gameReady(page, timeout) {
-  return page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), null, timeout ? { timeout } : {});
+/** Wait for the game's first frame. A minute: a game boots slowly while the other test lane loads the machine.
+ * When WebKit's internal load error hit the page (engine.mjs), it is loaded again, once. */
+export async function gameReady(page, timeout = 60000) {
+  const ready = (t) => page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), null, { timeout: t });
+  const started = Date.now();
+  while (true) {
+    try { return await ready(Math.min(5000, timeout - (Date.now() - started))); } catch (error) {
+      if (page.webkitFault) { page.webkitFault = false; await page.reload(); return ready(timeout); }
+      if (Date.now() - started >= timeout) throw error;
+    }
+  }
 }
 
 /** Navigate, retrying once when WebKit reports its intermittent "internal error" for a page that loads fine. */
+/** Wait for a navigation (from a click, say) to reach `url`. WebKit sometimes fails a navigation with an internal
+ * error; then the page is loaded directly, as gotoPage does. */
+export async function arrivedAt(page, url, opts) {
+  try {
+    return await page.waitForURL(url, opts);
+  } catch (error) {
+    if (typeof url !== 'string' || !/WebKit encountered an internal error/.test(error.message)) throw error;
+    return page.goto(url, opts);
+  }
+}
+
 export async function gotoPage(page, url, opts) {
   try {
     return await page.goto(url, opts);

@@ -2,8 +2,6 @@
 resolver = "2"
 members = [
     "crates/blip",
-    "crates/blip_font",
-    "crates/blip_basic",
     "crates/serpent",
     "crates/bouncer",
     "crates/brawler",
@@ -14,7 +12,6 @@ members = [
     "crates/raider",
     "crates/adder",
     "crates/warlock",
-    "crates/blip_build",
 ]
 
 [workspace.package]
@@ -27,7 +24,6 @@ publish = false
 macroquad = { version = "0.4", features = ["audio"] }
 png = "0.17"
 blip = { path = "crates/blip" }
-blip_font = { path = "crates/blip_font" }
 
 [profile.release]
 opt-level = "z"
@@ -35,11 +31,6 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
-
-# BLIP BASIC interprets every statement of a program each frame: speed there
-# is frames drawn on time, worth more than the bytes "z" saves.
-[profile.release.package.blip_basic]
-opt-level = 3
 
 # blip synthesises the games' music on the device at load: speed there
 # is worth more than the bytes "z" saves.

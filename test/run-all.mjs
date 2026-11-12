@@ -20,7 +20,7 @@ async function checkAccess() {
       args: ['--no-sandbox', '--disable-dev-shm-usage', '--mute-audio'],
     });
     const page = await browser.newPage();
-    const response = await page.goto(`http://127.0.0.1:${server.address().port}/basic.html`, {
+    const response = await page.goto(`http://127.0.0.1:${server.address().port}/index.html`, {
       waitUntil: 'domcontentloaded', timeout: 30000,
     });
     if (!response?.ok()) throw new Error(`Local page returned ${response?.status()}`);
@@ -44,10 +44,10 @@ await checkAccess();
 if (!args.includes('--check-access')) {
   const failures = [];
   if (await run('cargo', ['test', '--release'])) failures.push('Rust');
-  if (await run('cargo', ['build-web'])) throw new Error('Web build failed');
+  if (await run('npm', ['run', 'build:web'])) throw new Error('Web build failed');
   const files = (await readdir(new URL('./', import.meta.url)))
     .filter((name) => name.endsWith('.mjs') && !name.startsWith('run-')
-      && name !== 'shard.mjs' && name !== 'visual-parity.mjs')
+      && name !== 'shard.mjs' && name !== 'visual.mjs')
     .sort();
   // Sequential suites keep browser load bounded and print results as they arrive.
   for (const file of files) {
@@ -55,7 +55,7 @@ if (!args.includes('--check-access')) {
       failures.push(file);
     }
   }
-  if (await run(process.execPath, ['test/run-visual.mjs'])) failures.push('visual parity');
+  if (await run(process.execPath, ['test/run-visual.mjs'])) failures.push('visual');
   console.log(failures.length ? `\nFailed: ${failures.join(', ')}` : '\nAll test suites passed.');
   process.exitCode = failures.length ? 1 : 0;
 }

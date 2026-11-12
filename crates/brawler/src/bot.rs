@@ -138,7 +138,7 @@ fn walk(inp: &mut Input, me: &Fighter, forward: bool) {
 /// The foe's attack has missed or been blocked and is still recovering: hit
 /// back with the quickest blow that reaches before it can guard again.
 fn punish(b: &mut Bot, me: &Fighter, foe: &Fighter) -> Option<Input> {
-    if !me.free() || b.next_attack > 0.0 || foe.act != Act::Attack || blip::bot::is("STYLE", "basic") { return None; }
+    if !me.free() || b.next_attack > 0.0 || foe.act != Act::Attack || blip::bot::is("STYLE", "simple") { return None; }
     let m = foe.scaled(move_data(foe.mv));
     let recovering = foe.t > (m.startup + m.active) * F && foe.t < (m.startup + m.active + m.recovery - 4.0) * F;
     if !recovering { return None; }
@@ -210,7 +210,7 @@ fn uppercut(b: &mut Bot, me: &Fighter, foe: &Fighter) -> Option<Input> {
 fn switch_stance(b: &mut Bot, me: &Fighter, foe: &Fighter) -> Option<Input> {
     if b.switching == 0 {
         let far = (foe.x - me.x).abs() > attack_range(me, MoveId::HighKick) + 30.0;
-        if !(far && me.free() && !blip::bot::is("STYLE", "basic") && gen_range(0.0, 1.0) < 0.02) { return None; }
+        if !(far && me.free() && !blip::bot::is("STYLE", "simple") && gen_range(0.0, 1.0) < 0.02) { return None; }
     }
     b.switching += 1;
     let down = !(3..6).contains(&b.switching);
@@ -237,9 +237,9 @@ fn close_in_and_attack(b: &mut Bot, me: &Fighter, foe: &Fighter) -> Input {
         b.run -= 1;
         b.next_attack = 0.2;
     } else if b.next_attack <= 0.0 && me.free() {
-        // BLIP_BOT_STYLE=basic: quick punches and the odd low kick only.
-        let basic = blip::bot::is("STYLE", "basic");
-        match if basic { [0, 1, 0, 1, 2][gen_range(0, 5)] } else { gen_range(0, 7) } {
+        // BLIP_BOT_STYLE=simple: quick punches and the odd low kick only.
+        let simple = blip::bot::is("STYLE", "simple");
+        match if simple { [0, 1, 0, 1, 2][gen_range(0, 5)] } else { gen_range(0, 7) } {
             0 => inp.punch_low = true,
             1 => inp.punch_high = true,
             2 => inp.kick_low = true,
@@ -251,8 +251,8 @@ fn close_in_and_attack(b: &mut Bot, me: &Fighter, foe: &Fighter) -> Input {
         b.next_attack = gen_range(0.25, 0.7);
         // Often a punch starts a run to the hook, and a low kick is followed
         // by the roundhouse.
-        if !basic && (inp.punch_low || inp.punch_high) && gen_range(0.0, 1.0) < 0.4 { (b.run, b.run_kicks) = (2, false); }
-        if !basic && inp.kick_low && !inp.down && gen_range(0.0, 1.0) < 0.4 { (b.run, b.run_kicks) = (1, true); }
+        if !simple && (inp.punch_low || inp.punch_high) && gen_range(0.0, 1.0) < 0.4 { (b.run, b.run_kicks) = (2, false); }
+        if !simple && inp.kick_low && !inp.down && gen_range(0.0, 1.0) < 0.4 { (b.run, b.run_kicks) = (1, true); }
         if b.run > 0 { b.next_attack = 0.2; }
     }
     inp

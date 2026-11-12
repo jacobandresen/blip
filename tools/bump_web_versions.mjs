@@ -4,8 +4,8 @@
 //
 //   node tools/bump_web_versions.mjs
 //
-// Needs git. Per-game pages are copied from web/shell.html, so run
-// `cargo build-web` afterwards to carry shell.html's versions to them.
+// Needs git. Per-game pages are copied from web/game.html, so run
+// `npm run build:web` afterwards to carry game.html's versions to them.
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
@@ -22,7 +22,7 @@ const changed = git('status', '--porcelain', '--', 'web').split('\n').filter(Boo
   .filter((file) => !file.endsWith('/sw.js'));
 if (!changed.length) { console.log('nothing under web/ has changed'); process.exit(0); }
 
-// The pages and scripts that link assets; per-game pages are generated, so they are left to cargo build-web.
+// The pages and scripts that link assets; per-game pages are generated, so they are left to npm run build:web.
 const linkers = readdirSync(web).filter((name) => /\.(html|js|css)$/.test(name)).map((name) => path.join('web', name));
 const names = [...new Set(changed.map((file) => path.basename(file)))];
 
@@ -51,4 +51,4 @@ if (current === last) {
   writeFileSync(sw, swText.replace(cache, `var CACHE = "blip-v${Number(current) + 1}";`));
   console.log(`service worker cache blip-v${Number(current) + 1}`);
 }
-console.log(`${bumped} links bumped for ${names.length} changed files; run cargo build-web to copy shell.html to the game pages`);
+console.log(`${bumped} links bumped for ${names.length} changed files; run npm run build:web to copy game.html to the game pages`);

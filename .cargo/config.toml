@@ -14,5 +14,3 @@
 [target.wasm32-unknown-unknown]
 rustflags = ["-C", "link-arg=--import-undefined"]
 
-[alias]
-build-web = "run --release -p blip_build"

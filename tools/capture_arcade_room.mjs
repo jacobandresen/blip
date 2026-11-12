@@ -13,7 +13,7 @@
 //   --still   freezes every animation at a fixed time once the nearby attract loops have loaded, so two runs
 //             of the same page give the same pictures
 //   --lite    opens the page with ?room=lite
-//   --guides  draws the room's shared regions (arcade-room.css --room-* tokens) over each picture
+//   --guides  draws the room's shared regions (arcade.css --room-* tokens) over each picture
 //   --perf    instead of pictures, replays a fixed touch drag on the phone and writes perf.json: layouts,
 //             style recalculations and their time per touchmove, and frame intervals
 //   --trace   saves a compressed CDP trace for each performance run

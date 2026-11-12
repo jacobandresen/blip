@@ -1,70 +1,54 @@
-# Blip Engine Arcade
+# Blip Arcade
 
-Step inside, pick a machine, and chase that next high score! Blip packs nine arcade games, an iOS-style Home Screen, and a programmable retro computer into your browser. The games run on the Rust `blip` engine, compiled to WebAssembly.
+Ten arcade games in the browser, written in Rust on the small `blip` engine and compiled to WebAssembly.
 
-**[Play in the browser →](https://jacobandresen.github.io/blip/)**
+**[Play →](https://jacobandresen.github.io/blip/)** · [Home Screen](https://jacobandresen.github.io/blip/home.html) · [API](https://jacobandresen.github.io/blip/api.html)
 
-[![The Blip arcade front: Rally between Adder and Bouncer, in front of a tiled maze wall with neon signs](docs/screenshots/arcade-front.png)](https://jacobandresen.github.io/blip/)
-
-**[Explore the Blip API →](https://jacobandresen.github.io/blip/api.html)** — see how the games use the engine, then try making one with Rust or an AI coding agent such as Claude Code or Codex.
+[![The Blip arcade: Rally between Adder and Bouncer](docs/screenshots/arcade-front.png)](https://jacobandresen.github.io/blip/)
 
 ## Games
 
-- **[Rally](https://jacobandresen.github.io/blip/rally/)** — table tennis for one or two players. Keep your eye on the ball!
-- **[Serpent](https://jacobandresen.github.io/blip/serpent/)** — guide a growing snake through a maze and keep your tail out of trouble.
-- **[Adder](https://jacobandresen.github.io/blip/adder/)** — weave through a pit of rival vipers, slip through gaps in their bodies, and bring a second player along.
-- **[Bouncer](https://jacobandresen.github.io/blip/bouncer/)** — smash bricks, grab pickups, and unleash multi-ball mayhem.
-- **[Defender](https://jacobandresen.github.io/blip/defender/)** — take on alien formations and their motherships. They brought friends.
-- **[Meteors](https://jacobandresen.github.io/blip/meteors/)** — thrust, turn, and blast through drifting asteroids.
-- **[Raider](https://jacobandresen.github.io/blip/raider/)** — fly into formations, flak, and bosses in a vertical shooter.
-- **[Brawler](https://jacobandresen.github.io/blip/brawler/)** — choose from 15 fighters and climb a 14-match ladder, alone or against a friend.
-- **[Bubbler](https://jacobandresen.github.io/blip/bubbler/)** — bubble-blowing platform action for one or two players. Trap trouble, then pop it!
+| Game | What it is |
+|---|---|
+| [Rally](https://jacobandresen.github.io/blip/rally/) | Table tennis, one or two players |
+| [Serpent](https://jacobandresen.github.io/blip/serpent/) | A snake that grows through a maze |
+| [Adder](https://jacobandresen.github.io/blip/adder/) | Vipers in a pit, up to six, two humans |
+| [Bouncer](https://jacobandresen.github.io/blip/bouncer/) | Bricks, pickups and multi-ball |
+| [Defender](https://jacobandresen.github.io/blip/defender/) | Alien formations and motherships |
+| [Meteors](https://jacobandresen.github.io/blip/meteors/) | Thrust and shoot through asteroids |
+| [Raider](https://jacobandresen.github.io/blip/raider/) | A vertical shooter with bosses |
+| [Brawler](https://jacobandresen.github.io/blip/brawler/) | Fifteen fighters, a fourteen-match ladder |
+| [Bubbler](https://jacobandresen.github.io/blip/bubbler/) | Trap monsters in bubbles, one or two players |
+| [Warlock](https://jacobandresen.github.io/blip/warlock/) | A maze shooter in candlelit cellars |
 
-## A little arcade in your pocket
+The arcade is a room of cabinets: insert a coin and play. The Home Screen is the same games as phone apps, free to play. Best scores stay in your browser.
 
-The **[iOS-style Home Screen](https://jacobandresen.github.io/blip/home.html)** puts every game behind a colorful app icon, with a dock, search, and long-press menus. Rearrange your favorites, tap straight into free play, or add a game to your device's Home Screen for a quick rematch. The dock takes you back to the cabinet aisle whenever the neon calls.
+## Build
 
-<a href="https://jacobandresen.github.io/blip/home.html"><img src="docs/screenshots/ios-home.png" width="320" alt="Blip's iOS-style Home Screen with all nine game icons, two-player badges, search, and a dock"></a>
-
-## Meet BLIP BASIC
-
-Fancy making the machine do your bidding? **[BLIP BASIC](https://jacobandresen.github.io/blip/basic.html)** is an Amiga-inspired BASIC playground inside a retro computer, complete with game cassettes, a console, and an editor. All nine games come as numbered tapes: load one, peek at its code, change the rules, and run it again.
-
-The interpreter runs in Rust and shares drawing, math, and effects with the Blip engine. Start with the **[BLIP BASIC programming book](https://jacobandresen.github.io/blip/basic-book.html)**, then dig into the [language and engine guide](crates/blip_basic/README.md). Your next arcade obsession could be one you write yourself.
-
----
-
-## 🚀 Getting Started
-
-### Native development
-
-Install Rust and Cargo, then build or run a game:
-
-```bash
-cargo build --release
-cargo run -p rally
+```sh
+cargo run --release -p rally              # play natively
+rustup target add wasm32-unknown-unknown  # once
+npm install                               # once, for the tests
+npm run build:web                         # every game to web/<game>/
+node tools/serve_web.mjs                  # serve web/ locally
 ```
 
-See the [Blip API page](https://jacobandresen.github.io/blip/api.html) or [source guide](docs/blip.md).
+[docs/blip.md](docs/blip.md) explains the engine; [AGENTS.md](AGENTS.md) covers layout, tests and conventions.
 
-### Web build
+## Test
 
-```bash
-rustup target add wasm32-unknown-unknown
-cargo build-web
-node tools/serve_web.mjs
+```sh
+cargo test --release      # Rust rules and engine
+npm test                  # fast unit tests
+npm run test:web          # browser suites (headless Chromium and WebKit)
+npm run test:visual       # every game starts and responds to input
+npm run test:playthrough  # the playtest bots play every game
 ```
 
-The build places each game's `index.wasm` in `web/<game>/`; the shared shell and macroquad runtime are served from `web/`.
+## Deploy
 
-### Deployment and previews
+A push to `main` publishes `web/` to GitHub Pages. Each pull request gets a preview at `pr-preview/pr-<number>/`.
 
-GitHub Pages serves the `gh-pages` branch. A push to `main` applies new database migrations, then publishes `web/` to the branch's root ([pages.yml](.github/workflows/pages.yml)); the site is at <https://jacobandresen.github.io/blip/>.
+## Contributing
 
-Each pull request from a branch of this repository gets a preview at `https://jacobandresen.github.io/blip/pr-preview/pr-<number>/`, linked in a comment on the pull request and removed when it closes ([preview.yml](.github/workflows/preview.yml)). Only the five most recently updated open pull requests keep a preview, and `gh-pages` is squashed to one commit after every deploy ([preview-cleanup.yml](.github/workflows/preview-cleanup.yml)); push to a pull request to bring its preview back. Previews have no high scores and no offline cache, and share saved settings (coins, sound, home-screen order) with the live site. Pull requests from forks get no preview.
-
-### Kiosk controls
-
-Use the stick or arrows to select a game and fire to start. Fire, Enter or `5` inserts a coin; Backspace returns to the cabinet; `M` toggles sound. The fullscreen choice persists across pages, and idle games return to the cabinet.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
+See [CONTRIBUTING.md](CONTRIBUTING.md).

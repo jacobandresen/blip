@@ -1100,7 +1100,7 @@ fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
     blip.draw_text(&lvl, 12.0, WIN_H as f32 - 22.0, 2.0, BLIP_GRAY);
 }
 
-fn draw_title(blip: &Blip, hi: &web::HighScore, art: &[Texture2D; 4]) {
+fn draw_title(blip: &Blip, hi: i32, art: &[Texture2D; 4]) {
     blip.clear(BLIP_BLACK);
     blip.draw_texture(&art[0], 0.0, 0.0, WIN_W as f32, WIN_H as f32);
     blip.draw_centered("METEORS", (WIN_H / 4) as f32, 6.0, NEON_CYAN);
@@ -1120,7 +1120,7 @@ fn draw_title(blip: &Blip, hi: &web::HighScore, art: &[Texture2D; 4]) {
         316.0 + (t * 0.5).sin() * 12.0, 584.0, 48.0, 48.0, (t * 0.35).sin() * 0.12);
 }
 
-fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool, grid: &Texture2D) {
+fn draw_over(blip: &Blip, score: i32, hi: i32, waiting: bool, grid: &Texture2D) {
     blip.clear(BLIP_BLACK);
     blip.draw_texture(grid, 0.0, 0.0, WIN_W as f32, WIN_H as f32);
     blip.draw_game_over(score, hi, NEON_PINK, NEON_CYAN, NEON_YELLOW, !waiting);
@@ -1150,19 +1150,19 @@ async fn main() {
     });
 
     // DRIFT, then STORM from wave STORM_WAVE.
-    let mut music = Jukebox::new("METEORS", &["DRIFT", "STORM"]);
+    let mut music = Jukebox::new("meteors", &["DRIFT", "STORM"]);
 
     let mut sfx = Sounds {
-        fire:         blip::audio::load_sound(blip::wav!("fire")).await,
-        thrust:       blip::audio::load_sound(blip::wav!("thrust")).await,
-        bang_large:   blip::audio::load_sound(blip::wav!("bang_large")).await,
-        bang_medium:  blip::audio::load_sound(blip::wav!("bang_medium")).await,
-        bang_small:   blip::audio::load_sound(blip::wav!("bang_small")).await,
-        saucer_big:   blip::audio::load_sound(blip::wav!("saucer_big")).await,
-        saucer_small: blip::audio::load_sound(blip::wav!("saucer_small")).await,
-        ship_boom:    blip::audio::load_sound(blip::wav!("ship_explosion")).await,
-        hyperspace:   blip::audio::load_sound(blip::wav!("hyperspace")).await,
-        extra_life:   blip::audio::load_sound(blip::wav!("extra_life")).await,
+        fire:         blip::sound!("fire"),
+        thrust:       blip::sound!("thrust"),
+        bang_large:   blip::sound!("bang_large"),
+        bang_medium:  blip::sound!("bang_medium"),
+        bang_small:   blip::sound!("bang_small"),
+        saucer_big:   blip::sound!("saucer_big"),
+        saucer_small: blip::sound!("saucer_small"),
+        ship_boom:    blip::sound!("ship_explosion"),
+        hyperspace:   blip::sound!("hyperspace"),
+        extra_life:   blip::sound!("extra_life"),
     };
     let mut thrust_snd_t = 0.0f32;
 
@@ -1192,8 +1192,8 @@ async fn main() {
         }
 
         match g.state {
-            State::Title => draw_title(&blip, &web::high_score(), &title_art),
-            State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.respawn_t.active(), &title_art[0]),
+            State::Title => draw_title(&blip, web::high_score(), &title_art),
+            State::Over  => draw_over(&blip, g.sess.score, web::high_score(), g.respawn_t.active(), &title_art[0]),
             State::Play | State::Dead => draw_play(&blip, &g, &blot),
         }
 

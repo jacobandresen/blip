@@ -3,11 +3,11 @@
 
 // Generating pictures and sounds: what each game's gfx.rs and tunes.rs build on.
 pub mod cosy;
+pub mod glyphs;
 pub mod image;
 pub mod song;
 pub mod techno;
 pub mod wav;
-pub mod xm;
 
 /// A picture its build script made (see `build_assets`), built into the game.
 #[macro_export]
@@ -25,22 +25,32 @@ macro_rules! wav {
     };
 }
 
+/// An effect its build script made, loaded and ready to play: `blip::sound!("eat")`, in an async fn.
+#[macro_export]
+macro_rules! sound {
+    ($name:expr) => {
+        $crate::audio::load_sound($crate::wav!($name)).await
+    };
+}
+
 /// A generated file: its path under the asset folder, and its bytes.
 pub type Asset = (&'static str, Vec<u8>);
 
 /// A game's whole build script (`blip::build_script!();`): its pictures (src/gfx.rs) and its effects and music
-/// (src/tunes.rs) become its assets, through `build_assets`.
+/// (src/tunes.rs) become its assets, through `build_assets`. `blip::build_script!("art")` also rebuilds them when
+/// the files under `art` change.
 #[macro_export]
 macro_rules! build_script {
-    () => {
+    ($($watch:literal),*) => {
         #[path = "src/gfx.rs"]
         mod gfx;
         #[path = "src/tunes.rs"]
         mod tunes;
 
         fn main() {
-            println!("cargo:rerun-if-changed=src/gfx.rs");
-            println!("cargo:rerun-if-changed=src/tunes.rs");
+            for path in ["src/gfx.rs", "src/tunes.rs" $(, $watch)*] {
+                println!("cargo:rerun-if-changed={path}");
+            }
             let mut assets = gfx::generate();
             assets.extend(tunes::sounds());
             $crate::build_assets(assets, tunes::music());
@@ -49,34 +59,25 @@ macro_rules! build_script {
 }
 
 /// A game's build script: the pictures and effects go to OUT_DIR/assets for the
-/// game to embed, and every file, the music too, to `web/TAPE/<GAME>/ASSETS`, the
-/// folder BLIP BASIC reads, with a manifest.json listing them.
+/// game to embed, and the music to `web/<game>/music`, beside the game's page,
+/// for it to load while it plays.
 pub fn build_assets(assets: Vec<Asset>, music: Vec<(String, Vec<u8>)>) {
     use std::{env, fs, path::PathBuf};
     let var = |name| env::var(name).expect(name);
     let out = PathBuf::from(var("OUT_DIR")).join("assets");
-    let game = var("CARGO_PKG_NAME").to_ascii_uppercase();
-    let tape = PathBuf::from(var("CARGO_MANIFEST_DIR")).join("../../web/TAPE").join(game).join("ASSETS");
+    let web = PathBuf::from(var("CARGO_MANIFEST_DIR")).join("../../web").join(var("CARGO_PKG_NAME"));
     let write = |path: PathBuf, bytes: &[u8]| {
         fs::create_dir_all(path.parent().expect("a folder")).expect("make the folder");
         fs::write(path, bytes).expect("write the file");
     };
-    // The folder holds exactly what the game makes now.
-    let _ = fs::remove_dir_all(&tape);
-    let files = assets.into_iter().map(|(path, bytes)| (path.to_string(), bytes)).chain(music);
-    let mut names = Vec::new();
-    for (path, bytes) in files {
-        if !path.starts_with("music/") {
-            write(out.join(&path), &bytes);
-        }
-        let name = path.rsplit('/').next().expect("a name").to_ascii_uppercase();
-        assert!(!names.contains(&name), "two files called {name}");
-        write(tape.join(&name), &bytes);
-        names.push(name);
+    for (path, bytes) in assets {
+        write(out.join(path), &bytes);
     }
-    names.sort();
-    let list = names.iter().map(|n| format!("\"{n}\"")).collect::<Vec<_>>().join(", ");
-    write(tape.join("manifest.json"), format!("[{list}]\n").as_bytes());
+    // The folder holds exactly the music the game makes now.
+    let _ = fs::remove_dir_all(web.join("music"));
+    for (path, bytes) in music {
+        write(web.join(path), &bytes);
+    }
 }
 
 #[cfg(feature = "engine")]
@@ -126,7 +127,7 @@ pub use fx::Fx;
 pub use fx::{EffectParticle, EffectParticles};
 #[cfg(feature = "engine")]
 pub use math::{
-    angle_diff, clamp, distance, ease_out_cubic, lerp, ordered_ladder, rand_int, rand_range_f32, rand_seed,
+    angle_diff, clamp, distance, ease_out_cubic, lerp, rand_int, rand_range_f32, rand_seed,
     rects_overlap, scatter, segment_circle_overlap, segment_rect_overlap, smoothstep01, wrap,
 };
 #[cfg(feature = "engine")]

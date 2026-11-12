@@ -965,7 +965,7 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
-fn draw_title(blip: &Blip, hi: &web::HighScore, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9]) {
+fn draw_title(blip: &Blip, hi: i32, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9]) {
     for (row, (start, count)) in [(1, 8), (2, 6)].into_iter().enumerate() {
         let x0 = (WIN_W - count * (BRICK_W + BRICK_GAP) + BRICK_GAP) / 2;
         for col in 0..count {
@@ -1055,16 +1055,16 @@ async fn main() {
         paddle_hit:  load_takes(&PADDLE_HIT_WAV).await,
         brick_hit:   load_takes(&BRICK_HIT_WAV).await,
         brick_break: load_takes(&BRICK_BREAK_WAV).await,
-        wall_hit:    blip::audio::load_sound(blip::wav!("wall_hit")).await,
-        bomb:        blip::audio::load_sound(blip::wav!("bomb")).await,
-        life_lost:   blip::audio::load_sound(blip::wav!("life_lost")).await,
-        win:         blip::audio::load_sound(blip::wav!("win")).await,
-        pickup_good: blip::audio::load_sound(blip::wav!("pickup_good")).await,
-        pickup_bad:  blip::audio::load_sound(blip::wav!("pickup_bad")).await,
-        pickup_life: blip::audio::load_sound(blip::wav!("pickup_life")).await,
+        wall_hit:    blip::sound!("wall_hit"),
+        bomb:        blip::sound!("bomb"),
+        life_lost:   blip::sound!("life_lost"),
+        win:         blip::sound!("win"),
+        pickup_good: blip::sound!("pickup_good"),
+        pickup_bad:  blip::sound!("pickup_bad"),
+        pickup_life: blip::sound!("pickup_life"),
     };
     // Two tunes, alternating by level.
-    let mut music = Jukebox::new("BOUNCER", &["BOUNCE", "REBOUND"]);
+    let mut music = Jukebox::new("bouncer", &["BOUNCE", "REBOUND"]);
 
     if blip.screenshot_mode {
         g.start_game();
@@ -1091,9 +1091,9 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title => draw_title(&blip, &web::high_score(), &paddle, &ball, &ball_shade, &brick),
+            State::Title => draw_title(&blip, web::high_score(), &paddle, &ball, &ball_shade, &brick),
             State::Win   => draw_clear(&blip, g.sess.level),
-            State::Over  => blip.draw_game_over(g.sess.score, &web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active()),
+            State::Over  => blip.draw_game_over(g.sess.score, web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active()),
             State::Launch | State::Play | State::Dead => {
                 draw_play(&blip, &g, &paddle, &ball, &ball_shade, &brick, &drops);
                 // The ball waits on the paddle after every lost life; say so.

@@ -193,7 +193,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
     let rpad_vy = (g.rpad_y - rpy0) / dt;
 
     let mut ball = Ball { ball_x: g.ball_x, ball_y: g.ball_y, ball_vx: g.ball_vx, ball_vy: g.ball_vy, ball_spd: g.ball_spd };
-    let events = physics::move_ball(&COURT, &mut ball, dt, g.lpad_y, g.rpad_y, lpad_vy, rpad_vy);
+    let events = physics::move_ball(&mut ball, dt, g.lpad_y, g.rpad_y, lpad_vy, rpad_vy);
     (g.ball_x, g.ball_y, g.ball_vx, g.ball_vy, g.ball_spd) = (ball.ball_x, ball.ball_y, ball.ball_vx, ball.ball_vy, ball.ball_spd);
     for event in events {
         match event {
@@ -347,14 +347,14 @@ async fn main() {
     let mut g = Game::new();
 
     let sfx = Beeps {
-        wall:    blip::audio::load_sound(blip::wav!("wall")).await,
-        hit_l:   blip::audio::load_sound(blip::wav!("hit_l")).await,
-        hit_r:   blip::audio::load_sound(blip::wav!("hit_r")).await,
-        score_l: blip::audio::load_sound(blip::wav!("score_l")).await,
-        score_r: blip::audio::load_sound(blip::wav!("score_r")).await,
+        wall:    blip::sound!("wall"),
+        hit_l:   blip::sound!("hit_l"),
+        hit_r:   blip::sound!("hit_r"),
+        score_l: blip::sound!("score_l"),
+        score_r: blip::sound!("score_r"),
     };
     // Five loops in rotation.
-    let mut jukebox = Jukebox::new("RALLY", &["LOOP1", "LOOP2", "LOOP3", "LOOP4", "LOOP5"]);
+    let mut jukebox = Jukebox::new("rally", &["LOOP1", "LOOP2", "LOOP3", "LOOP4", "LOOP5"]);
     let mut autopilot = bot::Bot::default();
 
     loop {

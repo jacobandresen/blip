@@ -312,3 +312,20 @@ fn pressing_a_button_on_the_result_screen_moves_on_and_never_strands_the_game() 
         }
     }
 }
+
+#[test]
+pub(crate) fn roster_order_visits_each_other_entry_and_keeps_finalists_last() {
+    let homes = [1, 0, 2, 3, 3, 3, 3, 6, 4, 5];
+    let finalists = [8, 9];
+    for pick in 0..homes.len() {
+        let order = crate::game::ordered_ladder(pick, &homes, &finalists);
+        let expected = (1..homes.len()).map(|step| (pick + step) % homes.len()).collect::<Vec<_>>();
+        assert_eq!(order.len(), homes.len() - 1);
+        assert_eq!(order.iter().copied().collect::<std::collections::HashSet<_>>().len(), order.len());
+        assert!(!order.contains(&pick));
+        assert!(order.windows(2).all(|pair| homes[pair[0]] != homes[pair[1]]));
+        let ends = finalists.iter().copied().filter(|who| expected.contains(who)).collect::<Vec<_>>();
+        assert_eq!(&order[order.len() - ends.len()..], &ends);
+    }
+    assert!(crate::game::ordered_ladder(0, &[], &finalists).is_empty());
+}

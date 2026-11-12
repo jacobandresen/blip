@@ -50,28 +50,6 @@ test('the game shell', async (t) => {
   ORIGIN = `http://127.0.0.1:${server.address().port}`;
   t.after(() => new Promise((ok) => server.close(ok)));
 
-  await t.test('the name prompt takes a tap while touch play is on, and its keys while the coin wall is up', async (t) => {
-    const cdp = await browser(t, 9401, { touch: true, width: 390, height: 844 });
-    await open(cdp, 'bouncer/index.html?controls=touch');
-    assert.equal(await evaluate(cdp, "document.documentElement.getAttribute('data-touch')"), 'drag');
-
-    // Coins left, so touch play is live: every tap that is not a button plays.
-    await evaluate(cdp, "document.getElementById('need-coin-overlay').classList.remove('visible'); window.blipScores.promptHandle('test'); true");
-    await sleep(300);
-    await evaluate(cdp, 'document.activeElement && document.activeElement.blur(); true');
-    const at = JSON.parse(await evaluate(cdp, "(function(){var b=document.querySelector('.blip-hs-input').getBoundingClientRect();return JSON.stringify({x:b.left+b.width/2,y:b.top+b.height/2});})()"));
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [at] });
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    await sleep(300);
-    assert.ok(await evaluate(cdp, "document.activeElement === document.querySelector('.blip-hs-input')"),
-      'a tap on the name field did not focus it');
-
-    // Out of coins the wall swallows keys for the game, not the prompt's.
-    await evaluate(cdp, "document.getElementById('need-coin-overlay').classList.add('visible'); true");
-    await key(cdp, 'Escape', 'Escape', 27);
-    assert.ok(await evaluate(cdp, "!document.querySelector('.blip-hs-modal')"), 'Escape did not close the prompt');
-  });
-
   await t.test('fullscreen on a PC is the top bar and the picture, and comes off again', async (t) => {
     const cdp = await browser(t, 9402);
     await open(cdp, 'meteors/index.html', 17000);

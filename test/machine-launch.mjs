@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { openPage, arcadeArranged } from './lib/harness.mjs';
+import { openPage, arcadeArranged, arrivedAt } from './lib/harness.mjs';
 
 for (const engine of ['chromium', 'webkit']) {
   for (const { phone, game } of [{phone:false,game:'rally'},{phone:true,game:'rally'},{phone:false,game:'brawler'},{phone:true,game:'brawler'}]) {
@@ -39,7 +39,7 @@ for (const engine of ['chromium', 'webkit']) {
       })));
       const start = await page.locator('.card-focused .card-shot-wrap').boundingBox();
       await page.locator('.card-focused .machine-start').click();
-      await page.waitForURL(`${origin}/${game}/index.html`);
+      await arrivedAt(page, `${origin}/${game}/index.html`);
       await page.waitForFunction(() => window.__machineTransition || window.__machineTransitionError);
         const result = await page.evaluate(() => ({ groups: window.__machineTransition, all:window.__machineAllAnimations, reveal:window.__machineReveal, error: window.__machineTransitionError,
         art: document.getElementById('launch-frame')?.style.backgroundImage,
@@ -75,7 +75,7 @@ for (const engine of ['chromium', 'webkit']) {
     await page.goto(`${origin}/index.html`);
     await page.waitForSelector('.card-focused .machine-start');
     await page.locator('.card-focused .machine-start').click();
-    await page.waitForURL(`${origin}/rally/index.html`);
+    await arrivedAt(page, `${origin}/rally/index.html`);
     assert.equal(await page.locator('#launch-frame').count(),0);
     assert.equal(await page.evaluate(()=>document.documentElement.hasAttribute('data-machine-handoff')),false);
   });
