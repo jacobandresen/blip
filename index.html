@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="google" content="notranslate">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BLIP">
+  <title>BLIP ARCADE</title>
+  <style>
+    html { background:#100d0b; }
+    :root[data-cabinet-arranging] body { opacity:0; pointer-events:none; }
+    /* Back from a machine, its parts move back into the aisle: the room is shown as it is laid out. */
+    :root[data-cabinet-arranging][data-machine-return] body { opacity:1; }
+  </style>
+  <script>
+    // Every visit starts in the arcade, whatever was open last; the Home
+    // Screen and BLIP are a switch away. A game's BLIP badge comes back here.
+    try { localStorage.setItem('blip-frontend', 'cabinet'); } catch (e) {}
+    try { sessionStorage.setItem('blip-freeplay', '0'); } catch (e) {}   // this session plays the cabinet's way
+    document.documentElement.setAttribute('data-cabinet-arranging', '');
+  </script>
+  <!-- The first frame waits for the whole page to be parsed: a machine coming back from its game is named by the
+       page's script before that frame is shown and captured. -->
+  <link rel="expect" href="#arcade-parsed" blocking="render">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/x-icon" href="favicon.ico?v=3">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=3">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=3">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=3">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v1.0.0/blip-deck.css">
+  <link rel="stylesheet" href="deck.css?v=12">
+  <link rel="stylesheet" href="blip.css?v=177">
+  <link rel="stylesheet" href="arcade.css?v=6">
+  <!-- Match the shared cabinet controls before first paint. -->
+  <script>
+    if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
+      document.documentElement.setAttribute('data-has-touch', '');
+
+    try {
+      var departure = JSON.parse(sessionStorage.getItem('blip-cabinet-return') || 'null');
+      sessionStorage.removeItem('blip-cabinet-return');
+      if (departure && Date.now() - departure.at < 15000 && /^[a-z_]+$/.test(departure.slug)) {
+        // A browser that carries the machine across pages steps back from it (blipMachineReturn); otherwise the
+        // aisle rolls back in over the game's last frame.
+        if (departure.native && 'onpagereveal' in window) {
+          window.blipMachineReturn = departure;
+          document.documentElement.setAttribute('data-machine-return', '');
+        }
+        else {
+          window.blipCabinetReturn = departure;
+          document.documentElement.setAttribute('data-cabinet-return', '');
+        }
+      }
+    } catch (e) {}
+
+    // Resolve the room before paint: explicit mode wins, otherwise use lite on a small supported device.
+    var roomMode = 'full';
+    var roomAsked = null;
+    try { roomAsked = new URLSearchParams(location.search).get('room'); } catch (e) {}
+    if (roomAsked === 'full' || roomAsked === 'lite') roomMode = roomAsked;
+    else if (['hardwareConcurrency','deviceMemory'].some(function (name) {
+      try { var value = navigator[name]; return typeof value === 'number' && isFinite(value) && value > 0 && value <= 2; }
+      catch (e) { return false; }
+    })) roomMode = 'lite';
+    document.documentElement.setAttribute('data-room', roomMode);
+
+    try {
+      if (localStorage.getItem('blip-fullscreen') === '1')
+        document.documentElement.setAttribute('data-fullscreen', '');
+    } catch (e) {}
+  </script>
+</head>
+<body class="cabinet-page">
+
+  <a class="blip-logo" href="index.html" aria-label="BLIP — cabinet"><img class="blip-logo-mark" src="blip-logo.svg" alt=""></a>
+  <button type="button" class="home-switch" id="home-switch-btn" aria-label="Switch to the home screen" title="Home screen"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="1" width="4" height="4" rx="1.2"/><rect x="7" y="1" width="4" height="4" rx="1.2"/><rect x="1" y="7" width="4" height="4" rx="1.2"/><rect x="7" y="7" width="4" height="4" rx="1.2"/></svg></button>
+  <div class="top-marquee-bar"></div>
+  <!-- Coin slot: top-right corner of the cabinet panel, mirroring the
+       BLIP ARCADE logo at top-left. -->
+  <button class="kiosk-btn" id="kiosk-insert-btn"></button>
+
+  <div class="cab-rail left"></div>
+  <div class="cab-rail right"></div>
+
+  <header></header>
+
+  <div class="divider"></div>
+
+  <div class="screen-bezel" id="screen-bezel">
+    <span class="screw tl"></span><span class="screw tr"></span>
+    <span class="screw bl"></span><span class="screw br"></span>
+    <div class="jukebox-game-screen"><div class="cabinet-glass" aria-hidden="true"></div></div>
+    <div class="jukebox-front" id="jukebox-front">
+  <!-- The room's neon signs (arcade.css): an original BLIP script, and an OPEN sign lit by a credit. -->
+  <template id="room-signs">
+    <svg class="aisle-neon" viewBox="0 0 190 108" aria-hidden="true" focusable="false">
+      <defs>
+        <g id="neon-blip" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M34 20C31 42 28 62 25 84"/>
+          <path d="M20 30C32 15 66 12 66 30C66 43 50 49 32 50C56 48 76 56 72 70C68 84 44 90 24 84C40 90 62 84 74 76"/>
+          <path d="M74 76C88 68 100 44 102 26C103 14 92 14 91 28C90 44 90 66 96 80C100 87 108 78 112 66C114 60 115 56 116 52C115 64 114 74 118 80C122 85 130 76 134 62C136 55 137 51 138 47L130 104"/>
+          <path d="M135 56C146 42 170 44 166 63C163 79 144 83 134 75"/>
+          <path d="M118 36L119 35"/>
+        </g>
+      </defs>
+      <g class="neon-supports"><rect x="22" y="76" width="4" height="13" rx="1.5"/><rect x="93" y="70" width="4" height="13" rx="1.5"/><rect x="157" y="60" width="4" height="13" rx="1.5"/></g>
+      <use href="#neon-blip" class="neon-tube"/>
+      <use href="#neon-blip" class="neon-core"/>
+    </svg>
+    <svg class="aisle-open" viewBox="0 0 132 60" aria-hidden="true" focusable="false">
+      <defs>
+        <path id="neon-open-frame" d="M14 5H118L128 30L118 55H14L4 30Z" fill="none" stroke-linejoin="round"/>
+        <g id="neon-open-letters" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="25" y="18" width="16" height="24" rx="7"/>
+          <path d="M50 42V18H58C66 18 66 31 58 31H50"/>
+          <path d="M84 18H72V42H84M72 30H81"/>
+          <path d="M93 42V18L107 42V18"/>
+        </g>
+      </defs>
+      <use href="#neon-open-frame" class="open-frame-tube"/>
+      <use href="#neon-open-frame" class="open-frame-core"/>
+      <use href="#neon-open-letters" class="open-letter-tube"/>
+      <use href="#neon-open-letters" class="open-letter-core"/>
+    </svg>
+  </template>
+  <!-- A tiled maze tribute, repeated across the whole wall. Each cell is one ceramic tile. -->
+  <template id="room-tiles">
+    <div class="aisle-tiles" aria-hidden="true">
+      <svg viewBox="0 0 1280 680" aria-hidden="true" focusable="false">
+        <defs>
+          <pattern id="tile-joints" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M0 40V0H40" fill="none" class="tile-grout" stroke-width="1.4"/>
+          </pattern>
+          <linearGradient id="tile-glaze" x2=".3" y2="1">
+            <stop stop-color="#fff2d6" stop-opacity=".18"/>
+            <stop offset=".35" stop-color="#fff2d6" stop-opacity="0"/>
+            <stop offset="1" stop-color="#000" stop-opacity="0"/>
+          </linearGradient>
+          <radialGradient id="tile-reflection">
+            <stop stop-color="#fff4dc" stop-opacity=".32"/>
+            <stop offset="1" stop-color="#fff4dc" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <path class="tile-black" d="M0 0H1280V680H0Z"/>
+        <!-- Maze runs meet at each repeat's edges; its corridors leave room for the chase. -->
+        <path class="tile-blue" d="M0 0H1280V40H0ZM0 280H400V320H0ZM440 280H880V320H440ZM920 280H1280V320H920ZM40 360H360V400H80V480H40ZM440 360H800V400H480V480H440ZM880 360H1240V480H1200V400H880ZM0 560H200V520H240V600H0ZM320 520H600V560H360V640H320ZM680 520H960V560H720V640H680ZM1040 520H1080V560H1280V600H1040Z"/>
+        <!-- Open mouth and stepped silhouettes, drawn on the tile grid rather than as smooth sprites. -->
+        <path class="tile-yellow" d="M120 40H240V80H280V120H200V160H280V200H240V240H120V200H80V80H120Z"/>
+        <path class="tile-red" d="M560 40H680V80H720V240H680V200H640V240H600V200H560V240H520V80H560Z"/>
+        <path class="tile-cyan" d="M840 40H960V80H1000V240H960V200H920V240H880V200H840V240H800V80H840Z"/>
+        <path class="tile-purple" d="M1120 40H1200V80H1240V240H1200V200H1160V240H1120V200H1080V80H1120Z"/>
+        <path class="tile-white" d="M320 120H360V160H320ZM400 120H440V160H400ZM560 80H600V160H560ZM640 80H680V160H640ZM840 80H880V160H840ZM920 80H960V160H920ZM1120 80H1160V160H1120ZM1200 80H1240V160H1200ZM160 440H200V480H160ZM240 440H280V480H240ZM560 440H600V480H560ZM640 440H680V480H640ZM1040 440H1080V480H1040ZM1120 440H1160V480H1120Z"/>
+        <path class="tile-pupil" d="M560 120H600V160H560ZM640 120H680V160H640ZM840 120H880V160H840ZM920 120H960V160H920ZM1120 120H1160V160H1120ZM1200 120H1240V160H1200Z"/>
+        <g class="tile-glaze">
+          <path d="M0 0H1280V680H0Z" fill="url(#tile-glaze)"/>
+          <ellipse cx="180" cy="150" rx="110" ry="150" fill="url(#tile-reflection)"/>
+          <ellipse cx="900" cy="90" rx="90" ry="130" fill="url(#tile-reflection)"/>
+        </g>
+        <path d="M0 0H1280V680H0Z" fill="url(#tile-joints)"/>
+      </svg>
+    </div>
+  </template>
+  <!-- What stands round the machines (arcade.css): a power cord to the wall, and what visitors left behind. -->
+  <template id="room-dressing">
+    <svg class="room-can" viewBox="0 0 34 63" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="can-metal" x1="0" x2="1">
+          <stop offset="0" stop-color="#2a0305"/><stop offset=".1" stop-color="#7a0a10"/><stop offset=".22" stop-color="#c8141c"/>
+          <stop offset=".29" stop-color="#ff9c8f"/><stop offset=".31" stop-color="#fff1ec"/><stop offset=".335" stop-color="#ff8a7c"/>
+          <stop offset=".42" stop-color="#d0161e"/><stop offset=".66" stop-color="#a80f17"/><stop offset=".74" stop-color="#e04a3c"/>
+          <stop offset=".8" stop-color="#9c0e15"/><stop offset=".93" stop-color="#4c0609"/><stop offset="1" stop-color="#1c0203"/>
+        </linearGradient>
+        <linearGradient id="can-alu" x1="0" x2="1">
+          <stop offset="0" stop-color="#3a3c42"/><stop offset=".2" stop-color="#8d929c"/><stop offset=".3" stop-color="#f4f5f7"/>
+          <stop offset=".36" stop-color="#a9adb6"/><stop offset=".7" stop-color="#7d828c"/><stop offset=".78" stop-color="#c3c7ce"/><stop offset="1" stop-color="#2e3035"/>
+        </linearGradient>
+        <linearGradient id="can-room" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ff9a4a" stop-opacity=".22"/><stop offset=".35" stop-color="#ff9a4a" stop-opacity="0"/>
+          <stop offset=".8" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".5"/>
+        </linearGradient>
+        <clipPath id="can-body"><path d="M2 13Q2 10.5 4.6 9.2L6.2 7.4H27.8L29.4 9.2Q32 10.5 32 13V56.5Q32 58.5 30 59.6L28 61H6L4 59.6Q2 58.5 2 56.5Z"/></clipPath>
+      </defs>
+      <!-- body -->
+      <path d="M2 13Q2 10.5 4.6 9.2L6.2 7.4H27.8L29.4 9.2Q32 10.5 32 13V56.5Q32 58.5 30 59.6L28 61H6L4 59.6Q2 58.5 2 56.5Z" fill="url(#can-metal)"/>
+      <g clip-path="url(#can-body)">
+        <!-- the print: a white band with the name, wrapping round the cylinder -->
+        <path d="M2 26Q17 29 32 26V35Q17 38 2 35Z" fill="#efe9df" opacity=".9"/>
+        <text x="17" y="34.6" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-size="7" font-weight="900" fill="#b3121a" letter-spacing=".3" transform="translate(17 0) scale(.92 1) translate(-17 0)">COLA</text>
+        <!-- the room in the metal: warm light from above, darkness below, the highlight over the print -->
+        <rect x="0" y="0" width="34" height="63" fill="url(#can-room)"/>
+        <rect x="2" y="9" width="1.1" height="51" fill="#ff9a4a" opacity=".45"/>
+      </g>
+      <!-- necked-in shoulder and the rolled rim, seen from below -->
+      <path d="M4.6 9.2L6.2 7.4Q7 5.4 8.4 4.6H25.6Q27 5.4 27.8 7.4L29.4 9.2Q17 11 4.6 9.2Z" fill="url(#can-alu)"/>
+      <path d="M8 4.8Q17 6.6 26 4.8L26 3.2Q17 4.6 8 3.2Z" fill="url(#can-alu)"/>
+      <path d="M8 3.2Q17 4.6 26 3.2" stroke="#45484f" stroke-width=".5" fill="none"/>
+      <path d="M4.6 9.2Q17 11 29.4 9.2" stroke="#2a0a0b" stroke-width=".6" fill="none" opacity=".7"/>
+    </svg>
+    <span class="room-can-shadow" aria-hidden="true"></span>
+    <svg class="room-wrapper" viewBox="0 0 84 40" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="foil" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ff6cb6"/><stop offset=".45" stop-color="#e02a86"/><stop offset=".55" stop-color="#ffd2ea"/><stop offset=".65" stop-color="#d6237c"/><stop offset="1" stop-color="#8e1452"/>
+        </linearGradient>
+        <linearGradient id="foil-end" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#b78a12"/><stop offset=".5" stop-color="#ffe27a"/><stop offset="1" stop-color="#c99a1c"/>
+        </linearGradient>
+      </defs>
+      <!-- its shadow on the carpet -->
+      <path d="M10 22L22 15L30 18L42 13L56 17L66 14L77 20L68 27L56 25L44 30L31 26L20 29Z" fill="rgb(0 0 0 / .45)" transform="translate(2 3)"/>
+      <!-- the twisted ends, crumpled flat -->
+      <path d="M4 17L14 12L17 15L21 14L22 22L18 24L15 27L6 25L9 21Z" fill="url(#foil-end)"/>
+      <path d="M14 12L17 15L15 19L9 21Z" fill="#fff3b8" opacity=".55"/>
+      <path d="M80 15L70 11L68 14L63 13L62 21L66 23L68 26L78 23L74 19Z" fill="url(#foil-end)"/>
+      <path d="M70 11L68 14L71 18L74 19Z" fill="#7a5a0a" opacity=".5"/>
+      <!-- the opened middle: foil facets catching the light -->
+      <path d="M21 14L31 10L43 12L55 9L63 13L62 21L54 26L42 24L31 27L22 22Z" fill="url(#foil)"/>
+      <g opacity=".85">
+        <path d="M31 10L36 17L43 12Z" fill="#ffc2e0"/>
+        <path d="M43 12L48 19L55 9Z" fill="#ff8cc8"/>
+        <path d="M36 17L42 24L48 19Z" fill="#b51b68"/>
+        <path d="M22 22L31 27L28 18Z" fill="#a1175c"/>
+        <path d="M55 9L63 13L57 16Z" fill="#fff0f7"/>
+        <path d="M48 19L54 26L57 16Z" fill="#ff5aa8"/>
+      </g>
+      <!-- crinkle lines and the print's white stripe, broken by the folds -->
+      <path d="M24 16L30 15L35 19M40 14L46 17L52 13M38 22L44 20L50 23M27 21L33 22" stroke="#fff" stroke-width=".7" fill="none" opacity=".75"/>
+      <path d="M25 18Q33 15 38 18T52 16L60 17" stroke="#fff6fb" stroke-width="1.8" fill="none" opacity=".55" stroke-dasharray="7 2 5 3"/>
+    </svg>
+  </template>
+  <div class="game-grid" id="game-grid" aria-label="Arcade machines. Use the left and right arrows to walk between games.">
+
+    <article class="card card-rally" data-game-url="rally/index.html">
+      <div class="card-shot-wrap">
+        <img class="card-shot" src="rally/screenshot.png" alt="Rally gameplay">
+      </div>
+      <div class="card-title">RALLY</div>
+    </article>
+
+    <article class="card card-bouncer" data-game-url="bouncer/index.html">
+      <div class="card-shot-wrap">
+        <img class="card-shot" src="bouncer/screenshot.png?v=4" alt="Bouncer gameplay">
+      </div>
+      <div class="card-title">BOUNCER</div>
+    </article>
+
+    <article class="card card-galactic" data-game-url="defender/index.html">
+      <div class="card-shot-wrap">
+        <img class="card-shot" src="defender/screenshot.png?v=7" alt="Defender gameplay">
+      </div>
+      <div class="card-title">DEFENDER</div>
+    </article>
+
+    <article class="card card-bubbler" data-game-url="bubbler/index.html">
+      <div class="card-shot-wrap">
+        <img class="card-shot" src="bubbler/screenshot.png?v=4" alt="Bubbler gameplay">
+      </div>
+      <div class="card-title">BUBBLER</div>
+    </article>
+
+    <article class="card card-sky-raider" data-game-url="raider/index.html">
+      <div class="card-shot-wrap">
+        <img class="card-shot" src="raider/screenshot.png?v=12" alt="Raider gameplay">
+      </div>
+      <div class="card-title">RAIDER</div>
+    </article>
+    <article class="card card-meteors" data-game-url="meteors/index.html">
+      <div class="card-shot-wrap">
+        <img class="card-shot" src="meteors/screenshot.png?v=6" alt="Meteors gameplay">
+      </div>
+      <div class="card-title">METEORS</div>
+    </article>
+
+    <article class="card card-serpent" data-game-url="serpent/index.html">
+      <div class="card-shot-wrap">
+        <img class="card-shot" src="serpent/screenshot.png?v=4" alt="Serpent gameplay">
+      </div>
+      <div class="card-title">SERPENT</div>
+    </article>
+
+    <article class="card card-brawler" data-game-url="brawler/index.html">
+      <div class="card-shot-wrap">
+        <img class="card-shot" src="brawler/card.png?v=15" alt="Brawler: a high kick, over the sign">
+      </div>
+      <div class="card-title">BRAWLER</div>
+    </article>
+
+    <article class="card card-adder" data-game-url="adder/index.html">
+      <div class="card-shot-wrap">
+        <img class="card-shot" src="adder/screenshot.png" alt="Adder gameplay">
+      </div>
+      <div class="card-title">ADDER</div>
+    </article>
+
+    <article class="card card-warlock" data-game-url="warlock/index.html">
+      <div class="card-shot-wrap">
+        <img class="card-shot" src="warlock/card.png?v=2" alt="Warlock: the hooded sorcerer in his arch, a young wizard raising his staff">
+      </div>
+      <div class="card-title">WARLOCK</div>
+    </article>
+
+  </div>
+    </div>
+  </div>
+
+  <!-- The landing page's controls let the player walk the aisle and start a machine. -->
+  <div class="manual-overlay" id="manual-overlay" hidden role="dialog" aria-modal="true" aria-label="BLIP Arcade Manual">
+    <a class="book-logo" href="index.html" aria-label="BLIP — cabinet"><img src="blip-logo.svg" alt=""></a>
+    <div class="manual-open-book" role="document">
+      <section class="manual-open-page manual-open-left" id="manual-contents-page" aria-label="Manual left page">
+        <i class="manual-tear" aria-hidden="true"></i>
+        <div class="manual-left-contents">
+          <div class="manual-paper-mark">BLIP ARCADE &nbsp; · &nbsp; OPERATOR'S COPY</div>
+          <h2>CONTENTS</h2>
+          <ol class="manual-contents manual-chapter-contents">
+            <li><button type="button" data-chapter="first-use" disabled><span>First time use<i></i></span><b>—</b></button></li>
+            <li><button type="button" data-chapter="controls" disabled><span>1 &nbsp; Playing the games<i></i></span><b>—</b></button></li>
+          </ol>
+          <h3 class="manual-game-index-title">Game index</h3>
+          <ol class="manual-contents manual-game-contents" id="manual-game-contents"></ol>
+          <ol class="manual-contents manual-back-contents">
+            <li><button type="button" data-chapter="history" disabled><span>2 &nbsp; The golden age of arcade games<i></i></span><b>—</b></button></li>
+            <li><button type="button" data-chapter="about" disabled><span>3 &nbsp; About Blip<i></i></span><b>—</b></button></li>
+            <li><button type="button" data-chapter="operators" disabled><span>&emsp;The operators<i></i></span><b>—</b></button></li>
+          </ol>
+          <div class="manual-stamp">BLIP<br><small>EST. 1981*</small></div>
+          <small class="manual-footnote">* A new cabinet with an old soul.</small>
+        </div>
+        <div class="manual-page-number manual-left-head"><span id="manual-left-title"></span></div>
+        <article class="manual-page-content manual-left-content" id="manual-left-content" aria-hidden="true"></article>
+        <span class="manual-folio" id="manual-left-folio"></span>
+      </section>
+      <div class="manual-open-spine" aria-hidden="true"></div>
+      <section class="manual-open-page manual-open-right" aria-label="Manual page">
+        <i class="manual-tear" aria-hidden="true"></i>
+        <div class="manual-page-number"><span id="manual-book-title">MANUAL</span><b id="manual-page-count">01 / 01</b></div>
+        <article class="manual-page-content" id="manual-page-content" tabindex="-1" aria-live="polite"></article>
+        <span class="manual-folio" id="manual-right-folio"></span>
+        <div class="manual-page-corner" aria-hidden="true"></div>
+      </section>
+      <button class="manual-contents-tab" id="manual-contents-tab" type="button" aria-controls="manual-contents-page" aria-expanded="false">Contents</button>
+      <button class="manual-close" id="manual-close" type="button" aria-label="Close manual"><span>Close manual</span></button>
+      <button class="manual-turn manual-turn-prev" id="manual-prev" type="button" disabled aria-label="Turn to the previous page">‹ <small>PREV</small></button>
+      <button class="manual-turn manual-turn-next" id="manual-next" type="button" disabled aria-label="Turn to the next page"><small>TURN PAGE</small> ›</button>
+    </div>
+  </div>
+  <template id="manual-first-use">
+    <div class="manual-leaf">
+    <div class="page">
+    <p class="manual-first-edition">BLIP ARCADE &nbsp; · &nbsp; MANUAL</p>
+    <h2>First time use</h2>
+    <p class="manual-first-intro">A few coins. A steady hand. You are ready to play.</p>
+    <div class="manual-first-steps">
+    <section class="manual-first-step">
+    <h3>1. Insert a coin</h3>
+    <p>Press the coin door on a machine, press <kbd>5</kbd> on the keyboard, or press Select on a gamepad. The door shows your credits, and the Start lamp lights when you can play.</p>
+    </section>
+    <section class="manual-first-step">
+    <h3>2. Choose your game</h3>
+    <p>Use the left and right arrow keys, a gamepad, or the on-screen arrows to walk between machines.</p>
+    </section>
+    <section class="manual-first-step">
+    <h3>3. Load and play</h3>
+    <p>Press Start on the machine. Its screen opens and play begins. Use the controls shown beneath the screen.</p>
+    </section>
+    </div>
+    <p>For a game’s own keys and playing notes, find it in the contents. To choose another game, press the BLIP logo, the game’s title or the docked ROM.</p>
+    </div>
+    </div>
+  </template>
+  <script src="https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v1.0.0/dist/blip-deck.js"></script>
+
+  <script src="howler.min.js"></script>
+  <script src="blip_core.js?v=17"></script>
+  <script src="cabinet.js?v=110"></script>
+  <script src="aisle.js?v=2"></script>
+  <script src="arcade.js?v=5"></script>
+<i id="arcade-parsed" hidden></i>
+</body>
+</html>

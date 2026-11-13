@@ -1,0 +1,1665 @@
+/* A machine's marquee: the backlit sign over its screen, the game's name printed bold over its own motif.
+   The arcade's cabinets and the game page's top bar show the same sign; it is the same machine. */
+@font-face {font-family:'Press Start 2P';src:url(press-start-2p.woff2) format('woff2');font-display:swap}
+
+[data-machine="rally"] {--machine-trim:#e2513a;--marquee-art:repeating-linear-gradient(90deg,transparent 0 46%,#fff4 46% 47%,transparent 47%)}
+[data-machine="serpent"] {--machine-trim:#3ec44f;--marquee-ink:#f3ffdc;--marquee-art:repeating-linear-gradient(90deg,#0002 0 12px,transparent 12px 24px)}
+[data-machine="bouncer"] {
+  --machine-trim:#1fb7c4;
+  --marquee-ink:#efffff;
+  --marquee-art:linear-gradient(90deg,#ff5a5a55 0 20%,#ffd25a55 20% 40%,#5aff8a55 40% 60%,#5ab4ff55 60% 80%,#c45aff55 80%) 0 0/100% 22% no-repeat;
+}
+[data-machine="defender"] {
+  --machine-trim:#b046d6;
+  --marquee-ink:#fbeaff;
+  --marquee-art:radial-gradient(circle at 12% 30%,#fff 0 1px,transparent 2px),radial-gradient(circle at 86% 65%,#fff 0 1px,transparent 2px),radial-gradient(circle at 70% 20%,#fff9 0 1px,transparent 2px);
+}
+[data-machine="meteors"] {
+  --machine-trim:#8e98b3;
+  --marquee-ink:#fff;
+  --marquee-art:radial-gradient(circle at 20% 60%,transparent 0 7px,#fff8 8px 9px,transparent 10px),radial-gradient(circle at 82% 35%,transparent 0 5px,#fff8 6px 7px,transparent 8px);
+}
+[data-machine="raider"] {--machine-trim:#3a6fe0;--marquee-ink:#eef4ff;--marquee-art:repeating-linear-gradient(0deg,transparent 0 6px,#fff2 6px 7px)}
+[data-machine="brawler"] {
+  --machine-trim:#e0362a;
+  --marquee-ink:#fff3c4;
+  --marquee-art:repeating-conic-gradient(from 0deg at 50% 120%,#fff1 0 6deg,transparent 6deg 12deg);
+}
+[data-machine="bubbler"] {
+  --machine-trim:#45b6f0;
+  --marquee-ink:#ffffff;
+  --marquee-art:radial-gradient(circle at 12% 40%,transparent 0 7px,#fff9 8px 9px,transparent 10px),radial-gradient(circle at 90% 62%,transparent 0 5px,#fff9 6px 7px,transparent 8px);
+}
+[data-machine="adder"] {--machine-trim:#e09a2a;--marquee-ink:#fff5d8;--marquee-art:repeating-linear-gradient(45deg,transparent 0 14px,#fff2 14px 16px)}
+[data-machine="warlock"] {
+  --machine-trim:#9a46d6;
+  --marquee-ink:#f6ecff;
+  --marquee-art:radial-gradient(circle at 50% 45%,transparent 0 8px,#fff4 9px 11px,transparent 12px),radial-gradient(circle at 50% 45%,transparent 0 22px,#fff2 23px 25px,transparent 26px);
+}
+
+.machine-marquee,#game-grid .card-title.machine-marquee {
+  /* !important where the arcade's older card rules force a plain title. */
+  --trim:var(--machine-trim,#9a9aa6);
+  display:flex;align-items:center;justify-content:center;box-sizing:border-box;
+  font:400 20px/1 'Press Start 2P','Courier New',monospace;letter-spacing:.02em;font-style:normal;text-align:center;text-decoration:none;white-space:nowrap;
+  color:var(--marquee-ink,#fff7d6)!important;-webkit-text-fill-color:currentColor;
+  text-shadow:-2px -2px #120c18,2px -2px #120c18,-2px 2px #120c18,2px 2px #120c18,3px 4px 0 color-mix(in srgb,var(--trim) 70%,#000),0 0 18px color-mix(in srgb,var(--trim) 80%,#fff);
+  background:
+    radial-gradient(ellipse 62% 85% at 50% 50%,#ffffff40,transparent 72%),
+    var(--marquee-art,linear-gradient(transparent,transparent)),
+    linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff),var(--trim) 40%,color-mix(in srgb,var(--trim) 45%,#000))!important;
+  border:3px solid #09080c;border-radius:4px 4px 2px 2px;
+  box-shadow:inset 0 0 0 1px #ffffff55,inset 0 -5px 9px #0006,0 0 30px color-mix(in srgb,var(--trim) 55%,transparent),0 5px 0 #050407;
+}
+
+/* No double-tap-to-zoom: an iPad fires it on fast repeated taps and jumps the
+   viewport mid-play. Pinch-zoom still works; the deck and canvas set the
+   stricter `touch-action: none` themselves. */
+html {
+  touch-action: manipulation;
+}
+
+.kiosk-btn {
+  font-family: 'Courier New', Courier, monospace;
+
+  font-weight: 900;
+
+  /* A lit fixture: near-white core, the colour in a layered glow, and a glow
+     on the button edge too. */
+
+  text-decoration: none;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  white-space: nowrap;
+  padding: 9px 16px;
+
+}
+.kiosk-btn:active {
+  transform: translateY(2px);
+  border-bottom-width: 1px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.75), inset 0 2px 5px rgba(0,0,0,0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #need-coin-overlay,
+  #need-coin-overlay .nco-msg { animation: none; }
+}
+/* Keep the coin control visible as a steady physical highlight while locked. */
+body.need-coin #insert-coin-btn,
+body.need-coin #kiosk-insert-btn {
+  border-color:#e3a457;
+  color:#fff0d2;
+  text-shadow:0 1px 0 rgba(0,0,0,.72);
+  animation:none!important;
+  transform:rotateX(var(--bar-tilt,26deg))!important;
+}
+
+/* ---- BLIP logo ---- The name plate (blip-logo.svg), the same top left on every
+   screen, and the tap back to the arcade. Above the marquee (9), scanlines (98-100)
+   and the bar (200); clear of a landscape notch or island. */
+.blip-logo {
+  position:fixed;z-index:500;top:calc(6px + env(safe-area-inset-top,0px));left:max(8px,calc(env(safe-area-inset-left,0px) + 6px));
+  box-sizing:border-box;width:116px;height:40px;padding:0;display:inline-flex;align-items:center;justify-content:center;
+  text-decoration:none;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;
+  filter:drop-shadow(0 2px 3px #000a);transition:transform .08s;
+}
+.blip-logo:active {transform:translateY(1px)}
+.blip-logo-mark {display:block;width:100%;height:auto}
+@media (max-width:600px) {
+  .blip-logo {top:calc(9px + env(safe-area-inset-top,0px));width:86px;height:34px}
+}
+
+/* ---- Top marquee strip ---- The lit sign the logo (left) and coin slot
+   (right) sit in on the non-game pages; game pages use game.js's
+   #marquee-bar. Above the scanline/vignette overlays; pointer-events: none,
+   the logo and coin button float above it. */
+.top-marquee-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+
+  box-sizing: border-box;
+
+  padding-top: env(safe-area-inset-top, 0px);
+  z-index: 201;
+  pointer-events: none;
+  background: linear-gradient(180deg, #101010, #000 92%);
+
+}
+
+/* ---- Coin slot + drop animation ---- Shared by #insert-coin-btn (games) and
+   #kiosk-insert-btn (other pages), pinned top right to mirror the logo; the
+   slot graphic (::after) is at its right end. position: fixed anchors
+   #coin-drop-anim. */
+#insert-coin-btn,
+#kiosk-insert-btn {
+  position: fixed;
+  /* Mirror .blip-logo: top 0, same height, 8px from the edge, same top pad. */
+  top: 0;
+
+  z-index: 500;
+  box-sizing: border-box;
+
+  padding: env(safe-area-inset-top, 0px) 8px 0;
+  margin: 0;
+
+  align-items: center;
+  gap: 7px;
+  overflow: visible;
+
+  letter-spacing: 1px;
+  /* Idle it is part of the strip (hairline underline, no lift); it lights up
+     on hover or while beckoning. */
+
+  animation: none;
+  transition: color .2s, text-shadow .2s, box-shadow .2s, border-color .2s;
+}
+#insert-coin-btn:hover,
+#kiosk-insert-btn:hover {
+  color: #f6ffb8;
+  border-color: #6acf5a;
+  text-shadow: 0 0 4px #fff, 0 0 12px #e6dc32, 0 0 24px #e6dc32;
+}
+#insert-coin-btn:active,
+#kiosk-insert-btn:active {
+  transform: perspective(180vw) rotateX(var(--bar-tilt,26deg));
+  box-shadow: none;
+  color: #fff;
+  text-shadow: 0 0 6px #fff, 0 0 18px #e6dc32, 0 0 40px #e6dc32;
+}
+/* The coin mechanism, as on a real coin door: a small brushed-chrome plate
+   with a screw at each corner, a red reject button, and the coin entry, a
+   narrow recessed slot backlit orange so it can be found in a dark arcade. */
+#insert-coin-btn::after,
+#kiosk-insert-btn::after {
+  content: '';
+  display: inline-block;
+  flex-shrink: 0;
+  width: 26px;
+  height: 18px;
+  border-radius: 3px;
+  background:
+    /* screws */
+    radial-gradient(circle at 3px 3px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
+    radial-gradient(circle at 23px 3px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
+    radial-gradient(circle at 3px 15px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
+    radial-gradient(circle at 23px 15px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
+    /* reject button: a red dome with a highlight */
+    radial-gradient(circle at 5px 9px, #ffd0c8 0 0.5px, #ff4a36 1.2px, #a3160c 2.4px, #3a0804 2.9px, transparent 3.3px),
+    /* the slot: dark inside, lit orange at its lips */
+    linear-gradient(180deg, transparent 5px, #ffb347 6px, #120600 7px, #000 9px, #120600 11px, #ffb347 12px, transparent 13px)
+      center / 100% 100% no-repeat,
+    radial-gradient(ellipse 12px 4px at 14px 9px, rgba(255, 150, 40, 0.55), transparent 70%),
+    /* brushed steel */
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.07) 0 1px, rgba(0, 0, 0, 0.05) 1px 2px),
+    linear-gradient(135deg, #e3e6ea 0%, #9aa0a7 38%, #d4d8dd 55%, #7d838b 100%);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.55),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.45),
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 6px rgba(255, 150, 40, 0.18);
+}
+
+/* The coin slides across the face, turns edge-on, and recedes into the slit. */
+#coin-drop-anim {
+  --coin-size: clamp(34px,var(--cap,44px),48px);
+  position: absolute;
+  right: calc(var(--slot-x, 13px) - 40px);
+  top: 50%;
+  width: 80px;
+  height: 56px;
+  overflow: hidden;
+  perspective: 120px;
+  transform:translateY(-50%);
+  pointer-events: none;
+  z-index: 5;
+}
+#coin-drop-anim::before {
+  content: '';
+  position: absolute;
+  left: calc((80px - var(--coin-size))/2);
+  top: calc((56px - var(--coin-size))/2);
+  width: var(--coin-size);
+  height: var(--coin-size);
+  border-radius: 50%;
+  transform-origin: 50% 50%;
+  opacity: 0;
+  background:url("quarter-1964.svg") center/contain no-repeat;
+  box-shadow:0 0 2px #000a,inset 0 0 0 1px #f4f3e9;
+  filter:drop-shadow(0 1px 1px #000);
+}
+#coin-drop-anim.dropping::before {
+  animation: coin-drop .82s cubic-bezier(.3,.55,.4,1) both;
+}
+@keyframes coin-drop {
+  0%   { opacity:1; transform:translate3d(-14px,0,0) rotateX(0deg) scale(1); }
+  34%  { opacity:1; transform:translate3d(-5px,0,0) rotateX(0deg) scale(1); }
+  50%  { opacity:1; transform:translate3d(0,0,0) rotateX(78deg) scale(.96); }
+  68%  { opacity:1; transform:translate3d(0,0,-3px) rotateX(82deg) scale(.92); }
+  78%  { opacity:.9; transform:translate3d(0,0,-7px) rotateX(82deg) scale(.9); }
+  100% { opacity:0; transform:translate3d(0,0,-30px) rotateX(84deg) scale(.75); }
+}
+
+/* Narrow portrait phones (≤ 480 px) — shrink text so all three bar items fit */
+@media (max-width: 480px) {
+  .kiosk-btn {   padding: 7px 10px; }
+}
+
+.snes-pad .snes-btn.blip-pressed > span {
+  transform: scale(0.94);
+  filter: brightness(0.82);
+  box-shadow:
+    inset 0 5px 9px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 2px rgba(255, 200, 190, 0.15),
+    0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* A one-player game's second station is on the panel, as on a two-player cabinet, but takes no input. */
+
+@media (max-width: 620px) {
+  /* Two stations on a phone, sized off the screen width so they fit at 320px. */
+  :root[data-players] {
+    /* The caps get the width: the stick's drag region is everything left of
+       its caps (isStickTouch in game.js), so its box only needs the boot. */
+
+    --stick-w: clamp(34px, 9.4vw, 48px);
+  }
+}
+
+/* A finger is the same size on a big screen as on a small one — but
+   here there is room. Keyed on the pointer, not the viewport width. */
+@media (pointer: coarse) and (min-width: 621px) {
+  :root[data-players] {
+
+    --stick-w: clamp(60px, 6.4vw, 104px);
+  }
+}   
+
+@property --on { syntax: '<number>'; inherits: true; initial-value: 1; }
+
+/* Upright: the boot's centre is the bar's vertical centre. The base fills
+   the bar's height instead of towering over it; the ball and shaft rise
+   from the pivot and may overlap the game. */
+
+/* ---- One set of equipment everywhere ---- Caps, cross and stick are the
+   same size on the landing page and in one- and two-player games. Sized as a
+   share of half the bar, so two stations fit the narrowest deck; --cap,
+   --dpad and the boot derive from it. */
+
+/* a second action (Meteors' hyperspace) has a cool-blue cap on both */
+
+/* ---- Thumb-sized on a phone ---- One player upright on a touch phone:
+   equipment sized off the whole width, and the bar grows to seat the bigger
+   cross. */
+
+/* Two players upright on a touch phone: each station stacks cross over caps
+   on a diagonal (the picture is width-bound, so there is height). At 375px:
+   cross 77px, caps 42px. */
+
+/* One player sideways on the stick deck, laid out like the pad: stick in
+   the left gutter, the live caps stacked in the right, no dead station;
+   sizes match the pad's cross (84) and caps (52). */
+
+/* Except a one-player game's second station: its two caps are unlit blanks, as on a two-player cabinet. */
+
+.blip-power-indicator {
+  position:fixed;z-index:700;
+  display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #524435;border-radius:12px;
+  background:linear-gradient(#181512ee,#090a09ee);
+  font:700 9px/1 system-ui,sans-serif;letter-spacing:.11em;pointer-events:none;
+}
+.power-bulb {
+  width:12px;
+  height:12px;
+  border-radius:50%;
+  border:1px solid #553329;
+
+}
+
+:root[data-credit] .blip-power-indicator {border-color:#866c43;color:#c3b08d;box-shadow:0 2px 9px #000b,inset 0 1px #fff2d42b}
+:root[data-credit] .power-bulb {
+  border-color:#edcd83;
+  background:radial-gradient(circle at 34% 28%,#fff8d7 0 18%,#ffd879 42%,#bb672d 75%);
+  box-shadow:0 0 5px 2px #ffc857aa,0 0 15px #ffb43b88,inset 0 0 2px #fff;
+}
+
+@media(max-width:480px) {
+  .blip-power-indicator {gap:0;padding:2px;border:0;background:none;}
+  .power-label {display:none}
+  .power-bulb {width:16px;height:16px}
+}
+
+/* In fullscreen an idle mouse pointer is hidden (cabinet.js sets the attribute). */
+:root[data-fullscreen][data-cursor-idle],
+:root[data-fullscreen][data-cursor-idle] * { cursor: none !important; }
+.kiosk-btn:hover {  border-color:#f0bb73; border-bottom-color:#251414; }
+.kiosk-btn:active { border-bottom-color:#180e10; }
+#insert-coin-btn,
+#kiosk-insert-btn {
+  border:1px solid rgba(255,207,143,.45);
+  border-top:0;
+
+  color:#ffe2ad;
+  text-shadow:0 0 8px rgba(255,188,100,.55);
+
+}
+#insert-coin-btn:hover,
+#kiosk-insert-btn:hover,
+#insert-coin-btn:focus-visible,
+#kiosk-insert-btn:focus-visible {
+  color:#fff8e9;
+  border-color:rgba(255,229,179,.9);
+  text-shadow:0 0 5px #fff,0 0 13px #ffd17a,0 0 25px #e88c4d;
+  box-shadow:0 5px 16px rgba(0,0,0,.42),0 0 18px rgba(237,161,83,.24);
+}
+#insert-coin-btn::after,
+#kiosk-insert-btn::after {
+  background:
+    radial-gradient(circle at 3px 3px,#ffe9c7 0 .6px,#826142 1.2px,transparent 1.7px),
+    radial-gradient(circle at 15px 3px,#ffe9c7 0 .6px,#826142 1.2px,transparent 1.7px),
+    radial-gradient(circle at 3px 23px,#ffe9c7 0 .6px,#826142 1.2px,transparent 1.7px),
+    radial-gradient(circle at 15px 23px,#ffe9c7 0 .6px,#826142 1.2px,transparent 1.7px),
+    radial-gradient(circle at 8.3px 5.3px,#ffd7b9 0 .5px,#ff6545 1.2px,#a3160c 2.4px,#3a0804 2.9px,transparent 3.3px),
+    linear-gradient(90deg,transparent 7px,#ffc267 7px,#120600 7.8px,#000 9px,#120600 10.2px,#ffc267 11px,transparent 11px) center 11px / 100% 12px no-repeat,
+    radial-gradient(ellipse 5px 9px at 9px 17px,rgba(255,169,67,.62),transparent 70%),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.06) 0 1px,rgba(0,0,0,.05) 1px 2px),
+    linear-gradient(135deg,#efd4ad 0%,#a88159 38%,#e2c49c 55%,#75573b 100%);
+}
+
+/* The controls are shallow pockets cut into the wood fascia, not buttons
+   sitting on top of it. Keep the grain visible and the bevel inside. */
+body:has(.top-marquee-bar) #kiosk-insert-btn,
+#insert-coin-btn,
+#kiosk-insert-btn {
+  border-left:1px solid rgba(25,13,11,.78);
+  border-right:1px solid rgba(25,13,11,.78);
+  border-bottom:1px solid rgba(255,207,143,.32);
+  border-radius:0 0 7px 7px;
+  background:
+    repeating-linear-gradient(174deg,rgba(255,213,160,.055) 0 1px,transparent 1px 8px),
+    linear-gradient(180deg,rgba(24,12,12,.58),rgba(51,28,24,.3)),
+    linear-gradient(180deg,#684430,#392721);
+  box-shadow:inset 0 3px 7px rgba(12,6,7,.58),inset 0 1px rgba(9,5,5,.72),inset 0 -1px rgba(255,220,166,.1);
+}
+body:has(.top-marquee-bar) #kiosk-insert-btn:hover,
+#insert-coin-btn:hover,
+body:has(.top-marquee-bar) #kiosk-insert-btn:focus-visible,
+#kiosk-insert-btn:hover,
+#insert-coin-btn:focus-visible,
+#kiosk-insert-btn:focus-visible {
+  border-color:rgba(255,213,153,.62);
+  background:
+    repeating-linear-gradient(174deg,rgba(255,225,180,.07) 0 1px,transparent 1px 8px),
+    linear-gradient(180deg,rgba(24,12,12,.46),rgba(62,35,27,.24)),
+    linear-gradient(180deg,#704932,#432c25);
+  box-shadow:inset 0 3px 7px rgba(12,6,7,.5),inset 0 1px rgba(9,5,5,.62),inset 0 -1px rgba(255,220,166,.16);
+}
+#insert-coin-btn:active,
+#kiosk-insert-btn:active { transform:translateY(1px); }
+body.need-coin #kiosk-insert-btn,
+#insert-coin-btn.needs-coin,
+#kiosk-insert-btn.needs-coin {
+  background:
+    repeating-linear-gradient(174deg,rgba(255,213,160,.055) 0 1px,transparent 1px 8px),
+    linear-gradient(180deg,rgba(47,22,14,.42),rgba(80,40,22,.24)),
+    linear-gradient(180deg,#684430,#392721);
+}
+
+.top-marquee-bar {
+  display:flex;
+
+  justify-content:center;
+  gap:12px;
+}
+#marquee-name {
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+}
+.top-marquee-bar .marquee-bulbs,#marquee-bar .marquee-bulbs {
+  position:absolute;
+  top:50%;
+  width:min(110px,calc(50vw - var(--marquee-side-gap,77px)));
+  max-width:110px;
+  height:4px;
+  background-image:radial-gradient(circle,#8dfaff 0 1.6px,transparent 2px);
+  background-size:18px 4px;
+  background-repeat:repeat-x;
+  background-position:center;
+  filter:drop-shadow(0 0 4px #28dff5) drop-shadow(0 0 8px rgba(220,61,255,.42));
+  transform:translateY(-50%);
+}
+.top-marquee-bar { --marquee-side-gap:77px; }
+#marquee-bar { --marquee-side-gap:77px; }
+.top-marquee-bar .marquee-bulbs:first-of-type,#marquee-bar .marquee-bulbs:first-of-type { right:calc(50% + var(--marquee-side-gap)); }
+.top-marquee-bar .marquee-bulbs:last-of-type,#marquee-bar .marquee-bulbs:last-of-type { left:calc(50% + var(--marquee-side-gap)); }
+
+@media (max-width:520px) {
+  .top-marquee-bar,#marquee-bar { --marquee-side-gap:57px; }
+  .top-marquee-bar .marquee-bulbs,#marquee-bar .marquee-bulbs { width:min(40px,calc(50vw - 57px));max-width:40px; }
+}
+
+/* Raised title glass. */
+.top-marquee-bar,
+#marquee-bar.jukebox-marquee {
+  width:100%;
+  right:0;
+  height:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
+  align-items:center;
+  background:
+    var(--cabinet-shell);
+
+}
+#marquee-bar.jukebox-marquee #marquee-name {
+  top:calc(6px + env(safe-area-inset-top,0px));
+  z-index:2;
+  box-sizing:border-box;
+  justify-content:center;
+
+  border-radius:5px;
+
+}
+.top-marquee-bar .marquee-bulbs,
+#marquee-bar.jukebox-marquee .marquee-bulbs { margin-top:18px; }
+
+@media (max-width:520px) {
+
+  .top-marquee-bar,#marquee-bar.jukebox-marquee {height:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px))}
+}
+
+/* Keep the fascia and its mounted controls identical on every page. */
+body:has(.top-marquee-bar) #kiosk-insert-btn,
+body:has(#marquee-bar) #insert-coin-btn {
+  right:calc(env(safe-area-inset-right,0px) + 10px);
+  height:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
+  padding-left:10px;
+  padding-right:10px;
+  font-size:12px;
+}
+@media (max-width:480px) {
+  body:has(.top-marquee-bar) #kiosk-insert-btn,
+  body:has(#marquee-bar) #insert-coin-btn {
+    height:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
+  }
+}
+
+@media (max-width:620px), (pointer:coarse) and (max-width:950px) and (max-height:520px) {
+  #marquee-name {visibility:hidden!important}
+}
+
+.deck-coin-slot #coin-drop-anim {left:calc(50% - 40px);right:auto;top:50%}
+
+:root {   --cabinet-width:960px;--dock-clearance:82px }
+/* The fascia casts onto the recessed mechanisms without enlarging the bar. */
+.top-marquee-bar::before,#marquee-bar.jukebox-marquee::before {
+  content:'';position:absolute;left:0;right:0;bottom:0;height:6px;pointer-events:none;
+  background:linear-gradient(#15151b,#4b4b5a 25%,#25252e 45%,#0b0b0e 85%);
+  box-shadow:inset 0 1px #ffffff26;
+}
+.top-marquee-bar::after,#marquee-bar.jukebox-marquee::after {
+  content:'';position:absolute;left:0;right:0;top:100%;height:36px;pointer-events:none;
+  background:linear-gradient(#0009,#0005 20%,#0002 58%,transparent);
+}
+
+#marquee-bar #marquee-name[href] {cursor:pointer;text-decoration:none;pointer-events:auto}
+#marquee-bar #marquee-name[href]:focus-visible {outline:1px solid #dfc799;outline-offset:3px}
+
+.manual-pocket {position:fixed;right:calc(env(safe-area-inset-right,0px) + 92px);top:calc((var(--cabinet-fascia-height) - 32px) / 2 + env(safe-area-inset-top,0px));z-index:520;
+  display:flex;align-items:center;justify-content:center;width:144px;height:32px;padding:4px 7px 5px;box-sizing:border-box;
+  border:1px solid #806849;border-top-color:#33271d;border-bottom-color:#b1976b;border-radius:4px;
+  background:linear-gradient(90deg,#080505,#1a100d 8%,#20140e 80%,#080505);
+  box-shadow:inset 0 5px 7px #000,inset 3px 0 4px #0009,inset -3px 0 4px #000a,0 0 0 1px #140d09,0 -1px 1px #1b100c,0 1px 0 #c8a87133;}
+.manual-pocket::before {content:'';position:absolute;inset:0 0 auto;height:8px;z-index:3;pointer-events:none;border-radius:2px 2px 0 0;
+  background:linear-gradient(#080504dd,#08050488 35%,transparent);box-shadow:inset 0 1px #060303}
+.manual-pocket::after {content:'';position:absolute;left:2px;right:2px;bottom:2px;height:5px;z-index:2;pointer-events:none;border-radius:1px 1px 3px 3px;
+  background:radial-gradient(ellipse 7px 5px at 50% 0,#110b08 75%,transparent 85%),repeating-linear-gradient(174deg,#e5b37b08 0 1px,transparent 1px 6px),linear-gradient(#67472e,#38251c 65%,#22150f);
+  box-shadow:0 -1px 2px #000b,inset 0 1px #aa82524d}
+.cabinet-manual {position:relative;z-index:1;display:flex;align-items:center;justify-content:center;width:126px;height:23px;margin:0 0 2px;padding:0 8px;
+  border:1px solid #353021;border-bottom-color:#8c8060;border-radius:3px 2px 2px 3px;color:#e0dcc9;text-align:center;text-decoration:none;white-space:nowrap;transform:none;
+  appearance:none;cursor:pointer;font:900 8px/1 'Courier New',monospace;letter-spacing:.08em;
+  background:repeating-linear-gradient(0deg,#ddd2a208 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,#0002 0 1px,transparent 1px 3px),linear-gradient(90deg,#302e21 0 7px,#7b7458 7px 9px,#645e43 10px,#514c35 60%,#3f3c2a);
+  box-shadow:0 2px 2px #000c,2px 0 3px #000b,inset 0 1px #b9b38c33,inset 0 -2px #20281b;
+  transition:transform .22s cubic-bezier(.2,.7,.15,1),filter .2s,box-shadow .2s;box-sizing:border-box}
+.cabinet-manual:focus-visible {outline:1px solid #e0c48b;outline-offset:2px}
+.cabinet-manual::before {
+  content:'';
+  position:absolute;
+  left:7px;
+  top:2px;
+  bottom:2px;
+  width:2px;
+  border-left:1px solid #c0b18d;
+  border-right:1px solid #302f25;
+  pointer-events:none;
+}
+.cabinet-manual::after {
+  content:'';
+  position:absolute;
+  right:-3px;
+  top:2px;
+  bottom:2px;
+  width:4px;
+  border:1px solid #aaa48b;
+  border-left:0;
+  border-radius:0 2px 2px 0;
+  background:repeating-linear-gradient(0deg,#ded6be 0 1px,#888777 1px 2px);
+  box-shadow:1px 1px 2px #0009;
+  pointer-events:none;
+}
+.manual-book-spine {
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+  width:7px;
+  border-right:1px solid #a99c78;
+  border-radius:4px 0 0 2px;
+  background:linear-gradient(90deg,#242216,#5e583d 56%,#302f20);
+}
+.manual-page-edges {display:none}
+.manual-book-copy {display:flex;align-items:center;justify-content:center;min-width:0;white-space:nowrap}
+.manual-book-copy strong {color:#cabc94;font:700 8px/1 Georgia,serif;letter-spacing:.1em;text-shadow:0 1px #182011,0 -1px #cbb78322}
+.manual-book-copy small {display:none}
+.cabinet-manual:is(:hover,:focus-visible,.card-focused) {transform:translateY(-1px);filter:brightness(1.12)}
+.cabinet-manual.manual-away {visibility:hidden;pointer-events:none}
+.manual-transit {position:fixed;left:0;top:0;right:auto;margin:0;z-index:20001;pointer-events:none;transition:none;transform-origin:50% 75%}
+.manual-transit .manual-book-copy strong {font-size:inherit}
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .manual-pocket {display:none}
+@media(max-width:480px) {
+  .manual-pocket {
+    right:calc(env(safe-area-inset-right,0px) + 42px);
+    top:calc((var(--cabinet-fascia-height) - 27px) / 2 + env(safe-area-inset-top,0px));
+    width:94px;
+    height:27px;
+    padding:4px 4px 5px;
+  }
+  .cabinet-manual {width:82px;height:19px;padding:0 4px 0 10px;font-size:7px}
+  .manual-book-copy strong {font-size:8px;letter-spacing:.02em}
+}
+@media(prefers-reduced-motion:reduce) {.cabinet-manual {transition:none}}
+
+/* The selector and the games occupy the same physical cabinet. */
+body.cabinet-page {
+  background: radial-gradient(ellipse at 50% 8%, rgba(164,78,37,.19), transparent 43%),
+              radial-gradient(ellipse at 50% 72%, rgba(74,38,80,.18), transparent 60%), #100c12;
+  background-attachment: fixed;
+}
+body.cabinet-page::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 98;
+  background: radial-gradient(ellipse at center, transparent 43%, rgba(12,5,11,.58) 100%);
+}
+    /* ---- screen bezel — frames the game grid like a monitor set into the
+       cabinet, complete with corner screws and a glass glare ---- */
+    .screen-bezel {
+      position: fixed;
+      top: calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
+      bottom: var(--cabinet-panel-depth,56px);
+      left: 50%;
+      transform: translateX(-50%);
+      flex-shrink:0;
+      perspective: 1500px;
+      transform-style:preserve-3d;
+      overflow:hidden;
+      width: min(calc(100% - 32px), var(--cabinet-width));
+      max-width: var(--cabinet-width);
+      margin: 0;
+      padding: 27px 22px 54px;
+      border: 1px solid var(--cabinet-trim);
+      border-radius: 22px;
+      background: var(--cabinet-shell);
+      box-shadow:
+        0 20px 52px rgba(0,0,0,.72), 0 0 0 5px #0c090e,
+        0 0 0 7px rgba(255,255,255,.1), 0 0 46px rgba(120,105,196,.12),
+        inset 0 2px rgba(255,255,255,.12), inset 0 -9px 18px rgba(0,0,0,.58);
+    }
+    .screen-bezel::before {
+      content: '';
+      position: absolute;
+      inset: 12px;
+      border-radius: 10px;
+        box-shadow: inset 0 0 26px rgba(0,0,0,.84), inset 0 2px 0 rgba(255,255,255,.12), inset 0 0 0 1px rgba(255,255,255,.08);
+      pointer-events: none;
+    }
+    .screen-bezel::after {
+      content: '';
+      position: absolute;
+      inset: 12px;
+      border-radius: 10px;
+        background: linear-gradient(115deg,
+        rgba(255,255,255,.05) 0%, transparent 16%,
+        transparent 82%, rgba(255,255,255,.02) 100%);
+      pointer-events: none;
+    }
+    .screen-bezel .screw {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #f0d7a8, #92734d 34%, #281816 72%);
+      box-shadow: 0 1px 1px rgba(255,239,208,.62), 0 1px 3px rgba(0,0,0,.88), inset 0 0 0 1px rgba(255,222,167,.25);
+    }
+    .screen-bezel .screw::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 6px;
+      height: 1px;
+      background: #000;
+      transform: translate(-50%, -50%) rotate(35deg);
+    }
+    .screen-bezel .screw.tl { top: 9px; left: 9px; }
+    .screen-bezel .screw.tr { top: 9px; right: 9px; }
+    .screen-bezel .screw.bl { bottom: 9px; left: 9px; }
+    .screen-bezel .screw.br { bottom: 9px; right: 9px; }
+    @media (max-width: 520px) {
+      .screen-bezel { padding: 20px 14px 48px; border-radius: 14px; }
+    }
+
+    .cab-rail {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      width: 64px;
+      display: none;
+      pointer-events: none;
+      z-index: 4;
+      background:
+        linear-gradient(90deg, transparent 0 10%, rgba(255,201,117,.22) 10.5%, transparent 11.5% 89%, rgba(255,201,117,.18) 90%, transparent 91%),
+        repeating-linear-gradient(173deg, transparent 0 8px, rgba(236,164,102,.075) 9px, transparent 11px 18px),
+        radial-gradient(circle at 50% 0, #ffca73 0 2.4px, rgba(255,202,116,.18) 3px, transparent 4px) 0 44px / 100% 150px repeat-y,
+        linear-gradient(90deg, #8a5937, #4b2d29 52%, #1c1417);
+    }
+    /* bright seam where the rail meets the screen — sells it as a distinct panel */
+    .cab-rail::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(180deg, transparent, rgba(255,218,160,.42) 15%, rgba(255,218,160,.42) 85%, transparent);
+    }
+    .cab-rail.left  { left: 0; box-shadow: inset -14px 0 28px rgba(0,0,0,.75), inset 9px 0 18px rgba(255,174,97,.11); }
+    .cab-rail.left::after  { right: 0; }
+    .cab-rail.right { right: 0; box-shadow: inset 14px 0 28px rgba(0,0,0,.75), inset 9px 0 18px rgba(255,174,97,.11); transform: scaleX(-1); }
+    .cab-rail.right::after { right: 0; }
+    @media (min-width: 1180px) {
+      .cab-rail { display: block; }
+    }
+
+.cabinet-glass {
+  position: fixed; pointer-events: none; z-index: 8; border-radius: 10px;
+  background: linear-gradient(115deg, rgba(255,239,208,.065), transparent 16% 82%, rgba(255,196,132,.025));
+  box-shadow: inset 0 0 25px #000, inset 0 0 0 2px #261d18;
+}
+.jukebox-game-screen > .cabinet-glass { position:absolute; inset:0; }
+
+.cabinet-stars {
+  position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:0;
+}
+.cabinet-stars i {
+  position:absolute; width:1px; height:1px; border-radius:50%; background:#ffe1a5;
+}
+body.cabinet-page .cab-rail {
+  background:
+    var(--plastic-grain),
+    linear-gradient(90deg,#ffffff0d,transparent 14% 80%,#0000004d),
+    linear-gradient(180deg,#2e2f33,#202124 60%,#18191b);
+}
+
+@media(max-width:620px) {
+  :root { --dock-clearance:75px; --title-left:126px; }
+  #marquee-bar.jukebox-marquee #marquee-name {
+    visibility:visible!important;
+
+  }
+}
+@media(max-width:480px) {
+  :root {--title-right:128px;}
+}
+@media(min-width:601px) and (max-width:620px) {:root {--title-left:158px;}}
+
+/* The title window. */
+#marquee-bar.jukebox-marquee #marquee-name {
+  width:256px;height:50px;min-height:50px;font-size:30px;
+}
+/* Phones: the title takes the gap between the logo and the manual book, and its letters size to it. */
+@media (max-width:520px) {
+  #marquee-bar.jukebox-marquee #marquee-name {
+    --flip:clamp(10px,calc((100vw - 296px) / 6.4),19px);
+    left:calc(50% - 34px);top:calc(env(safe-area-inset-top,0px) + 25px - var(--flip) * .56);
+    height:auto;min-height:0;font-size:var(--flip);
+  }
+}
+/* Under 340px there is no room for the manual book beside the title on a game page: the title is centred, the book waits on the cabinet. */
+@media (max-width:340px) {
+  body:has(#glcanvas) .manual-pocket {display:none}
+  #marquee-bar.jukebox-marquee #marquee-name {left:50%}
+}
+
+.manual-open-book { touch-action: pan-y; }
+
+/* Two players on a phone: bigger caps and cross. */
+
+/* The credit lamps sit under the touch strip's glass, where nobody sees them. */
+
+/* A small phone on its side with two players: the lamps go under the caps, not behind them. */
+
+/* The controls card: printed paper that slides out from under the top bar when asked for. */
+#card-button {
+  position:fixed;z-index:521;width:22px;height:22px;padding:0;display:grid;place-items:center;
+
+  top:calc((var(--cabinet-fascia-height) - 22px) / 2 + env(safe-area-inset-top,0px));
+  border-radius:50%;
+
+  font:700 14px/1 Georgia,serif;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s,border-color .2s;
+}
+#card-button:hover, #card-button:focus-visible, :root[data-card] #card-button,
+body:has(#glcanvas) #card-button {
+  border-color:#ffe2a0;color:#fff9df;
+  background:radial-gradient(circle at 35% 28%,#ffe8af,#bc752a 65%,#724015);
+  box-shadow:0 0 5px 2px #ffc85799,0 0 13px #ffb43b77,inset 0 1px 3px #fff6;
+  text-shadow:0 0 4px #fff1b8;
+}
+#card-button:focus-visible {outline:2px solid #fff3ca;outline-offset:3px}
+/* Wide: beside the title window, away from the manual. Phones: between the title and the manual book. */
+@media (min-width:521px) {#card-button {right:auto;left:calc(50% - 168px)}}
+@media (max-width:520px) {#card-button {right:calc(env(safe-area-inset-right,0px) + 146px)}}
+@media (max-width:340px) {
+  body:has(#glcanvas) #card-button {right:calc(env(safe-area-inset-right,0px) + 42px)}
+  body:not(:has(#glcanvas)) #card-button {right:calc(env(safe-area-inset-right,0px) + 144px)}
+}
+
+#controls-card {
+  position:fixed;left:50%;z-index:160;width:min(480px,calc(100vw - 32px));box-sizing:border-box;
+  top:calc(var(--marquee-h) + env(safe-area-inset-top,0px) + 22px);padding:26px 13px 14px;
+  border:2px solid #b5aa8d;border-radius:11px;background:#243e3c;text-align:center;font-family:'Courier New',monospace;
+  box-shadow:0 14px 28px #000b,0 3px 0 #8f754e,inset 0 1px #fff4dc77,inset 0 -3px #0b0909;
+  transform:translate(-50%,calc(-100% - 110px)) rotate(-2.2deg);transform-origin:50% 0;
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:transform .6s cubic-bezier(.2,.85,.25,1.04),opacity .25s,visibility 0s .6s;
+}
+#controls-card::before {content:'';position:absolute;inset:3px;border:1px solid #f5edda55;border-radius:7px;pointer-events:none}
+:root[data-card] #controls-card {
+  transform:translate(-50%,0) rotate(-.6deg);opacity:1;visibility:visible;pointer-events:auto;cursor:pointer;
+  transition:transform .6s cubic-bezier(.2,.85,.25,1.04),opacity .25s,visibility 0s;
+}
+.cc-paper {position:relative;padding:12px 12px 10px;border:1px solid #a88b61;border-radius:3px;color:#30251d;
+  background:linear-gradient(135deg,#f1e6ce,#d9c7a5);box-shadow:inset 0 1px #fff8e8,0 2px 4px #120d0b99}
+.cc-punch {position:absolute;top:7px;left:50%;width:40px;height:10px;transform:translateX(-50%);pointer-events:none}
+.cc-punch::before, .cc-punch::after {content:'';position:absolute;top:1px;width:8px;height:8px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#e8d6ae 0 1px,#171313 2px 3px,#b49565 3.5px 4px,transparent 4.5px)}
+.cc-punch::before {left:3px}
+.cc-punch::after {right:3px}
+.cc-title {margin:0;color:#3e5f59;font-size:10px;font-weight:700;letter-spacing:.3em}
+.cc-game {margin:5px 0 12px;color:#742e36;font:900 clamp(20px,5.5vw,28px)/1 'Courier New',monospace;letter-spacing:.14em}
+.cc-foot {margin:12px 0 0;color:#765733;font-size:8px;letter-spacing:.2em}
+#controls-card .pc-legend {padding-top:12px;border-top:1px solid #65807777}
+
+/* The arm: a rod fixed to the card slides out of a brass sleeve under the top bar, so the card is carried down. */
+.cc-rod {position:absolute;left:50%;bottom:calc(100% - 4px);width:9px;height:240px;margin-left:-4.5px;z-index:-1;
+  background:linear-gradient(90deg,#51483a,#d8cba8 40%,#8c7d5e 70%,#2f2a22);border-radius:2px 2px 0 0;box-shadow:1px 0 2px #0008}
+.cc-clamp {position:absolute;left:50%;top:-9px;width:42px;height:13px;margin-left:-21px;border:1px solid #6e5a38;border-radius:4px;
+  background:linear-gradient(180deg,#e2cf9f,#9d8454 55%,#6b5738);box-shadow:0 2px 3px #000a,inset 0 1px #fff6;
+  background-image:radial-gradient(circle at 20% 50%,#2a2118 0 1.5px,transparent 2px),radial-gradient(circle at 80% 50%,#2a2118 0 1.5px,transparent 2px),linear-gradient(180deg,#e2cf9f,#9d8454 55%,#6b5738)}
+#card-sleeve {position:fixed;left:50%;z-index:161;width:20px;height:34px;margin-left:-10px;border:1px solid #6e5a38;border-radius:0 0 4px 4px;
+  top:calc(var(--marquee-h) + env(safe-area-inset-top,0px) - 12px);
+  background:linear-gradient(90deg,#4a3d27,#e8d6a8 35%,#a58d5c 65%,#3b2f1d);box-shadow:0 3px 4px #000a;
+  visibility:hidden;transition:visibility 0s .6s}
+:root[data-card] #card-sleeve {visibility:visible;transition:none}
+@media (prefers-reduced-motion:reduce) {#controls-card, :root[data-card] #controls-card {transition:opacity .2s}}
+
+.pc-legend {display:flex;gap:12px 24px;flex-wrap:wrap;justify-content:center}
+.pc-group {display:flex;flex-direction:column;align-items:center;gap:7px}
+.pc-keys {display:flex;align-items:center;gap:4px}
+.pc-keys i {margin:0 4px;color:#765733;font:700 10px/1 'Courier New',monospace;font-style:normal;letter-spacing:.1em;text-transform:uppercase}
+.pc-legend kbd {
+  position:relative;min-width:30px;height:30px;padding:0 7px;display:inline-grid;place-items:center;
+  border:1.5px solid #30251d;border-bottom-width:3px;border-radius:5px;background:#fbf4e2;color:#30251d;
+  font:700 15px/1 'Courier New',monospace;
+}
+.pc-legend kbd.wide {padding:0 12px;letter-spacing:.12em;font-size:12px;white-space:nowrap}
+.pc-legend kbd.space {min-width:84px}
+.pc-legend kbd.arrow::before {content:'';width:0;height:0;border:6px solid transparent}
+.pc-legend kbd.left::before {border-right:9px solid #30251d;border-left:0}
+.pc-legend kbd.right::before {border-left:9px solid #30251d;border-right:0}
+.pc-legend kbd.up::before {border-bottom:9px solid #30251d;border-top:0}
+.pc-legend kbd.down::before {border-top:9px solid #30251d;border-bottom:0}
+.pc-legend kbd:is(.red,.blue) {grid-auto-flow:column}
+.pc-legend kbd.red::before, .pc-legend kbd.blue::before {content:'';width:9px;height:9px;margin-right:7px;border:0;border-radius:50%;background:#c93a2f}
+.pc-legend kbd.blue::before {background:#3f6fd1}
+.pc-label {color:#30251d;font-size:11px;font-weight:700;letter-spacing:.2em}
+
+/* The cabinet's switch to the home screen: a brass button like the "?",
+   placed beside the logo by index.html. */
+.home-switch {
+  position:fixed;z-index:521;width:22px;height:22px;padding:0;display:grid;place-items:center;
+  top:calc((var(--cabinet-fascia-height) - 22px) / 2 + env(safe-area-inset-top,0px));
+  border-radius:50%;
+  cursor:pointer;transition:background .2s,color .2s,box-shadow .2s,border-color .2s;
+}
+.home-switch svg {width:12px;height:12px;fill:currentColor}
+.home-switch:hover, .home-switch:focus-visible {
+  border-color:#ffe2a0;color:#fff9df;background:radial-gradient(circle at 35% 28%,#ffe8af,#bc752a 65%,#724015);
+  box-shadow:0 0 5px 2px #ffc85799,0 0 13px #ffb43b77,inset 0 1px 3px #fff6;
+}
+.home-switch:focus-visible {outline:2px solid #fff3ca;outline-offset:3px}
+/* A thumb needs more than the 22px disc. */
+.home-switch::after {content:'';position:absolute;inset:-10px}
+
+/* Two players upright: each station's steering sits at its left and its caps
+   at its right, so without a wider channel the gap between the players equals
+   the gap inside a station and nobody can tell whose caps are whose. */
+
+/* ==== The game page ==== Game pages (game.html) and the deck preview: <html class="game-page">. */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* @font-face for Press Start 2P (the games' pixel-font look) lives in
+   blip.css now — loaded first on every page. */
+
+/* Cabinet accent — "r, g, b" so rgba(var(--cab), a) works. game.js overrides
+   this per game (see BLIP_GAMES in cabinet.js); this green is just the default
+   before that runs. */
+
+html:where(.game-page) {
+  /* overflow:hidden only on html, not body — iOS Safari anchors position:fixed
+     to the body when body has overflow:hidden, shifting fixed elements off-position */
+  overflow: hidden;
+  height: 100%;
+  background-color: #000;
+  /* A game page has nothing to select or copy — kill the iOS text loupe,
+     the selection handles and the copy/look-up callout that a drag or a
+     long-press on the joystick would otherwise pop up. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#topbar *, canvas {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:where(.game-page) body {
+  width: 100%; height: 100%;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+/* ---- Marquee: the per-game name sign above the screen ---- Built in
+   game.js; fillCanvas() reserves its rendered height. */
+#marquee-bar {
+  position: fixed;
+  top: 0; left: 0; 
+  /* Installed to the home screen the page runs under the status bar: the sign
+     draws in the strip below the inset and its background fills behind the
+     clock. fillCanvas() measures offsetHeight, so the canvas follows. */
+  box-sizing: border-box;
+
+  padding-top: env(safe-area-inset-top, 0px);
+  /* Above the scanline (100) and vignette (99) overlays: cabinet hardware,
+     not screen content. */
+  z-index: 201;
+  display: flex;
+
+  justify-content: center;
+  gap: 12px;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(174deg, transparent 0 7px, rgba(255,210,154,.045) 8px, transparent 10px 15px),
+    linear-gradient(180deg,#684430 0%,#392721 48%,#1a1519 100%);
+
+}
+
+:where(.game-page) #marquee-name {
+  display: flex;
+  align-items: center;
+
+  perspective: 280px;
+  font-family: 'Courier New', Courier, monospace;
+
+  line-height: 1;
+}
+/* Neon pinstripes flank the mechanical title cells. */
+.marquee-bulbs {
+  flex: 1 1 auto;
+
+  animation: none;
+}
+:root[data-live] .marquee-bulbs { animation-play-state: paused; }
+
+@keyframes marquee-bulbs {
+  50% { filter: drop-shadow(0 0 1px #ffd16a); opacity: .5; }
+}
+/* The shared bezel stays behind the separately positioned game canvas. */
+#arcade-bezel { z-index: 0; pointer-events: none; }
+
+canvas {
+  background:#09090b;
+  display: block;
+
+  image-rendering: crisp-edges;
+  outline: none;
+  position: fixed;
+
+  transform-origin: 0 0;
+  touch-action: none;
+  /* Match the glass opening on the selector page. */
+  clip-path: inset(0 round 10px);
+  z-index: 1;
+}
+
+/* ---- Loading screen ---- */
+
+#loader {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  z-index: 50;
+}
+
+#status {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  letter-spacing: 6px;
+  color: #32c832;
+  text-shadow: 0 0 10px #e6dc32;
+  text-transform: uppercase;
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink      { 50% { opacity: 0.25; } }
+
+#bar-outer {
+  width: 260px;
+  height: 5px;
+  border: 1px solid #1c1c1c;
+  background: #080808;
+}
+
+#bar-inner {
+  height: 100%;
+  width: 0%;
+  background: #32c832;
+  box-shadow: 0 0 8px #32c832;
+  transition: width .12s linear;
+}
+
+/* Fullscreen on a PC is the top bar and the picture: the keyboard plays, so
+   the deck, its picker and the cabinet frame go. A touch screen keeps them
+   (data-has-touch), since the deck is what it plays on. App mode does the
+   same on a PC, or on a tablet with a gamepad in hand (data-bare). */
+
+/* No cabinet behind the picture either. */
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]):where(.game-page) body { background: #000; }
+/* The picture starts right under the bar and runs to every edge, so nothing
+   may lap over it: no vignette, no edge trim, and the bar's glows, the coin
+   slot's swell and the logo's hint are cut off at the bar's own bottom. */
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]):where(.game-page) body::after { display: none; }
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]):where(.game-page) #marquee-bar { box-shadow: none; }
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]):where(.game-page) :is(.blip-logo, #insert-coin-btn) {
+  clip-path: inset(0 -80px);
+  transform: none !important;
+}
+/* ---- Bottom bar — game-page overrides ---- */
+
+/* Coin slot + drop animation: shared with the kiosk landing/history/about
+   pages' own insert-coin button, so it lives in blip.css (scoped to
+   "#insert-coin-btn, #kiosk-insert-btn") rather than duplicated here. */
+
+/* Lock the playfield while preserving the coin slot and physical controls. */
+#need-coin-overlay {
+  position:fixed;right:0;
+  bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px));
+  z-index:150;display:none;place-items:center;padding:24px;
+  color:#c6b89d;background:#000;pointer-events:auto;touch-action:none;
+}
+#need-coin-overlay.visible {display:grid}
+.nco-panel {text-align:center;font-family:'Courier New',monospace;text-transform:uppercase;letter-spacing:.14em}
+.nco-msg {color:#e8b04a;font-size:clamp(16px,3vw,24px);font-weight:900;letter-spacing:.2em}
+.nco-legend {max-width:560px;margin:18px auto 0}
+.nco-legend .pc-label {color:#c6b89d}
+.nco-legend .pc-keys i {color:#8d7a5c}
+.nco-sub {margin-top:13px;font-weight:700}
+.nco-how {color:#777064;letter-spacing:.08em}
+.nco-go {margin-top:22px;color:#f1e3c0;font-size:clamp(13px,2.2vw,18px);animation:nco-blink 1.2s steps(2,jump-none) infinite}
+.nco-go kbd {padding:2px 8px;border:1px solid #c6b89d;border-radius:4px;background:#2a2218;font:inherit}
+.nco-how {font-size:11px}
+:root[data-has-touch] .nco-pc, :root:not([data-has-touch]) .nco-touch {display:none}
+#need-coin-overlay.visible {cursor:pointer}
+@keyframes nco-blink {50% {opacity:.35}}
+@media (prefers-reduced-motion:reduce) {.nco-go {animation:none}}
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]):where(.game-page) #need-coin-overlay {
+  bottom:0;
+}
+
+/* Rally: the same panel as every game, the dials in the cross's slots and
+   the cross's size. Its sticks, pads and caps are hidden, not removed. */
+:root {
+     --cabinet-trim:rgba(255,255,255,.1);
+     --plastic-grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+     --cabinet-shell:
+    var(--plastic-grain),
+    linear-gradient(110deg, rgba(255,255,255,.04), transparent 35% 75%, rgba(0,0,0,.14)),
+    linear-gradient(180deg, #353542 0%, #2a2a36 22%, #22212b 68%, #1a1a22 100%);
+     --cabinet-fascia-height:60px;
+ --cab: 50, 200, 50; /* Height of the marquee strip, and so of the BLIP logo and coin slot
+     mounted on its ends; one variable so they cannot drift apart. Redefined
+     per breakpoint below. */
+  --marquee-h: var(--cabinet-fascia-height); --marquee-gap: 8px;}
+
+/* Shrink controls in landscape / short screens */
+@media (max-height: 450px) {
+  :root { --marquee-gap: 6px; }
+  #marquee-bar { gap: 8px; }
+}
+
+/* Phones — a fatter marquee strip so the BLIP logo and coin slot over its
+   ends are easy thumb targets (blip.css bumps those to a 46px box). The
+   bezel and top screws follow it down. */
+@media (max-width: 480px) {
+  :root { --marquee-h: var(--cabinet-fascia-height); }
+}
+
+/* ---- Two players on a phone: turn it sideways (game.js rotateHint) ---- */
+#rotate-hint {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  top: calc(var(--marquee-h, 28px) + var(--marquee-gap, 8px) + 20px + env(safe-area-inset-top, 0px));
+  bottom: calc(var(--topbar-h, 56px) + 12px + env(safe-area-inset-bottom, 0px));
+  z-index: 140;
+
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.82);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  color: #e6dc32;
+  text-align: center;
+  touch-action: manipulation;
+}
+#rotate-hint.show { display: flex; }
+#rotate-hint .rh-text { font-size: 13px; line-height: 1.9; letter-spacing: 1px; text-shadow: 0 0 8px rgba(230, 220, 50, 0.6); }
+#rotate-hint .rh-phone {
+  width: 38px;
+  height: 64px;
+  border: 3px solid #cfe6ef;
+  border-radius: 7px;
+  box-shadow: inset 0 -6px 0 -3px #cfe6ef;
+  animation: rh-turn 2.2s ease-in-out infinite;
+}
+@keyframes rh-turn {
+  0%, 25% { transform: rotate(0deg); }
+  55%, 100% { transform: rotate(-90deg); }
+}
+@media (prefers-reduced-motion: reduce) { #rotate-hint .rh-phone { animation: none; transform: rotate(-90deg); } }
+#rotate-hint .rh-stay {
+  margin-top: 8px;
+  padding: 10px 14px;
+  border: 1px solid rgba(150, 165, 150, 0.5);
+  border-radius: 4px;
+  background: rgba(12, 16, 12, 0.9);
+  color: rgba(190, 205, 190, 0.85);
+  font: 8px 'Press Start 2P', 'Courier New', monospace;
+  letter-spacing: 1px;
+}
+
+:root[data-freeplay] .blip-power-indicator { visibility: hidden; }
+
+/* "Add to Home Screen": the game's icon and how to save it. */
+#install-sheet {
+  position: fixed; inset: 0; z-index: 900; display: grid; place-items: center; padding: 16px;
+  background: rgba(0, 0, 0, .62);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+}
+.install-card {
+  width: min(360px, 100%); padding: 22px 20px 16px; border-radius: 18px; text-align: center;
+  background: #1f1d26; color: #f2f2f7; box-shadow: 0 12px 40px rgba(0, 0, 0, .6);
+}
+.install-icon { width: 76px; height: 76px; border-radius: 17px; box-shadow: 0 4px 12px rgba(0, 0, 0, .5); }
+.install-card h2 { margin: 12px 0 6px; font-size: 19px; line-height: 1.25; }
+.install-lede, .install-wait { margin: 0 0 12px; font-size: 14px; line-height: 1.4; color: #c7c7cc; }
+.install-steps { margin: 0 0 14px; padding: 0 0 0 22px; text-align: left; font-size: 15px; line-height: 1.6; }
+.install-share { width: 14px; height: 18px; vertical-align: -3px; color: #0a84ff; }
+.install-actions { display: flex; flex-direction: column; gap: 8px; }
+.install-actions button {
+  min-height: 46px; border: 0; border-radius: 12px; font: 600 16px/1 inherit; cursor: pointer;
+  font-family: inherit;
+}
+.install-go { background: #0a84ff; color: #fff; }
+.install-close { background: rgba(255, 255, 255, .1); color: #f2f2f7; }
+.install-actions button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.cc-install { margin: 10px 0 0; text-align: center; }
+.cc-control-options { display: flex; gap: 5px; margin: 8px 0 10px; }
+.cc-control-options button {
+  flex: 1; min-width: 0; min-height: 44px; padding: 5px 3px;
+  border: 1px solid currentColor; border-radius: 6px;
+  background: transparent; color: inherit; opacity: .62;
+  font: 600 10px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  letter-spacing: .03em; cursor: pointer;
+}
+.cc-control-options button[aria-pressed="true"] { opacity: 1; background: rgba(255,255,255,.18); }
+.cc-control-options button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.cc-install button {
+  padding: 6px 10px; border: 1px solid currentColor; border-radius: 6px; background: none;
+  color: inherit; font: inherit; font-size: 11px; letter-spacing: .06em; cursor: pointer;
+}
+/* A phone on its side has no height to spare on the card. */
+:root[data-layout="landscape"] .cc-install { display: none; }
+:root[data-layout="landscape"] #controls-card {
+  top: calc(var(--marquee-h) + env(safe-area-inset-top, 0px) + 10px);
+  padding: 12px 10px 8px;
+}
+:root[data-layout="landscape"] #controls-card .cc-foot { display: none; }
+
+/* ---- App style ---- A game opened from the home screen or its own icon
+   wears an app's look: a frosted title bar with a way Home, the game on
+   black, a plain deck. Sizes stay the cabinet's, so the picture is fitted
+   the same. */
+:root[data-appstyle] {
+  --app-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --app-tint: #0a84ff;
+  background: #000;
+}
+:root[data-appstyle] body { background: #000; }
+:root[data-appstyle] .cabinet-stars,
+:root[data-appstyle] .cab-rail,
+:root[data-appstyle] .screen-bezel .screw,
+:root[data-appstyle] .cabinet-glass,
+:root[data-appstyle] .manual-pocket,
+:root[data-appstyle] .marquee-bulbs,
+:root[data-appstyle] #card-sleeve,
+:root[data-appstyle] .blip-logo-mark { display: none !important; }
+:root[data-appstyle] #arcade-bezel { background: #000; border: 0; box-shadow: none; border-radius: 0; }
+:root[data-appstyle] #arcade-bezel::before, :root[data-appstyle] #arcade-bezel::after { display: none; }
+
+:root[data-appstyle] #marquee-bar {
+  background: rgba(22, 22, 24, .78);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8); backdrop-filter: blur(20px) saturate(1.8);
+  border: 0; border-bottom: .5px solid rgba(255, 255, 255, .14); box-shadow: none;
+}
+:root[data-appstyle] #marquee-bar::before, :root[data-appstyle] #marquee-bar::after { display: none; }
+:root[data-appstyle] #marquee-bar.jukebox-marquee #marquee-name {
+  background: none; border: 0; box-shadow: none; pointer-events: none;
+}
+:root[data-appstyle] #marquee-name::before { display: none; }
+:root[data-appstyle] #marquee-name::after {
+  content: attr(data-title);
+  font: 600 17px/1 var(--app-font); color: #fff; letter-spacing: -.01em;
+}
+/* Home: an app's back button, where the logo stands. */
+:root[data-appstyle] .blip-logo { display: none !important; }
+:root[data-appstyle] .app-back {
+  position: fixed; z-index: 520; display: flex; align-items: center; gap: 5px;
+  left: calc(env(safe-area-inset-left, 0px) + 8px);
+  top: calc(env(safe-area-inset-top, 0px) + (var(--cabinet-fascia-height, 52px) - 44px) / 2);
+  height: 44px; padding: 0 8px;
+  color: var(--app-tint); font: 400 17px/1 var(--app-font); text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+:root[data-appstyle] .app-back svg { width: 11px; height: 19px; }
+:root[data-appstyle] .app-back:active { opacity: .45; }
+:root[data-appstyle] .app-back:focus-visible { outline: 2px solid var(--app-tint); outline-offset: 2px; border-radius: 8px; }
+/* The controls card's "?" as an app's info button. */
+:root[data-appstyle] #card-button {
+  border: 1.5px solid var(--app-tint);   
+  font: 600 13px/1 var(--app-font); 
+}
+:root[data-appstyle] #card-button:hover, :root[data-appstyle][data-card] #card-button,
+:root[data-appstyle] body:has(#glcanvas) #card-button {
+  border-color: var(--app-tint); background: none; color: var(--app-tint); box-shadow: none; text-shadow: none;
+}
+:root[data-appstyle][data-card] #card-button { background: var(--app-tint); color: #fff; }
+
+/* The launch screen: the icon on black while the game loads. */
+:root[data-appstyle] #loader { background: #000; gap: 28px; }
+:root[data-appstyle] #loader::before {
+  content: ''; width: 108px; height: 108px; border-radius: 24px;
+  background: var(--app-icon) center / cover no-repeat;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .6);
+}
+:root[data-appstyle] #status { display: none; }
+:root[data-appstyle] #bar-outer { width: 120px; height: 4px; border: 0; border-radius: 2px; background: rgba(255, 255, 255, .16); overflow: hidden; }
+:root[data-appstyle] #bar-inner { background: #fff; box-shadow: none; border-radius: 2px; }
+
+/* The controls card as an app's panel: frosted, system type, plain keys. */
+:root[data-appstyle] #controls-card {
+  border: .5px solid rgba(255, 255, 255, .16); border-radius: 20px; padding: 16px 14px 14px;
+  background: rgba(30, 30, 32, .82);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .55); font-family: var(--app-font);
+  transform: translate(-50%, -24px) scale(.96);
+  transition: transform .32s cubic-bezier(.32, .72, 0, 1), opacity .2s, visibility 0s .32s;
+}
+:root[data-appstyle][data-card] #controls-card {
+  transform: translate(-50%, 0); transition: transform .32s cubic-bezier(.32, .72, 0, 1), opacity .2s, visibility 0s;
+}
+:root[data-appstyle] #controls-card::before,
+:root[data-appstyle] #controls-card .cc-rod,
+:root[data-appstyle] #controls-card .cc-clamp,
+:root[data-appstyle] #controls-card .cc-punch,
+:root[data-appstyle] #controls-card .cc-foot { display: none; }
+:root[data-appstyle] .cc-paper { padding: 0; border: 0; background: none; box-shadow: none; color: #fff; }
+:root[data-appstyle] .cc-title { color: rgba(235, 235, 245, .6); font: 600 12px/1 var(--app-font); letter-spacing: .02em; text-transform: uppercase; }
+:root[data-appstyle] .cc-game { margin: 6px 0 14px; color: #fff; font: 700 24px/1.1 var(--app-font); letter-spacing: -.01em; text-transform: capitalize; }
+:root[data-appstyle] #controls-card .pc-legend { border-top: .5px solid rgba(255, 255, 255, .14); }
+:root[data-appstyle] .pc-label { color: rgba(235, 235, 245, .6); font: 500 12px/1 var(--app-font); letter-spacing: 0; text-transform: capitalize; }
+:root[data-appstyle] .pc-keys i { color: rgba(235, 235, 245, .45); font: 400 12px/1 var(--app-font); text-transform: none; }
+:root[data-appstyle] .pc-legend kbd {
+  border: 0; border-radius: 8px; background: rgba(118, 118, 128, .3); color: #fff;
+  font: 600 14px/1 var(--app-font); box-shadow: inset 0 -1px rgba(0, 0, 0, .3);
+}
+:root[data-appstyle] .pc-legend kbd.wide { font-size: 12px; letter-spacing: .02em; }
+:root[data-appstyle] .pc-legend kbd.left::before { border-right-color: #fff; }
+:root[data-appstyle] .pc-legend kbd.right::before { border-left-color: #fff; }
+:root[data-appstyle] .pc-legend kbd.up::before { border-bottom-color: #fff; }
+:root[data-appstyle] .pc-legend kbd.down::before { border-top-color: #fff; }
+:root[data-appstyle] .cc-install button {
+  border: 0; border-radius: 10px; padding: 9px 14px; background: var(--app-tint); color: #fff;
+  font: 600 13px/1 var(--app-font); letter-spacing: 0;
+}
+/* The cabinet hides its title tiles where the bar is crowded; an app's
+   title bar has room for its name. */
+:root[data-appstyle] #marquee-name { visibility: visible !important; }
+
+/* The Guide over a game: a sheet that rises from the bottom, its top edge
+   showing the game still underneath. */
+#guide-sheet {
+  position: fixed; inset: 0; z-index: 950; display: flex; align-items: flex-end;
+  background: rgba(0, 0, 0, .4);
+  animation: guide-dim .3s ease-out;
+}
+#guide-sheet iframe {
+  display: block; width: 100%; height: calc(100% - env(safe-area-inset-top, 0px) - 12px);
+  border: 0; border-radius: 12px 12px 0 0; background: #000;
+  animation: guide-up .42s cubic-bezier(.32, .72, 0, 1);
+}
+#guide-sheet.closing { animation: guide-dim .26s ease-in reverse forwards; }
+#guide-sheet.closing iframe { animation: guide-up .26s ease-in reverse forwards; }
+@keyframes guide-dim { from { background: transparent; } }
+@keyframes guide-up { from { transform: translateY(100%); } }
+@media (min-width: 768px) and (min-height: 700px) {
+  #guide-sheet { align-items: center; justify-content: center; }
+  #guide-sheet iframe { width: min(720px, 92vw); height: min(860px, 88vh); border-radius: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { #guide-sheet, #guide-sheet iframe { animation: none !important; } }
+:root[data-appstyle]:not([data-layout="landscape"]) .cc-install { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+:root[data-appstyle] #cc-guide { background: rgba(118, 118, 128, .3); }
+/* The "?" is the bar's trailing button, as in an iOS navigation bar. */
+:root[data-appstyle] #card-button {
+  left: auto !important;
+  right: calc(env(safe-area-inset-right, 0px) + 16px) !important;
+  width: 26px;
+  height: 26px;
+  top: calc((var(--cabinet-fascia-height) - 26px) / 2 + env(safe-area-inset-top, 0px));
+}
+
+/* The launch screen's copy, fading into the game's first frame. */
+.launch-fade {
+  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+  background: #000; pointer-events: none; animation: launch-fade .35s ease-out .05s forwards;
+}
+.launch-fade::before { content: ''; width: 108px; height: 108px; border-radius: 24px; background: var(--app-icon) center / cover no-repeat; }
+.launch-fade > * { visibility: hidden; }
+@keyframes launch-fade { to { opacity: 0; } }
+
+/* The score to beat, under the title, as a navigation bar's subtitle. */
+:root[data-appstyle] #marquee-bar.jukebox-marquee #marquee-name {
+  flex-direction: column; gap: 3px; width: min(230px, calc(100vw - 210px)); padding: 0;
+  /* The same 44px line as the back button beside it. */
+  top: calc(env(safe-area-inset-top, 0px) + (var(--cabinet-fascia-height, 52px) - 44px) / 2) !important;
+  height: 44px !important; min-height: 44px !important;
+}
+:root[data-appstyle] #marquee-name::after { order: 1; }
+:root[data-appstyle] #marquee-name[data-best]::before {
+  display: block !important; order: 2; content: attr(data-best); max-width: 100%;
+  font: 400 12px/1 var(--app-font); color: rgba(235, 235, 245, .6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* "Turn sideways" in app style: a frosted card in system type. */
+:root[data-appstyle] #rotate-hint {
+  background: rgba(30, 30, 32, .82); -webkit-backdrop-filter: blur(30px); backdrop-filter: blur(30px);
+  border-radius: 20px; font-family: var(--app-font); color: #fff;
+}
+:root[data-appstyle] #rotate-hint .rh-text { font: 600 17px/1.35 var(--app-font); letter-spacing: 0; text-shadow: none; text-transform: lowercase; }
+:root[data-appstyle] #rotate-hint .rh-text::first-letter { text-transform: uppercase; }
+:root[data-appstyle] #rotate-hint .rh-phone { border-color: #fff; box-shadow: inset 0 -6px 0 -3px #fff; border-radius: 9px; }
+:root[data-appstyle] #rotate-hint .rh-stay {
+  border: 0; border-radius: 12px; padding: 11px 18px; background: rgba(118, 118, 128, .3); color: #fff;
+  font: 600 15px/1 var(--app-font); letter-spacing: 0; text-transform: lowercase;
+}
+:root[data-appstyle] #rotate-hint .rh-stay::first-letter { text-transform: uppercase; }
+/* The first time: the card says how to begin. */
+:root[data-appstyle][data-intro] .cc-paper::after {
+  content: 'Press any key to play'; display: block; margin-top: 12px;
+  font: 400 13px/1.3 var(--app-font); color: rgba(235, 235, 245, .6);
+}
+:root[data-appstyle][data-intro][data-has-touch] .cc-paper::after { content: 'Tap to play'; }
+
+/* The top bar is the machine's marquee (blip.css), the sign it wears in the arcade, lit across the whole bar
+   with the game's name; the flip tiles and the ROM slot are gone. App style keeps its own title bar. */
+:root:not([data-appstyle]) #marquee-bar.jukebox-marquee .marquee-bulbs,
+:root:not([data-appstyle]) #marquee-bar.jukebox-marquee::before,
+:root:not([data-appstyle]) #marquee-bar.jukebox-marquee::after,
+:root:not([data-appstyle]) #marquee-name.machine-marquee::before,
+:root:not([data-appstyle]) #marquee-name.machine-marquee::after {display:none!important}
+:root[data-appstyle] .machine-marquee-name {display:none}
+:root:not([data-appstyle]) #marquee-bar.jukebox-marquee {
+  --trim:var(--machine-trim,#9a9aa6);
+
+  border:0!important;border-bottom:3px solid #09080c!important;
+  box-shadow:inset 0 0 0 1px #ffffff40,inset 0 -5px 9px #0006,0 0 30px color-mix(in srgb,var(--trim) 45%,transparent)!important;
+}
+:root:not([data-appstyle]) #marquee-bar.jukebox-marquee #marquee-name.machine-marquee {
+  gap:0;padding:0 14px;background:none!important;border:0!important;box-shadow:none!important;
+}
+:root:not([data-appstyle]):where(.game-page) .machine-marquee-name {
+  font:400 20px/1 'Press Start 2P','Courier New',monospace;letter-spacing:.02em;color:var(--marquee-ink,#fff7d6);-webkit-text-fill-color:currentColor;
+  text-shadow:-2px -2px #120c18,2px -2px #120c18,-2px 2px #120c18,2px 2px #120c18,3px 4px 0 color-mix(in srgb,var(--trim) 70%,#000),0 0 18px color-mix(in srgb,var(--trim) 80%,#fff);
+}
+@media (max-width:520px) {
+  :root:not([data-appstyle]) #marquee-bar.jukebox-marquee #marquee-name.machine-marquee {padding:0 4px 0 14px}
+  :root:not([data-appstyle]):where(.game-page) .machine-marquee-name {
+    font-size:12px;
+    text-shadow:-1px -1px #120c18,1px -1px #120c18,-1px 1px #120c18,1px 1px #120c18,2px 2px 0 color-mix(in srgb,var(--trim) 70%,#000);
+  }
+}
+
+/* The arcade's zoom ends on the machine's screen; the game page opens on the same picture, where the game will
+   draw, and fades it as the first frame comes up (#launch-frame, from game.js). */
+#launch-frame {
+  position: fixed;
+  z-index: 49;
+  background: #000 center / contain no-repeat;
+  image-rendering: pixelated;
+  clip-path: inset(0 round 10px);
+  pointer-events: none;
+  transition: opacity .35s ease-out;
+}
+#launch-frame.launch-frame-out { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { #launch-frame { transition: none; } }
+/* While the picture waits for the game, no loading words over it. */
+body:has(#launch-frame:not(.launch-frame-out)) #loader { visibility: hidden; }
+
+/* In the arcade the game page is its machine up close (data-machine, from game.js); its surfaces are the machine's (below). */
+:root[data-machine]:not([data-appstyle]) #arcade-bezel .screw { display: none; }
+
+/* ==== The machine ==== Physical surfaces shared by the arcade's cabinets and the game pages (data-machine). */
+/* Physical surfaces shared by the overview cabinet and its game page. Layout stays with each view. */
+[data-machine] {
+  --trim:var(--machine-trim,#9a9aa6);
+  --machine-body:linear-gradient(90deg,#ffffff12,transparent 7% 93%,#0000004d),linear-gradient(180deg,#24212b,#131117 38%,#0d0c11);
+  --machine-monitor:radial-gradient(ellipse at 30% 0,#ffffff12,transparent 50%),#09090c;
+  --machine-monitor-ring:inset 0 0 0 4px #000,inset 0 0 0 5px color-mix(in srgb,var(--trim) 70%,#fff),inset 0 0 0 8px #050507,0 0 0 2px #2c2a31,0 4px 10px #000c;
+  --machine-glare:linear-gradient(160deg,#ffffff1a,#ffffff06 28%,transparent 40%),repeating-linear-gradient(0deg,#0000 0 2px,#00000024 2px 3px),radial-gradient(ellipse at 50% 50%,transparent 58%,#0008);
+  --machine-speaker:radial-gradient(circle,#000 0 1.4px,transparent 1.8px) 0 50%/6px 6px,linear-gradient(#3a3940,#1d1c22);
+  --machine-apron:linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff) 0 1px,var(--trim) 2px 5px,color-mix(in srgb,var(--trim) 55%,#000) 7px,#151318 9px,#252229 11px,#100e13 100%);
+  --machine-marquee:radial-gradient(ellipse 62% 85% at 50% 50%,#ffffff40,transparent 72%),var(--marquee-art,linear-gradient(transparent,transparent)),linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff),var(--trim) 40%,color-mix(in srgb,var(--trim) 45%,#000));
+}
+
+/* The overview's dimensions and 3D transforms are defined in index.html. */
+#game-grid .card {background:var(--machine-body)}
+#game-grid .card-shot-wrap {background:var(--machine-monitor);}
+#game-grid .game-rom::after {background:var(--machine-glare)}
+#game-grid .machine-speaker {background:var(--machine-speaker)}
+#game-grid .machine-controls::after {background:var(--machine-apron)}
+#game-grid .card-title.machine-marquee,
+:root[data-machine]:not([data-appstyle]) #marquee-bar.jukebox-marquee {background:var(--machine-marquee)!important}
+#game-grid .machine-marquee-name {font:inherit}
+
+/* Up close: the same laminate, narrow coloured molding, speaker and CRT pinstripe. */
+:root {--machine-speaker-band:18px}
+:root[data-layout="landscape"],:root[data-bare],:root[data-fullscreen]:not([data-has-touch]) {--machine-speaker-band:0px}
+:root[data-machine]:not([data-appstyle],[data-deck-preview]) body {
+  background:var(--machine-body);
+  box-shadow:inset 6px 0 var(--trim),inset -6px 0 var(--trim),inset 8px 0 #0008,inset -8px 0 #0008;
+}
+:root[data-machine]:not([data-appstyle]) #arcade-bezel {
+  top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px) + var(--machine-speaker-band,0px));
+  background:var(--machine-monitor);border:0;border-radius:6px;box-shadow:var(--machine-monitor-ring);
+}
+:root[data-machine]:not([data-appstyle]) #arcade-bezel::before,
+:root[data-machine]:not([data-appstyle]) #arcade-bezel::after {content:none}
+:root[data-machine]:not([data-appstyle]) .cabinet-glass {
+  background:var(--machine-glare);border-radius:16px/20px;box-shadow:0 0 0 3px #000,0 0 14px color-mix(in srgb,var(--trim) 45%,transparent);
+}
+:root[data-machine]:not([data-appstyle]) canvas {clip-path:inset(0 round 16px / 20px)}
+:root[data-machine]:not([data-appstyle]) .cab-rail {
+  background:var(--machine-body);box-shadow:inset 6px 0 var(--trim),inset -2px 0 #0008;
+}
+:root[data-machine]:not([data-appstyle]) .cab-rail::after {background:var(--trim)}
+body > .machine-speaker {
+  position:fixed;z-index:4;pointer-events:none;
+  top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px) + 3px);
+  left:20%;right:20%;height:10px;border-radius:2px;background:var(--machine-speaker);
+  box-shadow:inset 0 1px 2px #000,0 1px #ffffff1c;
+}
+:is(:root[data-layout="landscape"],:root[data-appstyle],:root[data-bare],:root[data-fullscreen]:not([data-has-touch])) body > .machine-speaker {
+  display:none;
+}
+/* Fullscreen and embedded games retain their edge-to-edge play surface. */
+:is(:root[data-bare],:root[data-fullscreen]:not([data-has-touch])) body {box-shadow:none}
+:is(:root[data-bare],:root[data-fullscreen]:not([data-has-touch])) canvas {clip-path:none}
+
+/* The browser matches these physical parts across navigation using their actual rendered bounds. */
+@view-transition {navigation:auto}
+.card-launching .card-shot-wrap {view-transition-name:machine-monitor}
+.card-launching .game-rom {view-transition-name:machine-picture}
+.card-launching .card-title {view-transition-name:machine-title}
+.card-launching .machine-marquee-name {view-transition-name:machine-name}
+.card-launching .machine-controls {view-transition-name:machine-deck}
+/* The way back is the same move reversed: the game page names the same parts as it leaves (data-machine-leaving)
+   and the arcade names its machine's (.card-launching) as it comes back. */
+:root[data-machine-leaving] #arcade-bezel {view-transition-name:machine-monitor}
+:root[data-machine-leaving] #glcanvas {view-transition-name:machine-picture}
+:root[data-machine-leaving] #marquee-bar {view-transition-name:machine-title}
+:root[data-machine-leaving] .machine-marquee-name {view-transition-name:machine-name}
+:root[data-machine-handoff] #arcade-bezel {view-transition-name:machine-monitor}
+:root[data-machine-handoff] #launch-frame {view-transition-name:machine-picture}
+:root[data-machine-handoff] #marquee-bar {view-transition-name:machine-title}
+:root[data-machine-handoff] .machine-marquee-name {view-transition-name:machine-name}
+/* The fascia's fittings stand at the same pixels on both pages: named, they hold still over the moving sign. */
+:is(:root:has(.card-launching),:root[data-machine-handoff],:root[data-machine-leaving]) body > .blip-logo {view-transition-name:fascia-logo}
+:is(:root:has(.card-launching),:root[data-machine-handoff],:root[data-machine-leaving]) #home-switch-btn {view-transition-name:fascia-home}
+:is(:root:has(.card-launching),:root[data-machine-handoff],:root[data-machine-leaving]) .manual-pocket {view-transition-name:fascia-manual}
+:is(:root:has(.card-launching),:root[data-machine-handoff],:root[data-machine-leaving]) .blip-power-indicator {view-transition-name:fascia-power}
+:is(:root[data-machine-handoff],:root[data-machine-leaving]) #card-button {view-transition-name:fascia-card}
+/* One picture through the move: both ends are letterboxed alike. Going in, the frozen frame is the same on both
+   sides, so it does not cross-fade; coming back, the game's last frame holds until the machine has settled. */
+::view-transition-old(machine-picture),::view-transition-new(machine-picture) {width:100%;height:100%;object-fit:contain}
+:root[data-machine-handoff]::view-transition-old(machine-picture) {animation:none;opacity:0}
+:root[data-machine-handoff]::view-transition-new(machine-picture) {animation:none;opacity:1}
+:root:has(.card-launching)::view-transition-old(machine-picture) {animation:machine-picture-hold 900ms both}
+:root:has(.card-launching)::view-transition-new(machine-picture) {animation:machine-picture-show 900ms both}
+@keyframes machine-picture-hold {0%,75% {opacity:1} 100% {opacity:0}}
+@keyframes machine-picture-show {0%,75% {opacity:0} 100% {opacity:1}}
+::view-transition-group(machine-monitor),::view-transition-group(machine-picture),::view-transition-group(machine-title),::view-transition-group(machine-name),::view-transition-group(machine-deck) {
+  animation-duration:900ms;animation-timing-function:cubic-bezier(.45,0,.2,1);
+}
+::view-transition-old(root),::view-transition-new(root) {animation-duration:900ms;animation-timing-function:ease-in-out}
+@media (prefers-reduced-motion:reduce) {
+  @view-transition {navigation:none}
+}
+
+/* The caps sit straight on the panel, with no plate behind them. */
+
+/* Player lamps: square lit buttons in black bezels, as beside each stick on the cabinet. */
+
+/* Thumb-sized on a phone: two players side by side, each with a stick and two caps a thumb wide,
+   set on a slant like a cabinet's button arc. */
+
+@media (max-width:600px) {
+  :root[data-layout="upright"][data-players] #topbar :is(.snes-face.four,.fire-buttons.four) > :first-child {justify-self:end}
+  :root[data-layout="upright"][data-players] #topbar :is(.snes-face.four,.fire-buttons.four) > :nth-child(2) {justify-self:start}
+}
+
+/* ---- The top bar ---- The fascia in the panel's charcoal plastic, with black glossy fittings:
+   round black switches, a slim manual card and a blue power LED. */
+:root:not([data-appstyle]):not([data-machine]) body.cabinet-page {
+  background:radial-gradient(ellipse at 50% 8%,#7f9bc414,#0000 43%),radial-gradient(ellipse at 50% 72%,#4a265012,#0000 60%),#0e0f12;
+}
+:root:not([data-appstyle]) .top-marquee-bar {
+  background:linear-gradient(180deg,#ffffff12,#fff0 40%),var(--cabinet-shell);
+  border-bottom:1px solid #050506;
+  box-shadow:0 1px 0 #ffffff12,0 6px 16px #000b,inset 0 1px #ffffff1f;
+}
+:root:not([data-appstyle]) :is(.home-switch,#card-button) {
+  border:0;color:#d7dbe0;
+  background:radial-gradient(circle at 50% 30%,#3a3b40,#16171a 70%,#0b0b0d);
+  box-shadow:0 0 0 1px #000,0 1px 0 1px #ffffff1a,0 2px 4px #000a,inset 0 1px #ffffff40;
+}
+:root:not([data-appstyle]) :is(.home-switch,#card-button):is(:hover,:focus-visible),
+:root:not([data-appstyle])[data-card] #card-button,
+:root:not([data-appstyle]) body:has(#glcanvas) #card-button {
+  color:#fff;background:radial-gradient(circle at 50% 30%,#4b4d53,#1d1e22 70%,#0b0b0d);
+  box-shadow:0 0 0 1px #000,0 0 0 2px #ffffff40,0 0 10px #8fb8ff66,inset 0 1px #ffffff59;
+}
+:root:not([data-appstyle]) .manual-pocket::before {background:linear-gradient(#000c,#0000)}
+:root:not([data-appstyle]) .manual-pocket::after {display:none}
+/* The manual in its pocket shows its spine: navy book cloth, rounded, with gold double fillets at each end,
+   the title in gold foil, a gilt fore-edge and the tail of its red ribbon, in a slot lined with black felt. */
+:root:not([data-appstyle]) .manual-pocket {
+  border:0;
+  border-radius:6px;
+  background:radial-gradient(ellipse 80% 120% at 50% 0,#1a1b22,#050507 70%);
+  box-shadow:inset 0 3px 5px #000,inset 0 -1px #ffffff0d,0 0 0 1px #000,0 1px 0 1px #ffffff17;
+}
+:root:not([data-appstyle]) .cabinet-manual {
+  overflow:visible;border:0;border-radius:3px 5px 5px 3px;
+  background:
+    linear-gradient(180deg,#ffffff2e,#fff0 30% 70%,#0006),
+    repeating-linear-gradient(0deg,#ffffff0a 0 1px,transparent 1px 2px),repeating-linear-gradient(90deg,#00000024 0 1px,transparent 1px 2px),
+    linear-gradient(180deg,#2f4a72,#1f3556 50%,#14243d);
+  box-shadow:0 1px 1px #000,0 3px 5px #000b,inset 0 1px #ffffff40,inset 0 -1px #0009;
+}
+:root:not([data-appstyle]) .cabinet-manual::before {
+  left:12px;right:9px;top:4px;bottom:4px;width:auto;border:0;
+  background:linear-gradient(90deg,#e4c475 0 1px,#0000 1px 3px,#e4c475 3px 4px,#0000 4px calc(100% - 4px),#e4c475 calc(100% - 4px) calc(100% - 3px),#0000 calc(100% - 3px) calc(100% - 1px),#e4c475 calc(100% - 1px));
+  opacity:.85;
+}
+:root:not([data-appstyle]) .cabinet-manual::after {
+  right:-2px;top:2px;bottom:2px;width:3px;border:0;border-radius:0 2px 2px 0;
+  background:repeating-linear-gradient(0deg,#f8e6a8 0 1px,#b98d3f 1px 2px);box-shadow:1px 0 1px #0008;
+}
+:root:not([data-appstyle]) .manual-book-spine {
+  width:9px;
+  border:0;
+  border-radius:3px 0 0 3px;
+  background:linear-gradient(90deg,#0b1424,#1b2e4b 55%,#0e1a2c);
+  box-shadow:inset -1px 0 #e4c47599;
+}
+:root:not([data-appstyle]) .manual-book-copy strong {
+  font:700 8px/1 Georgia,serif;letter-spacing:.2em;text-indent:.2em;
+  background:linear-gradient(180deg,#fff3c8,#e6c06a 45%,#a8792f 56%,#efd28a);-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 1px 0 #000a);text-shadow:none;
+}
+@media(max-width:600px) {
+  :root:not([data-appstyle]) .manual-book-copy strong {font-size:7px;letter-spacing:.04em;text-indent:0}
+  :root:not([data-appstyle]) .manual-book-copy {padding:0 6px 0 2px}
+}
+/* The spine carries the cover's title: the BLIP plate and MANUAL. A hover lifts it a little out of its slot. */
+:root:not([data-appstyle]) .manual-book-copy {gap:6px}
+:root:not([data-appstyle]) .manual-book-plate {display:block;height:15px;width:auto;filter:drop-shadow(0 1px 1px #000a)}
+:root:not([data-appstyle]) .cabinet-manual {cursor:pointer;transition:transform .2s cubic-bezier(.2,.7,.15,1),box-shadow .2s}
+:root:not([data-appstyle]) .cabinet-manual:is(:hover,:focus-visible) {
+  transform:translateY(-3px);
+  filter:none;
+  box-shadow:0 1px 1px #000,0 7px 9px #000c,inset 0 1px #ffffff40,inset 0 -1px #0009;
+}
+@media(max-width:600px) {
+  :root:not([data-appstyle]) .manual-book-plate { height:11px; }
+  :root:not([data-appstyle]) .cabinet-manual::before {
+    left:11px;
+    right:6px;
+    background:linear-gradient(90deg,#e4c475 0 1px,#0000 1px calc(100% - 1px),#e4c475 calc(100% - 1px));
+    display:none;
+  }
+}
+:root:not([data-appstyle]) .manual-page-edges {
+  display:block;position:absolute;right:26%;bottom:-8px;width:5px;height:10px;pointer-events:none;
+  background:linear-gradient(90deg,#7d1a14,#c0372b 50%,#86201a);clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%);
+  filter:drop-shadow(0 1px 1px #000a);
+}
+/* The machine is always switched on: its power lamp always burns. */
+:root:not([data-appstyle]) .blip-power-indicator {
+  border:0;
+  background:linear-gradient(180deg,#24252a,#0d0e10);
+  box-shadow:0 0 0 1px #000,0 1px 0 1px #ffffff14,0 2px 6px #000a;
+  color:#c9d6e6;
+}
+:root:not([data-appstyle]) .power-bulb {
+  border-color:#0b2a55;background:radial-gradient(circle at 40% 35%,#eaf4ff 0 15%,#5aa8ff 45%,#1d5fd0 80%);
+  box-shadow:0 0 5px 2px #4a9cff99,0 0 14px #3d8bff77,inset 0 0 2px #fff;
+}
+:root[data-layout="landscape"][data-players="2"] #topbar .fire-buttons.four > :first-child {justify-self:end}
+:root[data-layout="landscape"][data-players="2"] #topbar .fire-buttons.four > :nth-child(2) {justify-self:start}
+
+/* ---- Up close, in the same room ----
+   On a screen wider than the machine, the arcade's wall shows either side of it: the same lowered ceiling,
+   the same maze mosaic (room-tiles.svg, made from the arcade's own) drawn larger because we stand closer,
+   and the same carpet. The cabinet is a column in its own laminate and trim. */
+@media (min-width:1017px) {
+  :root[data-machine]:not([data-appstyle],[data-deck-preview],[data-bare]) body {
+    --column:calc(var(--cabinet-width) + 56px);
+    --room-top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
+    --room-tile:clamp(34px,4.4vh,56px);
+    box-shadow:none;
+    background:
+      linear-gradient(90deg,#0009,transparent 22px calc(100% - 22px),#0009) center top / var(--column) 100% no-repeat,
+      linear-gradient(90deg,var(--trim) 0 6px,#0008 6px 8px,transparent 8px calc(100% - 8px),#0008 calc(100% - 8px) calc(100% - 6px),var(--trim) calc(100% - 6px)) center top / var(--column) 100% no-repeat,
+      linear-gradient(90deg,#ffffff12,transparent 7% 93%,#0000004d) center top / var(--column) 100% no-repeat,
+      linear-gradient(180deg,#24212b,#131117 38%,#0d0c11) center top / var(--column) 100% no-repeat,
+      linear-gradient(90deg,transparent calc(50% - var(--column) / 2 - 56px),#000b calc(50% - var(--column) / 2),#000b calc(50% + var(--column) / 2),transparent calc(50% + var(--column) / 2 + 56px)),
+      linear-gradient(180deg,#000c,#0000 26px) center calc(100% - 9vh) / 100% 26px no-repeat,
+      repeating-linear-gradient(90deg,#6b211c 0 80px,#180b08 80px 160px) center bottom / 100% 9vh no-repeat,
+      linear-gradient(180deg,#2b0d09 0 16%,#d63c31 16%,#c3302a 42%,#8f1d17 72%,#6e140f 74%,#fff3c8 76%,#ffd36b 86%,#e7a23e 100%) 0 var(--room-top) / 100% 46px no-repeat,
+      radial-gradient(ellipse 60% 30% at 50% 0,rgb(255 200 130 / .22),transparent 70%) 0 calc(var(--room-top) + 46px) / 100% 60% no-repeat,
+      url(room-tiles.svg) center calc(var(--room-top) + 46px) / calc(var(--room-tile) * 32) auto repeat-x,
+      linear-gradient(180deg,#b8582f,#8e3720 30%,#561d12 80%,#260a07);
+  }
+  :root[data-machine]:not([data-appstyle],[data-deck-preview],[data-bare]) .cab-rail {display:none}
+}
+
+/* Rally: the spinners stand a fifth of the way in from each end of the panel, where hands fall, with their
+   lamps under them. */
+
+/* The room moves with the machine: the page being left and the page arriving are scaled about the machine's
+   screen (blipMachineZoom), so the wall, the neighbours and the deck travel with the cabinet as one place
+   seen nearer or farther, rather than one picture fading into another. */
+:is(:root[data-machine-handoff],:root[data-machine-return])::view-transition-old(root) {
+  transform-origin:0 0;animation:machine-room-leave 900ms cubic-bezier(.45,0,.2,1) both;
+}
+:is(:root[data-machine-handoff],:root[data-machine-return])::view-transition-new(root) {
+  transform-origin:0 0;animation:machine-room-arrive 900ms cubic-bezier(.45,0,.2,1) both;
+}
+@keyframes machine-room-leave {
+  0% {transform:none;opacity:1}
+  45% {opacity:1}
+  100% {transform:var(--machine-zoom-old,none);opacity:0}
+}
+@keyframes machine-room-arrive {
+  0% {transform:var(--machine-zoom-new,none);opacity:0}
+  40% {opacity:.6}
+  100% {transform:none;opacity:1}
+}
+@media (prefers-reduced-motion:reduce) {
+  :is(:root[data-machine-handoff],:root[data-machine-return])::view-transition-old(root),
+  :is(:root[data-machine-handoff],:root[data-machine-return])::view-transition-new(root) {animation-duration:.01ms}
+}
+:root[data-deck-preview] body {background:transparent!important;overflow:hidden}
+:root[data-deck-preview] body::before,:root[data-deck-preview] body::after {display:none!important}
