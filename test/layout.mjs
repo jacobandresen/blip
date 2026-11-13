@@ -7,8 +7,8 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GAME_SLUGS } from './lib/games.mjs';
-import { openPage } from './lib/harness.mjs';
+import { GAMES, GAME_SLUGS } from './lib/games.mjs';
+import { openPage, openPhone } from './lib/harness.mjs';
 
 // CSS pixels; the insets are what the notch, the island and the home bar take.
 const DEVICES = [
@@ -35,8 +35,8 @@ const DEVICES = [
   { name: 'desktop 2560x1440', w: 2560, h: 1440, desktop: true },
 ];
 
-const TWO_SEATS = ['rally', 'brawler', 'bubbler', 'adder'];
-const GAMES = GAME_SLUGS;
+// Rally seats two at its dials; the others say so in the registry.
+const TWO_SEATS = GAMES.filter((game) => game.players === 2 || game.slug === 'rally').map((game) => game.slug);
 
 // The pieces of interface that must each have their own space.
 const PIECES = {
@@ -46,7 +46,6 @@ const PIECES = {
   cardButton: '#card-button',
   pick: '.card-pick',
   lamp: '.blip-power-indicator',
-  receiver: '.jukebox-receiver',
   coin: '.deck-coin-slot',
   dpad: '.snes-dpad',
   button: '.snes-btn, .arcade-btn',
@@ -144,12 +143,8 @@ async function settled(page) {
 
 async function open(t, device) {
   const touch = !device.desktop;
-  const { page, origin } = await openPage(t, 'chromium', { hasTouch: touch, viewport: { width: device.w, height: device.h } });
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setDeviceMetricsOverride', { width: device.w, height: device.h, deviceScaleFactor: 2, mobile: touch });
-  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: touch });
   const insets = { top: device.top || 0, bottom: device.bottom || 0, left: device.left || 0, right: device.right || 0 };
-  await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets });
+  const { page, origin, cdp } = await openPhone(t, { width: device.w, height: device.h }, { touch, insets });
   await page.addInitScript((pieces) => { window.__pieces = pieces; }, PIECES);
   // The layout belongs to the shell, not to the game: a wasm that never arrives keeps the page quiet and the CPU free.
   await page.route('**/*.wasm', () => {});
@@ -195,7 +190,7 @@ async function check(page, device, insets, label, failures) {
     if (CONTROLS.includes(box.key) && !device.desktop && box.key !== 'coin' && box.bottom > edge.bottom + 2) {
       failures.push(`${label}: ${box.name} sits under the home bar (${Math.round(box.bottom)} past ${edge.bottom})`);
     }
-    if (box.key !== 'receiver' && (box.left < edge.left - 1 || box.right > edge.right + 1) && insets.left) {
+    if ((box.left < edge.left - 1 || box.right > edge.right + 1) && insets.left) {
       failures.push(`${label}: ${box.name} sits under the notch`);
     }
   }
@@ -246,7 +241,7 @@ for (const device of mine) {
     await page.keyboard.press('ArrowDown');
 
     // Exercise each game with the controls offered on this device.
-    for (const slug of GAMES) {
+    for (const slug of GAME_SLUGS) {
       // Touchscreen games have one control mode; Rally retains its alternate dial/strip layouts.
       const controllers = device.desktop || slug !== 'rally' ? [null] : [null, 'touch', 'pad'];
       for (const controller of controllers) {
@@ -281,7 +276,7 @@ for (const device of mine) {
       }
     }
     const icons = result.boxes.filter((b) => b.key === 'icon');
-    if (icons.length !== GAMES.length) failures.push(`${icons.length} icons show, not ${GAMES.length}`);
+    if (icons.length !== GAME_SLUGS.length) failures.push(`${icons.length} icons show, not ${GAME_SLUGS.length}`);
     if (!device.desktop) for (const i of icons) if (i.right - i.left < 44) failures.push(`${i.name} is ${Math.round(i.right - i.left)}px, too small for a thumb`);
     assert.deepEqual(failures, []);
   });
@@ -383,7 +378,7 @@ for (const device of mine) {
     const { page, origin } = await open(t, device);
     await page.emulateMedia({ reducedMotion: 'reduce' });   // the card lands where it will rest, without the slide
     const failures = [];
-    for (const slug of GAMES) {
+    for (const slug of GAME_SLUGS) {
       await page.goto(`${origin}/${slug}/index.html`);
       await page.waitForSelector('#card-button');
       await settled(page);

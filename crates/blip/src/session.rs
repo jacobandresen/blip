@@ -37,6 +37,19 @@ impl Session {
         if self.lives <= 0 { LifeResult::GameOver } else { LifeResult::StillAlive }
     }
 
+    /// Lose a life and start `timer`: `respawn` seconds to the next life, or [`GAME_OVER_MIN_WAIT`] on the
+    /// game-over screen, whose score is then reported.
+    pub fn lose_life_after(&mut self, timer: &mut crate::Timer, respawn: f32) -> LifeResult {
+        let result = self.lose_life();
+        if result == LifeResult::GameOver {
+            timer.start(GAME_OVER_MIN_WAIT);
+            crate::web::report_score(self.score);
+        } else {
+            timer.start(respawn);
+        }
+        result
+    }
+
     /// Advance to the next level (increments the level counter only).
     pub fn next_level(&mut self) {
         self.level += 1;
@@ -56,3 +69,17 @@ impl Session {
 /// How long GAME OVER stays up before a key can dismiss it: the fire button
 /// still held from the play that ended would otherwise skip it unread.
 pub const GAME_OVER_MIN_WAIT: f32 = 2.0;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_lost_life_waits_to_respawn_and_the_last_one_waits_on_game_over() {
+        let (mut sess, mut timer) = (Session::new(2), crate::Timer::default());
+        assert!(sess.lose_life_after(&mut timer, 1.5) == LifeResult::StillAlive);
+        assert_eq!(timer.remaining(), 1.5);
+        assert!(sess.lose_life_after(&mut timer, 1.5) == LifeResult::GameOver);
+        assert_eq!(timer.remaining(), GAME_OVER_MIN_WAIT);
+    }
+}

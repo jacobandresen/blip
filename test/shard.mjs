@@ -2,19 +2,10 @@
 //
 //   node test/shard.mjs 2 test/layout.mjs
 
-import { spawn } from 'node:child_process';
+import { run } from './lib/run.mjs';
 
 const [count, file] = [Number(process.argv[2]), process.argv[3]];
-const codes = await Promise.all(Array.from({ length: count }, (_, shard) => new Promise((done) => {
-  const child = spawn(process.execPath, ['--test', '--test-concurrency=1', file], {
-    env: { ...process.env, TEST_SHARD: `${shard}/${count}` }, stdio: ['ignore', 'pipe', 'inherit'],
-  });
-  let out = '';
-  child.stdout.on('data', (chunk) => { out += chunk; });
-  child.on('close', (code) => {
-    process.stdout.write(`\n== shard ${shard + 1}/${count}\n` + out.split('\n').filter((l) => /^(✖|ℹ (tests|pass|fail))|^\s+\+   '/.test(l)).join('\n') + '\n');
-    done(code);
-  });
-})));
+const codes = await Promise.all(Array.from({ length: count }, (_, shard) => run(process.execPath,
+  ['--test', '--test-concurrency=1', file], { env: { ...process.env, TEST_SHARD: `${shard}/${count}` }, heading: `shard ${shard + 1}/${count}` })));
 // exitCode, not exit(): a piped stdout must drain the last shard's report first
 process.exitCode = codes.some((code) => code !== 0) ? 1 : 0;

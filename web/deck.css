@@ -469,11 +469,12 @@ body.cabinet-page:has(.top-marquee-bar,#marquee-bar) .kiosk-bar :is(#insert-coin
 .ts-actions { display: none; }
 :root[data-touch="action"] .ts-glass { padding-right: min(38%, 180px); }
 :root[data-touch="action"] .ts-actions {
-  display: flex; gap: 6px;
+  display: flex; flex-wrap: wrap; gap: 6px;
   position: absolute; top: 8px; right: 8px; bottom: 26px; width: min(35%, 166px);
 }
 :root[data-touch="action"] .ts-action {
-  flex: 1; display: grid; place-items: center; min-width: 0;
+  /* Side by side while each fits its label; stacked on the narrowest phones. */
+  flex: 1 1 52px; display: grid; place-items: center; min-width: 0;
 
    background: rgba(255,255,255,.09);
   font: 600 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -622,11 +623,11 @@ body.cabinet-page:has(.top-marquee-bar,#marquee-bar) .kiosk-bar :is(#insert-coin
   display: flex;
   align-items: center;
   gap: 6px;
-  position: absolute;
+  position: fixed;
   left: auto;
   right: 10px;
   top: 10px;
-  z-index: 2;
+  z-index: 210;
   margin: 0;
   min-width: 96px;
   min-height: 52px;
@@ -645,17 +646,13 @@ body.cabinet-page:has(.top-marquee-bar,#marquee-bar) .kiosk-bar :is(#insert-coin
   -webkit-tap-highlight-color: transparent;
   animation: tj-glow 2.4s ease-in-out infinite;
 }
-:root[data-touch][data-open][data-layout="landscape"] .ts-join {
-  position: fixed;
-  top: max(100px, calc(env(safe-area-inset-top, 0px) + 12px));
-  left: auto;
-  right: max(16px, calc(env(safe-area-inset-right, 0px) + 8px));
-  bottom: auto;
-  z-index: 210;
+/* On the screen, never on the trackpad: upright at the picture's top-right (game.js places it), sideways in the corner. */
+:root[data-touch][data-open]:not([data-layout="landscape"]) .ts-join {
+  top: var(--join-top, 10px); right: var(--join-right, 10px); min-width: 88px; min-height: 44px;
 }
-/* Action games keep their own buttons at the right of the trackpad: upright, 2P JOIN waits on the left,
-   below the P1 tag. After the general rule above, which has the same specificity. */
-:root[data-touch="action"][data-open]:not([data-layout="landscape"]) .ts-join { left: 10px; right: auto; top: 26px; }
+:root[data-touch][data-open][data-layout="landscape"] .ts-join {
+  top: max(100px, calc(env(safe-area-inset-top, 0px) + 12px)); right: max(16px, calc(env(safe-area-inset-right, 0px) + 8px));
+}
 .ts-join:active { transform: scale(0.96); }
 .tj-plus { font-size: 14px; line-height: 1; font-weight: 500; }
 @keyframes tj-glow {
@@ -901,9 +898,6 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
 :root[data-touch] :is(.snes-pad, .deck-side, #paddle-dial, #paddle-dial-p2) { display: none !important; }
 :root[data-touch="paddles"][data-layout="landscape"] :is(.ts-tag, .ts-hint, .ts-thumb, .ts-demo, .ts-arrow),
 :root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] :is(.ts-tag, .ts-hint, .ts-thumb, .ts-demo, .ts-arrow) { display: none; }
-:root[data-cabinet-screen] :is(.blip-logo,#insert-coin-btn,#topbar,#marquee-bar,#arcade-bezel,.cabinet-glass,.cab-rail,#need-coin-overlay,#loader) {
-  display:none!important;
-}
 body.cabinet-page :is(.ts-tag,.ts-hint) {color:#c2b49c;font-family:'Courier New',monospace;}
 :root:not([data-appstyle]) #topbar :is(.fire-buttons.four,.snes-face.four)::before {content:none}
 :root:not([data-appstyle]) #topbar :is(.arcade-btn .arcade-btn-cap,.snes-btn > span)::before {

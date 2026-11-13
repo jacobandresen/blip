@@ -212,10 +212,6 @@ test('the deck from jsDelivr is cached offline at the tag the pages load', async
   }
 });
 
-test('the jukebox numbers the machines in the aisle\'s own order', async () => {
-  const { readFileSync } = await import('node:fs');
-  const shell = readFileSync(new URL('../web/game.js', import.meta.url), 'utf8');
-  const order = JSON.parse(shell.match(/var selectionOrder = (\[[^\]]*\])/)[1].replace(/'/g, '"'));
-  assert.deepEqual(order, AISLE);
+test('every game has one machine in the aisle', () => {
   assert.deepEqual([...AISLE].sort(), [...GAME_SLUGS].sort(), 'every game has one machine in the aisle');
 });

@@ -9,7 +9,6 @@ use blip::input::{
 use blip::macroquad::rand::rand;
 use blip::macroquad::texture::Texture2D;
 use blip::{
-    GAME_OVER_MIN_WAIT,
     load_png, load_png_smooth,
     clamp, Fx, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, segment_rect_overlap, web,
     window_conf, Blip, BlipColor, LifeResult, Pooled, Session, Timer, rand_range_f32, BLIP_BLACK, BLIP_CYAN,
@@ -353,18 +352,12 @@ impl Game {
     }
 }
 
-struct Sounds {
-    paddle_hit: [blip::BlipSound; 3],
-    brick_hit: [blip::BlipSound; 3],
-    brick_break: [blip::BlipSound; 3],
-    wall_hit: blip::BlipSound,
-    bomb: blip::BlipSound,
-    life_lost: blip::BlipSound,
-    win: blip::BlipSound,
-    pickup_good: blip::BlipSound,
-    pickup_bad: blip::BlipSound,
-    pickup_life: blip::BlipSound,
-}
+blip::sounds!(Sounds {
+    paddle_hit: [blip::BlipSound; 3] = [blip::sound!("paddle_hit_0"), blip::sound!("paddle_hit_1"), blip::sound!("paddle_hit_2")],
+    brick_hit: [blip::BlipSound; 3] = [blip::sound!("brick_hit_0"), blip::sound!("brick_hit_1"), blip::sound!("brick_hit_2")],
+    brick_break: [blip::BlipSound; 3] = [blip::sound!("brick_break_0"), blip::sound!("brick_break_1"), blip::sound!("brick_break_2")],
+    wall_hit, bomb, life_lost, win, pickup_good, pickup_bad, pickup_life,
+});
 
 /// A random take of an impact sound, louder for a harder hit.
 fn play_variant(takes: &[blip::BlipSound; 3], speed: f32) {
@@ -456,14 +449,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             blip::bot::add(&format!("lost_at_speed{}", (g.ball_vx.hypot(g.ball_vy) / 50.0) as i32 * 50), 1.0);
             play_sfx(&sfx.life_lost);
             g.reset_drops();
-            match g.sess.lose_life() {
-                LifeResult::StillAlive => { g.dead_timer.start(1.2); g.state = State::Dead; }
-                LifeResult::GameOver => {
-                    g.dead_timer.start(GAME_OVER_MIN_WAIT);
-                    g.state = State::Over;
-                    web::report_score(g.sess.score);
-                }
-            }
+            g.state = match g.sess.lose_life_after(&mut g.dead_timer, 1.2) {
+                LifeResult::StillAlive => State::Dead,
+                LifeResult::GameOver => State::Over,
+            };
             return;
         }
     }
@@ -1020,19 +1009,6 @@ const DROP_PNGS: [&[u8]; 5] = [
     blip::png!("drop_wide"), blip::png!("drop_narrow"), blip::png!("drop_slow"), blip::png!("drop_life"),
     blip::png!("drop_multi"),
 ];
-const PADDLE_HIT_WAV: [&[u8]; 3] = [blip::wav!("paddle_hit_0"), blip::wav!("paddle_hit_1"), blip::wav!("paddle_hit_2")];
-const BRICK_HIT_WAV: [&[u8]; 3] = [blip::wav!("brick_hit_0"), blip::wav!("brick_hit_1"), blip::wav!("brick_hit_2")];
-const BRICK_BREAK_WAV: [&[u8]; 3] = [
-    blip::wav!("brick_break_0"), blip::wav!("brick_break_1"), blip::wav!("brick_break_2"),
-];
-
-async fn load_takes(wavs: &[&'static [u8]; 3]) -> [blip::BlipSound; 3] {
-    [
-        blip::audio::load_sound(wavs[0]).await,
-        blip::audio::load_sound(wavs[1]).await,
-        blip::audio::load_sound(wavs[2]).await,
-    ]
-}
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -1051,18 +1027,7 @@ async fn main() {
         load_png(blip::png!("brick_bomb")),
     ];
 
-    let sfx = Sounds {
-        paddle_hit:  load_takes(&PADDLE_HIT_WAV).await,
-        brick_hit:   load_takes(&BRICK_HIT_WAV).await,
-        brick_break: load_takes(&BRICK_BREAK_WAV).await,
-        wall_hit:    blip::sound!("wall_hit"),
-        bomb:        blip::sound!("bomb"),
-        life_lost:   blip::sound!("life_lost"),
-        win:         blip::sound!("win"),
-        pickup_good: blip::sound!("pickup_good"),
-        pickup_bad:  blip::sound!("pickup_bad"),
-        pickup_life: blip::sound!("pickup_life"),
-    };
+    let sfx = Sounds::load().await;
     // Two tunes, alternating by level.
     let mut music = Jukebox::new("bouncer", &["BOUNCE", "REBOUND"]);
 

@@ -100,11 +100,9 @@ window.alert = function (msg) { try { console.error('[blip] ' + msg); } catch (e
 }());
 
 var TOPBAR_H   = 56;
-var MARQUEE_H  = 94; // marquee and the card receiver beneath it
-var CABINET_SCREEN = new URLSearchParams(location.search).get('cabinet') === '1';
+var MARQUEE_H  = 94;
 var GAME = blipGameFromPath(location.pathname);
 var RETURN_TO_API = new URLSearchParams(location.search).get('from') === 'api';
-if (CABINET_SCREEN) document.documentElement.setAttribute('data-cabinet-screen','');
 var FRAME_PAD  = 14; // matches the cabinet screen's inset below the arcade
 
 var loader    = document.getElementById('loader');
@@ -114,9 +112,6 @@ var canvas    = document.getElementById('glcanvas');
 var overlay   = document.getElementById('need-coin-overlay');
 // Launched from the home screen or the game's own icon: no coins at all.
 var FREE_PLAY = blipFreePlay();
-
-// The runtime focuses its canvas at boot; a cabinet preview must leave keys with the arcade.
-if (CABINET_SCREEN) canvas.inert = true;
 
 updateCoinsHud();
 
@@ -128,7 +123,7 @@ var returningToCabinet = false;
 function returnToCabinet(event) {
   if (event && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) return;
   if (event) event.preventDefault();
-  if (CABINET_SCREEN || returningToCabinet) return;
+  if (returningToCabinet) return;
   returningToCabinet = true;
   var departure = { slug:GAME && GAME.slug, at:Date.now() };
   if (RETURN_TO_API) {
@@ -150,7 +145,6 @@ function returnToCabinet(event) {
 // ---- Per-game marquee + cabinet accent ----
 // Built here rather than in each game's HTML.
 (function () {
-  if(CABINET_SCREEN) return;
   var game = GAME;
   if (!game) return;
   document.documentElement.style.setProperty('--cab', game.accent);
@@ -169,15 +163,6 @@ function returnToCabinet(event) {
   showBest(sign);
   // An app's launch screen shows its icon while the game loads.
   document.documentElement.style.setProperty('--app-icon', 'url("' + new URL('icon-512.png?v=2', location.href).href + '")');
-  for (var i = 0; i < 8; i++) {
-    var char = '\u00a0';
-    var tile = document.createElement('span');
-    tile.className = 'marquee-letter';
-    tile.style.setProperty('--flap-index', i);
-    tile.textContent = char;
-    sign.appendChild(tile);
-
-  }
   // The cabinet's own marquee (blip.css), as it stands in the arcade: the same machine.
   sign.classList.add('machine-marquee');
   sign.appendChild(Object.assign(document.createElement('b'), { className: 'machine-marquee-name', textContent: game.name }));
@@ -186,9 +171,8 @@ function returnToCabinet(event) {
     sign,
     Object.assign(document.createElement('span'), { className: 'marquee-bulbs' })
   );
-  blipCardReceiver(bar);
   document.body.insertBefore(bar, document.body.firstChild);
-  markGameLoaded(game, bar);
+  rememberGame(game);
   sign.addEventListener('click', returnToCabinet);
   document.querySelector('.blip-logo').addEventListener('click', returnToCabinet);
   // An app's way back: "< Home" where the logo stands. A game in its own app has nowhere to go back to.
@@ -234,25 +218,9 @@ window.addEventListener('pagehide', function () {
   Howler.stop();
 });
 
-function markGameLoaded(game, bar) {
-  var receiver=bar.querySelector('.jukebox-receiver');
-  receiver.classList.add('stowed');
-  blipSetMarquee(game.name, false);
-  document.documentElement.removeAttribute('data-card-loading');
-  try {
-    var selectionOrder = ['rally', 'bouncer', 'defender', 'bubbler', 'raider', 'meteors', 'serpent', 'brawler', 'adder', 'warlock'];
-    var code = 'A' + (selectionOrder.indexOf(game.slug) + 1);
-    var rom={
-      slug: game.slug, name: game.name, code: code,
-      art: new URL('screenshot.png', location.href).href
-    };
-    blipSeatRom(receiver,rom);
-    sessionStorage.setItem('blip-last-game', game.slug);
-    ['blip-card-insert', 'blip-card-seated', 'blip-title-seated'].forEach(function (key) {
-      sessionStorage.removeItem(key);
-    });
-  } catch (e) {}
-  if(!receiver.classList.contains('loaded'))blipSeatRom(receiver,{name:game.name,art:'screenshot.png'});
+// The arcade walks back to the machine last played.
+function rememberGame(game) {
+  try { sessionStorage.setItem('blip-last-game', game.slug); } catch (e) {}
 }
 
 // Control detents use vibration where supported, otherwise a 40 ms sub-bass pulse.
@@ -441,7 +409,7 @@ var cardApi = (function () {
 // from their own prompt; iOS can only be told where Share is. Either way the
 // saved page is ./?app, so the icon opens the game in its own app mode.
 function showInstallSheet() {
-  if (CABINET_SCREEN || blipStandalone() || !GAME || document.getElementById('install-sheet')) return;
+  if (blipStandalone() || !GAME || document.getElementById('install-sheet')) return;
   try { history.replaceState(null, '', './?app'); } catch (e) {}
   var name = GAME.name.charAt(0) + GAME.name.slice(1).toLowerCase();
   var sheet = document.createElement('div');
@@ -523,7 +491,7 @@ if (new URLSearchParams(location.search).has('install')) showInstallSheet();
 // play. Once per game (blip-seen-<slug>).
 function introduceControls() {
   var root = document.documentElement;
-  if (!cardApi || !GAME || !root.hasAttribute('data-appstyle') || CABINET_SCREEN) return;
+  if (!cardApi || !GAME || !root.hasAttribute('data-appstyle')) return;
   var key = 'blip-seen-' + GAME.slug;
   try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch (e) { return; }
   root.setAttribute('data-intro', '');
@@ -618,12 +586,6 @@ function bareScreen() {
 
 var lastFit = '';
 function fillCanvas() {
-  if(CABINET_SCREEN) {
-    canvas.style.setProperty('width',innerWidth+'px','important');
-    canvas.style.setProperty('height',innerHeight+'px','important');
-    canvas.style.setProperty('top','0','important');canvas.style.setProperty('left','0','important');
-    canvas.style.setProperty('transform','none','important');syncBuffer();return;
-  }
   blipApplyLayout();
   var tb = document.getElementById('topbar');
   var bare = bareScreen();
@@ -637,11 +599,7 @@ function fillCanvas() {
   TOPBAR_H = bare || blipLandscape() ? 0 : (tb ? Math.max(deckCover(tb), 56) : 56);
   var mb = document.getElementById('marquee-bar');
   if (mb) {
-    var receiver = bare ? null : mb.querySelector('.jukebox-receiver');
-    var receiverBottom = receiver
-      ? Math.ceil(parseFloat(getComputedStyle(receiver).top) + receiver.offsetHeight)
-      : 0;
-    MARQUEE_H = Math.max(mb.offsetHeight, receiverBottom, 28);
+    MARQUEE_H = Math.max(mb.offsetHeight, 28);
   } else MARQUEE_H = 0;
   // Sideways the controls stand in the two gutters; keep the picture out
   // of them (a wide game like Brawler would otherwise run under the cross).
@@ -742,7 +700,7 @@ window.addEventListener('pagereveal',function(event){
   cabinetTransition.then(function(){document.documentElement.removeAttribute('data-machine-handoff');});
 });
 var launchFrame = (function () {
-  if (CABINET_SCREEN || blipAppMode() || document.documentElement.hasAttribute('data-appstyle')) return null;
+  if (blipAppMode() || document.documentElement.hasAttribute('data-appstyle')) return null;
   var launch = null;
   try {
     launch = JSON.parse(sessionStorage.getItem('blip-cabinet-launch') || 'null');
@@ -844,7 +802,7 @@ function hideLoader() {
     fillCanvas();
     if (!launchFrame || !launchFrame.hasAttribute('data-hold')) dropLaunchFrame();
     introduceControls();
-    if(!CABINET_SCREEN)canvas.focus();
+    canvas.focus();
   }
 }
 
@@ -869,8 +827,7 @@ window.blipCanvasReady=function(){
   fillCanvas();
   requestAnimationFrame(function(){requestAnimationFrame(function(){
     document.documentElement.setAttribute('data-game-ready','');hideLoader();
-    if(CABINET_SCREEN)parent.postMessage({type:'blip-game-ready'},location.origin);
-    if(!CABINET_SCREEN && !blipAppMode()) {
+    if(!blipAppMode()) {
       var slug=blipGameFromPath(location.pathname)?.slug;
       var cabinetStart=false;
       try {
@@ -951,7 +908,6 @@ window.addEventListener('keydown', function (e) {
 }, true);
 
 (function () {
-  if(CABINET_SCREEN) return;
   var game = GAME;
   var buttonSpecs = (game && game.buttons) || [{ key: ' ', code: 'Space' }];
   var primary = buttonSpecs[0] || { key: ' ', code: 'Space' };
@@ -1067,11 +1023,11 @@ window.addEventListener('keydown', function (e) {
     var bar = document.getElementById('topbar');
     var glass = strip.querySelector('.ts-glass');
 
-    // While a second seat is open, a button seats player two (their
-    // own join key). Upright it sits in the trackpad, sideways in the
-    // bottom-right corner of the screen.
+    // While a second seat is open, a button seats player two (their own join key). It sits on the
+    // screen's top-right corner, off the trackpad, so player one's thumbs never land on it.
     var join = strip.querySelector('.ts-join');
     if (join) {
+      document.body.appendChild(join);
       join.addEventListener('pointerdown', function (e) {
         e.preventDefault();
         if (coinGated()) return;
@@ -1079,10 +1035,16 @@ window.addEventListener('keydown', function (e) {
         setTimeout(function () { BlipController.set('p2button1', false); }, 60);
       });
     }
+    // Upright, in the black band above the picture; where that is too short (iPhone SE), on the bezel above the screen.
     function placeJoin() {
-      if (!join) return;
-      var home = blipLandscape() ? document.body : glass;
-      if (join.parentNode !== home) home.appendChild(join);
+      if (!join || blipLandscape()) return;
+      var cr = canvas.getBoundingClientRect(), pic = window.blipPicture, h = join.offsetHeight;
+      var picH = pic && pic.w && pic.h ? Math.min(cr.height, cr.width * pic.h / pic.w) : cr.height;
+      var band = (cr.height - picH) / 2, picTop = cr.top + band;
+      var mb = document.getElementById('marquee-bar'), floor = mb ? mb.getBoundingClientRect().bottom : cr.top - h;
+      var top = band >= h + 8 ? cr.top + (band - h) / 2 : floor + (picTop - floor - h) / 2;
+      join.style.setProperty('--join-top', Math.round(top) + 'px');
+      join.style.setProperty('--join-right', Math.round(innerWidth - cr.right + 8) + 'px');
     }
 
     // The trackpad is never wider than the game's picture: the canvas

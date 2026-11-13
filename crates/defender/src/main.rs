@@ -471,17 +471,11 @@ impl Game {
     }
 }
 
-struct Sounds {
-    shoot: blip::BlipSound,
-    explosion: blip::BlipSound,
-    dive: blip::BlipSound,
-    level_clear: blip::BlipSound,
-    ufo_siren: blip::BlipSound,
-    march: [blip::BlipSound; 4],
-    laser_charge: blip::BlipSound,
-    laser_blast: blip::BlipSound,
-    game_over: blip::BlipSound,
-}
+blip::sounds!(Sounds {
+    shoot, explosion, dive, level_clear, ufo_siren,
+    march: [blip::BlipSound; 4] = [blip::sound!("march1"), blip::sound!("march2"), blip::sound!("march3"), blip::sound!("march4")],
+    laser_charge, laser_blast, game_over,
+});
 
 const UFO_Y: f32 = (PLAY_Y + 8) as f32;
 
@@ -1609,22 +1603,7 @@ async fn main() {
     let bullet = load_png(blip::png!("bullet"));
     let saucer = load_png(blip::png!("ufo_saucer"));
 
-    let sfx = Sounds {
-        shoot:       blip::sound!("shoot"),
-        explosion:   blip::sound!("explosion"),
-        dive:        blip::sound!("dive"),
-        level_clear: blip::sound!("level_clear"),
-        ufo_siren:   blip::sound!("ufo_siren"),
-        march: [
-            blip::sound!("march1"),
-            blip::sound!("march2"),
-            blip::sound!("march3"),
-            blip::sound!("march4"),
-        ],
-        laser_charge: blip::sound!("laser_charge"),
-        laser_blast:  blip::sound!("laser_blast"),
-        game_over:    blip::sound!("game_over"),
-    };
+    let sfx = Sounds::load().await;
     // The invasion tune, and the mothership's on boss levels.
     let mut music = Jukebox::new("defender", &["INVASION", "MOTHERSHIP"]);
 

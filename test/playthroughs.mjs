@@ -20,7 +20,8 @@ for (const game of games) {
   });
   for (const name of names) {
     test(`${game}: ${name}`, () => {
-      const r = playBot(game, { BLIP_BOT_PLAYTHROUGH: name });
+      // Brawler's ladder runs take about 500 s on their own: room for a busy machine.
+      const r = playBot(game, { BLIP_BOT_PLAYTHROUGH: name }, 900);
       assert.equal(r.error, undefined, r.error);
       assert.equal(r.playthrough, 'pass', `missing ${r.missing} after ${r.t}s (ended: ${r.outcome})`);
     });

@@ -49,7 +49,8 @@ Copy the smallest similar game (Serpent is compact).
 1. Add `crates/<slug>` to the workspace, with `macroquad` and `blip` dependencies and `blip` (default features
    off) as a build dependency. `build.rs` is `blip::build_script!();`.
 2. Write `main.rs`, `gfx.rs`, `tunes.rs` and `bot.rs`; `levels.rs` for authored levels. Keep score, lives and
-   level in `blip::Session`.
+   level in `blip::Session` (`lose_life_after` starts the respawn or game-over wait and reports the score); name the
+   effects once with `blip::sounds!`.
 3. Add it to `BLIP_GAMES` in `web/blip_core.js`; the build, the tests and the arcade read the list from there.
    Add its marquee colours to `web/blip.css` and its manual spread to `web/controls.html`.
 4. Add its card crop to `tools/make_game_icons.mjs`, its attract capture to `tools/make_attract_strips.mjs`,

@@ -7,8 +7,7 @@ pub(crate) fn select_info_size(text: &str, width: f32) -> f32 {
     if text_w(text, 2.0) <= width { 2.0 } else { 1.0 }
 }
 
-/// Text as a lit tube. blip's `draw_text_glow` is a one-pixel halo, lost
-/// under a big logo: this blooms outward in colour over several passes, lays
+/// Text as a lit tube: this blooms outward in colour over several passes, lays
 /// fattened glass, and puts a near-white core inside.
 pub(crate) fn neon(blip: &Blip, text: &str, y: f32, sz: f32, c: BlipColor, lit: f32) {
     let x = blip.text_cx(text, sz as i32) as f32;

@@ -423,9 +423,8 @@ document.querySelectorAll('#game-grid .card').forEach(function(card){
   var players=slug==='rally'||BLIP_GAMES[slug]&&BLIP_GAMES[slug].players===2?2:1,name=title?title.textContent.trim():'';
   card.dataset.machine=slug;title.classList.add('machine-marquee');
   title.textContent='';var titleName=document.createElement('b');titleName.className='machine-marquee-name';titleName.textContent=name;title.appendChild(titleName);
-  var legend={rally:'BAT · SERVE',bouncer:'MOVE · LAUNCH',defender:'MOVE · FIRE',bubbler:'RUN · BUBBLE · JUMP',raider:'STEER · FIRE',meteors:'TURN · THRUST · FIRE',serpent:'STEER',brawler:'MOVE · PUNCH · KICK',adder:'TURN LEFT · RIGHT',warlock:'MOVE · BOLT · REVEAL'};
   var screen=card.querySelector('.card-shot-wrap');
-  var instructions=document.createElement('span');instructions.className='machine-instructions';instructions.setAttribute('aria-hidden','true');instructions.textContent=(players>1?'1 OR 2 PLAYERS · ':'')+(legend[slug]||'');screen.appendChild(instructions);
+  var instructions=document.createElement('span');instructions.className='machine-instructions';instructions.setAttribute('aria-hidden','true');instructions.textContent=(players>1?'1 OR 2 PLAYERS · ':'')+((BLIP_GAMES[slug]||{}).legend||'');screen.appendChild(instructions);
   var attract=document.createElement('span');attract.className='machine-attract';attract.setAttribute('aria-hidden','true');attract.innerHTML='<b>PRESS START</b><span class="machine-credit">CREDIT 0</span>';card.querySelector('.game-rom').appendChild(attract);
   var speaker=document.createElement('span');speaker.className='machine-speaker';speaker.setAttribute('aria-hidden','true');card.appendChild(speaker);
   ['left','right'].forEach(function(side){var panelSide=document.createElement('span');panelSide.className='machine-side '+side;panelSide.setAttribute('aria-hidden','true');panelSide.innerHTML='<b>'+name+'</b>';card.appendChild(panelSide);});

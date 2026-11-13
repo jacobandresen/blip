@@ -5,7 +5,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage, HTTP_PORT, evaluate, waitFor, sleep } from './lib/harness.mjs';
+import { openPage, HTTP_PORT, evaluate, waitFor, sleep, gameReady, insertCoins } from './lib/harness.mjs';
 
 // Most of these tests read the shell's own layout and key plumbing, which do not need the wasm: unless
 // `real`, it is held back so the page loads at once and the CPU stays free.
@@ -19,10 +19,10 @@ async function loadGame(cdp, slug, controls, { real = false } = {}) {
   await waitFor(cdp, "typeof window.BlipController === 'object'", 15000);
   // Controls stay gated until a credit enters through the coin button.
   if (await evaluate(cdp, "document.getElementById('need-coin-overlay').classList.contains('visible')")) {
-    await cdp.page.evaluate(() => document.getElementById('insert-coin-btn').click());
+    await insertCoins(cdp.page);
     await waitFor(cdp, "!document.getElementById('need-coin-overlay').classList.contains('visible')");
   }
-  if (real) await waitFor(cdp, "document.getElementById('loader').style.display === 'none'", 20000);
+  if (real) await gameReady(cdp.page);
   await sleep(real ? 150 : 40);
 }
 
@@ -563,7 +563,6 @@ test(`a phone on its side puts the controls beside the picture`, async (t) => {
 
 async function bootGame(cdp, controls) {
   await loadGame(cdp, 'brawler', controls, { real: true });
-  await waitFor(cdp, "document.getElementById('loader').style.display === 'none'", 20000);
   await sleep(800);
 }
 
@@ -777,9 +776,8 @@ test(`a second player joins by touch through their own buttons on the stick or t
     const ctx = await browser.newContext({ viewport: { width: 900, height: 800 }, hasTouch: true });
     const page = await ctx.newPage();
     await page.goto(`http://127.0.0.1:${HTTP_PORT}/brawler/index.html?controls=${controls}`);
-    await page.waitForFunction(() => document.getElementById('loader').style.display === 'none',
-      null, { timeout: 20000 });
-    if (await page.locator('#need-coin-overlay.visible').count()) await page.evaluate(() => document.getElementById('insert-coin-btn').click());
+    await gameReady(page);
+    if (await page.locator('#need-coin-overlay.visible').count()) await insertCoins(page);
     // The cabinet reports itself as soon as it is up; wait for that
     // rather than for a guessed number of milliseconds.
     await page.waitForFunction(

@@ -315,21 +315,7 @@ enum Sfx {
     Potion,
 }
 
-struct Sounds {
-    bolt: blip::BlipSound,
-    reveal: blip::BlipSound,
-    cleanse: blip::BlipSound,
-    kill: blip::BlipSound,
-    death: blip::BlipSound,
-    over: blip::BlipSound,
-    chamber: blip::BlipSound,
-    ward: blip::BlipSound,
-    warlock: blip::BlipSound,
-    fire: blip::BlipSound,
-    pulse: blip::BlipSound,
-    whelp: blip::BlipSound,
-    potion: blip::BlipSound,
-}
+blip::sounds!(Sounds { bolt, reveal, cleanse, kill, death, over, chamber, ward, warlock, fire, pulse, whelp, potion });
 
 struct Game {
     state: State,
@@ -1972,21 +1958,7 @@ async fn main() {
     let mut g = Game::new();
     // Leave the second station available for a mid-game co-op join.
     web::set_players(2);
-    g.sfx = Some(Sounds {
-        bolt: blip::sound!("bolt"),
-        reveal: blip::sound!("reveal"),
-        cleanse: blip::sound!("cleanse"),
-        kill: blip::sound!("kill"),
-        death: blip::sound!("death"),
-        over: blip::sound!("over"),
-        chamber: blip::sound!("chamber"),
-        ward: blip::sound!("ward"),
-        warlock: blip::sound!("warlock"),
-        fire: blip::sound!("fire"),
-        pulse: blip::sound!("pulse"),
-        whelp: blip::sound!("whelp"),
-        potion: blip::sound!("potion"),
-    });
+    g.sfx = Some(Sounds::load().await);
     let mut music = Jukebox::new("warlock", &["DUNGEON", "TOWER", "THEME", "DEPTHS"]);
     let mut art = art::Art::new();
     // the title shows the first cellar, torchlit and empty

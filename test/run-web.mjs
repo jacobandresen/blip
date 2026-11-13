@@ -3,23 +3,14 @@
 //
 //   node test/run-web.mjs
 
-import { spawn } from 'node:child_process';
+import { run } from './lib/run.mjs';
 
 const LANES = [
-  { name: 'game', concurrency: 1, files: ['touch', 'controls', 'two-player-touch-phones', 'bubbler-two-player-iphone', 'adder-two-player', 'warlock-two-player'] },
+  { name: 'game', concurrency: 1, files: ['touch', 'controls', 'two-player-phones', 'two-player-join'] },
   { name: 'layout', concurrency: 2, files: ['manual', 'cabinet', 'machine-identity', 'machine-launch', 'attract', 'iphone14-room', 'kiosk-room', 'touch-controls', 'aisle-perf', 'arcade-room', 'two-player-deck', 'topbar-layout', 'home'] },
 ];
 
-const codes = await Promise.all(LANES.map((lane) => new Promise((done) => {
-  const child = spawn(process.execPath, ['--test', `--test-concurrency=${lane.concurrency}`, ...lane.files.map((f) => `test/${f}.mjs`)], { stdio: ['ignore', 'pipe', 'inherit'] });
-  let out = '';
-  child.stdout.on('data', (chunk) => { out += chunk; });
-  child.on('close', (code) => {
-    const lines = out.split('\n'), failing = lines.findIndex((l) => l.startsWith('✖ failing tests:'));
-    process.stdout.write(`\n== ${lane.name} lane\n` + lines.filter((l) => /^(✖|ℹ (tests|pass|fail))|^\s+✖/.test(l)).join('\n') + '\n' +
-      (failing >= 0 ? lines.slice(failing, failing + 40).join('\n') + '\n' : ''));
-    done(code);
-  });
-})));
+const codes = await Promise.all(LANES.map((lane) => run(process.execPath,
+  ['--test', `--test-concurrency=${lane.concurrency}`, ...lane.files.map((f) => `test/${f}.mjs`)], { heading: `${lane.name} lane` })));
 // exitCode, not exit(): a piped stdout must drain the last lane's report first
 process.exitCode = codes.some((code) => code !== 0) ? 1 : 0;

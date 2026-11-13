@@ -8,7 +8,7 @@ use blip::input::{
 };
 use blip::macroquad::texture::Texture2D;
 use blip::{
-    GAME_OVER_MIN_WAIT, hsv,
+    hsv,
     Jukebox, pool_iter, pool_iter_mut, pool_spawn, play_sfx, rand_int, rand_range_f32, web, window_conf, Blip, Fx,
     BlipColor, LifeResult, Session, Timer, segment_circle_overlap, wrap, BLIP_BLACK, BLIP_GRAY, BLIP_WHITE, NEON_CYAN,
     NEON_GREEN, NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
@@ -253,18 +253,7 @@ impl Game {
     }
 }
 
-struct Sounds {
-    fire:        blip::BlipSound,
-    thrust:      blip::BlipSound,
-    bang_large:  blip::BlipSound,
-    bang_medium: blip::BlipSound,
-    bang_small:  blip::BlipSound,
-    saucer_big:  blip::BlipSound,
-    saucer_small: blip::BlipSound,
-    ship_boom:   blip::BlipSound,
-    hyperspace:  blip::BlipSound,
-    extra_life:  blip::BlipSound,
-}
+blip::sounds!(Sounds { fire, thrust, bang_large, bang_medium, bang_small, saucer_big, saucer_small, ship_boom = "ship_explosion", hyperspace, extra_life });
 
 fn field_centre() -> (f32, f32) {
     (PLAY_W as f32 / 2.0, PLAY_Y0 + PLAY_H as f32 / 2.0)
@@ -435,14 +424,10 @@ fn kill_ship(g: &mut Game, sfx: &Sounds) {
     g.ship_alive = false;
     let (sx, sy, svx, svy) = (g.ship.x, g.ship.y, g.ship.vx, g.ship.vy);
     burst(g, sx, sy, svx, svy, 7, 12.0, 110.0, NEON_CYAN);
-    match g.sess.lose_life() {
-        LifeResult::StillAlive => { g.respawn_t.start(RESPAWN_DELAY); g.state = State::Dead; }
-        LifeResult::GameOver   => {
-            g.respawn_t.start(GAME_OVER_MIN_WAIT);
-            g.state = State::Over;
-            web::report_score(g.sess.score);
-        }
-    }
+    g.state = match g.sess.lose_life_after(&mut g.respawn_t, RESPAWN_DELAY) {
+        LifeResult::StillAlive => State::Dead,
+        LifeResult::GameOver => State::Over,
+    };
 }
 
 fn award(g: &mut Game, sfx: &Sounds, pts: i32) {
@@ -1152,18 +1137,7 @@ async fn main() {
     // DRIFT, then STORM from wave STORM_WAVE.
     let mut music = Jukebox::new("meteors", &["DRIFT", "STORM"]);
 
-    let mut sfx = Sounds {
-        fire:         blip::sound!("fire"),
-        thrust:       blip::sound!("thrust"),
-        bang_large:   blip::sound!("bang_large"),
-        bang_medium:  blip::sound!("bang_medium"),
-        bang_small:   blip::sound!("bang_small"),
-        saucer_big:   blip::sound!("saucer_big"),
-        saucer_small: blip::sound!("saucer_small"),
-        ship_boom:    blip::sound!("ship_explosion"),
-        hyperspace:   blip::sound!("hyperspace"),
-        extra_life:   blip::sound!("extra_life"),
-    };
+    let mut sfx = Sounds::load().await;
     let mut thrust_snd_t = 0.0f32;
 
     if blip.screenshot_mode {

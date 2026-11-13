@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { openPage } from './lib/harness.mjs';
+import { openPage, PHONE, DESKTOP } from './lib/harness.mjs';
 import { attractMask, imageDifference } from './lib/arcade-room.mjs';
 
 const orientations = [
@@ -55,7 +55,7 @@ for (const engine of ['webkit', 'chromium']) {
   }
 
   test(`desktop focused screens keep playing with their overlay, hover and close view in ${engine}`, async (t) => {
-    const { page, origin } = await openPage(t, engine, { viewport: { width: 1280, height: 800 } });
+    const { page, origin } = await openPage(t, engine, { viewport: DESKTOP });
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.goto(`${origin}/index.html?room=full`);
     const games = await page.locator('#game-grid .card').evaluateAll((cards) => cards.map((card) => card.dataset.machine));
@@ -93,7 +93,7 @@ for (const engine of ['webkit', 'chromium']) {
   });
 
   test(`failed WebP and PNG attract images retain Brawler's still in ${engine}`, async (t) => {
-    const { page, origin } = await openPage(t, engine, { viewport: { width: 390, height: 844 }, hasTouch: true });
+    const { page, origin } = await openPage(t, engine, { viewport: PHONE, hasTouch: true });
     await page.route(/\/brawler\/attract\.(webp|png)$/, (route) => route.abort());
     await page.goto(`${origin}/index.html`);
     await page.waitForSelector('.card-focused[data-loop-ready]');
@@ -105,7 +105,7 @@ for (const engine of ['webkit', 'chromium']) {
   });
 
   test(`every game's PNG fallback paints changing frames in both orientations in ${engine}`, async (t) => {
-    const { page, origin } = await openPage(t, engine, { viewport: { width: 390, height: 844 }, hasTouch: true });
+    const { page, origin } = await openPage(t, engine, { viewport: PHONE, hasTouch: true });
     await page.route('**/attract.webp', (route) => route.abort());
     await page.goto(`${origin}/index.html?room=full`);
     const dir = new URL('artifacts/attract/', import.meta.url), report = [];
@@ -141,7 +141,7 @@ for (const engine of ['webkit', 'chromium']) {
   });
 
   test(`attract playback waits for decoded pixels in ${engine}`, async (t) => {
-    const { page, origin } = await openPage(t, engine, { viewport: { width: 390, height: 844 }, hasTouch: true });
+    const { page, origin } = await openPage(t, engine, { viewport: PHONE, hasTouch: true });
     await page.addInitScript(() => {
       const decode = HTMLImageElement.prototype.decode;
       HTMLImageElement.prototype.decode = function () {

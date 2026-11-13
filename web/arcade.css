@@ -1028,7 +1028,7 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
   :root[data-fullscreen] #game-grid .card {height:min(540px,calc(100% - 50px));}
 }
 @media (max-width:520px) {
-  .top-marquee-bar #marquee-name,#marquee-bar.jukebox-marquee #marquee-name {left:calc(50% - 2px);padding-left:2px;padding-right:2px}
+  #marquee-bar.jukebox-marquee #marquee-name {left:calc(50% - 2px);padding-left:2px;padding-right:2px}
 }
 
 :root[data-cabinet-return] .jukebox-front {visibility:hidden}
@@ -1251,8 +1251,6 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
 .card-pick::before,.card-pick::after {display:none}
 .card-pick .pick-arrow {pointer-events:auto}
 :root:not([data-credit]) .card-pick {filter:none}
-/* No title in the top bar: each machine wears its own marquee. Hidden, not removed, so the bar keeps its spacing. */
-body.cabinet-page .top-marquee-bar #marquee-name {visibility:hidden}
 /* The arcade's top bar stays whole in fullscreen too: logo, switches, manual and power. */
 :is(:root[data-fullscreen]:not([data-has-touch]),:root[data-bare]) body.cabinet-page .manual-pocket {display:flex}
 /* The controls and coin door are the machines' own: no deck along the bottom. */

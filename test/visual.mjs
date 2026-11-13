@@ -196,23 +196,31 @@ for (const [name, slug] of GAMES.filter(([name]) => !process.env.BLIP_VISUAL_GAM
         await page.waitForTimeout(450);
       }
     }
+    // The snake meets the right wall 1.6 s after Start: turn it up first, then make the slower checks. It climbs a cell a
+    // step; the tallest of the frames that follow shows the turn.
+    let serpent = null;
+    if (name === 'SERPENT') {
+      const before = await canvas.screenshot();
+      await tapKey(canvas, MOVE_KEY[name]);
+      const rowsBefore = await snakeRows(page, before), until = Date.now() + 1500;
+      serpent = { before, after: before, rows: rowsBefore };
+      while (serpent.rows <= rowsBefore + 12 && Date.now() < until) {
+        const frame = await canvas.screenshot(), rows = await snakeRows(page, frame);
+        if (rows > serpent.rows) serpent = { before, after: frame, rows };
+      }
+      assert.ok(serpent.rows > rowsBefore + 12, `SERPENT did not turn upward: the snake fills ${rowsBefore} rows, then ${serpent.rows}`);
+    }
     const started = await captureVisible(page, canvas, `${name} after Start`);
     const startChange = await frameDifference(page, title.image, started.image);
     await saveImage(slug, 'started', started.image);
     assert.ok(startChange > (START_CHANGE_MIN[name] || .05), `${name} stayed on its title after Start (${(startChange * 100).toFixed(2)}% changed)`);
-    const before = await canvas.screenshot();
-    if (name === 'SERPENT') {
-      await tapKey(canvas, MOVE_KEY[name]);
-      await page.waitForTimeout(240);
-    } else {
+    let before = serpent?.before, after = serpent?.after;
+    if (!serpent) {
+      before = await canvas.screenshot();
       await holdKey(page, canvas, MOVE_KEY[name], 350);
+      after = await canvas.screenshot();
     }
-    const after = await canvas.screenshot();
     const response = await frameDifference(page, before, after);
-    if (name === 'SERPENT') {
-      const rowsBefore = await snakeRows(page, before), rowsAfter = await snakeRows(page, after);
-      assert.ok(rowsAfter > rowsBefore + 12, `SERPENT did not turn upward: the snake fills ${rowsBefore} rows, then ${rowsAfter}`);
-    }
     assert.ok(response > (RESPONSE_MIN[name] || .0005), `${name} did not visibly respond to ${MOVE_KEY[name]} (${response.toFixed(4)} changed pixels)`);
     await saveImage(slug, 'input-before', before);
     await saveImage(slug, 'input-after', after);

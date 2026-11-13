@@ -362,13 +362,7 @@ impl Game {
     }
 }
 
-struct Sounds {
-    eat: blip::BlipSound,
-    game_over: blip::BlipSound,
-    bonus: blip::BlipSound,
-    bonus_eat: blip::BlipSound,
-    level: blip::BlipSound,
-}
+blip::sounds!(Sounds { eat, game_over, bonus, bonus_eat, level });
 
 fn update_title(g: &mut Game) {
     if coin_start() { g.start_game(); }
@@ -442,14 +436,10 @@ fn lose_life(g: &mut Game, sfx: &Sounds, why: &str) {
     let (x, y) = cell_centre(g.snake_at(0));
     g.fx.burst(x, y, 16, 140.0, BLIP_RED);
     play_sfx(&sfx.game_over);
-    match g.sess.lose_life() {
-        LifeResult::StillAlive => { g.dead_timer.start(1.5); g.state = State::Dead; }
-        LifeResult::GameOver   => {
-            g.dead_timer.start(GAME_OVER_MIN_WAIT);
-            g.state = State::Over;
-            web::report_score(g.sess.score);
-        }
-    }
+    g.state = match g.sess.lose_life_after(&mut g.dead_timer, 1.5) {
+        LifeResult::StillAlive => State::Dead,
+        LifeResult::GameOver => State::Over,
+    };
 }
 
 /// The bonus scores; the shears cut the tail, a puff per segment.
@@ -740,13 +730,7 @@ async fn main() {
 
     let food = load_png(blip::png!("food"));
 
-    let sfx = Sounds {
-        eat:       blip::sound!("eat"),
-        game_over: blip::sound!("game_over"),
-        bonus:     blip::sound!("bonus"),
-        bonus_eat: blip::sound!("bonus_eat"),
-        level:     blip::sound!("level"),
-    };
+    let sfx = Sounds::load().await;
     let mut music = Jukebox::new("serpent", &["SLITHER", "FRENZY"]);
 
     if blip.screenshot_mode {

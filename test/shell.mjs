@@ -122,19 +122,12 @@ test('the game shell', async (t) => {
     await arrivedAt(cdp, '/bouncer/index.html');
   });
 
-  await t.test('the mechanical title stays in place and flips through every game', async (t) => {
+  await t.test('each machine wears its own marquee and starts from its own controls', async (t) => {
     const cdp = await browser(t, 9410, { width: 1280, height: 800 });
     await open(cdp, 'index.html');
-    const layout = `JSON.stringify((function(){var n=document.querySelector('#marquee-name'),r=n.getBoundingClientRect();
-      return {box:[r.left,r.top,r.width,r.height],cells:n.querySelectorAll('.marquee-letter').length,
-        dots:n.querySelectorAll('.marquee-dot').length,text:Array.prototype.map.call(n.querySelectorAll('.marquee-letter'),function(x){return x.textContent}).join(''),
-        bulbs:Array.prototype.map.call(document.querySelectorAll('.top-marquee-bar .marquee-bulbs'),function(x){var b=x.getBoundingClientRect();return [b.left,b.top,b.width,b.height]})};})())`;
-    const empty = JSON.parse(await evaluate(cdp, layout));
-    assert.equal(empty.cells, 8);
-    assert.equal(empty.dots, 0);
-    assert.equal(empty.text, '\u00a0'.repeat(8));
     assert.equal(await evaluate(cdp, "document.querySelector('.top-marquee-bar').getBoundingClientRect().height"), 60,
-      'the fascia is tall enough for the large title flipper');
+      'the fascia keeps its height');
+    assert.equal(await evaluate(cdp, "!document.querySelector('.top-marquee-bar #marquee-name')"), true, 'the top bar carries no game title');
     assert.equal(await evaluate(cdp, "document.querySelectorAll('.top-marquee-bar .marquee-bulbs').length"), 0,
       'the cabinet fascia has no dot strips');
     assert.equal(await evaluate(cdp, "document.querySelector('.card-focused .card-title').textContent"), 'RALLY',
@@ -166,28 +159,6 @@ test('the game shell', async (t) => {
     await arrivedAt(cdp, '/bouncer/index.html');
     assert.equal(await evaluate(cdp, 'location.pathname'), '/bouncer/index.html');
     assert.ok([0, 1].includes(await evaluate(cdp, 'getCoins()')), 'the inserted credit reaches the game or starts play');
-    const titles = {
-      serpent: 'SERPENT', bouncer: 'BOUNCER', defender: 'DEFENDER', rally: 'RALLY',
-      meteors: 'METEORS', raider: 'RAIDER', brawler: 'BRAWLER', bubbler: 'BUBBLER',
-      adder: 'ADDER',
-    };
-    for (const [slug, title] of Object.entries(titles)) {
-      await open(cdp, `${slug}/index.html`, 300);
-      await evaluate(cdp, `blipSetMarquee(${JSON.stringify(title)}, true); true`);
-      await waitFor(cdp, `Array.from(document.querySelectorAll('#marquee-name .marquee-letter'), x => x.textContent).join('') === ${JSON.stringify(title.padEnd(8, '\u00a0'))}`, 5000);
-      const state = JSON.parse(await evaluate(cdp, `JSON.stringify((function(){var n=document.querySelector('#marquee-name'),r=n.getBoundingClientRect();
-        return {name:n.getAttribute('aria-label'),box:[r.left,r.top,r.width,r.height],cells:n.querySelectorAll('.marquee-letter').length,
-          dots:n.querySelectorAll('.marquee-dot').length,text:Array.prototype.map.call(n.querySelectorAll('.marquee-letter'),function(x){return x.textContent}).join(''),
-          duration:getComputedStyle(n.querySelector('.marquee-letter')).animationDuration,
-          delay:getComputedStyle([].slice.call(n.querySelectorAll('.marquee-letter')).pop()).animationDelay};})())`));
-      assert.equal(state.name, title, `${slug} accessible title`);
-      assert.equal(state.cells, 8, `${slug} has eight mechanical cells`);
-      assert.equal(state.dots, 0, `${slug} has no dot dividers`);
-      assert.equal(state.text, title.padEnd(8, '\u00a0'), `${slug} title cells`);
-      assert.deepEqual(state.box, empty.box, `${slug} title panel position and size`);
-      assert.equal(state.duration, '1s', `${slug} slow flap duration`);
-      assert.equal(state.delay, '1.33s', `${slug} final cell stagger`);
-    }
   });
 
   await t.test('mobile hides the game title and has no fascia utility buttons', async (t) => {
@@ -196,10 +167,10 @@ test('the game shell', async (t) => {
       await cdp.send('Emulation.setDeviceMetricsOverride', {width,height,deviceScaleFactor:1,mobile:true});
       for (const page of ['index.html','about.html','controls.html','history.html','defender/index.html']) {
         await open(cdp,page,1200);
-        const expectedTitle = page.includes('/') && width <= 620 ? 'visible' : 'hidden';
-        await waitFor(cdp, `getComputedStyle(document.querySelector('#marquee-name')).visibility === '${expectedTitle}'`, 5000);
-        assert.equal(await evaluate(cdp, "getComputedStyle(document.querySelector('#marquee-name')).visibility"), expectedTitle,
-          `${page} at ${width}px has the intended title visibility`);
+        const expectedTitle = !page.includes('/') ? 'none' : width <= 620 ? 'visible' : 'hidden';
+        const title = "(function(){var n=document.querySelector('#marquee-name');return n?getComputedStyle(n).visibility:'none'})()";
+        await waitFor(cdp, `${title} === '${expectedTitle}'`, 5000);
+        assert.equal(await evaluate(cdp, title), expectedTitle, `${page} at ${width}px has the intended title visibility`);
         assert.equal(await evaluate(cdp, "!document.querySelector('#fullscreen-btn, #mute-btn')"), true, `${page} has no fascia utility buttons`);
       }
     }

@@ -49,18 +49,6 @@ pub fn text_width(text: &str, sz: f32) -> f32 {
     text.chars().count() as f32 * 6.0 * sz
 }
 
-/// Draw a glowing string with a one-pixel halo and near-white core.
-/// About 10× the cost of [`draw_text`]; use for short labels.
-pub fn draw_text_glow(text: &str, x: f32, y: f32, sz: f32, c: Color) {
-    let halo = Color { a: c.a * 0.5, ..c };
-    for (dx, dy) in OUTLINE_OFFSETS {
-        draw_text(text, x + dx, y + dy, sz, halo);
-    }
-    // core: mostly white with a wash of the neon colour so the tint reads
-    let core = Color { r: (c.r + 2.0) / 3.0, g: (c.g + 2.0) / 3.0, b: (c.b + 2.0) / 3.0, a: 1.0 };
-    draw_text(text, x, y, sz, core);
-}
-
 /// Convenience wrapper to draw an integer without allocating a String at the call site.
 pub fn draw_number(n: i32, x: f32, y: f32, sz: f32, color: Color) {
     draw_text(&n.to_string(), x, y, sz, color);

@@ -30,9 +30,9 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=3">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=3">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v1.0.0/blip-deck.css">
-  <link rel="stylesheet" href="deck.css?v=9">
-  <link rel="stylesheet" href="blip.css?v=173">
-  <link rel="stylesheet" href="arcade.css?v=5">
+  <link rel="stylesheet" href="deck.css?v=12">
+  <link rel="stylesheet" href="blip.css?v=177">
+  <link rel="stylesheet" href="arcade.css?v=6">
   <!-- Match the shared cabinet controls before first paint. -->
   <script>
     if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
@@ -76,7 +76,7 @@
 
   <a class="blip-logo" href="index.html" aria-label="BLIP — cabinet"><img class="blip-logo-mark" src="blip-logo.svg" alt=""></a>
   <button type="button" class="home-switch" id="home-switch-btn" aria-label="Switch to the home screen" title="Home screen"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="1" width="4" height="4" rx="1.2"/><rect x="7" y="1" width="4" height="4" rx="1.2"/><rect x="1" y="7" width="4" height="4" rx="1.2"/><rect x="7" y="7" width="4" height="4" rx="1.2"/></svg></button>
-  <div class="top-marquee-bar"><span id="marquee-name" class="marquee-empty" aria-label="No game selected"><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span></span></div>
+  <div class="top-marquee-bar"></div>
   <!-- Coin slot: top-right corner of the cabinet panel, mirroring the
        BLIP ARCADE logo at top-left. -->
   <button class="kiosk-btn" id="kiosk-insert-btn"></button>
@@ -232,7 +232,6 @@
   </template>
   <div class="game-grid" id="game-grid" aria-label="Arcade machines. Use the left and right arrows to walk between games.">
 
-    <!-- RALLY -->
     <article class="card card-rally" data-game-url="rally/index.html">
       <div class="card-shot-wrap">
         <img class="card-shot" src="rally/screenshot.png" alt="Rally gameplay">
@@ -240,7 +239,6 @@
       <div class="card-title">RALLY</div>
     </article>
 
-    <!-- BUBBLER -->
     <article class="card card-bouncer" data-game-url="bouncer/index.html">
       <div class="card-shot-wrap">
         <img class="card-shot" src="bouncer/screenshot.png?v=4" alt="Bouncer gameplay">
@@ -248,7 +246,6 @@
       <div class="card-title">BOUNCER</div>
     </article>
 
-    <!-- DEFENDER -->
     <article class="card card-galactic" data-game-url="defender/index.html">
       <div class="card-shot-wrap">
         <img class="card-shot" src="defender/screenshot.png?v=7" alt="Defender gameplay">
@@ -256,7 +253,6 @@
       <div class="card-title">DEFENDER</div>
     </article>
 
-    <!-- RAIDER -->
     <article class="card card-bubbler" data-game-url="bubbler/index.html">
       <div class="card-shot-wrap">
         <img class="card-shot" src="bubbler/screenshot.png?v=4" alt="Bubbler gameplay">
@@ -264,14 +260,12 @@
       <div class="card-title">BUBBLER</div>
     </article>
 
-    <!-- BOUNCER -->
     <article class="card card-sky-raider" data-game-url="raider/index.html">
       <div class="card-shot-wrap">
         <img class="card-shot" src="raider/screenshot.png?v=12" alt="Raider gameplay">
       </div>
       <div class="card-title">RAIDER</div>
     </article>
-    <!-- METEORS -->
     <article class="card card-meteors" data-game-url="meteors/index.html">
       <div class="card-shot-wrap">
         <img class="card-shot" src="meteors/screenshot.png?v=6" alt="Meteors gameplay">
@@ -279,7 +273,6 @@
       <div class="card-title">METEORS</div>
     </article>
 
-    <!-- SERPENT -->
     <article class="card card-serpent" data-game-url="serpent/index.html">
       <div class="card-shot-wrap">
         <img class="card-shot" src="serpent/screenshot.png?v=4" alt="Serpent gameplay">
@@ -287,7 +280,6 @@
       <div class="card-title">SERPENT</div>
     </article>
 
-    <!-- BRAWLER -->
     <article class="card card-brawler" data-game-url="brawler/index.html">
       <div class="card-shot-wrap">
         <img class="card-shot" src="brawler/card.png?v=15" alt="Brawler: a high kick, over the sign">
@@ -295,7 +287,6 @@
       <div class="card-title">BRAWLER</div>
     </article>
 
-    <!-- ADDER -->
     <article class="card card-adder" data-game-url="adder/index.html">
       <div class="card-shot-wrap">
         <img class="card-shot" src="adder/screenshot.png" alt="Adder gameplay">
@@ -303,7 +294,6 @@
       <div class="card-title">ADDER</div>
     </article>
 
-    <!-- WARLOCK -->
     <article class="card card-warlock" data-game-url="warlock/index.html">
       <div class="card-shot-wrap">
         <img class="card-shot" src="warlock/card.png?v=2" alt="Warlock: the hooded sorcerer in his arch, a young wizard raising his staff">
@@ -383,10 +373,10 @@
   <script src="https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v1.0.0/dist/blip-deck.js"></script>
 
   <script src="howler.min.js"></script>
-  <script src="blip_core.js?v=14"></script>
-  <script src="cabinet.js?v=106"></script>
+  <script src="blip_core.js?v=17"></script>
+  <script src="cabinet.js?v=110"></script>
   <script src="aisle.js?v=2"></script>
-  <script src="arcade.js?v=4"></script>
+  <script src="arcade.js?v=5"></script>
 <i id="arcade-parsed" hidden></i>
 </body>
 </html>

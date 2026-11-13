@@ -5,7 +5,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage } from './lib/harness.mjs';
+import { openPage, openPhone, DESKTOP } from './lib/harness.mjs';
 import { GAME_SLUGS } from './lib/games.mjs';
 
 for (const width of [1280, 390]) {
@@ -180,10 +180,7 @@ test('turning a page lifts a leaf that comes to rest, and the book is whole afte
 });
 
 test('a swipe across the open book turns its pages, left for next and right for previous', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, viewport: { width: 390, height: 844 } });
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
-  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  const { page, origin, cdp } = await openPhone(t);
   await page.goto(`${origin}/index.html?manual=about`);
   await page.waitForFunction(() => document.querySelector('.manual-page-content .manual-leaf-sheet')
     && document.getElementById('manual-page-count').textContent.split('/')[1].trim() !== '01'
@@ -352,7 +349,7 @@ for (const [width, height] of [[1280, 800], [800, 600], [390, 844]]) {
 }
 
 test('on a wide screen the book lands closed, its cover swings open about the spine, and the book is whole again at the end', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
+  const { page, origin } = await openPage(t, 'chromium', { viewport: DESKTOP });
   await page.goto(`${origin}/index.html`);
   await page.waitForSelector('.card-focused');
   await page.waitForTimeout(1500);

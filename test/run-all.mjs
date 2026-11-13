@@ -1,10 +1,9 @@
-import { spawn } from 'node:child_process';
 import { readdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { createFileServer, listenOn } from './lib/harness.mjs';
 import { chromiumBinary } from './lib/chromium-binary.mjs';
+import { run as runChild } from './lib/run.mjs';
 
-const root = new URL('../', import.meta.url);
 const args = process.argv.slice(2);
 if (args.some((arg) => arg !== '--check-access')) {
   throw new Error('Usage: npm run test:all [-- --check-access]');
@@ -31,13 +30,9 @@ async function checkAccess() {
   }
 }
 
-async function run(command, commandArgs) {
+function run(command, commandArgs) {
   console.log(`\nRunning ${command} ${commandArgs.join(' ')}`);
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, commandArgs, { cwd: root, stdio: 'inherit' });
-    child.once('error', reject);
-    child.once('close', (code) => resolve(code ?? 1));
-  });
+  return runChild(command, commandArgs);
 }
 
 await checkAccess();

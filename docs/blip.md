@@ -33,14 +33,16 @@ async fn main() {
 }
 ```
 
-Games keep their screens in a `State` enum (`Title`, `Play`, `Over`, …) with an `update_*` and a `draw_*` function each.
+Games keep their screens in a `State` enum (`Title`, `Play`, `Over`, …) with an `update_*` and a `draw_*` function each. A
+lost life is `sess.lose_life_after(&mut timer, respawn)`: it starts the respawn or game-over wait and reports the final score.
 
 ## Assets
 
 `build.rs` is `blip::build_script!();`. It runs the game's `src/gfx.rs` (`generate()`, pictures) and `src/tunes.rs`
 (`sounds()` and `music()`) at build time:
 
-- pictures and effects are embedded: `load_png(blip::png!("food"))`, `blip::sound!("eat")`;
+- pictures and effects are embedded: `load_png(blip::png!("food"))`, `blip::sound!("eat")`; a game names its effects
+  once with `blip::sounds!(Sounds { eat, kill = "defeated" })` and loads them with `Sounds::load().await`;
 - music is written to `web/<game>/music/<NAME>.wav` and streamed: `Jukebox::new("serpent", &["SLITHER", "FRENZY"])`.
 
 `blip::image`, `blip::wav`, `blip::song`, `blip::cosy` and `blip::techno` are the generators the asset files build on.
