@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { devices } from 'playwright';
-import { openPage } from './lib/harness.mjs';
+import { openPage, PHONE } from './lib/harness.mjs';
 import { attractMask, holdHalfway, imageDifference, currentRoomHash } from './lib/arcade-room.mjs';
 
 const DIR = new URL('artifacts/iphone14-room/', import.meta.url);
@@ -59,7 +59,7 @@ async function paintedRegion(page, region, shot) {
 
 for (const engine of ['webkit', 'chromium']) {
   test(`iPhone 14 room screens paint while passing, wrapping and rotating in ${engine}`, async (t) => {
-    const { page, origin } = await openPage(t, engine, { viewport: { width: 390, height: 844 }, hasTouch: true,
+    const { page, origin } = await openPage(t, engine, { viewport: PHONE, hasTouch: true,
       deviceScaleFactor: 3, isMobile: true, userAgent: devices['iPhone 14'].userAgent });
     const sourceHash = currentRoomHash();
     const cdp = engine === 'chromium' ? await page.context().newCDPSession(page) : null;

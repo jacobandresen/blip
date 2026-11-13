@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage, gameReady } from './lib/harness.mjs';
+import { openPage, gameReady, openPhone, PHONE, DESKTOP, insertCoins } from './lib/harness.mjs';
 import { GAMES } from './lib/games.mjs';
 
 for (const engine of ['webkit', 'chromium']) {
   test(`touchscreen control selection uses gesture strips, preserving Rally, in ${engine}`, async (t) => {
-    const { page, origin } = await openPage(t, engine, { hasTouch: true, viewport: { width: 390, height: 844 } });
+    const { page, origin } = await openPage(t, engine, { hasTouch: true, viewport: PHONE });
     await page.goto(`${origin}/bouncer/index.html`);
     await page.waitForSelector('#touch-strip');
     assert.equal(await page.locator('#touch-strip').isVisible(), true, 'the arcade opens a touch strip');
@@ -53,7 +53,7 @@ for (const engine of ['webkit', 'chromium']) {
 }
 
 test('a desktop keeps the arcade controls and explicit deck choices', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
+  const { page, origin } = await openPage(t, 'chromium', { viewport: DESKTOP });
   await page.goto(`${origin}/bouncer/index.html`);
   assert.equal(await page.evaluate(() => blipControls()), 'stick');
   await page.goto(`${origin}/bouncer/index.html?controls=pad`);
@@ -89,7 +89,7 @@ test('action touch zones steer and hold game buttons without a pad', async (t) =
   const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, viewport: { width: 810, height: 1080 } });
   for (const [slug, actionKey] of [['meteors', ' '], ['brawler', 'f'], ['raider', ' ']]) {
     await page.goto(`${origin}/${slug}/index.html`);
-    await page.evaluate(() => document.getElementById('insert-coin-btn').click());
+    await insertCoins(page);
     const events = await page.evaluate(() => {
       const canvas = document.querySelector('canvas');
       const steer = document.querySelector('.ts-half');
@@ -118,7 +118,7 @@ test('Brawler gives both touch players independent movement and attacks', async 
   const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, viewport: { width: 810, height: 1080 } });
   await page.goto(`${origin}/brawler/index.html`);
   await gameReady(page);
-  await page.evaluate(() => document.getElementById('insert-coin-btn').click());
+  await insertCoins(page);
   const result = await page.evaluate(() => {
     blipSetMode(1);
     const canvas = document.querySelector('canvas');
@@ -146,10 +146,7 @@ test('Brawler gives both touch players independent movement and attacks', async 
 });
 
 test('two real touch contacts keep Brawler steering and attacking together', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, viewport: { width: 810, height: 1080 } });
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 810, height: 1080, deviceScaleFactor: 2, mobile: true });
-  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  const { page, origin, cdp } = await openPhone(t, { width: 810, height: 1080 });
   await page.goto(`${origin}/brawler/index.html`);
   await gameReady(page);
   await page.evaluate(() => {
@@ -180,7 +177,7 @@ test('two real touch contacts keep Brawler steering and attacking together', asy
 test('changing controller style releases a held touch direction', async (t) => {
   const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, viewport: { width: 810, height: 1080 } });
   await page.goto(`${origin}/raider/index.html`);
-  await page.evaluate(() => document.getElementById('insert-coin-btn').click());
+  await insertCoins(page);
   const result = await page.evaluate(() => {
     const canvas = document.querySelector('canvas'), steer = document.querySelector('.ts-half');
     const events = [];
@@ -200,10 +197,7 @@ test('changing controller style releases a held touch direction', async (t) => {
 });
 
 test('control choices and card fit an iPhone landscape safe area', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, viewport: { width: 844, height: 390 } });
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 844, height: 390, deviceScaleFactor: 2, mobile: true });
-  await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 0, bottom: 21, left: 47, right: 47 } });
+  const { page, origin, cdp } = await openPhone(t, { width: 844, height: 390 }, { insets: { top: 0, bottom: 21, left: 47, right: 47 } });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const slug of ['meteors', 'brawler']) {
     await page.goto(`${origin}/${slug}/index.html`);
@@ -218,20 +212,21 @@ test('control choices and card fit an iPhone landscape safe area', async (t) => 
   }
 });
 
-// Brawler and Warlock: two seats, and their own touch buttons on the trackpad's right.
-for (const { slug } of GAMES.filter((game) => game.players === 2 && game.touch?.kind === 'action')) {
-  for (const [shape, viewport] of [['upright', { width: 390, height: 844 }], ['sideways', { width: 844, height: 390 }]]) {
-    test(`${slug}: 2P JOIN stays clear of the touch buttons on an iPhone held ${shape}`, async (t) => {
+// Every touch game with a second seat: 2P JOIN stays off the trackpad, so player one's thumbs never land on it.
+const apart = (a, b) => a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y;
+for (const { slug } of GAMES.filter((game) => game.players === 2 && ['action', 'drag', 'platform'].includes(game.touch?.kind))) {
+  for (const [shape, viewport] of [['upright', { width: 390, height: 844 }], ['upright on an SE', { width: 320, height: 568 }], ['sideways', { width: 844, height: 390 }]]) {
+    test(`${slug}: 2P JOIN stays off the trackpad on an iPhone held ${shape}`, async (t) => {
       const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, isMobile: true, viewport });
       await page.route('**/*.wasm', () => {});          // the deck belongs to the shell; no game needs to run
       await page.goto(`${origin}/${slug}/index.html`);
       await page.evaluate(() => document.documentElement.setAttribute('data-open', ''));
-      const join = await page.locator('#touch-strip .ts-join, body > .ts-join').first().boundingBox();
-      const buttons = await page.locator('#touch-strip .ts-actions[data-player="0"]').boundingBox();
-      assert.ok(join && buttons, 'both 2P JOIN and the touch buttons show');
-      const apart = join.x + join.width <= buttons.x || buttons.x + buttons.width <= join.x ||
-        join.y + join.height <= buttons.y || buttons.y + buttons.height <= join.y;
-      assert.ok(apart, `2P JOIN ${JSON.stringify(join)} lies over the touch buttons ${JSON.stringify(buttons)}`);
+      const join = await page.locator('.ts-join').boundingBox();
+      assert.ok(join && join.width > 0, '2P JOIN shows');
+      for (const selector of ['#touch-strip .ts-glass', '#touch-strip .ts-actions[data-player="0"]']) {
+        const box = await page.locator(selector).count() ? await page.locator(selector).boundingBox() : null;
+        if (box && box.width > 0) assert.ok(apart(join, box), `2P JOIN ${JSON.stringify(join)} lies over ${selector} ${JSON.stringify(box)}`);
+      }
     });
   }
 }

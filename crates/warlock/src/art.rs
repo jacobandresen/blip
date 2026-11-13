@@ -1580,7 +1580,7 @@ impl Art {
             blip.draw_start_prompt(470.0);
         }
         blip.draw_centered_outlined(
-            by.pick("ARROWS MOVE  SPACE BOLT  Z REVEAL", "STICK MOVE  A BOLT  B REVEAL", "STICK MOVE  A BOLT  B REVEAL"),
+            by.pick("ARROWS MOVE  SPACE BOLT  Z REVEAL", "STICK MOVE  A BOLT  B REVEAL", "DRAG TO MOVE  TAP BOLT OR REVEAL"),
             WIN_W as f32 / 2.0,
             500.0,
             2.0,
@@ -1599,7 +1599,7 @@ impl Art {
         ];
         // A new tip every four seconds; the first says how the second player joins.
         let tip = match (t / 4.0) as usize % TIPS.len() {
-            0 => by.pick(TIPS[0], "2ND STATION JOINS WITH A", "2ND PLAYER JOINS ON THE DECK"),
+            0 => by.pick(TIPS[0], "2ND STATION JOINS WITH A", "2ND PLAYER TAPS 2P JOIN"),
             n => TIPS[n],
         };
         let fade = ((t / 4.0).fract() * 8.0).min(1.0).min((1.0 - (t / 4.0).fract()) * 8.0);

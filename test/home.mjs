@@ -10,14 +10,13 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { createFileServer, openPage, WEB_DIR, listenOn, arrivedAt } from './lib/harness.mjs';
+import { createFileServer, openPage, WEB_DIR, listenOn, arrivedAt, gameReady, PHONE, DESKTOP } from './lib/harness.mjs';
 import { chromiumBinary } from './lib/chromium-binary.mjs';
 
-const GAMES = GAME_SLUGS;
 
 /** A phone with the games' wasm held back: these tests read the pages, not play them. */
 async function phone(t, opts = {}) {
-  const handle = await openPage(t, 'chromium', { hasTouch: true, viewport: { width: 390, height: 844 }, ...opts });
+  const handle = await openPage(t, 'chromium', { hasTouch: true, viewport: PHONE, ...opts });
   await handle.page.route('**/*.wasm', () => {});
   return handle;
 }
@@ -41,7 +40,7 @@ test('the home screen shows every game as an app with its own icon, and nothing 
     slug: b.dataset.slug, label: b.querySelector('.app-label').textContent, src: b.querySelector('img').getAttribute('src'),
     badge: !!b.parentElement.querySelector('.app-badge'),
   })));
-  assert.deepEqual(apps.map((a) => a.slug).sort(), [...GAMES].sort());
+  assert.deepEqual(apps.map((a) => a.slug).sort(), [...GAME_SLUGS].sort());
   for (const a of apps) assert.match(a.src, new RegExp(`^${a.slug}/icon-192\\.png`));
   assert.deepEqual(apps.filter((a) => a.badge).map((a) => a.slug).sort(), ['adder', 'brawler', 'bubbler', 'rally', 'warlock']);
   assert.ok(await page.locator('#dock-arcade').isVisible(), 'the dock has the way back to BLIP Home');
@@ -127,7 +126,7 @@ test('the context menu sits beside its icon and inside the screen', async (t) =>
 });
 
 test('in edit mode an icon is dragged to a new place, which is kept', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 390, height: 844 } });
+  const { page, origin } = await openPage(t, 'chromium', { viewport: PHONE });
   await page.goto(`${origin}/home.html`);
   await page.locator('#app-grid [data-slug="adder"]').dispatchEvent('contextmenu');
   await page.locator('[data-action="edit"]').click();
@@ -205,7 +204,7 @@ test('a long press offers Add to Home Screen, which shows how on the game page',
 });
 
 test('Safari is shown the Share steps; Chrome gets its own Install button', async (t) => {
-  const ios = await openPage(t, 'chromium', { hasTouch: true, viewport: { width: 390, height: 844 } });
+  const ios = await openPage(t, 'chromium', { hasTouch: true, viewport: PHONE });
   await ios.page.route('**/*.wasm', () => {});
   await ios.page.addInitScript(() => Object.defineProperty(navigator, 'userAgent', { get: () => 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1' }));
   await ios.page.goto(`${ios.origin}/adder/?install`);
@@ -245,9 +244,6 @@ test('any game can start in app mode: from a link with ?app, or once the home sc
   await page.goto(`${origin}/meteors/`);
   await page.waitForFunction(() => typeof BlipController === 'object');
   assert.equal(await appStyle(), true);
-  // The cabinet's preview of a game is the cabinet's, whatever the choice.
-  await page.goto(`${origin}/meteors/?cabinet=1`);
-  assert.equal(await appStyle(), false);
 });
 
 test('opened from its own icon, a game plays free and stays itself', async (t) => {
@@ -276,7 +272,7 @@ test('opened from its own icon, a game plays free and stays itself', async (t) =
 });
 
 test('a game opened as an app draws a clean, sharp picture: no CRT, full pixel density', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 390, height: 844 } });
+  const { page, origin } = await openPage(t, 'chromium', { viewport: PHONE });
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: false });
   // Record what the game is told when it asks, through the bridge's own import.
@@ -330,7 +326,7 @@ test('the drawn status bar is for a PC: a phone or tablet has its own', async (t
   const { page, origin } = await phone(t);
   await page.goto(`${origin}/home.html`);
   assert.equal(await page.locator('.status-time').isVisible(), false);
-  const pc = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
+  const pc = await openPage(t, 'chromium', { viewport: DESKTOP });
   await pc.page.goto(`${pc.origin}/home.html`);
   assert.equal(await pc.page.locator('.status-time').isVisible(), true);
   assert.equal(await pc.page.locator('.status-battery').isVisible(), true);
@@ -375,7 +371,7 @@ test('over a game, Guide opens a sheet at that game, and Done puts it away', asy
 });
 
 test('app mode on a PC needs no deck; a tablet drops it for a gamepad until touched', async (t) => {
-  const pc = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
+  const pc = await openPage(t, 'chromium', { viewport: DESKTOP });
   await pc.page.route('**/*.wasm', () => {});
   await pc.page.goto(`${pc.origin}/serpent/?app`);
   await pc.page.waitForFunction(() => typeof BlipController === 'object');
@@ -420,7 +416,7 @@ test('in app mode the controls card and the Guide pause the game', async (t) => 
 });
 
 test('the first time a game opens in app mode it shows its controls, paused, until a key', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
+  const { page, origin } = await openPage(t, 'chromium', { viewport: DESKTOP });
   await page.goto(`${origin}/bouncer/?app`);   // the game itself runs here
   await page.waitForFunction(() => document.documentElement.hasAttribute('data-card'), null, { timeout: 30000 });
   assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-paused')), true);
@@ -428,7 +424,7 @@ test('the first time a game opens in app mode it shows its controls, paused, unt
   await page.keyboard.press('Space');
   await page.waitForFunction(() => !document.documentElement.hasAttribute('data-card') && !document.documentElement.hasAttribute('data-paused'));
   await page.reload();
-  await page.waitForFunction(() => document.getElementById('loader').style.display === 'none', null, { timeout: 30000 });
+  await gameReady(page);
   assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-card')), false, 'only the first time');
 });
 
@@ -445,7 +441,7 @@ test('an icon\'s menu opens the game\'s page in the Guide', async (t) => {
 test('each game page names itself and links its own manifest and icon', async (t) => {
   const { page, origin } = await phone(t);
   const seen = new Set();
-  for (const slug of GAMES) {
+  for (const slug of GAME_SLUGS) {
     await page.goto(`${origin}/${slug}/`);
     const head = await page.evaluate(() => ({
       title: document.title,

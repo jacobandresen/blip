@@ -56,9 +56,10 @@ for (const engine of ['chromium', 'webkit']) {
           assert.ok(near.body.includes(layer), `${game}: the cabinet's laminate ${layer} is on its page`);
         assert.deepEqual({ ...near, body: overview.body }, overview, `${game}: physical cabinet surfaces`);
         const liveHardware = await gamePage.evaluate(deckHardware);
-        // Input feedback adds inline widths and transforms only after the live shell wires the shared strip.
+        // Input feedback adds inline widths and transforms only after the live shell wires the shared strip, and the
+        // live shell lifts 2P JOIN off the trackpad onto the screen.
         if (hardware.strip) {
-          const content = html => html.replace(/ style="[^"]*"/g, '');
+          const content = html => html.replace(/ style="[^"]*"/g, '').replace(/<button class="ts-join"[^]*?<\/button>/, '');
           hardware.strip = content(hardware.strip); liveHardware.strip = content(liveHardware.strip);
         }
         assert.deepEqual(liveHardware, hardware, `${game}: controller type, caps and strip`);

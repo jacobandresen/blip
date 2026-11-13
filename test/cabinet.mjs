@@ -2,33 +2,20 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage, gameReady, arcadeArranged, arrivedAt } from './lib/harness.mjs';
+import { openPage, gameReady, arcadeArranged, arrivedAt, openArcade, machineReady, emulatePhone, PHONE } from './lib/harness.mjs';
 import { AISLE, GAMES as ALL_GAMES } from './lib/games.mjs';
 
 const GAMES_BY_SLUG = Object.fromEntries(ALL_GAMES.map((game) => [game.slug, game]));
 
+const DESK = { width: 1280, height: 844 };
+
 // [slug, NAME] in the aisle's order: the tests walk to each machine with the arrow keys.
 const GAMES = AISLE.map((slug) => [slug, GAMES_BY_SLUG[slug].name]);
-
-async function openArcade(t, width = 390, height = 844) {
-  const { page, origin } = await openPage(t, 'chromium', {
-    hasTouch: width < 700, viewport: { width, height },
-  });
-  await page.goto(`${origin}/index.html`);
-  await machineReady(page);
-  return { page, origin };
-}
-
-// The arcade has laid out its aisle and focused a machine whose Start can be pressed.
-function machineReady(page) {
-  return page.waitForFunction(() => document.querySelector('.card-focused .machine-start') &&
-    !document.documentElement.hasAttribute('data-cabinet-arranging'));
-}
 
 const selectedSlug = (page) => page.locator('.card-focused').getAttribute('data-game-url');
 
 test('the aisle shows one complete, selectable cabinet for every game', async (t) => {
-  const { page } = await openArcade(t, 1280);
+  const { page } = await openArcade(t, DESK);
   const cabinets = await page.locator('#game-grid .card').evaluateAll((cards) => cards.map((card) => ({
     slug: card.dataset.gameUrl.split('/')[0],
     title: card.querySelector('.card-title')?.textContent.trim(),
@@ -59,7 +46,7 @@ test('the aisle shows one complete, selectable cabinet for every game', async (t
 
 for (const [width, height] of [[1280, 844], [390, 844], [320, 568]]) {
   test(`the selected machine and its controls fit the arcade at ${width}×${height}`, async (t) => {
-    const { page } = await openArcade(t, width, height);
+    const { page } = await openArcade(t, { width, height });
     const fit = await page.evaluate(() => {
       const frame = document.querySelector('.screen-bezel').getBoundingClientRect();
       const card = document.querySelector('.card-focused');
@@ -84,7 +71,7 @@ for (const [width, height] of [[1280, 844], [390, 844], [320, 568]]) {
 }
 
 test('arrows and a tap walk between machines; tapping the cabinet body does not launch it', async (t) => {
-  const { page, origin } = await openArcade(t, 390);
+  const { page, origin } = await openArcade(t, PHONE);
   assert.equal(await selectedSlug(page), 'rally/index.html');
   await page.locator('.pick-next').tap();
   await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'bouncer/index.html');
@@ -100,7 +87,7 @@ test('arrows and a tap walk between machines; tapping the cabinet body does not 
 });
 
 test('returning from a game restores its machine without loading a hidden second game', async (t) => {
-  const { page, origin } = await openArcade(t);
+  const { page, origin } = await openArcade(t, PHONE);
   await page.locator('.card-focused .machine-coinbox').tap();
   await page.locator('.card-focused .machine-start').tap();
   await arrivedAt(page, `${origin}/rally/index.html`);
@@ -116,7 +103,7 @@ test('returning from a game restores its machine without loading a hidden second
 });
 
 test('a tap on the chosen machine’s screen starts it, paying its own coin', async (t) => {
-  const { page, origin } = await openArcade(t, 390);
+  const { page, origin } = await openArcade(t, PHONE);
   assert.equal(await page.locator('.card-focused .machine-attract b').textContent(), 'PRESS START');
   await page.locator('.card-focused .card-shot-wrap').tap({ force: true });
   await arrivedAt(page, `${origin}/rally/index.html`);
@@ -125,7 +112,7 @@ test('a tap on the chosen machine’s screen starts it, paying its own coin', as
 });
 
 test('desktop keyboard walking and physical Start begin play at the chosen machine', async (t) => {
-  const { page, origin } = await openArcade(t, 1280);
+  const { page, origin } = await openArcade(t, DESK);
   await page.keyboard.press('ArrowRight');
   await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'bouncer/index.html');
   await page.locator('.card-focused .machine-coinbox').click();
@@ -144,7 +131,7 @@ test('desktop keyboard walking and physical Start begin play at the chosen machi
 });
 
 test('keyboard coin input updates the selected door and its Start lamp', async (t) => {
-  const { page } = await openArcade(t, 1280);
+  const { page } = await openArcade(t, DESK);
   const readout = page.locator('.card-focused .machine-credit');
   assert.equal(await readout.textContent(), 'CREDIT 0');
   await page.keyboard.press('5');
@@ -157,7 +144,7 @@ test('keyboard coin input updates the selected door and its Start lamp', async (
 });
 
 test('a full credit bank refuses another coin without showing a coin drop', async (t) => {
-  const { page } = await openArcade(t, 1280);
+  const { page } = await openArcade(t, DESK);
   for (let coin = 0; coin < 5; coin++) await page.keyboard.press('5');
   assert.equal(await page.evaluate(() => getCoins()), 5);
   const door = page.locator('.card-focused .machine-coinbox');
@@ -168,7 +155,7 @@ test('a full credit bank refuses another coin without showing a coin drop', asyn
 });
 
 test('gamepad Select inserts a coin at the machine, then Start launches it', async (t) => {
-  const { page, origin } = await openArcade(t, 1280);
+  const { page, origin } = await openArcade(t, DESK);
   await page.evaluate(() => {
     const buttons = Array.from({ length: 16 }, () => ({ pressed: false, value: 0 }));
     window.__cabinetPadButtons = buttons;
@@ -186,7 +173,7 @@ test('gamepad Select inserts a coin at the machine, then Start launches it', asy
 
 for (const width of [1280, 390, 320]) {
   test(`walking the entire aisle keeps each cabinet in view at ${width}px`, async (t) => {
-    const { page } = await openArcade(t, width, width === 320 ? 568 : 844);
+    const { page } = await openArcade(t, { width, height: width === 320 ? 568 : 844 });
     for (let stop = 1; stop <= GAMES.length; stop++) {
       await page.keyboard.press('ArrowRight');
       const next = GAMES[stop % GAMES.length][0];
@@ -206,7 +193,7 @@ for (const width of [1280, 390, 320]) {
 
 for (const [index, [slug, title]] of GAMES.entries()) {
   test(`${title}: press its Start and reach playable controls`, async (t) => {
-    const { page, origin } = await openArcade(t);
+    const { page, origin } = await openArcade(t, PHONE);
     for (let step = 0; step < index; step++) await page.keyboard.press('ArrowRight');
     await page.waitForFunction((game) => document.querySelector('.card-focused')?.dataset.gameUrl === `${game}/index.html`, slug);
     const machine = page.locator('.card-focused');
@@ -258,21 +245,22 @@ for (const [index, [slug, title]] of GAMES.entries()) {
     await page.waitForFunction(() => getCoins() === 0, null, { timeout: 5000 });
     assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-cabinet-start')), null,
       `${title} consumed the cabinet Start action`);
-    // Use the controls offered on this device: a gesture strip, touch buttons, or Rally's dial.
+    // Use the controls offered on this device: a gesture strip, touch buttons, or Rally's dial. A tap can wait seconds
+    // while a heavy game boots beside the other test lane.
     await page.evaluate(() => {
       window.__cabinetActionKeys = [];
       document.querySelector('canvas').addEventListener('keydown', (event) => window.__cabinetActionKeys.push(event.code));
     });
     const mode = await page.evaluate(() => blipControls());
-    if (slug === 'rally') await page.locator('#paddle-dial').tap({ timeout: 3000 });
+    if (slug === 'rally') await page.locator('#paddle-dial').tap({ timeout: 15000 });
     else if (mode === 'touch' && await page.evaluate(() => BLIP_GAMES[blipGameFromPath(location.pathname).slug]?.touch?.kind === 'action')) {
       // action games steer on the trackpad and fire from their own touch button
-      await page.locator('#touch-strip .ts-action[data-button="1"]').first().tap({ timeout: 3000 });
+      await page.locator('#touch-strip .ts-action[data-button="1"]').first().tap({ timeout: 15000 });
     } else if (mode === 'touch') {
       const strip = await page.locator('#touch-strip .ts-glass').boundingBox();
       assert.ok(strip, `${title} exposes its touch surface`);
       await page.touchscreen.tap(strip.x + strip.width * .2, strip.y + strip.height * .7);
-    } else await page.locator(mode === 'pad' ? '#snes-pad .snes-btn[data-blip="button1"]' : '#fire-buttons .arcade-btn[data-blip="button1"]').first().tap({ timeout: 3000 });
+    } else await page.locator(mode === 'pad' ? '#snes-pad .snes-btn[data-blip="button1"]' : '#fire-buttons .arcade-btn[data-blip="button1"]').first().tap({ timeout: 15000 });
     const expected = await page.evaluate(() => BLIP_GAMES[blipGameFromPath(location.pathname).slug]?.buttons?.[0]?.code || 'Space');
     await page.waitForFunction((code) => window.__cabinetActionKeys?.includes(code), expected, { timeout: 2000 });
   });
@@ -307,7 +295,7 @@ const aislePos = (page) => page.evaluate(() => Number(document.getElementById('g
 const aisleStill = (page) => page.waitForFunction(() => !document.getElementById('game-grid').hasAttribute('data-aisle-moving'), null, { timeout: 8000 });
 
 test('holding an arrow walks the aisle, and letting go stops on a machine', async (t) => {
-  const { page } = await openArcade(t, 1280);
+  const { page } = await openArcade(t, DESK);
   await page.keyboard.down('ArrowRight');
   await page.waitForTimeout(1200);
   const passing = await aislePos(page);
@@ -322,7 +310,7 @@ test('holding an arrow walks the aisle, and letting go stops on a machine', asyn
 });
 
 test('a drag moves the aisle with the pointer and lets go on a machine; a short one springs back', async (t) => {
-  const { page } = await openArcade(t, 1280);
+  const { page } = await openArcade(t, DESK);
   await page.mouse.move(640, 300);
   await page.mouse.down();
   for (let i = 1; i <= 10; i++) { await page.mouse.move(640 - i * 20, 300); await page.waitForTimeout(30); }
@@ -343,7 +331,7 @@ test('a drag moves the aisle with the pointer and lets go on a machine; a short 
 });
 
 test('a quick portrait swipe stops at the next machine', async (t) => {
-  const { page } = await openArcade(t, 390, 844);
+  const { page } = await openArcade(t, PHONE);
   await page.mouse.move(310, 300);
   await page.mouse.down();
   for (let i = 1; i <= 5; i++) await page.mouse.move(310 - i * 22, 300);
@@ -354,10 +342,8 @@ test('a quick portrait swipe stops at the next machine', async (t) => {
 });
 
 test('a portrait touch swipe advances one machine without skipping', async (t) => {
-  const { page } = await openArcade(t, 390, 844);
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
-  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  const { page } = await openArcade(t, PHONE);
+  const cdp = await emulatePhone(page);
   const track = await page.locator('#game-grid').boundingBox();
   const x = track.x + track.width * .8, y = track.y + 300;
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 1, x, y }] });
@@ -372,7 +358,7 @@ test('a portrait touch swipe advances one machine without skipping', async (t) =
 
 test('a gamepad stick walks at the pace it is pushed', async (t) => {
   const walk = async (push) => {
-    const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
+    const { page, origin } = await openPage(t, 'chromium', { viewport: DESK });
     await page.addInitScript((x) => {
       const pad = { connected: true, axes: [0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) };
       window.__pad = pad;
@@ -399,7 +385,7 @@ test('a gamepad stick walks at the pace it is pushed', async (t) => {
 });
 
 test('with reduced motion an arrow still steps exactly one whole machine', async (t) => {
-  const { page } = await openArcade(t, 1280);
+  const { page } = await openArcade(t, DESK);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.evaluate(() => {
     window.__seen = [];
@@ -416,7 +402,7 @@ test('with reduced motion an arrow still steps exactly one whole machine', async
 const room = (page) => page.evaluate(() => blipArcadeSound.state());
 
 test('the machines are silent until the first key, then the nearest is loudest and the rest pan to their sides', async (t) => {
-  const { page } = await openArcade(t, 1280);
+  const { page } = await openArcade(t, DESK);
   assert.equal(await page.evaluate(() => _kioskAudioCtx === null && !(window.Howler && Howler.ctx)), true, 'no audio before any input');
   assert.equal((await room(page)).running, false);
   await page.keyboard.press('Shift');
@@ -440,7 +426,7 @@ test('the machines are silent until the first key, then the nearest is loudest a
 });
 
 test('the room is silent while muted and stops while the page is hidden', async (t) => {
-  const { page } = await openArcade(t, 1280);
+  const { page } = await openArcade(t, DESK);
   await page.keyboard.press('ArrowRight');
   await page.waitForFunction(() => blipArcadeSound.state().running);
   await page.evaluate(() => blipSetMuted(true));
@@ -460,7 +446,7 @@ test('the room is silent while muted and stops while the page is hidden', async 
 
 // ---- Stepping up to play: the game page opens on the picture the arcade's zoom ended on. ----
 test('a machine started from the arcade opens its game on the same screen picture, then the game', async (t) => {
-  const { page, origin } = await openArcade(t, 1280);
+  const { page, origin } = await openArcade(t, DESK);
   // Hold the game back a moment, so the picture can be seen waiting for it.
   await page.route('**/*.wasm', async (route) => { await new Promise((r) => setTimeout(r, 1500)); await route.continue(); });
   await page.locator('.card-focused .machine-coinbox').click();
@@ -483,7 +469,7 @@ test('a machine started from the arcade opens its game on the same screen pictur
 });
 
 test('a game page opened later, or another game, starts on its plain loader', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
+  const { page, origin } = await openPage(t, 'chromium', { viewport: DESK });
   await page.route('**/*.wasm', () => {});
   await page.goto(`${origin}/index.html`);
   // Twenty seconds old; and fresh, but for another machine.
@@ -498,7 +484,7 @@ test('a game page opened later, or another game, starts on its plain loader', as
 
 // ---- Living screens: a machine within two plays its strip; farther ones keep their still. ----
 test('only the machines near you fetch and play their attract loops', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
+  const { page, origin } = await openPage(t, 'chromium', { viewport: DESK });
   const fetched = [];
   page.on('request', (r) => { const m = r.url().match(/\/(\w+)\/attract\.webp$/); if (m) fetched.push(m[1]); });
   await page.goto(`${origin}/index.html`);
@@ -541,7 +527,7 @@ test('only the machines near you fetch and play their attract loops', async (t) 
 });
 
 test('Escape leaves a game for the arcade, once the controls card it may have open is put away', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
+  const { page, origin } = await openPage(t, 'chromium', { viewport: DESK });
   await page.route('**/*.wasm', () => {});
   await page.goto(`${origin}/meteors/index.html`);
   await page.waitForFunction(() => typeof BlipController === 'object');
@@ -556,7 +542,7 @@ test('Escape leaves a game for the arcade, once the controls card it may have op
 });
 
 test('with reduced motion Up steps up at once, and Escape steps back', async (t) => {
-  const { page } = await openArcade(t, 1280);
+  const { page } = await openArcade(t, DESK);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const pose = () => page.evaluate(() => document.querySelector('.card-focused').style.transform);
   const standing = await pose();
@@ -570,7 +556,7 @@ test('with reduced motion Up steps up at once, and Escape steps back', async (t)
 });
 
 test('the step into a machine ends on the screen of its game page, which is that machine up close', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
+  const { page, origin } = await openPage(t, 'chromium', { viewport: DESK });
   await page.route('**/*.wasm', () => {});
   await page.goto(`${origin}/bouncer/index.html`);
   await page.waitForFunction(() => typeof BlipController === 'object');

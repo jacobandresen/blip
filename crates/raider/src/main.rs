@@ -783,40 +783,46 @@ impl Game {
     }
 }
 
-struct Sounds {
+blip::sounds!(Sounds {
     /// Per weapon tier, two takes of that many guns firing together.
-    shoot: Vec<[blip::BlipSound; 2]>,
+    shoot: Vec<[blip::BlipSound; 2]> = {
+        let mut shoot = Vec::new();
+        for [a, b] in SHOOT_WAV {
+            shoot.push([blip::audio::load_sound(a).await, blip::audio::load_sound(b).await]);
+        }
+        shoot
+    },
     /// Several takes of each explosion, picked at random (play_take).
-    enemy_explode: [blip::BlipSound; 4],
-    player_explode: [blip::BlipSound; 2],
-    player_hit: blip::BlipSound,
-    ricochet: [blip::BlipSound; 2],
-    boss_explode: [blip::BlipSound; 2],
-    boss_warning: blip::BlipSound,
+    enemy_explode: [blip::BlipSound; 4] = load_takes(&ENEMY_EXPLODE_WAV).await.try_into().unwrap(),
+    player_explode: [blip::BlipSound; 2] = load_takes(&PLAYER_EXPLODE_WAV).await.try_into().unwrap(),
+    player_hit,
+    ricochet: [blip::BlipSound; 2] = load_takes(&RICOCHET_WAV).await.try_into().unwrap(),
+    boss_explode: [blip::BlipSound; 2] = load_takes(&BOSS_EXPLODE_WAV).await.try_into().unwrap(),
+    boss_warning,
     // Escalating weapon-tier pickup chimes: index 0 = reaching tier 2, ...,
     // index 3 = reaching tier 5 (the big fanfare). Index 0 is also reused for
     // the "already maxed, bonus points" catch.
-    powerup_up: [blip::BlipSound; 4],
-    health_pickup: blip::BlipSound,
-    stage_clear: blip::BlipSound,
-    victory: blip::BlipSound,
-    game_over: blip::BlipSound,
-    turret_fire: blip::BlipSound,
-    flak_burst: blip::BlipSound,
-    laser_charge: blip::BlipSound,
-    laser_fire: blip::BlipSound,
+    powerup_up: [blip::BlipSound; 4] = [blip::sound!("powerup2"), blip::sound!("powerup3"), blip::sound!("powerup4"), blip::sound!("max_power")],
+    health_pickup,
+    stage_clear,
+    victory,
+    game_over,
+    turret_fire,
+    flak_burst,
+    laser_charge,
+    laser_fire,
     // Looped and volume-ridden live by update_barrier() — not a one-shot.
-    barrier_hum: blip::BlipSound,
-    barrier_hum2: blip::BlipSound,
+    barrier_hum,
+    barrier_hum2,
     // Carrier launch: a one-shot engine crank/catch, plus a seamless
     // propeller loop update_launch() fades in and out around it.
-    engine_start: blip::BlipSound,
-    engine_splutter: blip::BlipSound,
-    enemy_gun: blip::BlipSound,
-    backfire: blip::BlipSound,
+    engine_start,
+    engine_splutter,
+    enemy_gun,
+    backfire,
     /// In-flight engine loops, slowest first (see ENGINE_AT, engine_mix()).
-    engine: [blip::BlipSound; 5],
-}
+    engine: [blip::BlipSound; 5] = load_takes(&ENGINE_WAV).await.try_into().unwrap(),
+});
 
 fn spawn_boat(g: &mut Game) {
     let x = 20.0 + rand_range_f32(0.0, 1.0) * (WIN_W as f32 - BOAT_W as f32 - 40.0);
@@ -3367,40 +3373,8 @@ async fn main() {
     let cloud_tex = CLOUD_PNGS.map(load_png_smooth);
     let island_tex = ISLAND_PNGS.map(load_png);
 
-    let mut shoot = Vec::new();
-    for [a, b] in SHOOT_WAV {
-        shoot.push([blip::audio::load_sound(a).await, blip::audio::load_sound(b).await]);
-    }
-    let sfx = Sounds {
-        shoot,
-        enemy_explode:  load_takes(&ENEMY_EXPLODE_WAV).await.try_into().unwrap(),
-        player_explode: load_takes(&PLAYER_EXPLODE_WAV).await.try_into().unwrap(),
-        player_hit:     blip::sound!("player_hit"),
-        ricochet:       load_takes(&RICOCHET_WAV).await.try_into().unwrap(),
-        boss_explode:   load_takes(&BOSS_EXPLODE_WAV).await.try_into().unwrap(),
-        boss_warning:   blip::sound!("boss_warning"),
-        powerup_up: [
-            blip::sound!("powerup2"),
-            blip::sound!("powerup3"),
-            blip::sound!("powerup4"),
-            blip::sound!("max_power"),
-        ],
-        health_pickup:  blip::sound!("health_pickup"),
-        stage_clear:    blip::sound!("stage_clear"),
-        victory:        blip::sound!("victory"),
-        game_over:      blip::sound!("game_over"),
-        turret_fire:    blip::sound!("turret_fire"),
-        flak_burst:     blip::sound!("flak_burst"),
-        laser_charge:   blip::sound!("laser_charge"),
-        laser_fire:     blip::sound!("laser_fire"),
-        barrier_hum:    blip::sound!("barrier_hum"),
-        barrier_hum2:   blip::sound!("barrier_hum2"),
-        engine_start:   blip::sound!("engine_start"),
-        engine_splutter: blip::sound!("engine_splutter"),
-        enemy_gun:      blip::sound!("enemy_gun"),
-        backfire:       blip::sound!("backfire"),
-        engine:         load_takes(&ENGINE_WAV).await.try_into().unwrap(),
-    };
+    let sfx = Sounds::load().await;
+
     // Two loops in rotation,
     // so a long level doesn't hear the same ~40s on repeat.
     let mut music = Jukebox::new("raider", &["LOOP1", "LOOP2"]);

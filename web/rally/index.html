@@ -14,7 +14,6 @@
   <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png?v=3">
   <link rel="icon" type="image/svg+xml" href="../favicon.svg?v=3">
   <link rel="apple-touch-icon" href="icon-180.png?v=2">
-  <script>if(new URLSearchParams(location.search).get('cabinet')==='1') document.documentElement.setAttribute('data-cabinet-screen','');</script>
   <!-- Stepped into from the arcade: nothing is painted until game.js has laid the page out, so the browser keeps the
        arcade's last frame up meanwhile (data-launching, cleared by game.js). -->
   <script>
@@ -33,7 +32,7 @@
   </script>
   <style>:root[data-launching] body{visibility:hidden}</style>
   <script src="../howler.min.js"></script>
-  <script src="../blip_core.js?v=14"></script>
+  <script src="../blip_core.js?v=17"></script>
   <script>(function () {
     var g = blipGameFromPath(location.pathname);
     if (!g) return;
@@ -42,11 +41,11 @@
     document.title = name + ' \u00b7 BLIP';
     document.querySelector('meta[name=apple-mobile-web-app-title]').content = name;
   }());</script>
-  <script src="../cabinet.js?v=106"></script>
+  <script src="../cabinet.js?v=110"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v1.0.0/blip-deck.css">
-  <link rel="stylesheet" href="../deck.css?v=9">
-  <link rel="stylesheet" href="../blip.css?v=173">
-  <script src="../game.js?v=6" defer blocking="render"></script>
+  <link rel="stylesheet" href="../deck.css?v=12">
+  <link rel="stylesheet" href="../blip.css?v=177">
+  <script src="../game.js?v=10" defer blocking="render"></script>
 </head>
 <body class="cabinet-page">
 

@@ -3,19 +3,18 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage } from './lib/harness.mjs';
+import { openPage, machineReady, PHONE } from './lib/harness.mjs';
 
 async function metrics(cdp) {
   return Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value]));
 }
 
 test('walking the aisle on a phone lays nothing out once its screens have loaded, nor does the arcade at rest', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 390, height: 844 }, hasTouch: true });
+  const { page, origin } = await openPage(t, 'chromium', { viewport: PHONE, hasTouch: true });
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Performance.enable');
   await page.goto(`${origin}/index.html`);
-  await page.waitForFunction(() => document.querySelector('.card-focused .machine-start') &&
-    !document.documentElement.hasAttribute('data-cabinet-arranging'));
+  await machineReady(page);
   // The arrows' nudge runs five times, then the arcade is still.
   await page.waitForTimeout(9500);
 

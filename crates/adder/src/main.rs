@@ -31,12 +31,7 @@ const DEMO_SNAKES: usize = 3;
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Play, Over }
 
-struct Sounds {
-    through: blip::BlipSound,
-    kill: blip::BlipSound,
-    round: blip::BlipSound,
-    game_over: blip::BlipSound,
-}
+blip::sounds!(Sounds { through, kill = "strike", round = "pit", game_over });
 
 struct Game {
     world: World,
@@ -179,12 +174,7 @@ async fn main() {
     web::set_players(2);
     let pit = blip::load_png(blip::png!("pit"));
 
-    let sfx = Sounds {
-        through: blip::sound!("through"),
-        kill: blip::sound!("strike"),
-        round: blip::sound!("pit"),
-        game_over: blip::sound!("game_over"),
-    };
+    let sfx = Sounds::load().await;
     let mut music = Jukebox::new("adder", &["COIL", "HUNT"]);
 
     if blip.screenshot_mode {

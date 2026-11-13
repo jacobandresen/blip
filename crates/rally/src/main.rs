@@ -96,13 +96,7 @@ impl Game {
     }
 }
 
-struct Beeps {
-    wall: blip::BlipSound,    // 587 Hz / 35 ms
-    hit_l: blip::BlipSound,   // 240 Hz / 35 ms
-    hit_r: blip::BlipSound,   // 300 Hz / 35 ms
-    score_l: blip::BlipSound, // 660 Hz / 120 ms (player scored)
-    score_r: blip::BlipSound, // 110 Hz / 200 ms (CPU scored)
-}
+blip::sounds!(Beeps { wall, hit_l, hit_r, score_l, score_r });
 
 /// A spin of a paddle dial this frame — the touch dials inject these same
 /// up/down keys (P1: arrows, P2: I/K), and on the keyboard the paddle keys
@@ -346,13 +340,7 @@ async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
-    let sfx = Beeps {
-        wall:    blip::sound!("wall"),
-        hit_l:   blip::sound!("hit_l"),
-        hit_r:   blip::sound!("hit_r"),
-        score_l: blip::sound!("score_l"),
-        score_r: blip::sound!("score_r"),
-    };
+    let sfx = Beeps::load().await;
     // Five loops in rotation.
     let mut jukebox = Jukebox::new("rally", &["LOOP1", "LOOP2", "LOOP3", "LOOP4", "LOOP5"]);
     let mut autopilot = bot::Bot::default();

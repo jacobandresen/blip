@@ -101,22 +101,23 @@ function blipSetControls(choice) {
 // `buttons` map deck caps; `stick` accepts engage/release and maxR pixels plus hysteresis degrees.
 // `touch.kind`: drag follows a finger, swipe steers by flick, paddles split bats,
 // platform runs/blows/jumps, action steers by dragging and has holdable actions.
+// `legend` is the control list printed on the cabinet's screen in the arcade.
 // `capLabel` is printed on the panel by a one-button game's caps (default FIRE; a two-button game labels its `buttons`).
 // `controls` is the key legend a PC sees after the first coin: [label, keys, alternative keys]; `hint` labels the touch strip; `mouseHint` labels a touchscreen laptop's mouse controls.
 var BLIP_GAMES = {
-  serpent:            { name: 'SERPENT',  accent: '50, 200, 50', capLabel: 'START', touchControls: [['STEER',['SWIPE']],['START',['TAP']]], controls: [['STEER',['↑','←','↓','→'],['W','A','S','D']],['START',['SPACE']]],
+  serpent:            { name: 'SERPENT', legend: 'STEER',  accent: '50, 200, 50', capLabel: 'START', touchControls: [['STEER',['SWIPE']],['START',['TAP']]], controls: [['STEER',['↑','←','↓','→'],['W','A','S','D']],['START',['SPACE']]],
                          touch: { kind: 'swipe', hint: 'Swipe to steer', mouseHint: 'Click and drag to steer' } },
-  bouncer:            { name: 'BOUNCER',  accent: '0, 200, 200', capLabel: 'LAUNCH', touchControls: [['MOVE',['DRAG']],['LAUNCH',['TAP']]], controls: [['MOVE',['←','→'],['A','D']],['LAUNCH',['SPACE']]],
+  bouncer:            { name: 'BOUNCER', legend: 'MOVE · LAUNCH',  accent: '0, 200, 200', capLabel: 'LAUNCH', touchControls: [['MOVE',['DRAG']],['LAUNCH',['TAP']]], controls: [['MOVE',['←','→'],['A','D']],['LAUNCH',['SPACE']]],
                          touch: { kind: 'drag', hint: 'Tap to launch', mouseHint: 'Point to move &middot; Click to launch' } },
-  defender:  { name: 'DEFENDER', accent: '200, 50, 200', touchControls: [['MOVE',['DRAG']],['FIRE',['HOLD']]], controls: [['MOVE',['←','→'],['A','D']],['FIRE',['SPACE']]],
+  defender:  { name: 'DEFENDER', legend: 'MOVE · FIRE', accent: '200, 50, 200', touchControls: [['MOVE',['DRAG']],['FIRE',['HOLD']]], controls: [['MOVE',['←','→'],['A','D']],['FIRE',['SPACE']]],
                          touch: { kind: 'drag', hint: 'Hold to fire', mouseHint: 'Point to move &middot; Hold the button to fire' } },
-  rally:              { name: 'RALLY',    accent: '220, 50, 50', touchControls: [['1 PLAYER',['TAP LEFT']],['2 PLAYERS',['TAP RIGHT']],['MOVE BAT',['DRAG']]], controls: [['YOUR BAT',['W','S'],['↑','↓']],['2ND PLAYER',['I','K']],['SERVE',['SPACE']]],
+  rally:              { name: 'RALLY', legend: 'BAT · SERVE',    accent: '220, 50, 50', touchControls: [['1 PLAYER',['TAP LEFT']],['2 PLAYERS',['TAP RIGHT']],['MOVE BAT',['DRAG']]], controls: [['YOUR BAT',['W','S'],['↑','↓']],['2ND PLAYER',['I','K']],['SERVE',['SPACE']]],
                          touch: { kind: 'paddles', hint: 'Drag up or down', mouseHint: 'Point up or down &middot; Click to serve' } },
-  meteors:            { name: 'METEORS',  accent: '180, 180, 180', touchControls: [['TURN AND THRUST',['DRAG']],['FIRE',['TOUCH FIRE']],['HYPERSPACE',['TOUCH HYPERSPACE']]], controls: [['TURN',['←','→'],['A','D']],['THRUST',['↑'],['W']],['FIRE',['SPACE']],['HYPERSPACE',['Z']]],
+  meteors:            { name: 'METEORS', legend: 'TURN · THRUST · FIRE',  accent: '180, 180, 180', touchControls: [['TURN AND THRUST',['DRAG']],['FIRE',['TOUCH FIRE']],['HYPERSPACE',['TOUCH HYPERSPACE']]], controls: [['TURN',['←','→'],['A','D']],['THRUST',['↑'],['W']],['FIRE',['SPACE']],['HYPERSPACE',['Z']]],
                          touch: { kind: 'action', hint: 'Drag to turn and thrust', actions: ['FIRE', 'HYPER'] },
                          buttons: [{ key: ' ', code: 'Space', label: 'FIRE' }, { key: 'z', code: 'KeyZ', label: 'HYPER' }] },
   // Two caps; holding toward hits high. `players: 2` enables the second station; `keys` maps P1 to WASD.
-  brawler:            { name: 'BRAWLER', accent: '220, 60, 40', touchControls: [['MOVE',['DRAG']],['PUNCH',['TOUCH PUNCH']],['KICK',['TOUCH KICK']]], controls: [['MOVE',['←','→'],['A','D']],['PUNCH',['SPACE'],['F']],['KICK',['Z'],['G']]],
+  brawler:            { name: 'BRAWLER', legend: 'MOVE · PUNCH · KICK', accent: '220, 60, 40', touchControls: [['MOVE',['DRAG']],['PUNCH',['TOUCH PUNCH']],['KICK',['TOUCH KICK']]], controls: [['MOVE',['←','→'],['A','D']],['PUNCH',['SPACE'],['F']],['KICK',['Z'],['G']]],
                          players: 2,
                          touch: { kind: 'action', hint: 'Drag to move', actions: ['PUNCH', 'KICK'] },
                          buttons: [{ key: 'f', code: 'KeyF', label: 'PUNCH' },
@@ -126,7 +127,7 @@ var BLIP_GAMES = {
   // A tribute to Bubble Bobble. Two caps: bubble (fire) and jump; up
   // jumps too. Like Brawler, player one is WASD so the arrows are player
   // two's, who drops in with their own bubble or jump.
-  bubbler:            { name: 'BUBBLER', accent: '120, 210, 255', touchControls: [['RUN',['SLIDE']],['BUBBLE',['TAP']],['JUMP',['FLICK UP']]], controls: [['RUN',['←','→'],['A','D']],['BUBBLE',['SPACE'],['F']],['JUMP',['↑'],['W']],['2ND PLAYER',['J','K']]],
+  bubbler:            { name: 'BUBBLER', legend: 'RUN · BUBBLE · JUMP', accent: '120, 210, 255', touchControls: [['RUN',['SLIDE']],['BUBBLE',['TAP']],['JUMP',['FLICK UP']]], controls: [['RUN',['←','→'],['A','D']],['BUBBLE',['SPACE'],['F']],['JUMP',['↑'],['W']],['2ND PLAYER',['J','K']]],
                          players: 2,
                          touch: { kind: 'platform', hint: 'Touch to bubble &middot; slide to run &middot; swipe up to jump',
                                   mouseHint: 'Drag to run &middot; click to bubble &middot; drag up to jump' },
@@ -135,12 +136,12 @@ var BLIP_GAMES = {
                          keys: TWO_PLAYER_KEYS },
   // A bullet-weaving shooter: fine nudges. A small dead zone, a long pivot
   // leash so re-centring neutralises, and a firm notch so a dodge holds.
-  raider:         { name: 'RAIDER', accent: '50, 100, 220', touchControls: [['STEER AND THROTTLE',['DRAG']],['FIRE',['TOUCH FIRE']]], controls: [['STEER',['←','→'],['A','D']],['THROTTLE',['↑','↓'],['W','S']],['FIRE',['SPACE']]],
+  raider:         { name: 'RAIDER', legend: 'STEER · FIRE', accent: '50, 100, 220', touchControls: [['STEER AND THROTTLE',['DRAG']],['FIRE',['TOUCH FIRE']]], controls: [['STEER',['←','→'],['A','D']],['THROTTLE',['↑','↓'],['W','S']],['FIRE',['SPACE']]],
                          touch: { kind: 'action', hint: 'Drag to steer and throttle', actions: ['FIRE'] },
                          stick: { engage: 11, release: 6, maxR: 58, hyst: 12 } },
   // Viper-inspired trail arena: relative left/right turns, passable dim gaps.
   // Space only starts/restarts; J joins player two. Drag steers by horizontal position.
-  adder:              { name: 'ADDER', accent: '224, 160, 52', touchControls: [['STEER',['DRAG']],['START',['TAP']]], controls: [['TURN',['A','D'],['←','→']],['START',['SPACE']],['2ND PLAYER JOINS',['J']]],
+  adder:              { name: 'ADDER', legend: 'TURN LEFT · RIGHT', accent: '224, 160, 52', touchControls: [['STEER',['DRAG']],['START',['TAP']]], controls: [['TURN',['A','D'],['←','→']],['START',['SPACE']],['2ND PLAYER JOINS',['J']]],
                          players: 2,
                          buttons: [{ key: ' ', code: 'Space', label: 'START' }],
                          keys: Object.assign({}, TWO_PLAYER_KEYS, { p2button2: TWO_PLAYER_KEYS.p2button1 }),
@@ -148,9 +149,9 @@ var BLIP_GAMES = {
                                   mouseHint: 'Point left/right to steer &middot; click to start' } },
   // A maze shooter in the spirit of Wizard of Wor: 4-way stick, A casts a
   // bolt down the corridor, B casts reveal. Two caps on a snappable stick.
-  warlock:            { name: 'WARLOCK', accent: '150, 60, 200', cabinetTitle: true, touchControls: [['MOVE',['STICK']],['BOLT',['A']],['REVEAL',['B']]], controls: [['MOVE',['←','↑','↓','→'],['W','A','S','D']],['BOLT',['SPACE'],['F']],['REVEAL',['Z'],['G']],['2ND PLAYER',['J','K']]],
+  warlock:            { name: 'WARLOCK', legend: 'MOVE · BOLT · REVEAL', accent: '150, 60, 200', cabinetTitle: true, touchControls: [['MOVE',['DRAG']],['BOLT',['TOUCH BOLT']],['REVEAL',['TOUCH REVEAL']]], controls: [['MOVE',['←','↑','↓','→'],['W','A','S','D']],['BOLT',['SPACE'],['F']],['REVEAL',['Z'],['G']],['2ND PLAYER',['J','K']]],
                          players: 2,
-                         touch: { kind: 'action', hint: 'Stick to move &middot; A bolt &middot; B reveal', actions: ['BOLT', 'REVEAL'] },
+                         touch: { kind: 'action', hint: 'Drag to move', actions: ['BOLT', 'REVEAL'] },
                          buttons: [{ key: 'f', code: 'KeyF', label: 'BOLT' },
                                    { key: 'g', code: 'KeyG', label: 'REVEAL' }],
                          keys: TWO_PLAYER_KEYS,
@@ -221,7 +222,7 @@ function saveCoins(n) {
  * sounds are Howler's, muted there; the cabinet's own (coins, clicks) all
  * leave through blipOut(), one gain that is shut while muted. */
 var _blipOut = null;
-function blipMuted() { if(document.documentElement.hasAttribute('data-cabinet-screen')) return true; try { return localStorage.getItem('blip-mute') === '1'; } catch (e) { return false; } }
+function blipMuted() { try { return localStorage.getItem('blip-mute') === '1'; } catch (e) { return false; } }
 function blipOut(ctx) {
   if (!_blipOut || _blipOut.context !== ctx) {
     _blipOut = ctx.createGain();
@@ -300,12 +301,6 @@ if (blipMuted()) {
     window.addEventListener('keydown', function (e) {
       if ((e.key !== 'm' && e.key !== 'M') || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
-      if (root.hasAttribute('data-cabinet-screen') && window.parent !== window) {
-        try {
-          window.parent.blipSetMuted(!window.parent.blipMuted());
-          return;
-        } catch (e) {}
-      }
       blipSetMuted(!blipMuted());
     }, true);
     apply(wanted());

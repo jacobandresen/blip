@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { run } from './lib/run.mjs';
 import { GAME_SLUGS } from './lib/games.mjs';
 
 const gameArg = process.argv.indexOf('--game');
@@ -10,15 +10,8 @@ const games = selectedGame
 
 const failures = [];
 for (const game of games) {
-  const code = await new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['--test', 'test/visual.mjs'], {
-      cwd: new URL('../', import.meta.url),
-      env: { ...process.env, BLIP_VISUAL_GAME: game, BLIP_VISUAL_ARTIFACTS: artifacts ? '1' : '0' },
-      stdio: 'inherit',
-    });
-    child.once('error', reject);
-    child.once('close', (status) => resolve(status ?? 1));
-  });
+  const code = await run(process.execPath, ['--test', 'test/visual.mjs'],
+    { env: { ...process.env, BLIP_VISUAL_GAME: game, BLIP_VISUAL_ARTIFACTS: artifacts ? '1' : '0' } });
   if (code !== 0) failures.push(game);
 }
 if (failures.length) console.error(`Visual check failed: ${failures.join(', ')}`);

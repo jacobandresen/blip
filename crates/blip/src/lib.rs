@@ -33,6 +33,28 @@ macro_rules! sound {
     };
 }
 
+/// A game's effects, named once: the struct and its async `load`. A field plays the sound of its own name, the one
+/// after `=`, or holds what a `: Type = expression` makes (takes, say):
+/// `blip::sounds!(Sounds { eat, kill = "defeated", hits: [BlipSound; 2] = [sound!("hit"), sound!("hit2")] });`
+/// then `let sfx = Sounds::load().await;`. Doc comments and a visibility (`pub(crate) Sounds`) carry over.
+#[macro_export]
+macro_rules! sounds {
+    ($(#[$doc:meta])* $vis:vis $name:ident { $($(#[$meta:meta])* $field:ident $(= $file:literal)? $(: $ty:ty = $init:expr)?),* $(,)? }) => {
+        $(#[$doc])*
+        $vis struct $name { $($(#[$meta])* $vis $field: $crate::sounds!(@type $($ty)?)),* }
+        impl $name {
+            $vis async fn load() -> Self {
+                Self { $($field: $crate::sounds!(@load $field $(init $init)? $(file $file)?)),* }
+            }
+        }
+    };
+    (@type $ty:ty) => { $ty };
+    (@type) => { $crate::BlipSound };
+    (@load $field:ident init $init:expr) => { $init };
+    (@load $field:ident file $file:literal) => { $crate::sound!($file) };
+    (@load $field:ident) => { $crate::sound!(stringify!($field)) };
+}
+
 /// A generated file: its path under the asset folder, and its bytes.
 pub type Asset = (&'static str, Vec<u8>);
 
@@ -108,7 +130,7 @@ pub mod timer;
 pub mod web;
 #[cfg(feature = "engine")]
 pub use audio::{
-    play_alert, play_ambient, play_music, play_music_volume, play_sfx, play_sfx_volume, stop_alert, stop_ambient,
+    play_alert, play_ambient, play_music_volume, play_sfx, play_sfx_volume, stop_alert, stop_ambient,
     stop_music, BlipSound, Jukebox,
 };
 #[cfg(feature = "engine")]

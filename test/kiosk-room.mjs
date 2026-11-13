@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { openPage, gameReady, arrivedAt } from './lib/harness.mjs';
+import { openPage, gameReady, arrivedAt, DESKTOP } from './lib/harness.mjs';
 
 for (const engine of ['chromium', 'webkit']) {
   test(`fullscreen kiosk cabinets retain every physical control deck in ${engine}`, async (t) => {
     const { page, origin } = await openPage(t, engine, { viewport: { width: 1080, height: 1920 } });
     await page.addInitScript(() => localStorage.setItem('blip-fullscreen', '1'));
-    await page.goto(`${origin}/index.html?room=full`);
+    // Not the whole load: ten deck previews and their pictures can outlast a busy machine's 30 s; the machine is enough.
+    await page.goto(`${origin}/index.html?room=full`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.card-focused[data-loop-ready]');
     assert.equal(await page.locator('html').getAttribute('data-fullscreen'), '');
     const cards = page.locator('#game-grid .card');
@@ -31,7 +32,7 @@ for (const engine of ['chromium', 'webkit']) {
 }
 
 test('a kiosk keeps fullscreen through a real Start and a simulated two-minute idle return', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
+  const { page, origin } = await openPage(t, 'chromium', { viewport: DESKTOP });
   await page.goto(`${origin}/home.html`);
   await page.locator('#dock-settings').click();
   await page.locator('#set-fullscreen').check();

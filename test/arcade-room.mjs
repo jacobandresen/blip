@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { openPage, gameReady, arrivedAt } from './lib/harness.mjs';
+import { openPage, gameReady, arrivedAt, openArcade, DESKTOP } from './lib/harness.mjs';
 import { holdHalfway, imageDifference } from './lib/arcade-room.mjs';
 
 // Every room layer and where it shows, by #66's visibility contract: phone portrait, landscape, the rest.
@@ -33,26 +33,13 @@ const CONFIGS = [
   { name: 'kiosk', width: 1080, height: 1920, touch: false, column: 2, fullscreen: true },
 ];
 
-async function openArcade(t, { width = 1280, height = 800, touch = false, fullscreen = false, query = '', reduce = false, capabilities = null } = {}) {
-  const { page, origin } = await openPage(t, 'chromium', { hasTouch: touch, viewport: { width, height } });
-  if (reduce) await page.emulateMedia({ reducedMotion: 'reduce' });
-  if (fullscreen) await page.addInitScript(() => localStorage.setItem('blip-fullscreen', '1'));
-  if (capabilities) await page.addInitScript((values) => {
-    for (const [name, value] of Object.entries(values)) Object.defineProperty(navigator, name, { configurable: true, value });
-  }, capabilities);
-  await page.goto(`${origin}/index.html${query}`);
-  await page.waitForFunction(() => document.querySelector('.card-focused .machine-start') &&
-    !document.documentElement.hasAttribute('data-cabinet-arranging'));
-  return page;
-}
-
 const roomTravel = (page) => page.evaluate(() => Number(document.getElementById('game-grid').dataset.roomTravel));
 const settled = (page) => page.waitForFunction(() => !document.getElementById('game-grid').hasAttribute('data-aisle-moving'),
   null, { timeout: 15000 });
 
 for (const config of CONFIGS) {
   test(`every room layer is decoration, shown where the contract says, on ${config.name}`, async (t) => {
-    const page = await openArcade(t, config);
+    const { page } = await openArcade(t, config);
     const layers = await page.evaluate(() => {
       const grid = document.getElementById('game-grid').getBoundingClientRect();
       return [...document.querySelectorAll('[data-room-layer]')].map((el) => {
@@ -90,7 +77,7 @@ for (const config of CONFIGS) {
 
 for (const [width, height, touch] of [[390, 844, true], [1280, 800, false]]) {
   test(`a press on the screen, Start or coin door still reaches the cabinet at ${width}×${height}`, async (t) => {
-    const page = await openArcade(t, { width, height, touch });
+    const { page } = await openArcade(t, { width, height, touch });
     const hits = await page.evaluate(() => {
       const card = document.querySelector('.card-focused');
       return ['.game-rom', '.machine-start', '.machine-coinbox'].map((sel) => {
@@ -117,12 +104,12 @@ function roomMotion() {
 
 test('the room keeps still at rest, and under reduced motion has no warm-up or transitions', async (t) => {
   await t.test('at rest', async (t2) => {
-    const page = await openArcade(t2);
+    const { page } = await openArcade(t2);
     await page.waitForTimeout(2000);
     assert.deepEqual((await page.evaluate(roomMotion)).running, [], 'no room animation runs at rest');
   });
   await t.test('reduced motion', async (t2) => {
-    const page = await openArcade(t2, { reduce: true });
+    const { page } = await openArcade(t2, { reduce: true });
     assert.deepEqual(await page.evaluate(roomMotion), { running: [], transitions: [] });
   });
 });
@@ -160,7 +147,7 @@ test('?room picks the room\'s look: lite drops its blur and glow, and leaves the
   let full;
   for (const [query, mode] of [['', 'full'], ['?room=full', 'full'], ['?room=bogus', 'full'], ['?room=lite', 'lite']]) {
     await t.test(query || 'no query', async (t2) => {
-      const page = await openArcade(t2, { query, capabilities: { hardwareConcurrency: 8, deviceMemory: 8 } });
+      const { page } = await openArcade(t2, { query, capabilities: { hardwareConcurrency: 8, deviceMemory: 8 } });
       assert.equal(await page.evaluate(() => document.documentElement.dataset.room), mode);
       const look = await page.evaluate(cabinetLook);
       if (!full) full = look;
@@ -189,7 +176,7 @@ function sampleRoom() {
 }
 
 test('the room and its signs scroll on without a jump past the last machine and the first, both ways', async (t) => {
-  const page = await openArcade(t);
+  const { page } = await openArcade(t);
   // The room's layers, how fast each moves against the machines, and the machines' spacing (the next one's pose).
   const room = await page.evaluate(() => {
     const cs = getComputedStyle(document.getElementById('game-grid'));
@@ -257,7 +244,7 @@ test('the room and its signs scroll on without a jump past the last machine and 
 });
 
 test('the physical carpet repeats without a visible jump in either direction, full and lite', async (t) => {
-  const page = await openArcade(t, { width: 390, height: 844, touch: true, query: '?room=full' });
+  const { page } = await openArcade(t, { width: 390, height: 844, touch: true, query: '?room=full' });
   for (const mode of ['full', 'lite']) {
     if (mode === 'lite') { await page.goto(new URL('?room=lite', page.url()).href); await page.waitForSelector('.aisle-carpet'); }
     await page.addStyleTag({ content: '#game-grid :not(.aisle-carpet) {visibility:hidden!important}.card-pick {visibility:hidden!important}' });
@@ -287,7 +274,7 @@ test('the physical carpet repeats without a visible jump in either direction, fu
 });
 
 test('the wall is warm: none of the old purple room is left', async (t) => {
-  const page = await openArcade(t);
+  const { page } = await openArcade(t);
   const wall = await page.evaluate(() => getComputedStyle(document.getElementById('game-grid')).backgroundImage);
   for (const purple of ['rgba(141, 63, 176', 'rgb(18, 14, 27)', 'rgba(30, 127, 176', 'rgba(192, 48, 110']) {
     assert.ok(!wall.includes(purple), `the wall still holds ${purple}`);
@@ -295,7 +282,7 @@ test('the wall is warm: none of the old purple room is left', async (t) => {
 });
 
 test('the full maze wall keeps square cells, seamless circuit repeats, and flat ceramic in lite mode', async (t) => {
-  const page = await openArcade(t);
+  const { page } = await openArcade(t);
   const read = () => page.evaluate(() => {
     const grid = document.getElementById('game-grid'), tiles = grid.querySelector('.aisle-tiles');
     const cs = getComputedStyle(grid), r = tiles.getBoundingClientRect(), g = grid.getBoundingClientRect();
@@ -329,7 +316,7 @@ test('the full maze wall keeps square cells, seamless circuit repeats, and flat 
 });
 
 test('the rendered mosaic repeats after an actual aisle lap in either direction, including after resize', async (t) => {
-  const page = await openArcade(t);
+  const { page } = await openArcade(t);
   // Isolate the real room layer for an image comparison; use normal navigation and rendering throughout.
   await page.addStyleTag({ content: '#game-grid :not(.aisle-tiles):not(.aisle-tiles *) {visibility:hidden!important}' });
   const count = await page.locator('#game-grid .card').count();
@@ -369,7 +356,7 @@ test('the rendered mosaic repeats after an actual aisle lap in either direction,
 const neonAnimations = (page) => page.evaluate(() => document.querySelector('.aisle-neon').getAnimations().map((a) => a.animationName));
 
 test('the BLIP sign warms up once on arrival, then stays lit as you walk and pay', async (t) => {
-  const page = await openArcade(t);
+  const { page } = await openArcade(t);
   await page.waitForTimeout(1500);
   assert.deepEqual(await neonAnimations(page), [], 'the warm-up is over');
   await page.keyboard.press('ArrowRight');
@@ -413,7 +400,7 @@ test('automatic lite selection is resolved once before the room appears, with ex
 });
 
 test('portrait keeps the maze mosaic across the wall at rest and halfway walking', async (t) => {
-  const page = await openArcade(t, { width: 390, height: 844, touch: true });
+  const { page } = await openArcade(t, { width: 390, height: 844, touch: true });
   for (const position of ['rest', 'half']) {
     if (position === 'half') await holdHalfway(page);
     const mosaic = await page.evaluate(() => {
@@ -431,7 +418,7 @@ test('portrait keeps the maze mosaic across the wall at rest and halfway walking
 });
 
 test('OPEN lights with a credit and goes dark again once a game spends it', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
+  const { page, origin } = await openPage(t, 'chromium', { viewport: DESKTOP });
   const arcade = async () => {
     await page.waitForFunction(() => document.querySelector('.card-focused .machine-start') &&
       !document.documentElement.hasAttribute('data-cabinet-arranging'));
@@ -458,7 +445,7 @@ test('OPEN lights with a credit and goes dark again once a game spends it', asyn
 for (const config of [...CONFIGS, { name: 'iPhone SE', width: 320, height: 568, touch: true },
   { name: 'iPhone 14 Pro Max', width: 430, height: 932, touch: true }, { name: 'iPhone SE landscape', width: 667, height: 375, touch: true }]) {
   test(`the signs hang clear of the cabinets and controls on ${config.name}`, async (t) => {
-    const page = await openArcade(t, config);
+    const { page } = await openArcade(t, config);
     await page.waitForTimeout(800);
     const clashes = await page.evaluate(() => {
       const box = (el) => el.getBoundingClientRect();

@@ -608,22 +608,7 @@ impl Game {
     }
 }
 
-struct Sounds {
-    blow: blip::BlipSound,
-    pop: blip::BlipSound,
-    trap: blip::BlipSound,
-    kill: blip::BlipSound,
-    fruit: blip::BlipSound,
-    jump: blip::BlipSound,
-    lose: blip::BlipSound,
-    bounce: blip::BlipSound,
-    sparkle: blip::BlipSound,
-    round: blip::BlipSound,
-    clear: blip::BlipSound,
-    hurry: blip::BlipSound,
-    over: blip::BlipSound,
-    won: blip::BlipSound,
-}
+blip::sounds!(Sounds { blow, pop, trap, kill = "defeated", fruit, jump, lose = "lost", bounce, sparkle, round = "jingle_round", clear = "jingle_clear", hurry = "jingle_hurry", over = "jingle_over", won = "jingle_won" });
 
 // ---- update ------------------------------------------------------------
 
@@ -2044,22 +2029,7 @@ async fn main() {
     let mut g = Game::new();
     web::set_players(2);
 
-    let sfx = Sounds {
-        blow: blip::sound!("blow"),
-        pop: blip::sound!("pop"),
-        trap: blip::sound!("trap"),
-        kill: blip::sound!("defeated"),
-        fruit: blip::sound!("fruit"),
-        jump: blip::sound!("jump"),
-        lose: blip::sound!("lost"),
-        bounce: blip::sound!("bounce"),
-        sparkle: blip::sound!("sparkle"),
-        round: blip::sound!("jingle_round"),
-        clear: blip::sound!("jingle_clear"),
-        hurry: blip::sound!("jingle_hurry"),
-        over: blip::sound!("jingle_over"),
-        won: blip::sound!("jingle_won"),
-    };
+    let sfx = Sounds::load().await;
     // The theme, and the same tune faster for HURRY UP.
     let mut music = Jukebox::new("bubbler", &["THEME", "HURRY"]);
     let mut shot_frame = 0u32;

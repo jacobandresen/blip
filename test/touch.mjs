@@ -5,19 +5,15 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage, gameReady, arrivedAt } from './lib/harness.mjs';
+import { openPage, gameReady, arrivedAt, openPhone, PHONE, DESKTOP } from './lib/harness.mjs';
 import { GAME_SLUGS } from './lib/games.mjs';
 
 /** A game page on a 390x844 phone, played by touch (the home screen's controller) or another deck controller, with
  * five coins in and the canvas's keys recorded. */
 async function phone(t, slug, controls = 'touch') {
-  const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, viewport: { width: 390, height: 844 } });
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
-  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  const { page, origin, cdp } = await openPhone(t);
   await page.goto(`${origin}/${slug}/index.html?controls=${controls}`);
-  await page.waitForFunction(() =>
-    typeof BlipController === 'object' && document.getElementById('loader').style.display === 'none', null, { timeout: 30000 });
+  await gameReady(page);
   await page.evaluate(() => {
     for (let i = 0; i < 5; i++) document.getElementById('insert-coin-btn').click();
     window.__keys = [];
@@ -46,9 +42,15 @@ async function phone(t, slug, controls = 'touch') {
       fingers.delete(id);
       await send('touchEnd', [finger]);
     },
-    /** The keys the canvas heard since the last call, in order, as "+Code" and "-Code". */
+    /** The keys the canvas heard since the last call, in order, as "+Code" and "-Code": read once none has come for
+     * 200ms, so a tap's timed key-up is in even on a loaded machine. */
     async keys() {
-      await page.waitForTimeout(120);
+      for (let count = -1, quiet = 0, waited = 0; quiet < 2 && waited < 2000; waited += 100) {
+        await page.waitForTimeout(100);
+        const now = await page.evaluate(() => window.__keys.length);
+        quiet = now === count ? quiet + 1 : 0;
+        count = now;
+      }
       return (await page.evaluate(() => window.__keys.splice(0))).join(' ');
     },
     strip: () => page.evaluate(() => {
@@ -219,9 +221,9 @@ for (const held of [true, false]) {
 
 for (const slug of GAME_SLUGS) {
   test(`${slug} keeps running when the clock jumps back and then a long way forward`, async (t) => {
-    const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 390, height: 844 } });
+    const { page, origin } = await openPage(t, 'chromium', { viewport: PHONE });
     await page.goto(`${origin}/${slug}/index.html`);
-    await page.waitForFunction(() => document.getElementById('loader').style.display === 'none', null, { timeout: 30000 });
+    await gameReady(page);
     await page.clock.install();
     await page.clock.fastForward(180000);
     await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -259,7 +261,7 @@ test('the end of a touch wakes a sleeping audio context, as iOS requires', async
 });
 
 test('on a PC a click on the coin wall inserts a coin and leaves the game focused', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
+  const { page, origin } = await openPage(t, 'chromium', { viewport: DESKTOP });
   await page.goto(`${origin}/meteors/index.html`);
   await gameReady(page);
   await page.waitForTimeout(1500);
@@ -275,19 +277,13 @@ async function cardSettled(page) {
   await page.waitForFunction(() => document.getElementById('controls-card').getAnimations().length === 0);
 }
 
-const SLUGS = GAME_SLUGS;
 for (const [label, phoneish] of [['a PC', false], ['a phone', true]]) {
   test(`on ${label} the controls card stays away until its button is pressed, then shows every control`, async (t) => {
-    const size = phoneish ? { width: 390, height: 844 } : { width: 1280, height: 800 };
-    const { page, origin } = await openPage(t, 'chromium', { hasTouch: phoneish, viewport: size });
-    if (phoneish) {
-      const cdp = await page.context().newCDPSession(page);
-      await cdp.send('Emulation.setDeviceMetricsOverride', { ...size, deviceScaleFactor: 2, mobile: true });
-      await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
-    }
+    const size = phoneish ? PHONE : DESKTOP;
+    const { page, origin } = phoneish ? await openPhone(t, size) : await openPage(t, 'chromium', { viewport: size });
     const failures = [];
     await page.route('**/*.wasm', () => {});          // the card belongs to the shell; no game needs to run
-    for (const slug of SLUGS) {
+    for (const slug of GAME_SLUGS) {
       await page.goto(`${origin}/${slug}/index.html`);
       await page.waitForSelector('#card-button');
       await page.waitForTimeout(150);
