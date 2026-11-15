@@ -2,6 +2,7 @@
 // handle, so harness.mjs helpers (which only call Runtime.evaluate) drive
 // WebKit and Firefox as well as Chromium, unattended.
 
+import { readFileSync } from 'node:fs';
 import { chromium, webkit, firefox } from 'playwright';
 import { chromiumBinary } from './chromium-binary.mjs';
 
@@ -28,6 +29,17 @@ export async function launchEngine(engineName, { headless = true, hasTouch = fal
   }
 
   const browser = await engine.launch({ headless, args, ...(engineName === 'chromium' ? { executablePath: chromiumBinary() } : {}) });
+  // BLIP_DECK names a local build of blip-deck (its dist/blip-deck.js): every context the tests open uses it in place
+  // of the tagged one from jsDelivr, to try a new deck before it is released. No service worker, which would fetch
+  // the deck itself, past the route.
+  if (process.env.BLIP_DECK) {
+    const deck = readFileSync(process.env.BLIP_DECK, 'utf8'), newContext = browser.newContext.bind(browser);
+    browser.newContext = async (options) => {
+      const context = await newContext({ ...options, serviceWorkers: 'block' });
+      await context.route(/\/blip-deck@[^/]+\/dist\/blip-deck\.js$/, (route) => route.fulfill({ contentType: 'text/javascript', body: deck }));
+      return context;
+    };
+  }
   const context = await browser.newContext({ hasTouch, ...(viewport ? { viewport } : {}),
     ...(deviceScaleFactor === undefined ? {} : { deviceScaleFactor }), ...(userAgent ? { userAgent } : {}),
     ...(isMobile === undefined ? {} : { isMobile }) });

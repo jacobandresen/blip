@@ -545,13 +545,18 @@ if (!FREE_PLAY && getCoins() <= 0) overlay.classList.add('visible');
 // for every page, in blip_core.js).
 blipApplyLayout();
 
+/** The deck's controls (its documented parts) and Rally's dials and the touch strip: what the picture keeps clear of. */
+function deckControls(bar) {
+  var deck = bar.querySelector('blip-deck'), own = deck && deck.shadowRoot;
+  var parts = own ? Array.prototype.slice.call(own.querySelectorAll('[part~="stick"], [part~="dpad"], [part~="button"]')) : [];
+  return parts.concat(Array.prototype.slice.call(bar.querySelectorAll('#paddle-dial, #paddle-dial-p2, #touch-strip .ts-half')));
+}
+
 /** Reserve the panel through the highest visible control, including any part
  * that rises above its fixed box. */
 function deckCover(bar) {
   var top = bar.getBoundingClientRect().top;
-  var parts = bar.querySelectorAll(
-    '.stick-ball, .stick-boot, .fire-buttons, .snes-dpad, .snes-face, ' +
-    '#paddle-dial, #paddle-dial-p2, #touch-strip .ts-half');
+  var parts = deckControls(bar);
   for (var i = 0; i < parts.length; i++) {
     var r = parts[i].getBoundingClientRect();
     if (r.width > 0 && r.height > 0 && r.top < top) top = r.top;
@@ -606,7 +611,7 @@ function fillCanvas() {
   var gl = PAD, gr = PAD;
   if (blipLandscape() && tb) {
     var mid = window.innerWidth / 2;
-    var ctl = tb.querySelectorAll('.snes-dpad, .snes-face, .stick-base, .stick-ball, .fire-buttons, #paddle-dial, #paddle-dial-p2, #touch-strip .ts-half');
+    var ctl = deckControls(tb);
     for (var i = 0; i < ctl.length; i++) {
       var r = ctl[i].getBoundingClientRect();
       if (!r.width || !r.height) continue;
@@ -755,11 +760,9 @@ if (!launchFrame) {
 // controller switched) instead of at guessed moments.
 if (typeof ResizeObserver === 'function') {
   var deckWatch = new ResizeObserver(function () { refit(); });
-  // The bar's own height is fixed in CSS, so watching it alone never
-  // fires for the thing that actually moves the deck's drawn edge: the
-  // caps, which go from nothing to full size when the deck is built.
-  ['#topbar', '#marquee-bar', '#fire-buttons', '#fire-buttons-p2',
-   '#snes-pad .snes-face', '#snes-pad .snes-dpad'].forEach(function (sel) {
+  // The deck sizes itself (it is as tall as its controls), so watching it
+  // catches a controller switch or a resize that moves its top edge.
+  ['#topbar', '#marquee-bar', 'blip-deck'].forEach(function (sel) {
     var el = document.querySelector(sel);
     if (el) deckWatch.observe(el);
   });
@@ -911,9 +914,8 @@ window.addEventListener('keydown', function (e) {
   var game = GAME;
   var buttonSpecs = (game && game.buttons) || [{ key: ' ', code: 'Space' }];
   var primary = buttonSpecs[0] || { key: ' ', code: 'Space' };
-  // <blip-deck> has built the deck (two stations, stick and pad each, caps from
-  // BLIP_GAMES) and set data-players / data-caps / data-seats. Rally has
-  // dials instead of the stick and pad, and hides them below.
+  // blipBuildDeck has set the deck up from BLIP_GAMES (two stations, the game's
+  // buttons). Rally has dials instead of the stick and pad, and hides them below.
   var twoUp = !isRally;
   var root = document.documentElement;
 
@@ -943,46 +945,13 @@ window.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') returnToCabinet(); else leaveGame();
   }, true);
 
-  // Live input -> the stick ball's lean (the pad lights its own buttons in
-  // the library), whether from a drag, the keyboard or a gamepad. One entry
-  // per station: the stick, its four logical names, and their state.
-  var stations = [
-    { stick: document.getElementById('stick-base'),
-      fire:  document.getElementById('fire-buttons'),
-      dirs:  { up: 'up', down: 'down', left: 'left', right: 'right' },
-      caps:  function (i) { return 'button' + (i + 1); },
-      held:  {} },
-    { stick: document.getElementById('stick-base-p2'),
-      fire:  document.getElementById('fire-buttons-p2'),
-      dirs:  { up: 'p2up', down: 'p2down', left: 'p2left', right: 'p2right' },
-      caps:  function (i) { return 'p2button' + (i + 1); },
-      held:  {} }
-  ];
-  if (!twoUp) stations.length = 1;
-  function leanStick(st) {
-    if (!st.stick) return;
-    var x = (st.held[st.dirs.right] ? 1 : 0) - (st.held[st.dirs.left] ? 1 : 0);
-    var y = (st.held[st.dirs.down]  ? 1 : 0) - (st.held[st.dirs.up]   ? 1 : 0);
-    BlipDeck.lean(st.stick, x, y);
-  }
-  // In a one-player game the arrows are player ONE's own (P1_ALONE in
-  // the game), so an arrow press has to lean player one's stick — by
-  // name alone it leaned the dead second one.
+  // The deck (<blip-deck>) lights what it is pressed with, and BlipController mirrors the keyboard and a gamepad
+  // on it. In a one-player game the arrows are player ONE's own (P1_ALONE in the game), so a player-two name lights
+  // player one's controls: by name alone it lit the idle second station.
+  var deck = document.querySelector('blip-deck');
   var versus = false;
   function reflectInput(name, down) {
-    stations.forEach(function (st, who) {
-      if (who === 1 && !versus) return;
-      for (var d in st.dirs) {
-        if (st.dirs[d] === name) { st.held[name] = down; leanStick(st); return; }
-      }
-      if (who === 0 && !versus && stations[1]) {
-        for (var e in stations[1].dirs) {
-          if (stations[1].dirs[e] === name) {
-            st.held[st.dirs[e]] = down; leanStick(st); return;
-          }
-        }
-      }
-    });
+    if (twoUp && !versus && /^p2(up|down|left|right)$/.test(name)) deck.press(name.slice(2), down);
   }
 
   BlipController.init({
@@ -998,6 +967,8 @@ window.addEventListener('keydown', function (e) {
   });
   BlipController.bindKeyboard();
   BlipController.bindGamepad(pollGamepad);
+  BlipController.bindDeck(deck);
+  if (game && game.stick) deck.tuning = game.stick;
 
   // No controller to choose: the front end decides it (blipFrontendControls).
   var touchSpec = game && game.touch;
@@ -1523,16 +1494,6 @@ window.addEventListener('keydown', function (e) {
     return;
   }
 
-  // ---- The game pad ----
-  // One pad per station (built by <blip-deck>), wired to that station's names.
-  stations.forEach(function (st, who) {
-    var pad = document.getElementById(who ? 'snes-pad-p2' : 'snes-pad');
-    if (!pad) return;
-    BlipController.bindButtons(pad);
-    BlipController.bindDpad(pad.querySelector('.snes-dpad'), { names: st.dirs });
-    BlipController.registerVisual(pad);
-  });
-
   // Called from WASM by the two-seat games: 0 = one player, 1 = two, 2 =
   // title screen with station two lit and waiting (a one-player game keeps it
   // dead to the touch).
@@ -1543,6 +1504,8 @@ window.addEventListener('keydown', function (e) {
     else root.removeAttribute('data-open');
     if (versus) root.setAttribute('data-versus', '');
     else root.removeAttribute('data-versus');
+    // Station two takes input on a title screen that seats a second player, and in a two-player match.
+    if (game && game.players === 2) deck.toggleAttribute('solo', !open && !versus);
     // The second station is on the panel either way; what changes is
     // whether anybody is sitting at it.
     Array.prototype.forEach.call(document.querySelectorAll('.deck-tag[data-second]'),
@@ -1552,7 +1515,6 @@ window.addEventListener('keydown', function (e) {
     queueMicrotask(function () {
       BlipController.releaseAll();
       touchPlay.resync();
-      stations.forEach(function (st) { st.held = {}; leanStick(st); });
     });
     fillCanvas();
     rotateHint();
@@ -1583,15 +1545,6 @@ window.addEventListener('keydown', function (e) {
   }
   window.addEventListener('resize', rotateHint);
 
-  // ---- Fire buttons (joystick mode) ----
-  // The caps were built by <blip-deck>; a cap the game does not declare has no
-  // logical name and does nothing.
-  stations.forEach(function (st) {
-    if (!st.fire) return;
-    BlipController.bindButtons(st.fire);
-    BlipController.registerVisual(st.fire);
-  });
-
   // The deck is built: fit the picture to what it covers, and once more next
   // frame for the separately injected marquee.
   if (typeof fillCanvas === 'function') {
@@ -1599,11 +1552,6 @@ window.addEventListener('keydown', function (e) {
     requestAnimationFrame(fillCanvas);
   }
 
-  // ---- The 8-way restrictor-gate joystick (blip-deck.js) ----
-  stations.forEach(function (st, who) {
-    BlipDeck.bindStick(st, { who: who, split: stations.length > 1, tuning: game && game.stick,
-      active: function () { return blipControls() === 'stick'; } });
-  });
 }());
 
 
@@ -1612,7 +1560,7 @@ window.addEventListener('keydown', function (e) {
 // ---- The deck's credit lamps ---- P1 lit while there is a credit, P2 for the second station. The deck carries no
 // coin mechanism: the cabinet's coin door, the coin wall over a game and the keys drop credits through the hidden button.
 (function () {
-  var coin = document.getElementById('insert-coin-btn'), panel = document.querySelector('.deck-panel');
+  var coin = document.getElementById('insert-coin-btn'), panel = document.querySelector('blip-deck');
   if (!coin || !panel) return;
   var root = document.documentElement;
   function el(tag, cls, text, attrs) {
@@ -1628,15 +1576,17 @@ window.addEventListener('keydown', function (e) {
   var placementFrame=0;
   function placeLamp() {
     placementFrame=0;
-    if(root.getAttribute('data-layout')!=='landscape') {lamp.style.left='';lamp2.style.left='';return;}
     var bounds=panel.getBoundingClientRect();
-    function center(selector,fallback) {
-    var part=bar.querySelector(selector),rect=part&&part.getBoundingClientRect();
+    // over a station's stick or cross (the deck's documented parts), else a dial or the touch strip's half
+    function center(who,selector,fallback) {
+    var station=panel.shadowRoot&&panel.shadowRoot.querySelectorAll('[part~="station"]')[who];
+    var control=!root.matches('[data-dials],[data-touch]')&&station&&Array.prototype.find.call(station.querySelectorAll('[part~="stick"],[part~="dpad"]'),function(e){return e.getBoundingClientRect().width>0;});
+    var part=control||bar.querySelector(selector),rect=part&&part.getBoundingClientRect();
     var x=rect&&rect.width>0?(rect.left+rect.right)/2:bounds.left+bounds.width*fallback;
     return Math.max(22,Math.min(bounds.width-22,x-bounds.left));
     }
-    lamp.style.left=center('#stick-base .stick-boot,#snes-pad .snes-dpad,#paddle-dial,#touch-strip .ts-half[data-slot="0"]',.25)+'px';
-    lamp2.style.left=center('#stick-base-p2 .stick-boot,#snes-pad-p2 .snes-dpad,#paddle-dial-p2,#touch-strip .ts-half[data-slot="1"]',.75)+'px';
+    lamp.style.left=center(0,'#paddle-dial,#touch-strip .ts-half[data-slot="0"]',.25)+'px';
+    lamp2.style.left=center(1,'#paddle-dial-p2,#touch-strip .ts-half[data-slot="1"]',.75)+'px';
   }
   function scheduleLamp(){if(!placementFrame)placementFrame=requestAnimationFrame(placeLamp);}
   window.addEventListener('resize',scheduleLamp);

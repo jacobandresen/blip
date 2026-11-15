@@ -20,9 +20,9 @@ function cabinetSurfaces(card) {
 function deckHardware() {
   const root = document.documentElement;
   return { controls: root.dataset.controls, touch: root.dataset.touch || null, dials: root.hasAttribute('data-dials'),
-    caps: [...document.querySelectorAll('.arcade-btn')].map(el => ({ spare: el.classList.contains('spare'), alt: el.classList.contains('alt') })),
+    deck: ['buttons', 'seats', 'solo', 'controls'].map((a) => document.querySelector('blip-deck').getAttribute(a)),
     strip: document.querySelector('#touch-strip')?.innerHTML || null,
-    panel: getComputedStyle(document.querySelector('.deck-panel')).backgroundImage };
+    panel: getComputedStyle(document.querySelector('blip-deck')).getPropertyValue('--blip-deck-panel') };
 }
 
 for (const engine of ['chromium', 'webkit']) {
@@ -41,7 +41,7 @@ for (const engine of ['chromium', 'webkit']) {
         const card = page.locator(`.card[data-machine="${game}"]`);
         const overview = await card.evaluate(cabinetSurfaces);
         const frame = await (await card.locator('iframe').elementHandle()).contentFrame();
-        await frame.waitForSelector('.deck-panel', { state: 'attached' });
+        await frame.waitForSelector('blip-deck[buttons]', { state: 'attached' });
         const hardware = await frame.evaluate(deckHardware);
         await gotoPage(gamePage, `${origin}/${game}/index.html`);
         // WebKit can hold back the frames of a tab behind another: the game draws only in front.

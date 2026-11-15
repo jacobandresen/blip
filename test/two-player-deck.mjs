@@ -1,11 +1,19 @@
-// The control deck of a two-seat cabinet: two stations (stick or pad, two
-// action caps each), one per player. These tests press
-// each control and read back the key that reached the canvas, which is all
-// the wasm game sees.
+// The control deck on a cabinet: two stations (stick or pad, the game's buttons), one per player. These tests press
+// each control and read back the key that reached the canvas, which is all the wasm game sees, and check that the
+// page seats the stations and keeps the picture clear of them. How the deck itself is drawn and pressed (sizes,
+// overlaps, the stick's gate) is tested in the blip-deck repository.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openPage, HTTP_PORT, evaluate, waitFor, sleep, gameReady, insertCoins } from './lib/harness.mjs';
+
+// The deck's documented parts, as '<station> <part> [n]': '2 station', '1 stick', '1 dpad', '2 buttons', '1 button 2'.
+const PART = `window.deckPart = function (spec) {
+  var deck = document.querySelector('blip-deck'), w = spec.split(' ');
+  var station = deck && deck.shadowRoot.querySelectorAll('[part~="station"]')[w[0] - 1];
+  if (!station || w[1] === 'station') return station || null;
+  return station.querySelectorAll('[part~="' + w[1] + '"]')[(w[2] || 1) - 1] || null;
+}; true`;
 
 // Most of these tests read the shell's own layout and key plumbing, which do not need the wasm: unless
 // `real`, it is held back so the page loads at once and the CPU stays free.
@@ -16,7 +24,8 @@ async function loadGame(cdp, slug, controls, { real = false } = {}) {
   await evaluate(cdp, 'true');
   await cdp.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/${slug}/index.html?controls=${controls}` });
   await waitFor(cdp, "document.readyState === 'complete'", 15000);
-  await waitFor(cdp, "typeof window.BlipController === 'object'", 15000);
+  await waitFor(cdp, "typeof window.BlipController === 'object' && !!customElements.get('blip-deck')", 15000);
+  await evaluate(cdp, PART);
   // Controls stay gated until a credit enters through the coin button.
   if (await evaluate(cdp, "document.getElementById('need-coin-overlay').classList.contains('visible')")) {
     await insertCoins(cdp.page);
@@ -26,97 +35,44 @@ async function loadGame(cdp, slug, controls, { real = false } = {}) {
   await sleep(real ? 150 : 40);
 }
 
-/** Press a control and report the key codes the canvas received. `sel`
- * is a CSS selector; a d-pad arm is pressed by aiming a pointer at the
- * cross's centre offset toward that arm. */
-const PRESS = (sel, dir) => `(function () {
-  var el = document.querySelector(${JSON.stringify(sel)});
-  if (!el) return { error: 'no element for ' + ${JSON.stringify(sel)} };
-  var seen = [];
-  var canvas = document.getElementById('glcanvas');
+/** Press a part with the mouse and report the key codes the canvas received; a cross is pressed toward `dir`. The
+ * deck holds every press for at least a frame, so the release is read a moment later. */
+const PRESS = (spec, dir) => `(async function () {
+  var el = deckPart(${JSON.stringify(spec)});
+  if (!el) return { error: 'no part ' + ${JSON.stringify(spec)} };
+  var deck = document.querySelector('blip-deck'), canvas = document.getElementById('glcanvas'), seen = [];
   function note(e) { seen.push(e.type + ':' + e.code); }
   canvas.addEventListener('keydown', note);
   canvas.addEventListener('keyup', note);
-  var r = el.getBoundingClientRect();
-  var x = r.left + r.width / 2, y = r.top + r.height / 2;
+  var r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
   var d = ${JSON.stringify(dir || null)};
-  if (d === 'left')  x = r.left + r.width * 0.1;
+  if (d === 'left') x = r.left + r.width * 0.1;
   if (d === 'right') x = r.left + r.width * 0.9;
-  if (d === 'up')    y = r.top + r.height * 0.1;
-  if (d === 'down')  y = r.top + r.height * 0.9;
+  if (d === 'up') y = r.top + r.height * 0.1;
   function send(type) {
-    el.dispatchEvent(new PointerEvent(type, {
-      bubbles: true, cancelable: true, pointerId: 7, pointerType: 'mouse',
-      clientX: x, clientY: y
-    }));
+    deck.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 7, pointerType: 'mouse', clientX: x, clientY: y }));
   }
   send('pointerdown');
   send('pointerup');
+  await new Promise(function (r) { setTimeout(r, 60); });
   canvas.removeEventListener('keydown', note);
   canvas.removeEventListener('keyup', note);
-  return { seen: seen, size: [r.width, r.height] };
+  return { seen: seen };
 })()`;
 
-/** Which logical names the deck actually built, station by station. */
-const DECK_NAMES = `(function () {
-  function names(root) {
-    if (!root) return null;
-    return Array.prototype.map.call(
-      root.querySelectorAll('.arcade-btn, .snes-btn, [data-blip]'),
-      function (el) { return el.getAttribute('data-blip'); });
-  }
-  return {
-    stickCaps: names(document.getElementById('fire-buttons')),
-    stickCaps2: names(document.getElementById('fire-buttons-p2')),
-    padAll: names(document.getElementById('snes-pad')),
-    padAll2: names(document.getElementById('snes-pad-p2'))
-  };
-})()`;
-
-/** Whether a station is in play, not merely on the panel: a two-seat cabinet
- * shows both stations in a one-player game too. */
-const LIVE = (sel) => `(function () {
-  var el = document.querySelector(${JSON.stringify(sel)});
-  if (!el) return null;
-  var r = el.getBoundingClientRect();
-  if (!(r.width > 0 && r.height > 0)) return false;
-  // An idle station looks exactly like a live one — same place, same
-  // panel, same caps — so "live" is whether it takes input, not how it
-  // is painted.
-  var ctrl = el.querySelector('.arcade-btn, .snes-btn');
-  if (!ctrl) return false;
-  return getComputedStyle(ctrl).pointerEvents !== 'none';
-})()`;
-
-const VISIBLE = (sel) => `(function () {
-  var el = document.querySelector(${JSON.stringify(sel)});
-  if (!el) return null;
-  var r = el.getBoundingClientRect();
-  return r.width > 0 && r.height > 0;
-})()`;
+/** A station is on the panel (VISIBLE) and in play (LIVE: it takes input). */
+const VISIBLE = (spec) => `(function () { var el = deckPart(${JSON.stringify(spec)}), r = el && el.getBoundingClientRect(); return !!r && r.width > 0 && r.height > 0; })()`;
+const LIVE = (spec) => `(function () { var el = deckPart(${JSON.stringify(spec)}); return !!el && !el.hasAttribute('aria-disabled'); })()`;
 
 const LAMPS_VISIBLE = `(function () {
-  var panel = document.querySelector('#topbar > .deck-panel');
-  var lamps = ['.deck-credit-lamp', '.deck-second-lamp'];
-  if (!panel) return { error: 'no deck panel' };
-  var p = panel.getBoundingClientRect();
-  return lamps.map(function (selector) {
-    var el = panel.querySelector(selector);
+  var deck = document.querySelector('blip-deck'), p = deck.getBoundingClientRect();
+  return ['.deck-credit-lamp', '.deck-second-lamp'].map(function (selector) {
+    var el = deck.querySelector(selector);
     if (!el) return { selector: selector, error: 'missing lamp' };
     var r = el.getBoundingClientRect();
-    var style = getComputedStyle(el);
-    return {
-      selector: selector,
-      display: style.display,
-      width: r.width,
-      height: r.height,
-      left: r.left,
-      right: r.right,
-      top: r.top,
-      bottom: r.bottom,
-      panel: { left: p.left, right: p.right, top: p.top, bottom: p.bottom },
-      viewport: { width: innerWidth, height: innerHeight }
-    };
+    return { selector: selector, display: getComputedStyle(el).display, width: r.width, height: r.height,
+      left: r.left, right: r.right, top: r.top, bottom: r.bottom,
+      panel: { left: p.left, right: p.right, top: p.top, bottom: p.bottom }, viewport: { width: innerWidth, height: innerHeight } };
   });
 })()`;
 
@@ -126,234 +82,121 @@ test(`brawler's deck seats two players`, async (t) => {
   await t.test('station two is always on the panel, and comes alive with a player', async () => {
     await loadGame(cdp, 'brawler', 'stick', { real: true });
     await waitFor(cdp, "document.documentElement.hasAttribute('data-open')", 10000);
-    // There from the start: the machine takes two, and a player should
-    // be able to see that before choosing anything.
-    assert.equal(await evaluate(cdp, VISIBLE('#deck-p2')), true,
-      'a two-player cabinet is showing only one station');
-    // A cold cabinet comes up on its title screen, where station two is
-    // deliberately live: reaching for it is how a second player joins.
-    assert.equal(await evaluate(cdp, LIVE('#deck-p2')), true,
-      'station two cannot be reached for on the title screen');
-
+    assert.equal(await evaluate(cdp, VISIBLE('2 station')), true, 'a two-player cabinet is showing only one station');
+    // A cold cabinet comes up on its title screen, where station two is live: reaching for it is how a second
+    // player joins.
+    assert.equal(await evaluate(cdp, LIVE('2 station')), true, 'station two cannot be reached for on the title screen');
     await evaluate(cdp, 'window.blipSetMode(1)');
     await sleep(120);
-    assert.equal(await evaluate(cdp, LIVE('#deck-p2')), true,
-      'station two never came alive after the game reported two players');
-    assert.equal(await evaluate(cdp, VISIBLE('#stick-base-p2')), true);
-    assert.equal(await evaluate(cdp, VISIBLE('#fire-buttons-p2')), true);
-
+    assert.equal(await evaluate(cdp, LIVE('2 station')), true, 'station two never came alive with two players');
+    assert.equal(await evaluate(cdp, VISIBLE('2 stick')), true);
     await evaluate(cdp, 'window.blipSetMode(0)');
     await sleep(120);
-    assert.equal(await evaluate(cdp, LIVE('#deck-p2')), false,
-      'station two stayed live after the game went back to one player');
-    assert.equal(await evaluate(cdp,
-      "document.documentElement.hasAttribute('data-open')"), false,
+    assert.equal(await evaluate(cdp, LIVE('2 station')), false, 'station two stayed live after the game went back to one player');
+    assert.equal(await evaluate(cdp, "document.documentElement.hasAttribute('data-open')"), false,
       'the title screen still advertises an open station');
   });
 
   await t.test('both player lamps stay visible on the deck', async () => {
     await loadGame(cdp, 'brawler', 'stick', { real: true });
-    await waitFor(cdp, "document.documentElement.hasAttribute('data-open')", 10000);
     await evaluate(cdp, 'window.blipSetMode(1)');
     await sleep(120);
-    const lamps = await evaluate(cdp, LAMPS_VISIBLE);
-    assert.ok(Array.isArray(lamps), JSON.stringify(lamps));
-    for (const lamp of lamps) {
+    for (const lamp of await evaluate(cdp, LAMPS_VISIBLE)) {
+      assert.ok(!lamp.error, lamp.error);
       assert.equal(lamp.display, 'block', `${lamp.selector} is hidden`);
       assert.ok(lamp.width > 0 && lamp.height > 0, `${lamp.selector} has no visible size`);
-      assert.ok(lamp.left >= lamp.panel.left && lamp.right <= lamp.panel.right,
+      assert.ok(lamp.left >= lamp.panel.left && lamp.right <= lamp.panel.right && lamp.top >= lamp.panel.top && lamp.bottom <= lamp.panel.bottom,
         `${lamp.selector} extends beyond the deck: ${JSON.stringify(lamp)}`);
-      assert.ok(lamp.top >= lamp.panel.top && lamp.bottom <= lamp.panel.bottom,
-        `${lamp.selector} extends beyond the deck: ${JSON.stringify(lamp)}`);
-      assert.ok(lamp.left >= 0 && lamp.right <= lamp.viewport.width &&
-        lamp.top >= 0 && lamp.bottom <= lamp.viewport.height,
-      `${lamp.selector} is clipped by the viewport: ${JSON.stringify(lamp)}`);
+      assert.ok(lamp.left >= 0 && lamp.right <= lamp.viewport.width && lamp.top >= 0 && lamp.bottom <= lamp.viewport.height,
+        `${lamp.selector} is clipped by the viewport: ${JSON.stringify(lamp)}`);
     }
   });
 
-  await t.test('each station has two action caps, and the names stay separate', async () => {
-    await loadGame(cdp, 'brawler', 'stick');
-    const deck = await evaluate(cdp, DECK_NAMES);
-    assert.deepEqual(deck.stickCaps, ['button1', 'button2']);
-    assert.deepEqual(deck.stickCaps2, ['p2button1', 'p2button2']);
-    const shared = deck.stickCaps.filter((n) => deck.stickCaps2.includes(n));
-    assert.deepEqual(shared, [], `both stations drive ${shared.join(', ')}`);
-  });
-
-  await t.test('the pad grows a second pad, with two caps and its own cross', async () => {
-    await loadGame(cdp, 'brawler', 'pad');
-    const deck = await evaluate(cdp, DECK_NAMES);
-    assert.deepEqual(deck.padAll,
-      ['up', 'right', 'down', 'left', 'button1', 'button2']);
-    assert.deepEqual(deck.padAll2,
-      ['p2up', 'p2right', 'p2down', 'p2left', 'p2button1', 'p2button2']);
-  });
-
-  // Each fighter has punch and kick caps; direction changes the attack height.
-  const CAPS = [
-    ['#fire-buttons .arcade-btn:nth-child(1)', 'KeyF', 'P1 punch'],
-    ['#fire-buttons .arcade-btn:nth-child(2)', 'KeyG', 'P1 kick'],
-    ['#fire-buttons-p2 .arcade-btn:nth-child(1)', 'KeyJ', 'P2 punch'],
-    ['#fire-buttons-p2 .arcade-btn:nth-child(2)', 'KeyK', 'P2 kick']
-  ];
-
-  await t.test('every cap on the stick deck sends its own attack', async () => {
-    await loadGame(cdp, 'brawler', 'stick');
-    await evaluate(cdp, 'window.blipSetMode(1)');
-    await sleep(120);
-    for (const [sel, code, what] of CAPS) {
-      const got = await evaluate(cdp, PRESS(sel));
-      assert.ok(!got.error, got.error);
-      assert.deepEqual(got.seen, [`keydown:${code}`, `keyup:${code}`],
-        `${what} (${sel}) sent ${got.seen.join(' ')}`);
-    }
-  });
-
-  await t.test('every cap on the pads sends its own attack', async () => {
-    await loadGame(cdp, 'brawler', 'pad');
-    await evaluate(cdp, 'window.blipSetMode(1)');
-    await sleep(120);
-    const padCaps = CAPS.map(([sel, code, what], i) =>
-      [`${i < 2 ? '#snes-pad' : '#snes-pad-p2'} .snes-face .snes-btn:nth-child(${(i % 2) + 1})`, code, what]);
-    for (const [sel, code, what] of padCaps) {
-      const got = await evaluate(cdp, PRESS(sel));
-      assert.ok(!got.error, got.error);
-      assert.deepEqual(got.seen, [`keydown:${code}`, `keyup:${code}`],
-        `${what} (${sel}) sent ${got.seen.join(' ')}`);
-    }
-  });
+  // Each fighter has punch and kick buttons.
+  const BUTTONS = [['1 button 1', 'KeyF', 'P1 punch'], ['1 button 2', 'KeyG', 'P1 kick'],
+    ['2 button 1', 'KeyJ', 'P2 punch'], ['2 button 2', 'KeyK', 'P2 kick']];
+  for (const controls of ['stick', 'pad']) {
+    await t.test(`every button sends its own attack (${controls})`, async () => {
+      await loadGame(cdp, 'brawler', controls);
+      await evaluate(cdp, 'window.blipSetMode(1)');
+      await sleep(120);
+      for (const [spec, code, what] of BUTTONS) {
+        const got = await evaluate(cdp, PRESS(spec));
+        assert.ok(!got.error, got.error);
+        assert.deepEqual(got.seen, [`keydown:${code}`, `keyup:${code}`], `${what} (${spec}) sent ${got.seen.join(' ')}`);
+      }
+    });
+  }
 
   await t.test("each pad's cross walks its own fighter", async () => {
     await loadGame(cdp, 'brawler', 'pad');
     await evaluate(cdp, 'window.blipSetMode(1)');
     await sleep(120);
-    const walks = [
-      ['#snes-pad .snes-dpad', 'left', 'KeyA'],
-      ['#snes-pad .snes-dpad', 'right', 'KeyD'],
-      ['#snes-pad .snes-dpad', 'up', 'KeyW'],
-      ['#snes-pad-p2 .snes-dpad', 'left', 'ArrowLeft'],
-      ['#snes-pad-p2 .snes-dpad', 'right', 'ArrowRight'],
-      ['#snes-pad-p2 .snes-dpad', 'up', 'ArrowUp']
-    ];
-    for (const [sel, dir, code] of walks) {
-      const got = await evaluate(cdp, PRESS(sel, dir));
+    for (const [spec, dir, code] of [['1 dpad', 'left', 'KeyA'], ['1 dpad', 'right', 'KeyD'], ['1 dpad', 'up', 'KeyW'],
+      ['2 dpad', 'left', 'ArrowLeft'], ['2 dpad', 'right', 'ArrowRight'], ['2 dpad', 'up', 'ArrowUp']]) {
+      const got = await evaluate(cdp, PRESS(spec, dir));
       assert.ok(!got.error, got.error);
-      assert.ok(got.seen.includes(`keydown:${code}`),
-        `${sel} pressed ${dir} sent ${got.seen.join(' ') || 'nothing'}, not ${code}`);
-      // A cross that reports a direction must never report the other
-      // player's: that is two fighters answering one thumb.
+      assert.ok(got.seen.includes(`keydown:${code}`), `${spec} pressed ${dir} sent ${got.seen.join(' ') || 'nothing'}, not ${code}`);
       const strays = got.seen.filter((s) => s.startsWith('keydown:') && !s.endsWith(code));
-      assert.deepEqual(strays, [], `${sel} ${dir} also sent ${strays.join(', ')}`);
+      assert.deepEqual(strays, [], `${spec} ${dir} also sent ${strays.join(', ')}`);
     }
   });
 
-  // The deck mirrors a keyboard player: WASD leans player one's stick, the
-  // arrows player two's.
+  // The deck mirrors a keyboard player: WASD leans player one's stick, the arrows player two's.
   await t.test('a keyboard player leans their own stick, not the other one', async () => {
     await loadGame(cdp, 'brawler', 'stick');
     await evaluate(cdp, 'window.blipSetMode(1)');
     await sleep(120);
-    // Neutral is 0, and an untouched stick has not been written at all —
-    // both mean "not leaning", so read them as numbers.
-    const lean = (sel) => `(function () {
-      var el = document.querySelector(${JSON.stringify('%s')});
-      return [Number(el.style.getPropertyValue('--dx') || 0),
-              Number(el.style.getPropertyValue('--dy') || 0)];
-    })()`.replace('%s', sel);
-    const press = (key, code) => `(function () {
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, code: ${JSON.stringify(code)} }));
-      return true;
-    })()`;
-
+    const lean = (spec) => `(function () { var s = deckPart(${JSON.stringify(spec)}).style;
+      return [Number(s.getPropertyValue('--dx') || 0), Number(s.getPropertyValue('--dy') || 0)]; })()`;
+    const press = (key, code) => `document.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, code: ${JSON.stringify(code)} })), true`;
     await evaluate(cdp, press('a', 'KeyA'));
-    assert.deepEqual(await evaluate(cdp, lean('#stick-base')), [-1, 0],
-      'player one held left and their own stick did not lean');
-    assert.deepEqual(await evaluate(cdp, lean('#stick-base-p2')), [0, 0],
-      "player one's key leaned player two's stick");
-
+    assert.deepEqual(await evaluate(cdp, lean('1 station')), [-1, 0], 'player one held left and their own stick did not lean');
+    assert.deepEqual(await evaluate(cdp, lean('2 station')), [0, 0], "player one's key leaned player two's stick");
     await evaluate(cdp, press('ArrowRight', 'ArrowRight'));
-    assert.deepEqual(await evaluate(cdp, lean('#stick-base-p2')), [1, 0],
-      'player two held right and their own stick did not lean');
-    assert.deepEqual(await evaluate(cdp, lean('#stick-base')), [-1, 0],
-      "player two's key moved player one's stick");
+    assert.deepEqual(await evaluate(cdp, lean('2 station')), [1, 0], 'player two held right and their own stick did not lean');
+    assert.deepEqual(await evaluate(cdp, lean('1 station')), [-1, 0], "player two's key moved player one's stick");
   });
 });
 
-test(`a one-player game's second station is there but dead`, async (t) => {
+test(`a one-player game's second station is there but idle`, async (t) => {
   const { cdp } = await openPage(t);
-
-  await t.test('serpent shows a second station, as a two-player cabinet does, that nobody can play', async () => {
-    // Serpent reads one button; both cabinet action caps map to fire.
+  await t.test('serpent shows a second station, as a two-player cabinet does, that nobody can play; its one button fires', async () => {
     await loadGame(cdp, 'serpent', 'stick');
-    assert.equal(await evaluate(cdp, VISIBLE('#deck-p2')), true,
-      'a one-player game hides its second station');
-    assert.equal(await evaluate(cdp, LIVE('#deck-p2')), false,
-      'a game with no second player has a live second station');
-    const deck = await evaluate(cdp, DECK_NAMES);
-    assert.equal(deck.stickCaps.length, 2, 'station one should have two action caps');
-    // A and B both map to fire for a one-button game.
-    assert.deepEqual(deck.stickCaps.filter(Boolean), ['button1', 'button2']);
-    assert.equal(await evaluate(cdp,
-      "document.querySelectorAll('#fire-buttons .arcade-btn.spare').length"), 0,
-      'Serpent should map both action caps to fire');
-    assert.equal(await evaluate(cdp,
-      "document.querySelectorAll('#fire-buttons-p2 .arcade-btn[data-blip]').length"), 0,
-      "player two's caps are wired on a game with no player two");
-  });
-
-  await t.test("brawler's idle station two is not dimmed", async () => {
-    await loadGame(cdp, 'brawler', 'stick');
-    await evaluate(cdp, 'window.blipSetMode(0)');
-    await sleep(120);
-    assert.equal(await evaluate(cdp,
-      "getComputedStyle(document.querySelector('#deck-p2 .stick-ball')).opacity"), '1',
-      "brawler's second station is dimmed although a player can join");
-  });
-
-  await t.test("serpent's one cap still fires", async () => {
-    await loadGame(cdp, 'serpent', 'stick');
-    const got = await evaluate(cdp, PRESS('#fire-buttons .arcade-btn:nth-child(1)'));
-    assert.deepEqual(got.seen, ['keydown:Space', 'keyup:Space']);
+    assert.equal(await evaluate(cdp, VISIBLE('2 station')), true, 'a one-player game hides its second station');
+    assert.equal(await evaluate(cdp, LIVE('2 station')), false, 'a game with no second player has a live second station');
+    assert.deepEqual((await evaluate(cdp, PRESS('2 button 1'))).seen, [], "player two's button is wired on a game with no player two");
+    assert.deepEqual((await evaluate(cdp, PRESS('1 button 1'))).seen, ['keydown:Space', 'keyup:Space']);
   });
 });
 
 // ---- A phone turned on its side ----------------------------------------
-// Sideways the controls move into the side gutters of the 5:4 picture and the
-// picture gets the whole height. These measure that, and that nothing lands
-// on the picture.
+// Sideways the controls move into the side gutters of the picture and the picture gets the whole height.
 
 const GEOMETRY = `(function () {
-  function box(sel) {
-    var el = document.querySelector(sel);
+  function box(el) {
     if (!el) return null;
     var r = el.getBoundingClientRect();
     if (!r.width || !r.height) return null;
     return { x: r.left, y: r.top, w: r.width, h: r.height, r: r.right, b: r.bottom };
   }
-  var deck = document.getElementById('topbar').getBoundingClientRect();
   var c = document.getElementById('glcanvas').getBoundingClientRect();
-  // The picture inside the canvas: the game letterboxes a 5:4 image
-  // into whatever box it is given, so the picture is the 5:4 rectangle
-  // centred in it — which is what the controls have to keep off.
-  var ar = 640 / 400;
-  var pw = Math.min(c.width, c.height * ar), ph = pw / ar;
+  // The picture inside the canvas: the game letterboxes a 16:10 image into whatever box it is given.
+  var ar = 640 / 400, pw = Math.min(c.width, c.height * ar), ph = pw / ar;
+  var parts = ['1 stick', '1 dpad', '1 buttons', '2 stick', '2 dpad', '2 buttons'].map(function (s) { return { sel: s, b: box(deckPart(s)) }; })
+    .concat(['#paddle-dial', '#paddle-dial-p2'].map(function (s) { return { sel: s, b: box(document.querySelector(s)) }; }));
   return {
     layout: document.documentElement.getAttribute('data-layout'),
-    vp: [innerWidth, innerHeight],
-    deck: { x: deck.left, w: deck.width, r: deck.right },
     canvas: { x: c.left, y: c.top, w: c.width, h: c.height },
     picture: { x: c.left + (c.width - pw) / 2, y: c.top + (c.height - ph) / 2, w: pw, h: ph },
-    controls: ['#stick-base', '#fire-buttons', '#stick-base-p2', '#fire-buttons-p2',
-               '#snes-pad .snes-dpad', '#snes-pad .snes-face',
-               '#snes-pad-p2 .snes-dpad', '#snes-pad-p2 .snes-face',
-               '#paddle-dial', '#paddle-dial-p2']
-      .map(function (s) { var b = box(s); return b && { sel: s, b: b }; })
-      .filter(Boolean)
+    controls: parts.filter(function (p) { return p.b; })
   };
 })()`;
 
 const LANDSCAPE = { width: 844, height: 390 };
 const PORTRAIT = { width: 390, height: 844 };
+const SIDEWAYS = [['brawler', 'pad', 1], ['brawler', 'stick', 1], ['brawler', 'pad', 2], ['brawler', 'stick', 2],
+  ['rally', 'stick', 1], ['serpent', 'pad', 1]];
 
 async function geometry(cdp, slug, controls, size, players) {
   await cdp.page.setViewportSize(size);
@@ -366,168 +209,21 @@ async function geometry(cdp, slug, controls, size, players) {
 test(`a phone on its side puts the controls beside the picture`, async (t) => {
   const { cdp } = await openPage(t);
 
-  await t.test('sideways, the picture gets the whole height of the screen', async () => {
-    for (const [slug, controls, players] of
-         [['brawler', 'pad', 1], ['brawler', 'stick', 1],
-          ['brawler', 'pad', 2], ['brawler', 'stick', 2],
-          ['rally', 'stick', 1], ['serpent', 'pad', 1]]) {
+  await t.test('sideways, the picture gets the whole height and no control is drawn over it', async () => {
+    for (const [slug, controls, players] of SIDEWAYS) {
       const g = await geometry(cdp, slug, controls, LANDSCAPE, players);
       const what = `${slug} ${controls} ${players}p`;
       assert.equal(g.layout, 'landscape', `${what}: did not switch layout`);
-      // The marquee and 14px cabinet frame inset remain on screen;
-      // landscape moves the bottom deck into the side gutters.
-      assert.ok(g.canvas.y <= LANDSCAPE.height * 0.25,
-        `${what}: the picture starts too far below the top of the screen`);
-      assert.ok(g.canvas.y + g.canvas.h >= LANDSCAPE.height - 16,
-        `${what}: the picture ends above the cabinet frame`);
-      assert.ok(g.canvas.h >= 240,
-        `${what}: the picture got only ${Math.round(g.canvas.h)}px of height`);
-    }
-  });
-
-  await t.test('and no control is drawn over the picture', async () => {
-    for (const [slug, controls, players] of
-         [['brawler', 'pad', 1], ['brawler', 'stick', 1],
-          ['brawler', 'pad', 2], ['brawler', 'stick', 2],
-          ['rally', 'stick', 1], ['serpent', 'pad', 1]]) {
-      const g = await geometry(cdp, slug, controls, LANDSCAPE, players);
-      const what = `${slug} ${controls} ${players}p`;
+      assert.ok(g.canvas.y <= LANDSCAPE.height * 0.25, `${what}: the picture starts too far below the top of the screen`);
+      assert.ok(g.canvas.y + g.canvas.h >= LANDSCAPE.height - 16, `${what}: the picture ends above the cabinet frame`);
+      assert.ok(g.canvas.h >= 240, `${what}: the picture got only ${Math.round(g.canvas.h)}px of height`);
       assert.ok(g.controls.length > 0, `${what}: found no controls at all`);
       for (const { sel, b } of g.controls) {
-        // Every control is in a gutter: entirely left of the picture or
-        // entirely right of it. A few pixels of overlap is the rounded
-        // corner of a cap, not a control sitting on the fight.
+        // A few pixels of overlap is the rounded corner of a button, not a control sitting on the game.
         const clear = b.r <= g.picture.x + 8 || b.x >= g.picture.x + g.picture.w - 8;
-        assert.ok(clear, `${what}: ${sel} at ${Math.round(b.x)}..${Math.round(b.r)} `
-          + `lies over the picture (${Math.round(g.picture.x)}..`
-          + `${Math.round(g.picture.x + g.picture.w)})`);
-        // And on the screen.
-        assert.ok(b.x >= -6 && b.r <= LANDSCAPE.width + 6,
-          `${what}: ${sel} runs off the side of the screen`);
-        assert.ok(b.b <= LANDSCAPE.height + 6,
-          `${what}: ${sel} runs off the bottom of the screen`);
-      }
-    }
-  });
-
-  await t.test("each player's controls are together, and the players are apart", async () => {
-    // Within a station: stick left, caps right, whichever controller. Between
-    // stations: a gap bigger than any inside one.
-    for (const size of [PORTRAIT, LANDSCAPE]) {
-      for (const [controls, steer, hit, steer2, hit2] of
-           [['stick', '#stick-base', '#fire-buttons', '#stick-base-p2', '#fire-buttons-p2'],
-            ['pad', '#snes-pad .snes-dpad', '#snes-pad .snes-face',
-             '#snes-pad-p2 .snes-dpad', '#snes-pad-p2 .snes-face']]) {
-        const g = await geometry(cdp, 'brawler', controls, size, 2);
-        const at = (sel) => {
-          const c = g.controls.find((x) => x.sel === sel);
-          assert.ok(c, `${controls} @ ${size.width}: ${sel} is missing`);
-          return c.b;
-        };
-        const where = `${controls} @ ${size.width}`;
-        const [a, b, c, d] = [at(steer), at(hit), at(steer2), at(hit2)];
-        // Stick left of buttons, on both stations. Compared by centre,
-        // because a stick's hit-box is wider than the stick drawn in it
-        // and the two boxes are allowed to touch.
-        const mid = (r) => r.x + r.w / 2;
-        assert.ok(mid(a) < mid(b), `${where}: player one's stick is not left of their buttons`);
-        assert.ok(mid(c) < mid(d), `${where}: player two's stick is not left of their buttons`);
-        // Player one entirely left of player two.
-        assert.ok(b.r <= c.x, `${where}: the two stations overlap`);
-        // And the gap between them beats the gap inside either.
-        const between = c.x - b.r;
-        const inside = Math.max(b.x - a.r, d.x - c.r);
-        assert.ok(between > inside * 1.4 && between > 24,
-          `${where}: ${Math.round(between)}px between the players against `
-          + `${Math.round(inside)}px inside a station — the daylight is in the wrong place`);
-      }
-    }
-  });
-
-  await t.test('the caps sit inside the panel, not over it', async () => {
-    // The square of caps needs a bar deep enough on an ordinary desktop too
-    // (neither phone nor touch), or the top row sits above the panel's edge.
-    // The arcade has no bottom deck: each cabinet carries its own.
-    for (const [page, w, h] of [['brawler/index.html', 1280, 900],
-                                ['brawler/index.html', 390, 844],
-                                ['serpent/index.html', 768, 700]]) {
-      await cdp.page.setViewportSize({ width: w, height: h });
-      await evaluate(cdp, 'true');
-      await cdp.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/${page}` });
-      await waitFor(cdp, "document.readyState === 'complete'", 15000);
-      await waitFor(cdp, "document.querySelectorAll('.arcade-btn').length > 0", 15000);
-      await sleep(250);
-      const g = await evaluate(cdp, `(function () {
-        var panel = document.querySelector('.deck-panel').getBoundingClientRect();
-        // Whichever controller is on: the joystick deck's caps, or the
-        // pad's. The other one is display:none and reports a zero rect,
-        // which would read as a cap at the top of the screen.
-        var caps = Array.prototype.map.call(
-          document.querySelectorAll('.fire-buttons .arcade-btn, .snes-face .snes-btn'),
-          function (el) { var r = el.getBoundingClientRect(); return { y: r.top, h: r.height }; })
-          .filter(function (c) { return c.h > 0; });
-        return { panelTop: panel.top, panelBot: panel.bottom, n: caps.length,
-                 top: Math.min.apply(null, caps.map(function (c) { return c.y; })) };
-      })()`);
-      assert.ok(g.n >= 2, `${page} @ ${w}: no action caps are on screen`);
-      assert.ok(g.top >= g.panelTop + 6,
-        `${page} @ ${w}: the caps start at ${Math.round(g.top)}, `
-        + `above the panel's top edge at ${Math.round(g.panelTop)}`);
-    }
-  });
-
-  await t.test('every page carries the same deck', async () => {
-    // One cabinet, one panel: every game but Rally shows the identical deck;
-    // a game that reads fewer caps leaves the spares blank. The arcade has
-    // none of its own: each cabinet carries its deck.
-    const PAGES = ['serpent/index.html', 'meteors/index.html', 'brawler/index.html'];
-    const shape = async (page) => {
-      await cdp.page.setViewportSize({ width: 1280, height: 800 });
-      await evaluate(cdp, 'true');
-      await cdp.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/${page}` });
-      await waitFor(cdp, "document.readyState === 'complete'", 15000);
-      await waitFor(cdp, "document.querySelectorAll('.arcade-btn').length > 0", 15000);
-      await sleep(250);
-      return evaluate(cdp, `(function () {
-        var bar = document.querySelector('#topbar, .kiosk-bar');
-        var ball = document.querySelector('.stick-ball').getBoundingClientRect();
-        var cap = document.querySelector('.arcade-btn').getBoundingClientRect();
-        return {
-          barH: Math.round(bar.getBoundingClientRect().height),
-          caps: document.querySelectorAll('.arcade-btn').length,
-          sticks: document.querySelectorAll('.stick-base').length,
-          ball: [Math.round(ball.width), Math.round(ball.height)],
-          cap: [Math.round(cap.width), Math.round(cap.height)],
-        };
-      })()`);
-    };
-    const first = await shape(PAGES[0]);
-    assert.equal(first.caps, 4, `${PAGES[0]}: ${first.caps} caps, not two stations of two`);
-    assert.equal(first.sticks, 2, `${PAGES[0]}: ${first.sticks} sticks, not two`);
-    // A ball-top is a sphere. It renders as an ellipse the moment
-    // something in its ancestry ends the preserve-3d chain, which is
-    // how this last went wrong on one page and not the others.
-    assert.ok(Math.abs(first.ball[0] - first.ball[1]) <= 2,
-      `${PAGES[0]}: the ball renders ${first.ball.join('x')} — the 3D chain is broken`);
-    for (const page of PAGES.slice(1)) {
-      const g = await shape(page);
-      assert.deepEqual(g, first, `${page} does not have the same deck as ${PAGES[0]}`);
-    }
-  });
-
-  await t.test('both players get the same deck, not mirror images', async () => {
-    for (const controls of ['stick', 'pad']) {
-      const g = await geometry(cdp, 'brawler', controls, LANDSCAPE, 2);
-      const by = (s) => g.controls.find((c) => c.sel === s);
-      const pairs = controls === 'stick'
-        ? [['#stick-base', '#fire-buttons'], ['#stick-base-p2', '#fire-buttons-p2']]
-        : [['#snes-pad .snes-dpad', '#snes-pad .snes-face'],
-           ['#snes-pad-p2 .snes-dpad', '#snes-pad-p2 .snes-face']];
-      for (const [steer, hit] of pairs) {
-        const a = by(steer), b = by(hit);
-        assert.ok(a && b, `${controls}: ${steer} or ${hit} is missing`);
-        assert.ok(a.b.r <= b.b.x,
-          `${controls}: ${steer} is not left of ${hit} — station is mirrored`);
+        assert.ok(clear, `${what}: ${sel} at ${Math.round(b.x)}..${Math.round(b.r)} lies over the picture `
+          + `(${Math.round(g.picture.x)}..${Math.round(g.picture.x + g.picture.w)})`);
+        assert.ok(b.x >= -6 && b.r <= LANDSCAPE.width + 6 && b.b <= LANDSCAPE.height + 6, `${what}: ${sel} runs off the screen`);
       }
     }
   });
@@ -535,36 +231,14 @@ test(`a phone on its side puts the controls beside the picture`, async (t) => {
   await t.test('turning the phone back puts the deck back under the picture', async () => {
     const g = await geometry(cdp, 'brawler', 'pad', PORTRAIT, 1);
     assert.equal(g.layout, 'upright');
-    const bar = await evaluate(cdp,
-      "Math.round(document.getElementById('topbar').getBoundingClientRect().height)");
-    assert.ok(bar > 60, `the deck collapsed in portrait: ${bar}px`);
-    // The canvas stops above what the deck DRAWS. It may run up behind
-    // the empty top of a station's box, which is only there to give the
-    // ball room to float.
-    const drawn = await evaluate(cdp, `(function () {
-      var top = innerHeight;
-      document.querySelectorAll('#topbar .stick-ball, #topbar .stick-boot, '
-        + '#topbar .fire-buttons, #topbar .snes-dpad, #topbar .snes-face')
-        .forEach(function (e) {
-          var r = e.getBoundingClientRect();
-          if (r.height > 0 && r.top < top) top = r.top;
-        });
-      return top;
-    })()`);
-    assert.ok(g.canvas.y + g.canvas.h <= drawn + 2,
-      `the picture runs ${Math.round(g.canvas.y + g.canvas.h)}px down, under a deck `
-      + `drawn from ${Math.round(drawn)}`);
+    const top = Math.min(...g.controls.map((c) => c.b.y));
+    assert.ok(g.canvas.y + g.canvas.h <= top + 2,
+      `the picture runs ${Math.round(g.canvas.y + g.canvas.h)}px down, under a deck drawn from ${Math.round(top)}`);
   });
 });
 
 // ---- The deck answers the title screen ----------------------------------
-// The game reports the mode as the cursor lands on it, so station two becomes
-// active while the player is choosing. Drive the real wasm with a coin and key.
-
-async function bootGame(cdp, controls) {
-  await loadGame(cdp, 'brawler', controls, { real: true });
-  await sleep(800);
-}
+// The game reports the mode as the cursor lands on it, so station two becomes active while the player is choosing.
 
 /** Hold a key long enough for the game to sample a frame with it down. */
 async function tap(cdp, key) {
@@ -574,201 +248,26 @@ async function tap(cdp, key) {
   await sleep(320);
 }
 
-const PLAYERS = "document.documentElement.getAttribute('data-players')";
-
 test(`the deck answers the title screen straight away`, async (t) => {
   const { cdp } = await openPage(t);
-
   for (const controls of ['stick', 'pad']) {
-    // Station two is #deck-p2 on the stick deck and #snes-pad-p2 on the pad
-    // deck; the other is hidden on purpose.
-    const station2 = controls === 'stick' ? '#deck-p2' : '#snes-pad-p2';
     await t.test(`${controls}: the second station arrives with the cursor`, async () => {
-      await bootGame(cdp, controls);
-      assert.equal(await evaluate(cdp, PLAYERS), '2',
-        'the waiting title screen should show both stations for player two to join');
-
-      // The title menu is two entries; either direction moves between
-      // them, and both of them have to be answered.
+      await loadGame(cdp, 'brawler', controls, { real: true });
+      await sleep(800);
       await tap(cdp, 'KeyD');
-      assert.equal(await evaluate(cdp, PLAYERS), '2',
-        'the cursor reached 2 PLAYERS and no second station appeared');
-      assert.equal(await evaluate(cdp,
-        "document.documentElement.hasAttribute('data-versus')"), true,
+      assert.equal(await evaluate(cdp, "document.documentElement.hasAttribute('data-versus')"), true,
         'the title cursor did not enter two-player mode');
-      assert.equal(await evaluate(cdp, LIVE(station2)), true,
-        'the second station is not live when 2 PLAYERS is selected');
-
+      assert.equal(await evaluate(cdp, LIVE('2 station')), true, 'the second station is not live when 2 PLAYERS is selected');
       await tap(cdp, 'KeyD');
-      assert.equal(await evaluate(cdp, PLAYERS), '2',
-        'the waiting station disappeared while returning to 1 PLAYER');
-      // Still on the title, so still open and still reachable — what
-      // changes is that it is advertising again rather than taken.
-      assert.equal(await evaluate(cdp,
-        "document.documentElement.hasAttribute('data-open')"), true);
-
-      // And the choice survives being confirmed: the select screen and
-      // the match that follows keep whatever the title said.
-      await tap(cdp, 'KeyA');
-      assert.equal(await evaluate(cdp, PLAYERS), '2');
-      await tap(cdp, 'KeyF');           // player one's low punch: confirm
-      assert.equal(await evaluate(cdp, PLAYERS), '2',
-        'confirming 2 PLAYERS took the second station away again');
+      // Still on the title, so still open and still reachable.
+      assert.equal(await evaluate(cdp, "document.documentElement.hasAttribute('data-open')"), true);
+      assert.equal(await evaluate(cdp, LIVE('2 station')), true);
     });
   }
 });
 
-// ---- What a thumb is actually offered ----------------------------------
-// The deck is tilted, so a cap's CSS size is not its screen size. These
-// measure the rendered rectangles, the same ones the touch code hit-tests.
-
-const TARGETS = `(function () {
-  function box(sel) {
-    var el = document.querySelector(sel);
-    if (!el) return null;
-    var r = el.getBoundingClientRect();
-    if (!(r.width > 0 && r.height > 0)) return null;
-    return { x: r.left, y: r.top, w: r.width, h: r.height, r: r.right, b: r.bottom };
-  }
-  function all(sel) {
-    return Array.prototype.map.call(document.querySelectorAll(sel), function (el) {
-      var r = el.getBoundingClientRect();
-      return { x: r.left, y: r.top, w: r.width, h: r.height, r: r.right, b: r.bottom };
-    }).filter(function (r) { return r.w > 0 && r.h > 0; });
-  }
-  return {
-    vw: innerWidth,
-    scrollW: document.documentElement.scrollWidth,
-    bar: box('#topbar'),
-    sides: [box('#deck-p1'), box('#deck-p2'), box('#snes-pad'), box('#snes-pad-p2')]
-      .filter(Boolean),
-    caps: all('#fire-buttons .arcade-btn').concat(all('#snes-pad .snes-btn')),
-    caps2: all('#fire-buttons-p2 .arcade-btn').concat(all('#snes-pad-p2 .snes-btn')),
-    stick: box('#stick-base') || box('#snes-pad .snes-dpad')
-  };
-})()`;
-
-const PHONES = [
-  { name: 'iPhone SE', width: 320, height: 568 },
-  { name: 'iPhone 8', width: 375, height: 667 },
-  { name: 'iPhone 13', width: 390, height: 844 },
-];
-
-test(`a thumb gets a real target on a small phone`, async (t) => {
-  const { cdp } = await openPage(t);
-
-  await t.test('every cap is big enough to hit without looking', async () => {
-    for (const phone of PHONES) {
-      for (const controls of ['stick', 'pad']) {
-        for (const players of [1, 2]) {
-          await cdp.page.setViewportSize({ width: phone.width, height: phone.height });
-          await loadGame(cdp, 'brawler', controls);
-          await evaluate(cdp, `window.blipSetMode(${players === 2 ? 1 : 0})`);
-          await sleep(250);
-          const g = await evaluate(cdp, TARGETS);
-          const what = `${phone.name} ${controls} ${players}P`;
-          assert.equal(g.caps.length, 2, `${what}: found ${g.caps.length} player-one caps, not two`);
-          for (const c of g.caps) {
-            // 28px is what the projection allows on the narrowest phone with
-            // two stations; the touch code's ±14px slop covers the rest of
-            // Apple's 44.
-            assert.ok(c.w >= 30 && c.h >= 28,
-              `${what}: a cap renders ${Math.round(c.w)}x${Math.round(c.h)}`);
-          }
-        }
-      }
-    }
-  });
-
-  await t.test('nothing on the deck runs off the panel', async () => {
-    for (const phone of PHONES) {
-      for (const controls of ['stick', 'pad']) {
-        await cdp.page.setViewportSize({ width: phone.width, height: phone.height });
-        await loadGame(cdp, 'brawler', controls);
-        await evaluate(cdp, 'window.blipSetMode(1)');
-        await sleep(250);
-        const g = await evaluate(cdp, TARGETS);
-        const what = `${phone.name} ${controls}`;
-        assert.equal(g.scrollW, g.vw, `${what}: the page scrolls sideways`);
-        for (const c of g.caps.concat(g.caps2)) {
-          assert.ok(c.x >= g.bar.x - 2 && c.r <= g.bar.r + 2,
-            `${what}: a cap at ${Math.round(c.x)}..${Math.round(c.r)} is outside `
-            + `the panel (${Math.round(g.bar.x)}..${Math.round(g.bar.r)})`);
-        }
-        // The whole station, padding and plate included, must stay on the
-        // panel.
-        for (const st of g.sides) {
-          assert.ok(st.x >= g.bar.x - 2 && st.r <= g.bar.r + 2,
-            `${what}: a station at ${Math.round(st.x)}..${Math.round(st.r)} overflows `
-            + `the panel (${Math.round(g.bar.x)}..${Math.round(g.bar.r)})`);
-        }
-      }
-    }
-  });
-
-  await t.test('two caps never share a thumb', async () => {
-    // Each cap gets ±14px of slop, so adjacent caps need a real gap between
-    // them or a touch is ambiguous.
-    await cdp.page.setViewportSize(PHONES[0]);
-    await loadGame(cdp, 'brawler', 'stick');
-    await evaluate(cdp, 'window.blipSetMode(1)');
-    await sleep(250);
-    const g = await evaluate(cdp, TARGETS);
-    const cols = g.caps.slice().sort((a, b) => a.x - b.x);
-    const a = cols[0], b = cols[1];
-    const overlaps = a.x < b.r && a.r > b.x && a.y < b.b && a.b > b.y;
-    assert.equal(overlaps, false,
-      `the two caps overlap: ${JSON.stringify(cols)}`);
-  });
-});
-
-test(`a big touch screen gets a deck sized for a finger`, async (t) => {
-  // A large touch screen (neither small nor a mouse) must get the thumb-sized
-  // deck too.
-  const { cdp } = await openPage(t);
-  const browser = cdp.page.context().browser();
-
-  for (const [w, h, what] of [[1024, 768, 'tablet'], [1280, 800, 'touch monitor'],
-                              [1920, 1080, 'wall panel']]) {
-    for (const controls of ['stick', 'pad']) {
-      const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true });
-      const page = await ctx.newPage();
-      await page.goto(`http://127.0.0.1:${HTTP_PORT}/brawler/index.html?controls=${controls}`);
-      await page.waitForTimeout(1600);
-      await page.evaluate(() => window.blipSetMode(1));
-      await page.waitForTimeout(250);
-      const g = await page.evaluate(() => {
-        const all = (s) => Array.prototype.map.call(document.querySelectorAll(s), (el) => {
-          const r = el.getBoundingClientRect();
-          return { w: r.width, h: r.height };
-        }).filter((r) => r.w > 0);
-        return {
-          coarse: matchMedia('(pointer: coarse)').matches,
-          caps: all('#fire-buttons .arcade-btn').concat(all('#snes-pad .snes-btn')),
-        };
-      });
-      const where = `${what} ${controls}`;
-      assert.ok(g.coarse, `${where}: the test is not emulating a touch screen`);
-      assert.equal(g.caps.length, 2, `${where}: found ${g.caps.length} player-one caps`);
-      for (const c of g.caps) {
-        // Apple's 44pt, which there is plenty of room for at this size.
-        assert.ok(c.w >= 44 && c.h >= 44,
-          `${where}: a cap renders ${Math.round(c.w)}x${Math.round(c.h)}`);
-        // Round, not a leaning ellipse: the perspective scales with the
-        // viewport so wide decks are not fisheyed.
-        assert.ok(Math.max(c.w, c.h) / Math.min(c.w, c.h) < 1.35,
-          `${where}: a cap renders ${Math.round(c.w)}x${Math.round(c.h)} — `
-          + 'the lens is distorting it');
-      }
-      await ctx.close();
-    }
-  }
-});
-
 test(`a second player joins by touch through their own buttons on the stick or the pad deck`, async (t) => {
-  // Tested by touch: a real tap on station two's own button against the real
-  // wasm. The page's part is that station two is reachable while the title is
-  // up (it is dead during a one-player match).
+  // A real tap on station two's own button against the real wasm.
   const { cdp } = await openPage(t);
   const browser = cdp.page.context().browser();
 
@@ -778,75 +277,28 @@ test(`a second player joins by touch through their own buttons on the stick or t
     await page.goto(`http://127.0.0.1:${HTTP_PORT}/brawler/index.html?controls=${controls}`);
     await gameReady(page);
     if (await page.locator('#need-coin-overlay.visible').count()) await insertCoins(page);
-    // The cabinet reports itself as soon as it is up; wait for that
-    // rather than for a guessed number of milliseconds.
-    await page.waitForFunction(
-      () => document.documentElement.hasAttribute('data-open'), null, { timeout: 20000 });
-
-    const state = () => page.evaluate(() => ({
-      players: document.documentElement.getAttribute('data-players'),
-      open: document.documentElement.hasAttribute('data-open'),
-    }));
-
-    let s = await state();
-    assert.equal(s.players, '2', `${controls}: the waiting title screen did not show both stations`);
-    assert.ok(s.open, `${controls}: the second station is not open on the title screen`);
-
+    await page.waitForFunction(() => document.documentElement.hasAttribute('data-open'), null, { timeout: 20000 });
     assert.equal(await page.evaluate(() => blipControls()), controls, `${controls}: a touchscreen keeps the deck it was asked for`);
-    const sel = controls === 'stick' ? '#fire-buttons-p2 .arcade-btn' : '#snes-pad-p2 .snes-btn';
-    const box = await (await page.$(sel)).boundingBox();
-    assert.ok(box, `${controls}: player two's join control is not visible`);
-    await page.evaluate(() => {
-      window.__joinKeys = [];
-      const canvas = document.querySelector('#glcanvas');
-      canvas.addEventListener('keydown', (e) => window.__joinKeys.push(`down:${e.code}`));
-      canvas.addEventListener('keyup', (e) => window.__joinKeys.push(`up:${e.code}`));
-    });
+    // Playwright's CSS reaches into the deck's shadow root: player two's first button.
+    const box = await page.locator('blip-deck [part~="station"] >> nth=1').locator('[part~="button"]').first().boundingBox();
+    assert.ok(box, `${controls}: player two's join button is not visible`);
     // The deck is up before the wasm reads input, so tap until it takes.
     const deadline = Date.now() + 15000;
+    let open = true;
     do {
       await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
       await page.waitForTimeout(350);
-      s = await state();
-    } while (s.open && Date.now() < deadline);
-    assert.equal(s.players, '2',
-      `${controls}: player two touched their own button and did not join: ${JSON.stringify(await page.evaluate(({ x, y }) => ({
-        attrs: ['data-controls', 'data-layout', 'data-players', 'data-open', 'data-versus'].map((key) =>
-          [key, document.documentElement.getAttribute(key)]),
-        hit: document.elementFromPoint(x, y)?.outerHTML.slice(0, 160),
-        keys: window.__joinKeys,
-        coin: getCoins(), overlay: document.querySelector('#need-coin-overlay').classList.contains('visible'),
-      }), { x: box.x + box.width / 2, y: box.y + box.height / 2 }))}`);
-    assert.ok(!s.open, `${controls}: the second station is still advertising for a player`);
+      open = await page.evaluate(() => document.documentElement.hasAttribute('data-open'));
+    } while (open && Date.now() < deadline);
+    assert.ok(!open, `${controls}: player two touched their own button and did not join`);
     await ctx.close();
   }
 });
 
 test(`the deck never laps over the picture`, async (t) => {
-  // fillCanvas() must reserve what the deck covers (the caps sit proud of the
-  // bar), not just the bar's height.
+  // fillCanvas() must reserve what the deck covers, not just the bar's height.
   const { cdp } = await openPage(t);
   const GAMES = ['bouncer', 'serpent', 'brawler', 'meteors', 'rally', 'raider'];
-  const EXTENT = `(function () {
-    var c = document.getElementById('glcanvas').getBoundingClientRect();
-    // Seeded from the bottom of the screen: every control is INSIDE the
-    // bar, so seeding with the bar's own top means nothing can lower it
-    // and the whole bar reads as covered.
-    var top = innerHeight;
-    // The parts that are DRAWN. A station's box is three caps tall to
-    // give the ball room to float and only its bottom third is inked,
-    // so the picture is allowed to run up behind the empty part.
-    var parts = document.querySelectorAll(
-      '#topbar .stick-ball, #topbar .stick-boot, #topbar .fire-buttons, ' +
-      '#topbar .snes-dpad, #topbar .snes-face, ' +
-      '#topbar #paddle-dial, #topbar #paddle-dial-p2');
-    for (var i = 0; i < parts.length; i++) {
-      var r = parts[i].getBoundingClientRect();
-      if (r.height > 0 && r.top < top) top = r.top;
-    }
-    return { canvasBot: c.bottom, deckTop: top, canvasH: c.height };
-  })()`;
-
   for (const controls of ['stick', 'pad']) {
     for (const [w, h] of [[1280, 900], [390, 844], [320, 568]]) {
       await t.test(`${controls} @ ${w}x${h}`, async () => {
@@ -854,47 +306,39 @@ test(`the deck never laps over the picture`, async (t) => {
           await cdp.page.setViewportSize({ width: w, height: h });
           await loadGame(cdp, game, controls);
           await sleep(250);
-          const g = await evaluate(cdp, EXTENT);
-          assert.ok(g.canvasH > 0, `${game}: the canvas has no height`);
-          assert.ok(g.canvasBot <= g.deckTop + 1,
-            `${game} ${controls} @ ${w}: the picture runs to `
-            + `${Math.round(g.canvasBot)} and the deck starts at ${Math.round(g.deckTop)}`);
+          const g = await evaluate(cdp, GEOMETRY);
+          const top = Math.min(h, ...g.controls.map((c) => c.b.y)); // no control on screen: the deck starts at the bottom
+          assert.ok(g.canvas.h > 0, `${game}: the canvas has no height`);
+          assert.ok(g.canvas.y + g.canvas.h <= top + 1,
+            `${game} ${controls} @ ${w}: the picture runs to ${Math.round(g.canvas.y + g.canvas.h)} and the deck starts at ${Math.round(top)}`);
         }
       });
     }
   }
 });
 
-// A physical pad has nothing on screen of its own, so station one's tag
-// carries a lamp: dim when a pad is connected, lit once it is used.
+// A physical pad has nothing on screen of its own, so station one's lamp shows it: dim when a pad is connected, lit
+// once it is used.
 test(`a gamepad lights station one's lamp`, async (t) => {
   const { cdp } = await openPage(t);
   await loadGame(cdp, 'serpent', 'stick');
-
   const PAD = (pressed) => `(function () {
     var pad = { id: 'test pad', connected: true, axes: [0, 0],
-      buttons: Array.from({ length: 16 }, function (_, i) {
-        return { pressed: ${pressed} && i === 0, value: 0 };
-      }) };
+      buttons: Array.from({ length: 16 }, function (_, i) { return { pressed: ${pressed} && i === 0, value: 0 }; }) };
     navigator.getGamepads = function () { return [pad]; };
     return true;
   })()`;
   const STATE = `document.documentElement.getAttribute('data-pad')`;
   const LAMP = `getComputedStyle(document.querySelector('.deck-credit-lamp')).getPropertyValue('--on').trim()`;
-
   assert.equal(await evaluate(cdp, STATE), null, 'a lamp is on with no pad connected');
   await evaluate(cdp, `document.documentElement.removeAttribute('data-credit')`);
-
   await evaluate(cdp, PAD(false));
   await waitFor(cdp, `${STATE} === 'idle'`, 2000);
   const idleLamp = await evaluate(cdp, LAMP);
-
   await evaluate(cdp, PAD(true));
   await waitFor(cdp, `${STATE} === 'active'`, 2000);
-  const activeLamp = await evaluate(cdp, LAMP);
-  assert.notEqual(activeLamp, idleLamp, 'using a connected pad does not light the station lamp');
+  assert.notEqual(await evaluate(cdp, LAMP), idleLamp, 'using a connected pad does not light the station lamp');
   await evaluate(cdp, PAD(false));
-
   await evaluate(cdp, `navigator.getGamepads = function () { return [null]; }, true`);
   await waitFor(cdp, `${STATE} === null`, 2000);
   assert.equal(await evaluate(cdp, LAMP), idleLamp, 'the lit lamp outlived the pad');

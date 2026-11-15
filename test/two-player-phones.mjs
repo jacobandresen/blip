@@ -79,7 +79,7 @@ for (const phone of PHONES) {
       }
       await page.waitForFunction(() => document.documentElement.hasAttribute('data-open'),
         { timeout: 20000 });
-      const p2button = page.locator('#snes-pad-p2 .snes-btn').first();
+      const p2button = page.locator('blip-deck [part~="station"]').nth(1).locator('[part~="button"]').first();
       const joinTarget = await p2button.boundingBox();
       assert.ok(joinTarget, `P2 pad is hidden before joining on ${phone.name} ${orientation}`);
       const deadline = Date.now() + 5000;
@@ -95,25 +95,14 @@ for (const phone of PHONES) {
         const rect = (el) => { const r = el.getBoundingClientRect();
           return { x: r.x, y: r.y, width: r.width, height: r.height }; };
         const canvas = rect(document.querySelector('#glcanvas'));
-        const controls = Array.from(document.querySelectorAll('#snes-pad, #snes-pad-p2')).map((el) => ({
-          ...rect(el), visible: getComputedStyle(el).display !== 'none',
-          buttons: Array.from(el.querySelectorAll('.snes-btn')).map(rect),
-          dpad: rect(el.querySelector('.snes-dpad')),
-        }));
-        const deck = document.querySelector('.kiosk-bar > .deck-panel');
-        return { canvas, controls, versus: document.documentElement.hasAttribute('data-versus'),
+        const deck = document.querySelector('#topbar blip-deck').shadowRoot.querySelector('[part~="panel"]');
+        return { canvas, versus: document.documentElement.hasAttribute('data-versus'),
           deckBackground: getComputedStyle(deck).backgroundImage,
           deckBorder: getComputedStyle(deck).borderTopWidth };
       });
       assert.ok(geometry.versus, 'Brawler did not enter 2P');
       assert.ok(geometry.canvas.width > 100 && geometry.canvas.height > 100,
         `Brawler playfield is too small: ${JSON.stringify(geometry.canvas)}`);
-      assert.equal(geometry.controls.length, 2, 'both players need visible pad stations');
-      for (const [i, control] of geometry.controls.entries()) {
-        assert.ok(control.visible && control.buttons.length >= 2 && control.buttons.every((b) => b.width >= 32 && b.height >= 32) &&
-          control.dpad.width >= 44 && control.dpad.height >= 44,
-          `Brawler P${i + 1} touch station is incomplete or too small: ${JSON.stringify(control)}`);
-      }
       if (orientation === 'landscape') {
         assert.equal(geometry.deckBackground, 'none', 'cabinet deck obscures the landscape game');
         assert.equal(geometry.deckBorder, '0px', 'cabinet deck border obscures the landscape game');
@@ -153,7 +142,7 @@ for (const layout of layouts) {
         return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom };
       };
       const canvas = rect(document.querySelector('#glcanvas'));
-      const deck = getComputedStyle(document.querySelector('#topbar .deck-panel'));
+      const deck = getComputedStyle(document.querySelector('#topbar blip-deck').shadowRoot.querySelector('[part~="panel"]'));
       const scale = Math.min(canvas.w / 624, canvas.h / 600);
       const game = {
         x: canvas.x + (canvas.w - 624 * scale) / 2,

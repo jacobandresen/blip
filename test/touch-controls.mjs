@@ -9,8 +9,8 @@ for (const engine of ['webkit', 'chromium']) {
     await page.goto(`${origin}/bouncer/index.html`);
     await page.waitForSelector('#touch-strip');
     assert.equal(await page.locator('#touch-strip').isVisible(), true, 'the arcade opens a touch strip');
-    assert.equal(await page.locator('#stick-base').isVisible(), false, 'no arcade stick');
-    assert.equal(await page.locator('#snes-pad').isVisible(), false, 'no duplicate pad behind the strip');
+    assert.equal(await page.locator('blip-deck [part~="stick"]').first().isVisible(), false, 'no arcade stick');
+    assert.equal(await page.locator('blip-deck [part~="dpad"]').first().isVisible(), false, 'no duplicate pad behind the strip');
 
     // Exercise the shared first-paint policy over every game, front end and legacy override.
     const policies = await page.evaluate(() => {
@@ -44,8 +44,8 @@ for (const engine of ['webkit', 'chromium']) {
     await page.waitForSelector('#touch-strip');
     assert.equal(await page.locator('#touch-strip').isVisible(), true, 'action games use touch controls');
     assert.equal(await page.locator('.ts-action').count(), 2, 'fire and hyperspace have touch zones');
-    assert.equal(await page.locator('#snes-pad').isVisible(), false, 'the pad is hidden');
-    assert.equal(await page.locator('#stick-base').isVisible(), false);
+    assert.equal(await page.locator('blip-deck [part~="dpad"]').first().isVisible(), false, 'the pad is hidden');
+    assert.equal(await page.locator('blip-deck [part~="stick"]').first().isVisible(), false);
     await page.goto(`${origin}/rally/index.html`);
     await page.waitForSelector('#paddle-dial');
     assert.equal(await page.locator('#paddle-dial').isVisible(), true, 'Rally retains its dials');
@@ -65,10 +65,10 @@ for (const engine of ['webkit', 'chromium']) test(`a touch player can choose joy
   await page.goto(`${origin}/meteors/index.html`);
   assert.equal(await page.evaluate(() => blipControls()), 'touch');
   await page.locator('#card-button').click();
-  for (const [choice, selector] of [['pad', '#snes-pad'], ['stick', '#stick-base'], ['touch', '#touch-strip'], ['pad', '#snes-pad']]) {
+  for (const [choice, selector] of [['pad', 'blip-deck [part~="dpad"]'], ['stick', 'blip-deck [part~="stick"]'], ['touch', '#touch-strip'], ['pad', 'blip-deck [part~="dpad"]']]) {
     await page.locator(`[data-control-choice="${choice}"]`).click();
     assert.equal(await page.evaluate(() => blipControls()), choice);
-    assert.equal(await page.locator(selector).isVisible(), true, `${choice} is visible`);
+    assert.equal(await page.locator(selector).first().isVisible(), true, `${choice} is visible`);
     assert.equal(await page.locator('#controls-card').isVisible(), true, 'the card stays open while choosing');
     if (choice !== 'touch') assert.match(await page.locator('#controls-card .pc-legend').textContent(), /RED BUTTON/);
   }
@@ -202,9 +202,9 @@ test('control choices and card fit an iPhone landscape safe area', async (t) => 
   for (const slug of ['meteors', 'brawler']) {
     await page.goto(`${origin}/${slug}/index.html`);
     await page.locator('#card-button').click();
-    for (const [choice, selector] of [['touch', '.ts-glass'], ['stick', '#stick-base'], ['pad', '#snes-pad .snes-dpad']]) {
+    for (const [choice, selector] of [['touch', '.ts-glass'], ['stick', 'blip-deck [part~="stick"]'], ['pad', 'blip-deck [part~="dpad"]']]) {
       await page.locator(`[data-control-choice="${choice}"]`).click();
-      const box = await page.locator(selector).boundingBox();
+      const box = await page.locator(selector).first().boundingBox();
       const card = await page.locator('#controls-card').boundingBox();
       assert.ok(box && box.x >= 46 && box.x + box.width <= 798 && box.y + box.height <= 371, `${slug} ${choice} fits: ${JSON.stringify(box)}`);
       assert.ok(card && card.x >= 46 && card.x + card.width <= 798 && card.y + card.height <= 391, `${slug} card fits: ${JSON.stringify(card)}`);
