@@ -690,7 +690,7 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
   box-shadow:inset 0 1px 1px #ffffff40,inset 0 -2px 3px #000c,0 2px 0 #1a1b1e,0 4px 0 #0b0b0d,2px 9px 6px #000c,4px 14px 13px #0007;
 }
 /* The deck preview (machine-deck.html) is only the deck, on the cabinet behind it. */
-:root[data-deck-preview] {background:transparent!important;overflow:hidden}
+:root[data-deck-preview] {--cabinet-width:100vw;background:transparent!important;overflow:hidden}
 :root[data-dials][data-layout="landscape"] {--dial: 84px; --ctl-cx: calc(max(10px, env(safe-area-inset-left, 0px)) + 42px);}
 :root[data-touch] :is(.deck-credit-lamp,.deck-second-lamp) {display:none}
 :is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]):where(.game-page) :is(#topbar, #arcade-bezel, .cabinet-glass, .cab-rail) {

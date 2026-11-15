@@ -1,4 +1,4 @@
-var CACHE = "blip-v847";
+var CACHE = "blip-v848";
 
 // The control deck, from jsDelivr at a pinned tag (github.com/jacobandresen/blip-deck): cached like our own files.
 var DECK = "https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v2.0.0/";
