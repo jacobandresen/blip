@@ -1270,8 +1270,9 @@ body.cabinet-page .screen-bezel {bottom:0!important}
   box-shadow:inset 1px 0 #fff2,inset -1px 0 #0009,0 8px 10px #000b}
 .machine-deck {position:absolute;left:0;right:0;top:0;height:var(--deck-height,42px);overflow:hidden;}
 .machine-deck iframe[data-loaded] {opacity:1}
-.machine-deck iframe {transition:opacity .35s;position:absolute;left:0;top:0;width:1000px;height:800px;border:0;background:transparent;
-  transform-origin:0 0;transform:scale(var(--deck-scale,.324)) translateY(-672px)}
+/* blip-deck 2.0 on an 800px page: its panel spans y 614–800, so 1400px wide (the cap lifted) keeps the cabinet deck 42px tall. */
+.machine-deck iframe {transition:opacity .35s;position:absolute;left:0;top:0;width:1400px;height:800px;border:0;background:transparent;
+  transform-origin:0 0;transform:scale(var(--deck-scale,.2314)) translateY(-614px)}
 .machine-deck-cheek {position:absolute;top:0;left:0;width:calc(var(--deck-height,42px) * .45);height:var(--deck-height,42px);transform-origin:0 0;transform:rotateY(90deg);
   clip-path:polygon(0 0,0 100%,100% 72%);background:linear-gradient(90deg,#393039,#17131a 35%,#0b090e);}
 .machine-deck-cheek.right {left:100%;background:linear-gradient(90deg,#211c24,#0b090e 80%)}
