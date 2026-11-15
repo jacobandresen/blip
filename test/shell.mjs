@@ -55,7 +55,7 @@ test('the game shell', async (t) => {
     await open(cdp, 'meteors/index.html', 17000);
     const state = `JSON.stringify((function(){var c=document.getElementById('glcanvas'),r=c.getBoundingClientRect();
       var topbar=document.getElementById('topbar');
-      return {topbarDisplay:getComputedStyle(topbar).display,panel:topbar.querySelector('.deck-panel').checkVisibility()?'shown':'none',
+      return {topbarDisplay:getComputedStyle(topbar).display,panel:topbar.querySelector('blip-deck').checkVisibility()?'shown':'none',
               barHeight:topbar.getBoundingClientRect().height,box:[r.left,r.top,r.width,r.height],buf:[c.width,c.height],
               marqueeBottom:document.getElementById('marquee-bar').getBoundingClientRect().bottom};})())`;
     const before = JSON.parse(await evaluate(cdp, state));
@@ -79,12 +79,12 @@ test('the game shell', async (t) => {
     await open(cdp, 'index.html');
     await evaluate(cdp, "blipSetFullscreen(true); true");
     await sleep(400);
-    assert.equal(await evaluate(cdp, "document.querySelector('.deck-panel')"), null, 'the arcade has a deck of its own');
+    assert.equal(await evaluate(cdp, "document.querySelector('blip-deck')"), null, 'the arcade has a deck of its own');
     assert.equal(await evaluate(cdp, 'document.documentElement.scrollHeight <= innerHeight'), true,
       'the catalogue needs scrolling on a 1080p kiosk');
     await open(cdp, 'serpent/index.html', 5000);
     assert.ok(await evaluate(cdp, "document.documentElement.hasAttribute('data-fullscreen')"), 'the game page forgot the choice');
-    assert.equal(await evaluate(cdp, "document.querySelector('#topbar .deck-panel').checkVisibility()"), false, 'the game page still shows its deck');
+    assert.equal(await evaluate(cdp, "document.querySelector('#topbar blip-deck').checkVisibility()"), false, 'the game page still shows its deck');
 
     // A mouse left lying loses its pointer.
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 400, y: 400 });

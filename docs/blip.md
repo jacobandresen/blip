@@ -92,18 +92,12 @@ web::controls();             // keyboard, deck or touch, for prompts
 
 ## The control deck
 
-`web/deck.js` and `web/deck.css` draw the cabinet's deck (two stations, each a ball-top stick or a pad and two
-caps) and turn it into input. Blip's pages build it from `BLIP_GAMES`; another page can host it too (breadbin does):
+The cabinet's deck is the `<blip-deck>` web component (github.com/jacobandresen/blip-deck): two stations, each a
+ball-top stick or a d-pad and the game's buttons. Blip's pages set it up from `BLIP_GAMES` (`blipBuildDeck`), and
+`web/controller.js` turns its `blip-input` events into the game's key events:
 
-```js
-// <div id="topbar" class="kiosk-bar"><div class="deck-panel"></div></div>, and <html data-layout="upright"
-// data-controls="stick"> (data-has-touch on touch screens)
-BlipDeck.build(panel, { buttons: [{ label: 'FIRE' }], seats: 1 });
-BlipController.init({ click: false, onInput: (name, down) => { /* 'up' … 'right', 'button1', 'button2' */ } });
-BlipController.bindButtons(document.getElementById('fire-buttons'));
-const stop = BlipDeck.bindStick({ stick: document.getElementById('stick-base'),
-  dirs: { up: 'up', down: 'down', left: 'left', right: 'right' } });
-BlipDeck.lean(stick, x, y);   // mirror held directions on the stick, from onInput
+```html
+<blip-deck seats="2" solo buttons='["FIRE","HYPER"]' controls="stick"></blip-deck>
 ```
 
 ## Build and run

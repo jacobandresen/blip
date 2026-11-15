@@ -210,7 +210,10 @@ for (const [index, [slug, title]] of GAMES.entries()) {
     await arrivedAt(page, `${origin}/${slug}/index.html`, { timeout: 30000 });
     await gameReady(page);
     const game = await page.evaluate(() => {
-      const visible = (selector) => [...document.querySelectorAll(selector)].some((el) => {
+      // the page's elements and the deck's parts (in its open shadow root)
+      const all = (selector) => [...document.querySelectorAll(selector),
+        ...(document.querySelector('blip-deck')?.shadowRoot.querySelectorAll(selector) || [])];
+      const visible = (selector) => all(selector).some((el) => {
         const r = el.getBoundingClientRect(), style = getComputedStyle(el);
         return r.width >= 10 && r.height >= 10 && style.display !== 'none' && style.visibility !== 'hidden';
       });
@@ -220,9 +223,9 @@ for (const [index, [slug, title]] of GAMES.entries()) {
         returnTo: blipFrontendUrl(),
         controls: BLIP_GAMES[blipGameFromPath(location.pathname)?.slug]?.touchControls?.length || 0,
         screen: visible('canvas'),
-        deck: visible('#topbar .deck-panel'),
-        move: visible('#stick-base,#snes-pad .snes-dpad,#paddle-dial,#touch-strip'),
-        action: visible('#fire-buttons .arcade-btn,#snes-pad .snes-face,#paddle-dial-p2,#touch-strip'),
+        deck: visible('#topbar blip-deck'),
+        move: visible('[part~="stick"],[part~="dpad"],#paddle-dial,#touch-strip'),
+        action: visible('[part~="button"],#paddle-dial-p2,#touch-strip'),
       };
     });
     assert.equal(game.slug, slug);
@@ -260,7 +263,7 @@ for (const [index, [slug, title]] of GAMES.entries()) {
       const strip = await page.locator('#touch-strip .ts-glass').boundingBox();
       assert.ok(strip, `${title} exposes its touch surface`);
       await page.touchscreen.tap(strip.x + strip.width * .2, strip.y + strip.height * .7);
-    } else await page.locator(mode === 'pad' ? '#snes-pad .snes-btn[data-blip="button1"]' : '#fire-buttons .arcade-btn[data-blip="button1"]').first().tap({ timeout: 15000 });
+    } else await page.locator('blip-deck [part~="button"]').first().tap({ timeout: 15000 });
     const expected = await page.evaluate(() => BLIP_GAMES[blipGameFromPath(location.pathname).slug]?.buttons?.[0]?.code || 'Space');
     await page.waitForFunction((code) => window.__cabinetActionKeys?.includes(code), expected, { timeout: 2000 });
   });

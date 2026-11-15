@@ -14,7 +14,7 @@ wrappers. Do not publish or push unless asked.
 | Game page | `web/game.html` (copied to each `web/<game>/index.html`), `web/game.js` |
 | Styles shared by the arcade, game pages and decks | `web/blip.css` |
 | The arcade room and its manual | `web/index.html`, `web/arcade.css`, `web/arcade.js`, `web/aisle.js`, `web/cabinet.js` |
-| The control deck (stick, pad, caps, input) | `<blip-deck>` from jsDelivr (the blip-deck repo), blip's dressing in `web/deck.css`, `blipBuildDeck` in `web/blip_core.js`, `web/machine-deck.html` |
+| The control deck (stick, pad, buttons) | `<blip-deck>` from jsDelivr (the blip-deck repo); `blipBuildDeck` in `web/blip_core.js`, its keys in `web/controller.js`, what is around it in `web/blip.css` ("Around the control deck"), `web/machine-deck.html` |
 | Home Screen and Guide | `web/home.*`, `web/guide.*` |
 | Manual pages | `web/controls.html`, `history.html`, `about.html` (read by both the arcade's manual and the Guide; `data-guide="cabinet"` or `"app"` marks copy for one) |
 | Tests | `test/*.mjs` (`node:test`), helpers in `test/lib/` |
@@ -22,11 +22,14 @@ wrappers. Do not publish or push unless asked.
 
 ## The shared deck
 
-The deck is the `<blip-deck>` element of the separate blip-deck repository (Lit; breadbin uses it too). Change it
-there and tag a release; the pages (`game.html`, `machine-deck.html`, `index.html`) and `sw.js` (`DECK`) load
-`dist/blip-deck.js` and `blip-deck.css` from jsDelivr at that tag, and the service worker caches them. Blip's own
-parts stay here: `blipBuildDeck` sets the deck up from `BLIP_GAMES` and adds the touch strip, and `web/deck.css`
-dresses it (housing, dials, touch strip, lamps, cabinet and app styles).
+The deck is the `<blip-deck>` element of the separate blip-deck repository (breadbin uses it too). It draws itself
+and reports presses as `blip-input` events; how it looks and answers a thumb is tested there, not here. Change it
+there and tag a release; `game.html`, `machine-deck.html` and `sw.js` (`DECK`) load `dist/blip-deck.js` from
+jsDelivr at that tag, and the service worker caches it. To try an untagged build, run the tests with
+`BLIP_DECK=../blip-deck/dist/blip-deck.js`. Blip's own parts stay here: `blipBuildDeck` sets the deck's attributes
+from `BLIP_GAMES` and adds the touch strip, `web/controller.js` turns its events (and the keyboard, a gamepad and
+Rally's dials) into the game's keys, and `web/blip.css` ("Around the control deck") styles what is around it: the
+bar, housing, dials, touch strip and lamps, and the deck's panel through its custom properties and `::part()`.
 
 ## Generated files
 

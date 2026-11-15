@@ -205,9 +205,10 @@ test('the deck from jsDelivr is cached offline at the tag the pages load', async
   const sw = readFileSync(new URL('sw.js', web), 'utf8');
   const deck = sw.match(/var DECK = "([^"]+)"/)[1];
   const cached = [...sw.matchAll(/DECK \+ "([^"]+)"/g)].map((m) => deck + m[1]);
-  for (const page of ['index.html', 'game.html', 'machine-deck.html']) {
+  // The arcade (index.html) shows its decks through machine-deck.html frames.
+  for (const [page, count] of [['index.html', 0], ['game.html', 1], ['machine-deck.html', 1]]) {
     const urls = [...readFileSync(new URL(page, web), 'utf8').matchAll(/"(https:\/\/cdn\.jsdelivr\.net\/[^"]+)"/g)].map((m) => m[1]);
-    assert.equal(urls.length, 2, `${page} loads the deck's script and styles`);
+    assert.equal(urls.length, count, `${page} loads the deck's one script`);
     assert.deepEqual(urls.filter((u) => !cached.includes(u)), [], `${page}'s deck is cached by sw.js`);
   }
 });

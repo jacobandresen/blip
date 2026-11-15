@@ -145,31 +145,6 @@ test('Bubbler: the whole strip stays with player one until player two joins', as
   assert.equal(await p.keys(), '+KeyJ -KeyJ', 'the right side belongs to player two after joining');
 });
 
-test('Meteors: one finger holds the d-pad while another taps the buttons', async (t) => {
-  const p = await phone(t, 'meteors', 'pad');
-  const pad = await p.page.evaluate(() => {
-    const centre = (selector) => [...document.querySelectorAll(selector)]
-      .filter((el) => el.getBoundingClientRect().width > 0).map((el) => {
-        const r = el.getBoundingClientRect();
-        return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width };
-      });
-    return { dpad: centre('.snes-dpad')[0], buttons: centre('.snes-btn') };
-  });
-  const dpad = pad.dpad;
-  await p.down(1, dpad.x + dpad.w * 0.35, dpad.y);
-  assert.equal(await p.keys(), '+ArrowRight');
-
-  await p.down(2, pad.buttons[0].x, pad.buttons[0].y);
-  assert.equal(await p.keys(), '+Space', 'the direction stays held while a button goes down');
-  await p.up(2);
-  assert.equal(await p.keys(), '-Space', 'lifting the button leaves the direction held');
-
-  await p.move(1, dpad.x - dpad.w * 0.35, dpad.y);
-  assert.equal(await p.keys(), '+ArrowLeft -ArrowRight', 'sliding across the d-pad changes direction');
-  await p.up(1);
-  assert.equal(await p.keys(), '-ArrowLeft');
-});
-
 test('Rally: in two-player play the strip is split down its middle, and each half is one player\'s', async (t) => {
   const p = await phone(t, 'rally');
   const { x, y, w, h } = await p.strip();

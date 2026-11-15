@@ -32,7 +32,7 @@
   </script>
   <style>:root[data-launching] body{visibility:hidden}</style>
   <script src="../howler.min.js"></script>
-  <script src="../blip_core.js?v=17"></script>
+  <script src="../blip_core.js?v=18"></script>
   <script>(function () {
     var g = blipGameFromPath(location.pathname);
     if (!g) return;
@@ -42,10 +42,9 @@
     document.querySelector('meta[name=apple-mobile-web-app-title]').content = name;
   }());</script>
   <script src="../cabinet.js?v=110"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v1.0.0/blip-deck.css">
-  <link rel="stylesheet" href="../deck.css?v=12">
-  <link rel="stylesheet" href="../blip.css?v=177">
-  <script src="../game.js?v=10" defer blocking="render"></script>
+  <link rel="stylesheet" href="../blip.css?v=178">
+  <script src="../controller.js?v=2" defer></script>
+  <script src="../game.js?v=11" defer blocking="render"></script>
 </head>
 <body class="cabinet-page">
 
@@ -61,7 +60,7 @@
   </div>
 
   <!-- The fixed bar has no transform (iOS Safari clips a transformed fixed
-       box); the deck inside it (blip-deck.js, class deck-panel) carries the tilt. -->
+       box); the deck inside it (<blip-deck>) carries the tilt. -->
   <div id="topbar" class="kiosk-bar">
    <div class="deck-housing" aria-hidden="true"></div>
    <blip-deck>
@@ -79,7 +78,7 @@
    </blip-deck>
   </div>
   <script>blipBuildDeck();</script>
-  <script src="https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v1.0.0/dist/blip-deck.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v2.0.0/dist/blip-deck.js"></script>
 
   <div id="need-coin-overlay">
     <div class="nco-panel">

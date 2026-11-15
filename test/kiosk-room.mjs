@@ -17,11 +17,17 @@ for (const engine of ['chromium', 'webkit']) {
       await page.waitForFunction((game) => document.querySelector('.card-focused')?.dataset.machine === game &&
         !document.getElementById('game-grid').hasAttribute('data-aisle-moving'), game);
       const deck = page.locator('.card-focused iframe').contentFrame();
-      const control = deck.locator(game === 'rally' ? '#paddle-dial' : '#stick-base');
+      const control = deck.locator(game === 'rally' ? '#paddle-dial' : 'blip-deck [part~="stick"]').first();
       await control.waitFor({ state: 'visible' });
       assert.equal(await deck.locator('html').getAttribute('data-fullscreen'), null, `${game}: preview retains its deck`);
+      // Painted and on top: the control is what its frame finds at its own centre (an element screenshot is no
+      // proof here: the card scales its frame, and the screenshot's box lands beside the control).
+      const onTop = await control.evaluate((el) => {
+        const r = el.getBoundingClientRect(), root = el.getRootNode(), at = root.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return r.width > 20 && (at === el || el.contains(at));
+      });
+      assert.ok(onTop, `${game}: the physical control is not painted on top`);
       const picture = await control.screenshot();
-      assert.ok(picture.length > 1000, `${game}: the physical control paints`);
       const dir = new URL('artifacts/kiosk-room/', import.meta.url);
       await mkdir(dir, { recursive: true });
       await writeFile(new URL(`${engine}-${game}.png`, dir), picture);

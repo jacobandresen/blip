@@ -377,7 +377,7 @@ test('app mode on a PC needs no deck; a tablet drops it for a gamepad until touc
   await pc.page.waitForFunction(() => typeof BlipController === 'object');
   const deck = (page) => page.evaluate(() => ({
     bare: document.documentElement.hasAttribute('data-bare'),
-    deck: (() => { const t = document.getElementById('topbar'); return getComputedStyle(t).display !== 'none' && t.getBoundingClientRect().height > 2 && [...t.querySelectorAll('.snes-dpad, .stick-base, .ts-glass')].some((c) => c.getBoundingClientRect().height > 2); })(),
+    deck: (() => { const t = document.getElementById('topbar'); return getComputedStyle(t).display !== 'none' && t.getBoundingClientRect().height > 2 && [...t.querySelectorAll('.ts-glass'), ...(t.querySelector('blip-deck')?.shadowRoot.querySelectorAll('[part~="dpad"], [part~="stick"]') || [])].some((c) => c.getBoundingClientRect().height > 2); })(),
     bottom: Math.round(document.getElementById('glcanvas').getBoundingClientRect().bottom),
   }));
   const shown = await deck(pc.page);

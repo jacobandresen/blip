@@ -23,7 +23,9 @@ function blipLandscape() {
   return window.innerHeight <= 520 && window.innerWidth > window.innerHeight * 1.25;
 }
 function blipApplyLayout() {
-  document.documentElement.setAttribute('data-layout', blipLandscape() ? 'landscape' : 'upright');
+  var layout = blipLandscape() ? 'landscape' : 'upright';
+  document.documentElement.setAttribute('data-layout', layout);
+  document.querySelectorAll('blip-deck').forEach(function (deck) { deck.setAttribute('layout', layout); });
 }
 blipApplyLayout();
 window.addEventListener('resize', blipApplyLayout);
@@ -64,6 +66,7 @@ function blipApplyControls() {
   var fixed = blipFrontendControls();
   var touch = fixed === 'touch' && !!(game && game.touch) && blipHasTouch();
   root.setAttribute('data-controls', fixed === 'stick' ? 'stick' : 'pad');
+  document.querySelectorAll('blip-deck').forEach(function (deck) { deck.setAttribute('controls', fixed === 'stick' ? 'stick' : 'pad'); });
   if (touch) root.setAttribute('data-touch', game.touch.kind);
   else root.removeAttribute('data-touch');
 }
@@ -166,16 +169,25 @@ function blipGameFromPath(pathname) {
   return g ? Object.assign({ slug: m[1], players: 1, touch: null, cabinetTitle: false }, g) : null;
 }
 
-/* The game's control deck (<blip-deck>, from blip-deck.js), set up from BLIP_GAMES where the page's deck ends, before
- * blip-deck.js loads. A cabinet in the arcade's aisle shows its game's deck (machine-deck.html?game=<slug>). */
+/* The game's control deck (<blip-deck>, from jsDelivr), set up from BLIP_GAMES: two stations, the second idle in a
+ * one-player game; the game's buttons by their legends; the page's controller and layout. A cabinet in the arcade's
+ * aisle shows its game's deck (machine-deck.html?game=<slug>). <html data-players / data-seats> keep blip's own
+ * dressing (lamps, dials) in step. */
 function blipBuildDeck() {
   var deck = document.querySelector('blip-deck'), root = document.documentElement;
   var game = blipGameFromPath(window.BLIP_DECK_GAME ? '/' + window.BLIP_DECK_GAME + '/' : location.pathname);
   if (!game) return;
   if (root.hasAttribute('data-deck-preview')) root.setAttribute('data-machine', game.slug);
-  deck.buttons = game.buttons || [{}];
-  deck.capLabel = game.capLabel;
-  deck.seats = game.players;
+  var labels = (game.buttons || [{}]).map(function (b) { return b.label || game.capLabel || 'FIRE'; });
+  deck.setAttribute('buttons', JSON.stringify(labels));
+  deck.setAttribute('seats', '2');
+  deck.toggleAttribute('solo', game.players !== 2);
+  deck.setAttribute('controls', root.getAttribute('data-controls') === 'pad' ? 'pad' : 'stick');
+  deck.setAttribute('layout', root.getAttribute('data-layout') || 'upright');
+  deck.setAttribute('aria-label', 'Controls');
+  root.setAttribute('data-players', '2');
+  if (game.players === 2) root.removeAttribute('data-seats');
+  else root.setAttribute('data-seats', '1');
   if (game.touch && blipHasTouch()) deck.parentElement.appendChild(blipTouchStrip(game.touch, game.players));
 }
 

@@ -47,9 +47,10 @@ const PIECES = {
   pick: '.card-pick',
   lamp: '.blip-power-indicator',
   coin: '.deck-coin-slot',
-  dpad: '.snes-dpad',
-  button: '.snes-btn, .arcade-btn',
-  stick: '.stick-base',
+  // the deck's documented parts, inside its shadow root (__all reaches them)
+  dpad: '[part~="dpad"]',
+  button: '[part~="button"]',
+  stick: '[part~="stick"]',
   strip: '.ts-glass',
   join: '.ts-join',
   creditLamp: '.deck-credit-lamp, .deck-second-lamp',
@@ -82,7 +83,7 @@ function collect(core) {
   };
   const found = [];
   for (const [key, selector] of Object.entries(window.__pieces)) {
-    document.querySelectorAll(selector).forEach((el, index) => {
+    __all(selector).forEach((el, index) => {
       if (!visible(el)) return;
       const r = el.getBoundingClientRect(), cut = core[key] || 0;
       const dx = r.width * cut, dy = r.height * cut;
@@ -135,7 +136,7 @@ async function settled(page) {
   for (let waited = 0; waited < 3000; waited += 150) {
     await page.waitForTimeout(150);
     const now = await page.evaluate(() => JSON.stringify(Object.values(window.__pieces || {}).map((selector) =>
-      [...document.querySelectorAll(selector)].map((el) => { const r = el.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round); }))));
+      __all(selector).map((el) => { const r = el.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round); }))));
     if (now === last) return;
     last = now;
   }
@@ -145,7 +146,12 @@ async function open(t, device) {
   const touch = !device.desktop;
   const insets = { top: device.top || 0, bottom: device.bottom || 0, left: device.left || 0, right: device.right || 0 };
   const { page, origin, cdp } = await openPhone(t, { width: device.w, height: device.h }, { touch, insets });
-  await page.addInitScript((pieces) => { window.__pieces = pieces; }, PIECES);
+  await page.addInitScript((pieces) => {
+    window.__pieces = pieces;
+    // the page's elements and the deck's parts (in its open shadow root) that match `selector`
+    window.__all = (selector) => [...document.querySelectorAll(selector),
+      ...[...document.querySelectorAll('blip-deck')].flatMap((deck) => [...deck.shadowRoot.querySelectorAll(selector)])];
+  }, PIECES);
   // The layout belongs to the shell, not to the game: a wasm that never arrives keeps the page quiet and the CPU free.
   await page.route('**/*.wasm', () => {});
   return { page, origin, insets };
@@ -347,7 +353,7 @@ for (const device of mine) {
           range.selectNodeContents(el.querySelector(selector));
           return [...range.getClientRects()].filter((r) => r.width > 0);
         });
-        const covering = [...document.querySelectorAll('.snes-dpad, .snes-btn, .arcade-btn, .stick-base, .deck-coin-slot')].filter((control) => {
+        const covering = __all('[part~="dpad"], [part~="button"], [part~="stick"], .deck-coin-slot').filter((control) => {
           const c = control.getBoundingClientRect(), style = getComputedStyle(control);
           if (c.width < 3 || style.display === 'none' || style.visibility === 'hidden') return false;
           const dx = c.width * 0.18, dy = c.height * 0.18;
