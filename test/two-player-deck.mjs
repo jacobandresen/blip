@@ -343,3 +343,22 @@ test(`a gamepad lights station one's lamp`, async (t) => {
   await waitFor(cdp, `${STATE} === null`, 2000);
   assert.equal(await evaluate(cdp, LAMP), idleLamp, 'the lit lamp outlived the pad');
 });
+
+// Alone at a two-player cabinet the arrows are player one's (Rounds, Warlock): pressing one must not move the idle
+// second station's stick as well.
+test('the arrow keys move only player one\'s stick while one plays', async (t) => {
+  const { cdp } = await openPage(t);
+  await loadGame(cdp, 'rounds', 'stick');
+  await evaluate(cdp, `(function () {
+    var deck = document.querySelector('blip-deck'), press = deck.press.bind(deck);
+    window.lit = {};
+    deck.press = function (name, down) { window.lit[name] = !!down; return press(name, down); };
+    return true;
+  })()`);
+  await cdp.page.keyboard.down('ArrowLeft');
+  await sleep(60);
+  const lit = await evaluate(cdp, 'window.lit');
+  await cdp.page.keyboard.up('ArrowLeft');
+  assert.equal(lit.left, true, 'player one\'s stick did not move');
+  assert.notEqual(lit.p2left, true, 'player two\'s stick moved too');
+});

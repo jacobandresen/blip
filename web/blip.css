@@ -755,6 +755,12 @@ body.cabinet-page :is(.ts-tag,.ts-hint) {color:#c2b49c;font-family:'Courier New'
   --marquee-art:radial-gradient(circle at 50% 45%,transparent 0 8px,#fff4 9px 11px,transparent 12px),radial-gradient(circle at 50% 45%,transparent 0 22px,#fff2 23px 25px,transparent 26px);
 }
 
+[data-machine="rounds"] {
+  --machine-trim:#f07896;
+  --marquee-ink:#fff6e6;
+  --marquee-art:radial-gradient(circle at 50% 120%,#ffd46a 0 22px,#ffd46a55 23px 36px,transparent 37px),repeating-linear-gradient(90deg,transparent 0 18px,#fff2 18px 20px);
+}
+
 .machine-marquee,#game-grid .card-title.machine-marquee {
   /* !important where the arcade's older card rules force a plain title. */
   --trim:var(--machine-trim,#9a9aa6);

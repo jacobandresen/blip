@@ -12,6 +12,7 @@ members = [
     "crates/raider",
     "crates/adder",
     "crates/warlock",
+    "crates/rounds",
 ]
 
 [workspace.package]

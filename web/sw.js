@@ -1,4 +1,4 @@
-var CACHE = "blip-v848";
+var CACHE = "blip-v862";
 
 // The control deck, from jsDelivr at a pinned tag (github.com/jacobandresen/blip-deck): cached like our own files.
 var DECK = "https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v2.0.0/";
@@ -157,6 +157,16 @@ var ASSETS = [
   "/blip/warlock/attract.webp",
   "/blip/warlock/attract.png",
   "/blip/warlock/card.png",
+  "/blip/rounds/index.html",
+  "/blip/rounds/index.wasm",
+  "/blip/rounds/manifest.json",
+  "/blip/rounds/icon-180.png",
+  "/blip/rounds/icon-192.png",
+  "/blip/rounds/icon-512.png",
+  "/blip/rounds/icon-maskable-512.png",
+  "/blip/rounds/screenshot.png",
+  "/blip/rounds/attract.webp",
+  "/blip/rounds/attract.png",
 ];
 
 self.addEventListener("install", function (e) {

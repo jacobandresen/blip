@@ -9,7 +9,7 @@ const GAMES = GAME_SLUGS.map((slug) => [slug.toUpperCase(), slug]);
 const MOVE_KEY = {
   ADDER: 'ArrowLeft', BOUNCER: 'ArrowLeft', BRAWLER: 'd', BUBBLER: 'ArrowRight',
   DEFENDER: 'ArrowLeft', METEORS: 'ArrowLeft', RALLY: 'ArrowUp',
-  SERPENT: 'ArrowUp', RAIDER: 'ArrowUp', WARLOCK: 'ArrowDown',
+  SERPENT: 'ArrowUp', RAIDER: 'ArrowUp', WARLOCK: 'ArrowDown', ROUNDS: 'ArrowLeft',
 };
 const START_CHANGE_MIN = { METEORS: .02, RALLY: .01, SERPENT: .03 };
 // At 85 px/s Adder adds about 120 trail pixels during the 350 ms input sample.

@@ -158,6 +158,16 @@ var BLIP_GAMES = {
                          buttons: [{ key: 'f', code: 'KeyF', label: 'BOLT' },
                                    { key: 'g', code: 'KeyG', label: 'REVEAL' }],
                          keys: TWO_PLAYER_KEYS,
+                         stick: { engage: 10, release: 6, maxR: 54, hyst: 10 } },
+  // A paper round in the spirit of Paperboy: houses on both sides, A throws left and B right. The stick steers
+  // (a damped, handlebar-like pull) and pedals. A second player climbs on the back of the tandem: the front seat
+  // steers and throws left, the back seat pedals and throws right.
+  rounds:             { name: 'ROUNDS', legend: 'STEER · THROW LEFT · RIGHT', accent: '240, 120, 150', touchControls: [['STEER AND PEDAL',['DRAG']],['THROW LEFT',['TOUCH LEFT']],['THROW RIGHT',['TOUCH RIGHT']]], controls: [['STEER',['A','D'],['←','→']],['FASTER · SLOWER',['W','S'],['↑','↓']],['THROW LEFT',['F'],['SPACE']],['THROW RIGHT',['G'],['Z']],['2ND PLAYER',['J','K']]],
+                         players: 2,
+                         touch: { kind: 'action', hint: 'Drag to steer and pedal', actions: ['LEFT', 'RIGHT'] },
+                         buttons: [{ key: 'f', code: 'KeyF', label: 'LEFT' },
+                                   { key: 'g', code: 'KeyG', label: 'RIGHT' }],
+                         keys: TWO_PLAYER_KEYS,
                          stick: { engage: 10, release: 6, maxR: 54, hyst: 10 } }
 };
 

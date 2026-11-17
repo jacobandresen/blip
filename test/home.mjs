@@ -42,7 +42,7 @@ test('the home screen shows every game as an app with its own icon, and nothing 
   })));
   assert.deepEqual(apps.map((a) => a.slug).sort(), [...GAME_SLUGS].sort());
   for (const a of apps) assert.match(a.src, new RegExp(`^${a.slug}/icon-192\\.png`));
-  assert.deepEqual(apps.filter((a) => a.badge).map((a) => a.slug).sort(), ['adder', 'brawler', 'bubbler', 'rally', 'warlock']);
+  assert.deepEqual(apps.filter((a) => a.badge).map((a) => a.slug).sort(), ['adder', 'brawler', 'bubbler', 'rally', 'rounds', 'warlock']);
   assert.ok(await page.locator('#dock-arcade').isVisible(), 'the dock has the way back to BLIP Home');
   assert.equal(await page.locator('#dock-arcade').getAttribute('aria-label'), 'BLIP Home');
   assert.match(await page.locator('#dock-arcade img').getAttribute('src'), /^icon\.svg/);

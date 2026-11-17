@@ -882,6 +882,7 @@ header {
 .card-bubbler    { --c: #78d2ff;        }
 .card-adder      { --c: #e0a034;        }
 .card-warlock    { --c: #9a46d6;        }
+.card-rounds     { --c: #f07896;        }
 
 .card::before, .card::after { border-color: var(--c); }
 
@@ -1453,6 +1454,9 @@ body.cabinet-page .screen-bezel {bottom:0!important}
 }
 #game-grid .card-warlock {
   --side-art:radial-gradient(circle at 50% 45%,transparent 0 10px,#fff4 11px 13px,transparent 14px),radial-gradient(circle at 50% 45%,transparent 0 24px,#fff2 25px 27px,transparent 28px),radial-gradient(circle at 50% 45%,transparent 0 38px,#fff1 39px 41px,transparent 42px);
+}
+#game-grid .card-rounds {
+  --side-art:radial-gradient(circle at 50% 100%,#ffd46a 0 18%,#ffd46a55 19% 30%,transparent 31%),repeating-linear-gradient(90deg,#e8b85c 0 22px,#be4e3c 22px 44px,#96bed6 44px 66px,#9cccA6 66px 88px);
 }
 :root[data-layout="landscape"] #game-grid .card {flex-direction:column;gap:0}
 @media (prefers-reduced-motion:reduce) {

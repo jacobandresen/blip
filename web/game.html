@@ -13,7 +13,7 @@
   <link rel="icon" type="image/x-icon" href="../favicon.ico?v=3">
   <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png?v=3">
   <link rel="icon" type="image/svg+xml" href="../favicon.svg?v=3">
-  <link rel="apple-touch-icon" href="icon-180.png?v=2">
+  <link rel="apple-touch-icon" href="icon-180.png?v=5">
   <!-- Stepped into from the arcade: nothing is painted until game.js has laid the page out, so the browser keeps the
        arcade's last frame up meanwhile (data-launching, cleared by game.js). -->
   <script>
@@ -32,7 +32,7 @@
   </script>
   <style>:root[data-launching] body{visibility:hidden}</style>
   <script src="../howler.min.js"></script>
-  <script src="../blip_core.js?v=18"></script>
+  <script src="../blip_core.js?v=19"></script>
   <script>(function () {
     var g = blipGameFromPath(location.pathname);
     if (!g) return;
@@ -41,10 +41,10 @@
     document.title = name + ' \u00b7 BLIP';
     document.querySelector('meta[name=apple-mobile-web-app-title]').content = name;
   }());</script>
-  <script src="../cabinet.js?v=110"></script>
-  <link rel="stylesheet" href="../blip.css?v=179">
+  <script src="../cabinet.js?v=111"></script>
+  <link rel="stylesheet" href="../blip.css?v=180">
   <script src="../controller.js?v=2" defer></script>
-  <script src="../game.js?v=11" defer blocking="render"></script>
+  <script src="../game.js?v=12" defer blocking="render"></script>
 </head>
 <body class="cabinet-page">
 

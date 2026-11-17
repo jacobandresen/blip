@@ -66,6 +66,15 @@ impl Pad {
         self.steer_with(0.0, d, slack, BLIP_KEY_LEFT, BLIP_KEY_RIGHT)
     }
 
+    /// Steer an axis with momentum (a bike's handlebars, a ship's drift): from `at`, moving at `vel`, toward
+    /// `target`. The speed wanted is the distance times `gain`, up to `max`; the stick pushes only while the
+    /// speed is more than `slack` off it, so the bot eases in instead of overshooting.
+    #[allow(clippy::too_many_arguments)]
+    pub fn arrive(&mut self, at: f32, vel: f32, target: f32, gain: f32, max: f32, slack: f32, less: KeyCode, more: KeyCode) -> &mut Self {
+        let want = ((target - at) * gain).clamp(-max, max);
+        self.steer_with(vel, want, slack, less, more)
+    }
+
     /// Toward `target` along one axis, with the keys for less and more.
     pub fn steer_with(&mut self, at: f32, target: f32, slack: f32, less: KeyCode, more: KeyCode) -> &mut Self {
         if target < at - slack { self.hold(less); } else if target > at + slack { self.hold(more); }

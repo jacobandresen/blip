@@ -29,6 +29,7 @@ const CROPS = {
   bubbler:           { art: 'screenshot.png', cx: 0.50, cy: 0.70, w: 0.56 },
   adder:             { art: 'screenshot.png', cx: 0.50, cy: 0.40, w: 0.86 },
   warlock:           { art: 'screenshot.png', cx: 0.50, cy: 0.42, w: 0.86 },
+  rounds:            { art: 'screenshot.png', cx: 0.50, cy: 0.60, w: 0.70 },
 };
 
 // Full bleed, as a modern home screen expects: the game's picture to the

@@ -20,6 +20,7 @@ Ten arcade games in the browser, written in Rust on the small `blip` engine and 
 | [Brawler](https://jacobandresen.github.io/blip/brawler/) | Fifteen fighters, a fourteen-match ladder |
 | [Bubbler](https://jacobandresen.github.io/blip/bubbler/) | Trap monsters in bubbles, one or two players |
 | [Warlock](https://jacobandresen.github.io/blip/warlock/) | A maze shooter in candlelit cellars |
+| [Rounds](https://jacobandresen.github.io/blip/rounds/) | A paper round on a cargo bike, a week of weather |
 
 The arcade is a room of cabinets: insert a coin and play. The Home Screen is the same games as phone apps, free to play. Best scores stay in your browser.
 
