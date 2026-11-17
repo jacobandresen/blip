@@ -360,6 +360,34 @@ impl Blip {
         set_camera(&cam);
     }
 
+    /// Turn everything drawn after this by `degrees` (clockwise) about the middle of the canvas, shifted by
+    /// (`dx`, `dy`): a camera swinging round a corner. `set_offset(0.0, 0.0)` restores the normal view.
+    pub fn set_view(&self, dx: f32, dy: f32, degrees: f32) {
+        let mut cam = Camera2D::from_display_rect(
+            Rect::new(-dx, -dy, self.width as f32, self.height as f32),
+        );
+        cam.rotation = degrees;
+        cam.render_target = Some(self.rt.clone());
+        set_camera(&cam);
+    }
+
+    /// Draw through a camera that turns the picture by `radians` (clockwise on screen) about `pivot`, a point in
+    /// canvas pixels, and puts the pivot at `to`: a view that turns with the player round a corner.
+    /// `set_offset(0.0, 0.0)` restores the normal view.
+    pub fn set_view_pivot(&self, pivot: (f32, f32), to: (f32, f32), radians: f32) {
+        let (w, h) = (self.width as f32, self.height as f32);
+        let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, w, h));
+        cam.rotation = radians.to_degrees();
+        // The camera turns about its target, which it puts in the middle of the canvas: pick the target so that
+        // the pivot, turned with everything else, lands on `to`.
+        let (s, c) = radians.sin_cos();
+        let (vx, vy) = (to.0 - w / 2.0, to.1 - h / 2.0);
+        let (rx, ry) = (vx * c + vy * s, -vx * s + vy * c);
+        cam.target = macroquad::math::vec2(pivot.0 - rx, pivot.1 - ry);
+        cam.render_target = Some(self.rt.clone());
+        set_camera(&cam);
+    }
+
     /// Letterboxed screen rect `(x, y, w, h)` for the current window size.
     fn viewport(&self) -> (f32, f32, f32, f32) {
         let sw = screen_width();

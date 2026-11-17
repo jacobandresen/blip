@@ -31,7 +31,7 @@ pub fn tri(phase: f32) -> f32 {
 
 /// Instruments for each game's warm synthesized music; Saw and Growl are the action-game leads.
 #[derive(Clone, Copy)]
-pub enum Voice { Lead, Bass, Arp, Bell, Marimba, Glock, Theremin, Glass, Pluck, Saw, Growl }
+pub enum Voice { Lead, Bass, Arp, Bell, Marimba, Glock, Theremin, Glass, Pluck, Saw, Growl, Accordion }
 
 /// A note into `buf` at `start`, held `len` samples.
 pub fn note(buf: &mut [f32], start: usize, len: usize, midi: i32, vol: f32, v: Voice) {
@@ -40,7 +40,7 @@ pub fn note(buf: &mut [f32], start: usize, len: usize, midi: i32, vol: f32, v: V
     let tail = match v {
         Voice::Lead => 0.06, Voice::Bass => 0.03, Voice::Arp => 0.01, Voice::Bell => 0.4,
         Voice::Marimba => 0.25, Voice::Glock => 0.6, Voice::Theremin => 0.12, Voice::Glass => 0.9, Voice::Pluck => 0.02,
-        Voice::Saw => 0.05, Voice::Growl => 0.02,
+        Voice::Saw => 0.05, Voice::Growl => 0.02, Voice::Accordion => 0.07,
     };
     let n = len + (tail * SR) as usize;
     for i in 0..n {
@@ -79,6 +79,11 @@ pub fn note(buf: &mut [f32], start: usize, len: usize, midi: i32, vol: f32, v: V
                 let a = (t / 0.002).min(1.0) * (0.45 + 0.55 * (-t / 0.06).exp());
                 if held { a } else { a * (1.0 - (i - len) as f32 / (tail * SR)) }
             }
+            // the bellows: a soft swell in, a steady breath, a short sigh out
+            Voice::Accordion => {
+                let a = (t / 0.025).min(1.0) * (0.85 + 0.15 * (-t / 0.1).exp());
+                if held { a } else { a * (1.0 - (i - len) as f32 / (tail * SR)) }
+            }
         };
         let vib = match v {
             Voice::Lead => 1.0 + 0.004 * (2.0 * PI * 5.5 * t).sin() * (t / 0.15).min(1.0),
@@ -105,6 +110,9 @@ pub fn note(buf: &mut [f32], start: usize, len: usize, midi: i32, vol: f32, v: V
             Voice::Saw => saw(ph * 0.997) * 0.4 + saw(ph * 1.003) * 0.4 + pulse(ph * 0.5, 0.5) * 0.2,
             // a sawtooth with a sine under it for weight
             Voice::Growl => saw(ph) * 0.55 + (2.0 * PI * ph).sin() * 0.6,
+            // two reeds a hair apart (the musette's slow beat) over a round sine
+            Voice::Accordion => pulse(ph, 0.4) * 0.14 + pulse(ph * 1.0045, 0.4) * 0.12 + (2.0 * PI * ph).sin() * 0.62
+                + (4.0 * PI * ph).sin() * 0.14,
         };
         buf[j] += s * env * vol;
     }

@@ -4,7 +4,7 @@
 
 use crate::input::{BLIP_KEY_DOWN, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_UP};
 use macroquad::input::KeyCode;
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 pub type Cell = (i32, i32);
 
@@ -74,9 +74,36 @@ pub fn room(at: Cell, open: impl Fn(i32, i32) -> bool, enough: usize) -> usize {
     seen.len()
 }
 
+/// An influence map: each source spreads its strength over the open cells, falling by `decay` (0 to 1) every
+/// step it walks, out to `reach` steps; strengths add where they meet. Monsters as sources give a danger field to
+/// keep low; food as sources, one to climb.
+pub fn influence(sources: &[(Cell, f32)], open: impl Fn(i32, i32) -> bool, decay: f32, reach: usize) -> HashMap<Cell, f32> {
+    let mut field = HashMap::new();
+    for &(at, strength) in sources {
+        let mut seen = HashSet::from([at]);
+        let mut queue = VecDeque::from([(at, 0usize)]);
+        while let Some((cell, n)) = queue.pop_front() {
+            *field.entry(cell).or_insert(0.0) += strength * (1.0 - decay).powi(n as i32);
+            if n >= reach { continue; }
+            for next in Step::ALL.map(|s| s.from(cell)) {
+                if open(next.0, next.1) && seen.insert(next) { queue.push_back((next, n + 1)); }
+            }
+        }
+    }
+    field
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn influence_fades_with_walking_distance_and_adds_up() {
+        let open = |c: i32, r: i32| (0..5).contains(&c) && r == 0;
+        let f = influence(&[((0, 0), 1.0), ((4, 0), 1.0)], open, 0.5, 4);
+        assert_eq!(f[&(0, 0)], 1.0 + 0.0625);
+        assert_eq!(f[&(2, 0)], 0.5);
+    }
 
     #[test]
     fn a_path_goes_around_a_wall_and_counts_its_steps() {

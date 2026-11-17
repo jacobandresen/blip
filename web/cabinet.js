@@ -150,7 +150,8 @@ var BLIP_ATTRACT = {
   serpent:  {wave:'triangle', root:392, beat:.14, decay:.14, level:.8,  notes:[0,2,4,7,9,7,4,2,0,null,-5,0]},
   brawler:  {wave:'sawtooth', root:110, beat:.15, decay:.12, level:.35, notes:[0,null,0,7,null,5,3,null,0,null,12,10]},
   adder:    {wave:'sine',     root:659, beat:.2,  decay:.4,  level:.7,  notes:[0,7,4,12,null,7,9,7]},
-  warlock:  {wave:'triangle', root:196, beat:.18, decay:.3,  level:.9,  notes:[0,null,7,5,null,3,7,12]}
+  warlock:  {wave:'triangle', root:196, beat:.18, decay:.3,  level:.9,  notes:[0,null,7,5,null,3,7,12]},
+  rounds:   {wave:'triangle', root:392, beat:.16, decay:.25, level:.8,  notes:[0,4,7,12,null,11,9,7,null,4,7,null]}
 };
 var blipArcadeSound=(function(){
   var ROOM=.22,HEARD=2.5;

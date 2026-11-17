@@ -5,8 +5,12 @@
 //!   ("steer toward the ball", "tap fire"); presses get their release frames.
 //! - [`Playthrough`]: a named run that shows one theme of the game ("the snake
 //!   eats and grows into level 2") and the stats that prove it.
-//! - [`grid`] and [`predict`]: path finding on tile maps, and where a moving
+//! - [`grid`] and [`predict`]: path finding and influence maps on tile maps, and where a moving
 //!   thing will be.
+//! - [`rollout`]: try each move, roll everything forward, keep the clearest path (sampled look-ahead).
+//! - [`utility`]: score every option on curved considerations and take the best; [`utility::Commit`] holds a
+//!   choice against close rivals.
+//! - [`remember`]: what a bot keeps between frames.
 //! - Stats: [`add`], [`set`], [`reached_level`]; the run ends with one
 //!   `RESULT` line ([`finish`]).
 //!
@@ -25,10 +29,14 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 pub mod grid;
+mod memory;
 mod pad;
 mod playthrough;
 pub mod predict;
+pub mod rollout;
+pub mod utility;
 
+pub use memory::{forget, remember};
 pub use pad::Pad;
 pub use playthrough::{playthroughs, Goal, Playthrough};
 
