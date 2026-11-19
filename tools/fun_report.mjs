@@ -2,7 +2,7 @@
 // and sources are in crates/blip/src/bot/FUN.md):
 //
 //   1. skill  (weight 3): the bot's score against random play's (BLIP_BOT_FUZZ); 100 times or more is 1.
-//   2. close  (weight 2): near misses / (near misses + hits), from hit boxes; only games whose bot reports them.
+//   2. close  (weight 2): (near misses + 1) / (near misses + hits + 2), from hit boxes; only games whose bot reports them.
 //   3. busy   (weight 1): 1 - the share of time with nothing to do (crates/blip/src/bot/fun.rs).
 //
 // fun = 100 x the weighted mean of the measures a game has, per seed; a game's fun is the mean over seeds.
@@ -80,8 +80,10 @@ const round = (v, d = 1) => Math.round(v * 10 ** d) / 10 ** d;
 /** One seed's measures: its bot run against random play over all seeds (random play is a baseline, not a pair). */
 function measures(bot, randomScore) {
   const m = { skill: clamp01(Math.log10(((bot.score ?? 0) + 1) / (randomScore + 1)) / 2) };
-  const passes = (bot.fun_near_pm ?? 0) + (bot.fun_hits_pm ?? 0);
-  if (bot.fun_near_pm !== undefined && passes > 0) m.close = bot.fun_near_pm / passes;
+  // Counted passes, with one near miss and one hit added (Laplace's rule): a run has only a few passes, and one hit in
+  // a run with none else scored close calls 0 and moved a seed's fun by 33 points.
+  const [near, hits] = [bot.fun_near_pm ?? 0, bot.fun_hits_pm ?? 0].map((pm) => pm * (bot.t ?? Number(secs)) / 60);
+  if (bot.fun_near_pm !== undefined && near + hits > 0) m.close = (near + 1) / (near + hits + 2);
   m.busy = 1 - (bot.fun_dead ?? 0);
   return m;
 }

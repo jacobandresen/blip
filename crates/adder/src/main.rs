@@ -54,9 +54,8 @@ impl Game {
     }
 
     fn start_game(&mut self) {
-        self.world = World::new(self.humans);
         // A bot run with `BLIP_BOT_LEVEL=n` starts at round n.
-        self.world.round = 1 + blip::bot::level(i32::MAX as usize) as i32;
+        self.world = World::at_round(self.humans, 1 + blip::bot::level(i32::MAX as usize) as i32);
         blip::bot::reached_level(self.world.round);
         self.state = State::Play;
     }

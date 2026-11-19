@@ -8,7 +8,7 @@ use super::*;
 #[cfg(feature = "gallery")]
 pub(crate) fn draw_gallery(blip: &Blip, now: f32) {
     blip.clear(BlipColor { r: 0.15, g: 0.16, b: 0.21, a: 1.0 });
-    let acts: [(&str, Act, MoveId); 23] = [
+    let acts: [(&str, Act, MoveId); 31] = [
         ("LOW PUNCH", Act::Attack, MoveId::LowPunch),
         ("HIGH PUNCH", Act::Attack, MoveId::HighPunch),
         ("LOW KICK", Act::Attack, MoveId::LowKick),
@@ -32,6 +32,14 @@ pub(crate) fn draw_gallery(blip: &Blip, now: f32) {
         ("FLYING", Act::Air, MoveId::LowPunch),
         ("LOW GUARD", Act::Block, MoveId::LowPunch),
         ("UPPERCUT", Act::Attack, MoveId::Uppercut),
+        ("BODY BLOW", Act::Hitstun, MoveId::LowPunch),
+        ("TURN", Act::Idle, MoveId::LowPunch),
+        ("RAGE", Act::Idle, MoveId::LowPunch),
+        ("SHIN KICK", Act::Hitstun, MoveId::LowPunch),
+        ("FORWARD JUMP", Act::Air, MoveId::LowPunch),
+        ("KIP UP", Act::Knockdown, MoveId::LowPunch),
+        ("THROWN", Act::Knockdown, MoveId::LowPunch),
+        ("SWEPT", Act::Knockdown, MoveId::LowPunch),
     ];
     // One move at a time, five frames of it across the screen, stepped with
     // left / right so a capture lands on a known frame.
@@ -70,7 +78,7 @@ pub(crate) fn draw_gallery(blip: &Blip, now: f32) {
             // has to read.
             Act::Attack => [m.startup * F * 0.35, m.startup * F * 0.7, m.startup * F,
                             (m.startup + m.active) * F, total * 0.8][k],
-            Act::Knockdown => [0.05, 0.22, 0.6, 0.95, 1.12][k],
+            Act::Knockdown => [0.05, 0.22, 0.31, 0.95, 1.12][k],
             Act::Hitstun => [0.02, 0.06, 0.12, 0.2, 0.3][k],
             // Everything else gets a time sweep too, so the sheet shows
             // whether a pose moves.
@@ -91,9 +99,23 @@ pub(crate) fn draw_gallery(blip: &Blip, now: f32) {
         }
         if act == Act::Walk { f.x = x + (now * 60.0) % 24.0; }
         if label == "LOW GUARD" { f.crouch_block = true; }
+        if label == "BODY BLOW" { f.struck_body = true; f.struck_force = 1.3; }
+        if label == "THROW" { f.hit_clean = true; }
+        if label == "RAGE" { f.health = 3; }
+        if label == "SHIN KICK" { f.struck_legs = true; f.struck_force = 1.2; }
+        if label == "TURN" { f.turn = 1.0 - k as f32 / 4.0; }
         if act == Act::Air {
             f.y = FLOOR_Y - 70.0;
             f.soar = k as f32 / 4.0;
+        }
+        if label == "SWEPT" { f.downed_by = MoveId::Sweep; f.t = [0.0, 0.05, 0.10, 0.16, 0.24][k]; }
+        if label == "THROWN" { f.downed_by = MoveId::Throw; f.t = [0.0, 0.05, 0.10, 0.16, 0.24][k]; }
+        if label == "KIP UP" { f.t = [0.88, 0.93, 0.98, 1.04, 1.10][k]; }
+        if label == "FORWARD JUMP" {
+            let k = 0.1 + 0.8 * k as f32 / 4.0;
+            f.vy = JUMP_VY * f.arch().jump_scale * (1.0 - 2.0 * k);
+            f.vx = f.facing * AIR_DRIFT * if who % 2 == 0 { 1.0 } else { -1.0 };
+            f.y = FLOOR_Y - 90.0 * (1.0 - (2.0 * k - 1.0).powi(2)) - 10.0;
         }
         blip.draw_line(x - 60.0, FLOOR_Y, x + 74.0, FLOOR_Y,
             BlipColor { r: 0.34, g: 0.34, b: 0.44, a: 0.8 });

@@ -59,6 +59,8 @@ pub const PLAYTHROUGHS: &[Playthrough] = &[
 #[derive(Default)]
 struct Mind {
     jump_wait: f32,
+    /// The ledge (its x) the dragon is climbing to, toward a bubble out of reach.
+    climb: Option<f32>,
     wander_t: f32,
     wander_dir: f32,
 }
@@ -132,6 +134,18 @@ fn think(g: &Game, pi: usize, mem: &mut Mind) -> Input {
     if let Some((tx, ty, is_bubble)) = target {
         let dx = tx - px;
         let dy = ty - py;
+        // Too high to reach with a jump: climb a ledge toward it first (one-way platforms: jump up through one
+        // from below). Walking under a ceiling cluster and jumping let both its catches break out (seed 1).
+        if is_bubble && dy < -CLIMB_ABOVE {
+            if p.on_ground { mem.climb = ledge_toward(g, px, p.y + P_H, tx); }
+            if let Some(lx) = mem.climb {
+                k.left = lx - px < -4.0;
+                k.right = lx - px > 4.0;
+                k.jump = p.on_ground && (lx - px).abs() < 8.0;
+                k.jump_held = k.jump;
+                return k;
+            }
+        }
         if is_bubble {
             if dx.abs() > 10.0 {
                 k.left = dx < 0.0;
@@ -178,6 +192,23 @@ fn think(g: &Game, pi: usize, mem: &mut Mind) -> Input {
     }
     k.jump_held = k.jump_held || k.jump;
     k
+}
+
+/// A bubble this far above the dragon's middle (px) is out of a jump's reach (116 px up, popping 30 px further).
+const CLIMB_ABOVE: f32 = 130.0;
+
+/// The middle of the nearest platform cell a jump from the floor at `foot` lands on, weighed toward `tx`.
+fn ledge_toward(g: &Game, px: f32, foot: f32, tx: f32) -> Option<f32> {
+    let rise = JUMP_V * JUMP_V / (2.0 * GRAV) - 8.0;
+    let mut spots = Vec::new();
+    for r in 1..ROWS as i32 - 1 {
+        let top = HUD + r as f32 * TILE;
+        if top >= foot - 8.0 || top < foot - rise { continue; }
+        for c in 1..COLS as i32 - 1 {
+            if g.platform(c, r) && !g.platform(c, r - 1) { spots.push(c as f32 * TILE + TILE / 2.0); }
+        }
+    }
+    best(spots.into_iter(), |x| (x - px).abs() + (x - tx).abs())
 }
 
 /// A rock or spark that will hit the dragon within 0.4 s, both moving as they are.

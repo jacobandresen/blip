@@ -123,8 +123,10 @@ pub(crate) const FIGHTERS: [Archetype; 15] = [
         skin: (0.86, 0.14, 0.16), hair: (0.10, 0.10, 0.12), build: Build::Spider, bulk: 0.88, size: 1.0, boss: false,
     },
     Archetype {
+        // Power 1.80 to 1.45, and Regent and Aurelia 116 health to 106 and a tenth less power: on fight 8
+        // the bot ended rounds against the three heavies with 0 of 6 rounds won where the others gave 1 in 9.
         name: "GAMMA", health: 92, walk: 84.0, back_walk: 70.0, jump_scale: 0.90,
-        power: 1.80, reach: 0.82, special: Special::BullRush, special_name: "RAMPAGE",
+        power: 1.45, reach: 0.82, special: Special::BullRush, special_name: "RAMPAGE",
         power_desc: "GIANT-SCALE DAMAGE",
         color: (0.46, 0.28, 0.62), trim: (0.72, 0.52, 0.92),
         skin: (0.38, 0.64, 0.26), hair: (0.10, 0.10, 0.12), build: Build::Giant, bulk: 1.15, size: 1.5, boss: false,
@@ -148,8 +150,8 @@ pub(crate) const FIGHTERS: [Archetype; 15] = [
         bulk: 0.94, size: 1.0, boss: false,
     },
     Archetype {
-        name: "REGENT", health: 116, walk: 112.0, back_walk: 92.0, jump_scale: 0.96,
-        power: 1.16, reach: 1.02, special: Special::BullRush, special_name: "VIOLET CRUSH",
+        name: "REGENT", health: 106, walk: 112.0, back_walk: 92.0, jump_scale: 0.96,
+        power: 1.06, reach: 1.02, special: Special::BullRush, special_name: "VIOLET CRUSH",
         power_desc: "ARMOURED CHARGE",
         color: (0.78, 0.12, 0.18), trim: (0.72, 0.74, 0.84),
         skin: (0.76, 0.58, 0.46), hair: (0.10, 0.08, 0.12), build: Build::Uniform,
@@ -164,8 +166,8 @@ pub(crate) const FIGHTERS: [Archetype; 15] = [
         bulk: 0.90, size: 1.0, boss: false,
     },
     Archetype {
-        name: "AURELIA", health: 116, walk: 88.0, back_walk: 74.0, jump_scale: 0.86,
-        power: 1.20, reach: 0.94, special: Special::BullRush, special_name: "BRONZE BREAKER",
+        name: "AURELIA", health: 106, walk: 88.0, back_walk: 74.0, jump_scale: 0.86,
+        power: 1.08, reach: 0.94, special: Special::BullRush, special_name: "BRONZE BREAKER",
         power_desc: "HEAVY ARMOUR BREAK",
         color: (0.64, 0.38, 0.16), trim: (0.98, 0.76, 0.34),
         skin: (0.76, 0.52, 0.38), hair: (0.68, 0.16, 0.12), build: Build::Gladiator,

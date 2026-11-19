@@ -490,6 +490,8 @@ fn fly_bolts(g: &mut Game, dt: f32, holds: [Input; 2]) {
                 else { g.bolts[i].damage };
             g.p[d].hurt(dmg, g.p[1 - d].size());
             g.p[d].act = Act::Hitstun;
+            let up = g.p[d].y - g.bolts[i].y;
+            g.p[d].struck(up, dmg.min(g.bolts[i].damage));
             g.p[d].stun = 18.0 * F;
             g.p[d].t = 0.0;
             if web && g.p[d].web() {

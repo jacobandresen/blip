@@ -74,6 +74,8 @@ pub(crate) const LASER_SPEED: f32 = 600.0;
 /// 120, and clears 91 a fifth of a second after leaving the ground).
 pub(crate) const LASER_HEIGHT: f32 = 88.0;
 pub(crate) const LASER_THICK: f32 = 6.0;
+/// How long the laser's stare lasts before it fires, in frames.
+pub(crate) const LASER_STARE: f32 = 24.0;
 /// How fast a flier moves through the air, and how high the feet may go: the
 /// head stays under the health bars.
 pub(crate) const SOAR: f32 = 170.0;
@@ -94,7 +96,7 @@ pub(crate) enum MoveId { LowPunch, HighPunch, LowKick, HighKick, Sweep, Uppercut
 /// One attack, in frames: `startup` before it can hit, `active` while it can,
 /// `recovery` helpless afterwards. The gap between reach and recovery is its
 /// personality.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub(crate) struct MoveData {
     pub(crate) startup: f32,
     pub(crate) active: f32,

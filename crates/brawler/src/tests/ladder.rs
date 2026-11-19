@@ -329,3 +329,16 @@ pub(crate) fn roster_order_visits_each_other_entry_and_keeps_finalists_last() {
     }
     assert!(crate::game::ordered_ladder(0, &[], &finalists).is_empty());
 }
+
+#[test]
+pub(crate) fn everyone_beaten_has_a_place_at_the_ending() {
+    // Nine fixed places ran out when the roster grew, and the ending panicked.
+    let beaten = FIGHTERS.len() - 1;
+    let xs: Vec<f32> = (0..beaten).map(|k| draw::ending_place(k, beaten)).collect();
+    let w = WIN_W as f32;
+    for (k, x) in xs.iter().enumerate() {
+        assert!((10.0..w - 10.0).contains(x), "place {k} is off the stage at {x}");
+        assert!((x - w / 2.0).abs() > 60.0, "place {k} at {x} stands on the champion");
+    }
+    assert!(xs.windows(2).all(|p| p[1] > p[0]), "the places overlap or cross: {xs:?}");
+}

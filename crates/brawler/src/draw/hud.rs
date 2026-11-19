@@ -82,6 +82,8 @@ pub(crate) fn draw_hud(blip: &Blip, g: &Game) {
     let text = format!("{secs}");
     blip.draw_text(&text, cx - text_w(&text, 4.0) / 2.0, 20.0, 4.0, tc);
 
+    // The stage's name gives way at the round's end to whose round it was, which is written there.
+    if g.state == State::RoundEnd { return; }
     let stage = STAGE_NAMES[g.stage % STAGES];
     blip.fill_rect(cx - text_w(stage, 2.0) / 2.0 - 5.0, 61.0,
         text_w(stage, 2.0) + 10.0, 20.0, BlipColor { r: 0.08, g: 0.08, b: 0.10, a: 0.75 });

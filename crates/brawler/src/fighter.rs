@@ -74,6 +74,20 @@ pub(crate) struct Fighter {
     /// sees it, so a landing is still actionable on the touchdown frame.
     pub(crate) land: f32,
     pub(crate) land_force: f32,
+    /// The blow behind this hitstun: to the legs (a knee buckles), the body (it folds over it) or the
+    /// head (it snaps back), and how hard, about 1 for a medium blow. Drawing state only.
+    pub(crate) struck_legs: bool,
+    pub(crate) struck_body: bool,
+    pub(crate) struck_force: f32,
+    /// The blow that put this fighter down, for how they fall: a throw turns the body over in the air, a
+    /// sweep takes the legs and drops it where it stood, an uppercut launches it. Drawing state only.
+    pub(crate) downed_by: MoveId,
+    /// Bows whatever their own way of opening a round (the beaten, at the ending). Drawing state only.
+    pub(crate) bows: bool,
+    /// The facing last drawn, and how much of a turn to face the other way is left to show (1 to 0).
+    /// Drawing state only.
+    pub(crate) shown_facing: f32,
+    pub(crate) turn: f32,
     /// How far a flier has tipped over into level flight, 0 to 1, eased so
     /// the picture does not snap with the stick. Drawing state only.
     pub(crate) soar: f32,
@@ -135,6 +149,8 @@ pub(crate) struct Fighter {
 /// long enough that nothing teleports, short enough that a jab still
 /// lands on the frame the rules say it does.
 pub(crate) const POSE_BLEND: f32 = 4.0 * F;
+/// How long turning round to face the other way takes to show.
+pub(crate) const TURN_BLEND: f32 = 6.0 * F;
 
 /// How long the knees take to absorb a landing and push back out of it.
 pub(crate) const LAND_ABSORB: f32 = 12.0 * F;
@@ -171,7 +187,7 @@ impl Fighter {
             shown: Act::Idle, shown_t: 0.0, shown_mv: MoveId::LowPunch,
             shown_air: false, shown_vy: 0.0, prev_air: false, prev_vy: 0.0,
             prev_act: Act::Idle, prev_mv: MoveId::LowPunch, prev_t: 0.0, blend: 0.0,
-            blend_len: POSE_BLEND, land: 0.0, land_force: 0.0,
+            blend_len: POSE_BLEND, land: 0.0, land_force: 0.0, struck_legs: false, struck_body: false, struck_force: 1.0, downed_by: MoveId::LowPunch, bows: false, shown_facing: facing, turn: 0.0,
             soar: 0.0, stomp: false, parry_t: 0.0, throw_rest: 0.0,
             webbed: 0.0, web_hits: 0, web_rest: 0.0, called: false, calling: false, aim: None,
             alt_punch: false, alt_kick: false, stumble_roll: 0, stumble: 0.0, stagger: 0.0,
@@ -225,6 +241,15 @@ impl Fighter {
         self.flies() && matches!(self.mv, MoveId::HighPunch | MoveId::LowPunch | MoveId::JumpPunch | MoveId::Uppercut)
     }
     /// Lose health to a blow; webbing ends after two landed hits.
+    /// Remember how a blow landed, for the picture: at `height` px off the floor, for `damage`.
+    pub(crate) fn struck(&mut self, height: f32, damage: i32) {
+        self.struck_legs = height < self.height() * 0.30;
+        self.struck_body = !self.struck_legs && height < self.height() * 0.62;
+        // A jab rocks a fighter a little (5 damage, 0.6), a heavy kick a lot (17 and more, 1.4).
+        // Each blow more of a combo rocks them a little further (combo is counted before this is called).
+        let run = 1.0 + 0.08 * (self.combo - 1).clamp(0, 4) as f32;
+        self.struck_force = ((0.35 + damage as f32 / 16.0) * run).clamp(0.6, 1.5);
+    }
     pub(crate) fn hurt(&mut self, damage: i32, _from: f32) {
         // A web takes two blows and no more, whatever they cost.
         if self.webbed > 0.0 && damage > 0 {
@@ -286,7 +311,11 @@ impl Fighter {
         // A small fighter hits above its weight to make up for its reach.
         // Against its own size there is nothing to make up.
         let even = if a.size < 1.0 && self.foe_size <= a.size { SMALL_ON_SMALL } else { 1.0 };
+        // The laser's stare is its tell, and the laser ends the round: it lasts long enough to see and get
+        // out of a blow already thrown. At 11 frames the bot, caught mid-kick, lost both rounds to it in 4 of 4 fights; at 24, one.
+        let startup = if a.special == Special::LaserVision && m == move_data(MoveId::Special) { LASER_STARE } else { m.startup };
         MoveData {
+            startup,
             damage: ((m.damage as f32) * a.power * rage * even).round() as i32,
             reach: m.reach * a.reach * a.size,
             height: m.height * aim,

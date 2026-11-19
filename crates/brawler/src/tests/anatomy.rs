@@ -15,18 +15,44 @@ pub(crate) fn every_pose() -> Vec<(String, Fighter)> {
                  MoveId::HighPunch, MoveId::Sweep, MoveId::Uppercut, MoveId::JumpPunch, MoveId::JumpKick,
                  MoveId::FlyingKick, MoveId::Special, MoveId::Throw];
     for who in 0..FIGHTERS.len() {
+        // Put down by a sweep, and by a throw: their falls are their own.
+        for step in 0..12 {
+            for by in [MoveId::Sweep, MoveId::Throw, MoveId::Uppercut] {
+                let mut f = Fighter::new(who, 300.0, 1.0);
+                f.act = Act::Knockdown;
+                f.downed_by = by;
+                f.t = step as f32 / 11.0 * 0.3;
+                out.push((format!("{} downed by {by:?} t={:.2}", FIGHTERS[who].name, f.t), f));
+            }
+        }
         for act in [Act::Idle, Act::Walk, Act::Crouch, Act::Block, Act::Hitstun,
-                    Act::Knockdown, Act::Victory, Act::Defeat] {
+                    Act::Knockdown, Act::Victory, Act::Defeat, Act::Bow] {
             for step in 0..12 {
                 let mut f = Fighter::new(who, 300.0, 1.0);
                 f.act = act;
                 f.t = match act {
                     Act::Knockdown => step as f32 / 11.0 * 1.15,
                     Act::Hitstun => step as f32 / 11.0 * 0.35,
+                    Act::Bow => step as f32 / 11.0 * BOW_TIME,
                     _ => step as f32 / 11.0,
                 };
                 if act == Act::Walk { f.x = 300.0 + step as f32 * 7.0; }
                 out.push((format!("{} {:?} t={:.2}", FIGHTERS[who].name, act, f.t), f));
+                // Nearly out of health: the enraged guard.
+                if matches!(act, Act::Idle | Act::Walk | Act::Block) {
+                    let mut w = f;
+                    w.health = 3;
+                    out.push((format!("{} {:?} nearly out t={:.2}", FIGHTERS[who].name, act, w.t), w));
+                }
+                // Struck in the body, hard: folded over the blow instead of snapped back.
+                if act == Act::Hitstun {
+                    let mut b = f;
+                    (b.struck_body, b.struck_force) = (true, 1.4);
+                    out.push((format!("{} body blow t={:.2}", FIGHTERS[who].name, b.t), b));
+                    let mut s = f;
+                    (s.struck_legs, s.struck_force) = (true, 1.4);
+                    out.push((format!("{} shin kick t={:.2}", FIGHTERS[who].name, s.t), s));
+                }
                 if act == Act::Block {
                     let mut c = f;
                     c.crouch_block = true;
@@ -55,6 +81,13 @@ pub(crate) fn every_pose() -> Vec<(String, Fighter)> {
             f.y = FLOOR_Y - 120.0 * (1.0 - (1.0 - 2.0 * k).powi(2)).max(0.02);
             f.t = k * 0.7;
             out.push((format!("{} Air vy={:.0}", FIGHTERS[who].name, f.vy), f));
+            // A jump forward or back: the light ones somersault through it.
+            for vx in [AIR_DRIFT, -AIR_DRIFT] {
+                let mut j = f;
+                j.vy = JUMP_VY * FIGHTERS[who].jump_scale * (1.0 - 2.0 * k);
+                j.vx = vx;
+                out.push((format!("{} jump vx={vx:.0} vy={:.0}", FIGHTERS[who].name, j.vy), j));
+            }
         }
         for mv in moves {
             let air = matches!(mv, MoveId::JumpPunch | MoveId::JumpKick | MoveId::FlyingKick);
@@ -67,6 +100,12 @@ pub(crate) fn every_pose() -> Vec<(String, Fighter)> {
                 let total = (m.startup + m.active + m.recovery) * F;
                 f.t = step as f32 / 15.0 * total;
                 out.push((format!("{} {:?} t={:.3}", FIGHTERS[who].name, mv, f.t), f));
+                // A throw that caught someone is a different picture: the hoist.
+                if mv == MoveId::Throw {
+                    let mut c = f;
+                    c.hit_clean = true;
+                    out.push((format!("{} landed throw t={:.3}", FIGHTERS[who].name, c.t), c));
+                }
             }
         }
     }
@@ -483,6 +522,8 @@ pub(crate) fn the_far_hand_stays_in_front_of_the_body() {
         if matches!(f.act, Act::Knockdown | Act::Defeat) { continue; }
         // The flier has no flying kick; his kick is the laser.
         if f.flies() && f.act == Act::Attack && f.mv == MoveId::FlyingKick { continue; }
+        // Turned over in a somersault, the body's back is not the screen's.
+        if draw::flip_of(&f) != 0.0 { continue; }
         let k = bones_of(&f);
         if k.hand_rear.1 < k.neck.1 { continue; }
         let t = ((k.hip.1 - k.hand_rear.1) / (k.hip.1 - k.neck.1).max(1.0)).clamp(0.0, 1.0);
@@ -505,8 +546,9 @@ pub(crate) fn a_fighter_has_two_arms_two_legs_and_one_torso() {
     let mut bad = vec![];
     for (label, f) in every_pose() {
         // A body rolling up off the floor passes its own limbs across
-        // each other, which is what getting up is.
-        if f.act == Act::Knockdown { continue; }
+        // each other, which is what getting up is; standing to attention
+        // side on, one arm hangs in front of the other.
+        if matches!(f.act, Act::Knockdown | Act::Bow) { continue; }
         let k = bones_of(&f);
         let gap = |a: draw::V, b: draw::V| ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt();
         // One fist passing the other on its way somewhere is a punch going
@@ -1233,6 +1275,8 @@ pub(crate) fn no_leg_is_curled_up_behind_the_back() {
     // leg, a chambered knee), so the product is bounded.
     let mut bad = Vec::new();
     for (name, f) in every_pose() {
+        // A somersault, or being thrown, turns the whole body over: its legs are judged unturned.
+        if draw::flip_of(&f) != 0.0 || (f.downed_by == MoveId::Throw && f.act == Act::Knockdown) { continue; }
         let k = bones_of(&f);
         for (side, ankle) in [("lead", k.ankle_lead), ("rear", k.ankle_rear)] {
             let behind = (k.hip.0 - ankle.0) * f.facing;

@@ -66,6 +66,9 @@ fn mack_driveby_keeps_going_after_he_is_knocked_down() {
 
 #[test]
 fn ten_mack_circuits_run_every_rung_through_the_fight_loop() {
+    // The bot and the CPU draw on the shared random numbers: without the lock this shifted them under the
+    // balance simulations running beside it, which then passed or failed by scheduling.
+    let _sim = super::balance::simulating(0x3AC4);
     let who = FIGHTERS.iter().position(|a| a.name == "MACK").unwrap();
     for run in 0..10 {
         let mut g = Game::new();
@@ -280,18 +283,18 @@ pub(crate) fn the_laser_from_the_air_burns_where_he_looked_and_a_jump_gets_clear
     // RYUKA faces left, so away is right.
     let back = Input { up: true, right: true, ..Input::default() };
     assert_eq!(under_the_stare(200.0, 140.0, 0, Input::default()), 0, "standing in it did not end the round");
-    // Jumping as the eyes light, or a moment after: it does not follow.
-    for delay in [0, 6, 12] {
+    // Jumping in place a moment after the eyes light, up to as it fires: it does not follow. (Sooner, and the
+    // jump comes back down into it.)
+    for delay in [10, 20, 30] {
         assert_eq!(under_the_stare(200.0, 140.0, delay, up), full, "a jump {delay} frames in was followed");
     }
-    // The level laser, from 180px: a jump within ten frames of the eyes
-    // lighting goes over it (ducking is tested with the laser itself).
-    for delay in [0, 5, 10] {
+    // The level laser, from 180px: a jump any time before it arrives goes over it (ducking is tested with the laser itself).
+    for delay in [0, 20, 40] {
         assert_eq!(under_the_stare(200.0, 0.0, delay, up), full, "a jump {delay} frames in did not clear the level laser");
     }
     // Jumping away works later still, and with him low and 80px off, where
-    // the beam lands on frame 17.
-    for (x, h, latest) in [(200.0, 140.0, 18), (300.0, 60.0, 12)] {
+    // the beam lands on frame 30.
+    for (x, h, latest) in [(200.0, 140.0, 36), (300.0, 60.0, 24)] {
         for delay in (0..=latest).step_by(6) {
             assert_eq!(under_the_stare(x, h, delay, back), full,
                 "a jump back {delay} frames in, from under ({x}, {h} up), was caught");

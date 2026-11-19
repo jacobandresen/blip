@@ -94,6 +94,28 @@ pub(crate) fn cpu_think(g: &mut Game) -> CpuPlan {
         }
     }
 
+    // The round's plan, played as sharply as the dial allows: hardly at all on the first fight, seven
+    // turns in ten on the last. (At one in four there, the bot's rounds on fight 1 fell from 17-5 to 13-5; at this, 17-4.)
+    let sharp = (0.3 + 0.5 * g.difficulty).max(0.05);
+    match g.cpu_style {
+        // Spacing answers a foe who comes in: poke them as they step into it, or step back out of
+        // reach. Against one who waits too it fights as the rest do (waiting for each other was a
+        // stalemate in 75 of 336 test rounds).
+        Plan::Spacing if dist > jab_range && room_behind(&me) && foe.act == Act::Walk => {
+            let (poke, reach) = longest_poke(&me);
+            if dist < reach && roll() < sharp { return CpuPlan::Attack(poke); }
+            if dist < spacing_edge(&foe) - 20.0 { return CpuPlan::Retreat; }
+        }
+        Plan::Zoning if dist > 160.0 => {
+            return if roll() < sharp { CpuPlan::Attack(MoveId::Special) }
+                else if dist > 380.0 { CpuPlan::Approach } else { CpuPlan::Wait };
+        }
+        Plan::JumpIn if (0.8..1.15).contains(&(dist / jump_travel(&me))) && roll() < sharp * 0.6 => {
+            return CpuPlan::Jump;
+        }
+        _ => {}
+    }
+
     if dist > 230.0 {
         // Too far to do anything but close the gap — or throw something
         // that crosses it.
@@ -190,10 +212,12 @@ pub(crate) fn cpu_turn(g: &mut Game, side: usize, dt: f32) -> Input {
         g.p.swap(0, 1);
         std::mem::swap(&mut g.cpu_plan, &mut g.demo_cpu.0);
         std::mem::swap(&mut g.cpu_delay, &mut g.demo_cpu.1);
+        std::mem::swap(&mut g.cpu_style, &mut g.demo_style);
         let inp = cpu_turn(g, 1, dt);
         g.p.swap(0, 1);
         std::mem::swap(&mut g.cpu_plan, &mut g.demo_cpu.0);
         std::mem::swap(&mut g.cpu_delay, &mut g.demo_cpu.1);
+        std::mem::swap(&mut g.cpu_style, &mut g.demo_style);
         return inp;
     }
     // A plan runs for its delay unless the world changes: coming out of a
@@ -202,6 +226,8 @@ pub(crate) fn cpu_turn(g: &mut Game, side: usize, dt: f32) -> Input {
         || (g.p[0].act == Act::Attack && (g.p[0].x - g.p[1].x).abs() < attack_range(&g.p[0], MoveId::HighKick));
     g.cpu_delay -= dt;
     if g.cpu_delay <= 0.0 || (jolted && g.cpu_delay < 0.12) {
+        // Well behind, now and then it tries another way (about every five seconds of decisions).
+        if well_behind(&g.p[1], &g.p[0]) && rand_int(0, 99) < 3 { g.cpu_style = Plan::pick(&g.p[1]); }
         g.cpu_plan = cpu_think(g);
         // The early turtles fight alone: the call is kept for opponents who
         // have had three fights to learn to guard low.

@@ -87,8 +87,9 @@ be avoided") the fairness of the hits.
   hazards' boxes *as the game's collision code tests them* (`blip::bot::near`). A hazard within 16 px starts a
   *pass*; the pass ends as a **near miss** when the boxes part, or as a **hit** when they touch or the game reports a
   hit (a rise in `deaths` or a `hit_*` stat; games remove a bullet the frame it hits and test hits on swept paths,
-  so touching boxes alone miss hits; a life lost within 3 s of a hit is that hit). `close = near misses / (near
-  misses + hits)`. With `BLIP_BOT_NEAR=<dir>`, each
+  so touching boxes alone miss hits; a life lost within 3 s of a hit is that hit). `close = (near misses + 1) /
+  (near misses + hits + 2)`: a run has few passes, and without the added one of each a lone hit scored 0 and moved a
+  seed's fun by 33 points (Raider's spread fell from 13.6 to 8.5 with it). With `BLIP_BOT_NEAR=<dir>`, each
   pass's closest frame is saved with the boxes drawn: green the player, red the nearest hazard (a point hazard gets a
   ring), yellow others near, and the gap in pixels.
 - **Approach B: centre distance.** Distance between centres under a radius. Simpler, but wrong for long or wide
@@ -224,6 +225,17 @@ playthroughs pass.
 | Warlock | Fireballs burn by drawn position, like monsters (they hit from a cell away) | a fairness fix; no measurable change |
 | Warlock | The bot steps away from a monster beside it, as a player would | close calls 0.08 → 0.51: a game of near escapes, now seen |
 | Bubbler, Raider, Warlock, Rounds, Bouncer | A continue at game over (shared `blip::Continue`): the same room, level, chamber, day or bricks, fresh lives, the run's best reported | playthroughs and unit tests; time after a game over, so outside the three measures. Not in the score-attack games, whose originals end a run there |
+| Warlock | Monsters are drawn over their whole step (they slid one cell a second and jumped the rest), and a bolt hits the cell a monster is leaving too | bolts had passed through imps stepping toward the wizard: lives lost 2.2 → 0.5 a run, fun +9.2 ± 6 |
+| Defender | The march stops speeding up at level 5 (it went on to twice as fast by level 8) | full formations of levels 6, 7, 11 and 12 landed in 7 of 12 runs, now 2: one shot at a time could not clear 50-60 invaders in time |
+| Defender | A lost cannon pauses play 2.4 s, not 3.6 | at a person's 250 ms reaction (`BLIP_BOT_REACT`) the pauses were a quarter of the run |
+| Bubbler | Round 5 has 13 toys, eight walkers (was 15 and ten) | the bot lost five hearts there in 35 s; rounds 4 and 6 cost one |
+| Defender | The three-row formation is ten wide, not eleven | at 446 of 480 px it met an edge every third step; wave 8 ended the run on 2 of 4 seeds, now 1 |
+| Rounds | After a crash at Frederik V the bike restarts beside the pedestal | it restarted on it: three lives in 3.3 s on Tuesday (unit test) |
+| Meteors | A hyperspace jump lands clear of the saucer and its shots, as of rocks | a fairness fix; the bot's scores are unchanged |
+| Bubbler | The last round has 9 toys, two ghosts and four walkers (was 11, three and five) | the bot lost 2 hearts there on average (0 to 3), now 0.5 |
+| Brawler | Zenith's laser stare lasts 24 frames, not 11 | the bot, caught mid-kick, lost both rounds to it in 4 of 4 fights; now one |
+| Brawler | Regent, Aurelia and Gamma hit less hard (Regent and Aurelia have less health too) | on fight 8 they took 6 of 6 rounds from the bot; Gamma now loses one now and then |
+| Brawler | Bot and CPU fight each round to a plan (`plan.rs`): pressure, spacing, zoning or jumping in | the bot took 7 of 14 rounds from Jade on fight 8 (1 of 9); the CPU plays the plans as hard as its fight's difficulty, so fight 1 stays 17-4; fun -1.7 ± 1.7 |
 
 What did not work is as useful: grazing in Raider (random play grazes by blundering, so skill fell), monsters
 pausing to "say hello" in Bubbler (a slow player died sooner), evening out Brawler's fighters with the difficulty
@@ -248,7 +260,7 @@ them all. Measuring all eleven games (six seeds, the bot and random play) took 2
 
 ## 5. Every game now
 
-Six seeds of 60 s each, in the arcade's order, with every change in [FUN-LOG.md](FUN-LOG.md) applied. **This is not a ranking.** The score compares a game with itself over
+Six seeds of 60 s each, in the arcade's order, with every change above applied (close calls with the added near miss and hit, which lowers games that never get hit, such as Defender and Rounds). **This is not a ranking.** The score compares a game with itself over
 time, which is all the CI gate does. Across games it mostly reflects which measures a game can take (only Raider,
 Defender and Bubbler report hit boxes) and what kind of game it is. A calm, simple game scores low on measures made
 for tension and still delights: Rally is the lowest here and one of the most loved, because it is simple and it
@@ -259,22 +271,23 @@ choose easy and casual games) that no bot can see.
 |---|---|---|---|---|---|---|---|
 | serpent | **92.8** | 1.6 | 91, 93, 91, 95, 94, 93 | 1 |  | 0.71 |  |
 | bouncer | **88.4** | 6.2 | 82, 97, 84, 92, 91, 84 | 0.85 |  | 0.99 |  |
-| defender | **65.8** | 3 | 64, 68, 70, 67, 63, 63 | 0.32 | 1 | 1 | 0.0 |
+| defender | **64** | 2.8 | 63, 67, 66, 65, 61, 61 | 0.36 | 0.89 | 1 | 0.0 |
 | rally | **40.5** | 2.1 | 41, 42, 42, 40, 37, 41 | 0.23 |  | 0.94 |  |
-| meteors | **64.6** | 8.4 | 48, 66, 70, 68, 68, 68 | 0.58 | 0 | 1 | 0.2 |
+| meteors | **65.2** | 3.8 | 58, 65, 69, 67, 67, 67 | 0.56 | 0.33 | 1 | 0.2 |
 | brawler | **52.5** | 6.4 | 59, 56, 46, 44, 56, 54 | 0.45 |  | 0.74 |  |
-| bubbler | **48** | 13.6 | 63, 38, 53, 47, 27, 60 | 0.17 | 0.72 | 0.94 | 0.7 |
-| raider | **50.1** | 13.6 | 27, 57, 48, 44, 66, 59 | 0.27 | 0.65 | 0.9 | 1.7 |
+| bubbler | **49.2** | 4.4 | 54, 53, 46, 53, 44, 46 | 0.28 | 0.65 | 0.94 | 0.5 |
+| raider | **50.1** | 8.5 | 38, 54, 48, 44, 61, 56 | 0.27 | 0.65 | 0.9 | 1.7 |
 | adder | **89.9** | 1.5 | 90, 90, 89, 88, 91, 92 | 1 |  | 0.6 |  |
-| warlock | **70** | 17 | 90, 76, 64, 46, 57, 86 | 0.74 | 0.51 | 0.97 | 4.9 |
-| rounds | **82.5** | 1.1 | 83, 81, 82, 83, 82, 84 | 0.69 | 1 | 0.88 | 0.0 |
+| warlock | **83.5** | 7.5 | 87, 83, 82, 97, 77, 76 | 1 | 0.47 | 0.91 | 0.8 |
+| rounds | **74.2** | 1.3 | 74, 76, 74, 75, 72, 76 | 0.66 | 0.81 | 0.85 | 0.0 |
 
 What the table points at:
 - **Rally's skill is low because of how it scores**, not its play: 60 s of Rally is two or three points, and random
   play scores none, so the ratio is small. A longer run or a per-rally score would measure it better.
 - **Bubbler's random play scores almost as well as the bot** (skill 0.17): a dragon mashing keys blows bubbles that
   catch monsters anyway. For a game made for young children that may be right; it is still worth a look.
-- **Defender: no hits at all** in six minutes, and close calls of 1: the cannon dodges everything. Its fun comes from
+- **Defender: no hits at all** in six minutes (close calls 0.89, the most seven near misses and no hit can give): the
+  cannon dodges everything. Its fun comes from
   skill and the near misses, and a harder bomb pattern would show up here first.
 - **Adder and Serpent are the least busy** (0.6 and 0.71): Adder's round changes and long straight runs, Serpent's long
   straight stretches between turns. The `IDLE` lines say where.

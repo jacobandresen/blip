@@ -403,12 +403,15 @@ fn spawn_saucer(g: &mut Game) {
 }
 
 /// Where a jump lands: clear space, so the gamble is the 1-in-N blow-up, not
-/// a rock the player could not see.
+/// a rock, the saucer or a saucer's shot the player could not see.
 fn landing_spot(g: &Game) -> (f32, f32) {
     let clear = |x: f32, y: f32| g.asteroids.iter().filter(|a| a.active).all(|a| {
         let (dx, dy) = (x - a.x, y - a.y);
         dx * dx + dy * dy > (a.size.radius() + SHIP_RADIUS + 40.0).powi(2)
-    });
+    }) && (!g.saucer.active || (x - g.saucer.x).hypot(y - g.saucer.y) > saucer_radius(g.saucer.big) + SHIP_RADIUS + 60.0)
+        // nor in the next half second of a saucer's shot
+        && g.bullets.iter().filter(|b| b.active && !b.from_player)
+            .all(|b| !wrapped_segment_circle_overlap((b.x, b.y), (b.x + b.vx * 0.5, b.y + b.vy * 0.5), (x, y), SHIP_RADIUS + 12.0));
     let mut spot = (0.0, 0.0);
     for _ in 0..16 {
         spot = (rand_range_f32(0.0, PLAY_W as f32), rand_range_f32(PLAY_Y0, PLAY_Y0 + PLAY_H as f32));
@@ -1246,6 +1249,17 @@ mod tests {
                 assert!((x - a.x).hypot(y - a.y) > a.size.radius() + SHIP_RADIUS,
                     "landed on a rock at ({x}, {y})");
             }
+        }
+    }
+
+    #[test]
+    fn a_jump_lands_clear_of_the_saucer() {
+        let mut g = Game::new();
+        g.asteroids = [ASTEROID_OFF; MAX_ASTEROIDS];
+        g.saucer = Saucer { active: true, x: PLAY_W as f32 / 2.0, y: PLAY_Y0 + PLAY_H as f32 / 2.0, vx: 0.0, wave_t: 0.0, fire_t: 9.0, big: true };
+        for _ in 0..200 {
+            let (x, y) = landing_spot(&g);
+            assert!((x - g.saucer.x).hypot(y - g.saucer.y) > saucer_radius(true) + SHIP_RADIUS, "landed on the saucer at ({x}, {y})");
         }
     }
 

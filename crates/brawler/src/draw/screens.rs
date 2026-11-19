@@ -438,6 +438,16 @@ pub(crate) fn draw_bonus(blip: &Blip, g: &Game) {
     }
 }
 
+/// Where the `k`th of `beaten` stands at the ending: half in a line to the champion's left, the rest to
+/// the right, each line running from the stage's edge to 70 px short of the middle.
+pub(crate) fn ending_place(k: usize, beaten: usize) -> f32 {
+    let w = WIN_W as f32;
+    let left = beaten.div_ceil(2);
+    let (i, count, from, to) = if k < left { (k, left, 22.0, w / 2.0 - 70.0) }
+        else { (k - left, beaten - left, w / 2.0 + 70.0, w - 22.0) };
+    from + (to - from) * (i as f32 + 0.5) / count.max(1) as f32
+}
+
 /// What became of each champion, in a line.
 const ENDINGS: [&str; FIGHTERS.len()] = [
     "THE ROAD GOES ON. THERE IS ALWAYS SOMEBODY STRONGER.",
@@ -457,21 +467,22 @@ const ENDINGS: [&str; FIGHTERS.len()] = [
     "THE LOWRIDER ROLLS HOME UNDER THE DUSK LIGHT.",
 ];
 
-/// The ladder cleared: the champion at home with a fist in the air, the nine
-/// who were beaten bowing in turn along the back, and paper coming down.
+/// The ladder cleared: the champion at home with a fist in the air, everyone
+/// who was beaten bowing in turn along the back, and paper coming down.
 pub(crate) fn draw_ending(blip: &Blip, g: &Game) {
     let (w, n) = (WIN_W as f32, FIGHTERS.len());
     let home = home_of(g.pick);
     draw_backdrop(blip, home, 0.0, g.now, 1.0);
     draw_floor(blip, home, 0.0);
 
-    // Five to the left of the champion and four to the right, facing in.
-    let xs = [34.0, 90.0, 146.0, 202.0, 252.0, 386.0, 440.0, 512.0, 596.0];
+    // The others in two lines either side of the champion, facing in, spaced to fit however many there
+    // are. (Nine fixed places ran out when the roster grew past ten, and the ending panicked.)
     for (k, who) in (1..n).map(|j| (g.pick + j) % n).enumerate() {
-        let x = xs[k];
+        let x = ending_place(k, n - 1);
         let mut f = Fighter::new(who, x, if x < w / 2.0 { 1.0 } else { -1.0 });
         f.act = Act::Bow;
         f.shown = Act::Bow;
+        f.bows = true;
         // A wave of bows running along the line.
         f.t = (g.now * 0.8 + k as f32 * 0.22).rem_euclid(2.4);
         draw_body(blip, &f, g.now, 0.0, 0.0, k, true);
@@ -496,7 +507,7 @@ pub(crate) fn draw_ending(blip: &Blip, g: &Game) {
     stamp(blip, FIGHTERS[g.pick].name, 92.0, 3.0, rgb(FIGHTERS[g.pick].trim));
     // The score counts from the last continue, so say how the run went.
     let run = match g.continues {
-        0 => "ALL NINE WITHOUT A CONTINUE".to_string(),
+        0 => "THE WHOLE LADDER WITHOUT A CONTINUE".to_string(),
         1 => "SCORE SINCE THE CONTINUE".to_string(),
         n => format!("{n} CONTINUES"),
     };

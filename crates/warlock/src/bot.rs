@@ -223,13 +223,37 @@ fn bot_path(g: &Game) -> Option<(Cell, Dir)> {
         .or_else(|| nearest(&mut g.runes.iter().filter(|r| !r.cleansed).map(|r| r.tile)))
         .or_else(|| nearest(&mut g.enemies.iter().filter(|e| !e.gone).map(|e| e.tile)))
         .or_else(|| g.whelp.as_ref().map(|w| w.tile))
-        .or_else(|| g.warlock.as_ref().filter(|w| w.wards > 0).map(|w| w.circles[w.circle]))
+        .or_else(|| g.warlock.as_ref().filter(|w| w.wards > 0).map(|w| firing_spot(g, me, w.circles[w.circle])))
         .or_else(|| try_a_sigil(g, me))
         .unwrap_or(g.exit);
     let goal = escape_gate(g, me).or_else(|| gate_toward(g, me, goal)).unwrap_or(goal);
     // The goal itself may be a monster's tile; the bot fires before it would step in.
     let blocked: Vec<Cell> = blocked_cells(g).into_iter().filter(|&c| c != goal).collect();
-    bfs_next(&g.walls, &blocked, me, goal)
+    bfs_next(&g.walls, &blocked, me, goal).or_else(|| {
+        // Every way there passes another monster (a gargoyle in the only corridor stood the wizard still for
+        // 11 s in the Burning Gallery): go for the nearest monster that can be reached instead.
+        let mut monsters: Vec<Cell> = blocked_cells(g);
+        monsters.sort_by_key(|&t| manhattan(me, t));
+        monsters.into_iter().find_map(|t| {
+            let others: Vec<Cell> = blocked_cells(g).into_iter().filter(|&c| c != t).collect();
+            bfs_next(&g.walls, &others, me, t)
+        })
+    })
+}
+
+/// A tile two to five steps from the Warlock's circle in a clear straight line, to bolt him from: walking onto the
+/// circle itself put the wizard in his fire at point-blank, and the Sanctum took three lives in 26 s (seed 3).
+fn firing_spot(g: &Game, me: Cell, circle: Cell) -> Cell {
+    let mut spots = Vec::new();
+    for d in DIRS {
+        let (dc, dr) = d.delta();
+        for k in 1..=5 {
+            let c = Cell { c: circle.c + dc * k, r: circle.r + dr * k };
+            if g.walls.get(c.c, c.r) || !Walls::in_bounds(c.c, c.r) { break; }
+            if k >= 2 { spots.push(c); }
+        }
+    }
+    spots.into_iter().min_by_key(|&t| steps(g, me, t).unwrap_or(usize::MAX)).unwrap_or(circle)
 }
 
 /// A ready sigil to step into, when walking to it and on from its partner
