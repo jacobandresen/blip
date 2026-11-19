@@ -107,6 +107,8 @@ pub mod audio;
 #[cfg(feature = "engine")]
 pub mod bot;
 #[cfg(feature = "engine")]
+pub mod grid;
+#[cfg(feature = "engine")]
 pub mod color;
 #[cfg(feature = "engine")]
 pub mod ctx;
@@ -150,12 +152,12 @@ pub use fx::{EffectParticle, EffectParticles};
 #[cfg(feature = "engine")]
 pub use math::{
     angle_diff, clamp, distance, ease_out_cubic, lerp, rand_int, rand_range_f32, rand_seed,
-    rects_overlap, scatter, segment_circle_overlap, segment_rect_overlap, smoothstep01, wrap,
+    rects_overlap, scatter, segment_circle_overlap, segment_rect_overlap, smoothstep01, spool, wrap, frame_starts, swept_from, sweep_hits,
 };
 #[cfg(feature = "engine")]
 pub use pool::{pool_iter, pool_iter_mut, pool_spawn, Pooled};
 #[cfg(feature = "engine")]
-pub use session::{LifeResult, Session, GAME_OVER_MIN_WAIT};
+pub use session::{Continue, LifeResult, Session, Streak, CONTINUE_GRACE, GAME_OVER_MIN_WAIT};
 #[cfg(feature = "engine")]
 pub use timer::Timer;
 

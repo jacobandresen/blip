@@ -223,12 +223,13 @@ pub struct Palette {
     pub glow: (u8, u8, u8),
 }
 pub const PALETTES: [Palette; ROUNDS] = [
-    Palette { sky0: (18, 12, 52), sky1: (48, 20, 84), glow: (255, 140, 220) },
-    Palette { sky0: (6, 24, 50), sky1: (10, 60, 90), glow: (120, 230, 255) },
-    Palette { sky0: (30, 16, 8), sky1: (70, 36, 16), glow: (255, 200, 90) },
-    Palette { sky0: (8, 30, 18), sky1: (16, 70, 40), glow: (150, 255, 150) },
-    Palette { sky0: (26, 6, 30), sky1: (60, 10, 50), glow: (220, 150, 255) },
-    Palette { sky0: (36, 10, 18), sky1: (84, 26, 40), glow: (255, 150, 140) },
-    Palette { sky0: (24, 22, 6), sky1: (60, 56, 16), glow: (244, 240, 124) },
-    Palette { sky0: (6, 22, 26), sky1: (16, 54, 60), glow: (170, 255, 230) },
+    // Dreamy pastel dusks (yume kawaii), kept darker than the pastel toys so they stand out.
+    Palette { sky0: (52, 30, 92), sky1: (120, 66, 138), glow: (255, 160, 220) },
+    Palette { sky0: (22, 44, 90), sky1: (50, 104, 150), glow: (150, 230, 255) },
+    Palette { sky0: (70, 36, 62), sky1: (150, 86, 96), glow: (255, 210, 130) },
+    Palette { sky0: (24, 58, 70), sky1: (60, 124, 110), glow: (170, 255, 190) },
+    Palette { sky0: (50, 26, 90), sky1: (112, 70, 156), glow: (230, 170, 255) },
+    Palette { sky0: (76, 28, 64), sky1: (160, 76, 112), glow: (255, 170, 170) },
+    Palette { sky0: (56, 50, 70), sky1: (132, 120, 80), glow: (250, 240, 150) },
+    Palette { sky0: (20, 54, 74), sky1: (56, 130, 136), glow: (180, 255, 235) },
 ];

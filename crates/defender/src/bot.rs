@@ -8,6 +8,7 @@
 //! column a bomb lands too soon to dodge, so it passes under one only to shoot it.
 
 use super::*;
+use blip::bot::rollout::Mover;
 use blip::bot::{Goal::*, Pad, Playthrough};
 
 /// What the bot must show it can do in Defender.
@@ -45,6 +46,7 @@ pub fn drive(g: &Game) {
     match g.state {
         State::Title => { pad.press_start(); }
         State::Play => {
+            hit_boxes(g);
             let me = g.player_x + ALIEN_W as f32 / 2.0;
             let want = if in_danger(g, me) { nearest_safe_spot(g, me) } else { aim_point(g, me) };
             pad.fire();
@@ -56,6 +58,16 @@ pub fn drive(g: &Game) {
         _ => {}
     }
     pad.send();
+}
+
+/// The hit boxes the game tests, for the fun meter. The cannon is a wedge (`bomb_hits_ship`): two stacked boxes,
+/// each as wide as the wedge at its lower edge; a bomb hits with its tip, a point.
+fn hit_boxes(g: &Game) {
+    let (top, x) = ((GROUND_Y - 28) as f32, g.player_x + ALIEN_W as f32 / 2.0);
+    let half = |row: f32| (1.0 + row * 15.0) * ALIEN_W as f32 / 32.0 + 2.0;
+    let me = [Mover::still(x, top + 7.0).sized(half(0.5), 7.0), Mover::still(x, top + 21.0).sized(half(1.0), 7.0)];
+    let bombs: Vec<Mover> = g.bullets[MAX_PLAYER_BULLETS..].iter().filter(|b| b.active).map(|b| Mover::still(b.x + 2.0, b.y + 12.0)).collect();
+    blip::bot::near(&me, &bombs);
 }
 
 /// A short move: hold `dir` (-1 left, 1 right) for `frames`, then let go.
@@ -107,8 +119,7 @@ fn play_ahead(g: &Game, (dir, frames): Move) -> (Option<f32>, f32) {
     let bombs: Vec<_> = g.bullets[MAX_PLAYER_BULLETS..].iter().filter(|b| b.active).map(|b| (b.x, b.y)).collect();
     for f in 0..60 {
         let target = if f < frames { dir as f32 * PLAYER_SPEED } else { 0.0 };
-        let rate = if target == 0.0 || target * vx < 0.0 { PLAYER_BRAKE } else { PLAYER_ACCEL } * dt;
-        vx += (target - vx).clamp(-rate, rate);
+        vx = blip::spool(vx, target, PLAYER_ACCEL, PLAYER_BRAKE, dt);
         x = (x + vx * dt).clamp(0.0, max_x);
         let t = (f + 1) as f32 * dt;
         if bombs.iter().any(|&(bx, by)| bomb_hits_ship(bx, by + g.bomb_speed * t, x)) {

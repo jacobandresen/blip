@@ -1,6 +1,6 @@
-//! Finding the way on a tile map: the first step of a shortest path, and how
-//! much room there is. A cell is `(column, row)`; `open(c, r)` says whether a
-//! bot may stand there, and must be false off the map.
+//! Finding the way on a tile map, for computer players and playtest bots alike: the first step of a shortest path, what can
+//! be reached and how much room there is. A cell is `(column, row)`; `open(c, r)` says whether something may stand
+//! there, and must be false off the map.
 
 use crate::input::{BLIP_KEY_DOWN, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_UP};
 use macroquad::input::KeyCode;
@@ -13,7 +13,8 @@ pub type Cell = (i32, i32);
 pub enum Step { Up, Right, Down, Left }
 
 impl Step {
-    pub const ALL: [Step; 4] = [Step::Up, Step::Right, Step::Down, Step::Left];
+    /// The order a search tries them in, so ties break the same way every time.
+    pub const ALL: [Step; 4] = [Step::Up, Step::Down, Step::Left, Step::Right];
 
     /// Column and row change.
     pub fn delta(self) -> Cell {
@@ -37,9 +38,10 @@ impl Step {
 }
 
 /// The first step of a shortest path from `from` to `to`, and its length in
-/// steps. `first` may rule out some first steps (a snake cannot reverse).
-/// `to` counts as reachable even when `open` says no (food under a monster).
+/// steps. `first` may rule out some first steps (no turning straight back).
+/// `to` counts as reachable even when `open` says no (a goal someone stands on). None when already there.
 pub fn path(from: Cell, to: Cell, open: impl Fn(i32, i32) -> bool, first: impl Fn(Step) -> bool) -> Option<(Step, usize)> {
+    if from == to { return None; }
     let mut seen = HashSet::from([from]);
     let mut queue = VecDeque::new();
     for step in Step::ALL.into_iter().filter(|s| first(*s)) {
@@ -62,7 +64,12 @@ pub fn path(from: Cell, to: Cell, open: impl Fn(i32, i32) -> bool, first: impl F
 /// How many open cells can be reached from `at` (0 if `at` is closed),
 /// counting no further than `enough`.
 pub fn room(at: Cell, open: impl Fn(i32, i32) -> bool, enough: usize) -> usize {
-    if !open(at.0, at.1) { return 0; }
+    reachable(at, open, enough).len()
+}
+
+/// The open cells that can be reached from `at` (none if `at` is closed), stopping once there are `enough`.
+pub fn reachable(at: Cell, open: impl Fn(i32, i32) -> bool, enough: usize) -> HashSet<Cell> {
+    if !open(at.0, at.1) { return HashSet::new(); }
     let mut seen = HashSet::from([at]);
     let mut stack = vec![at];
     while let Some(cell) = stack.pop() {
@@ -71,12 +78,12 @@ pub fn room(at: Cell, open: impl Fn(i32, i32) -> bool, enough: usize) -> usize {
             if open(next.0, next.1) && seen.insert(next) { stack.push(next); }
         }
     }
-    seen.len()
+    seen
 }
 
 /// An influence map: each source spreads its strength over the open cells, falling by `decay` (0 to 1) every
-/// step it walks, out to `reach` steps; strengths add where they meet. Monsters as sources give a danger field to
-/// keep low; food as sources, one to climb.
+/// step it walks, out to `reach` steps; strengths add where they meet. Hazards as sources give a danger field to
+/// keep low; goals as sources, one to climb.
 pub fn influence(sources: &[(Cell, f32)], open: impl Fn(i32, i32) -> bool, decay: f32, reach: usize) -> HashMap<Cell, f32> {
     let mut field = HashMap::new();
     for &(at, strength) in sources {
@@ -109,9 +116,11 @@ mod tests {
     fn a_path_goes_around_a_wall_and_counts_its_steps() {
         // A 5x3 room with a wall down the middle column, open at the bottom.
         let open = |c: i32, r: i32| (0..5).contains(&c) && (0..3).contains(&r) && !(c == 2 && r < 2);
-        assert_eq!(path((0, 0), (4, 0), open, |_| true), Some((Step::Right, 8)));
-        assert_eq!(path((0, 0), (4, 0), open, |s| s != Step::Right), Some((Step::Down, 8)));
-        // The goal may itself be closed (food under a monster).
+        // Down and right tie; a search tries down first.
+        assert_eq!(path((0, 0), (4, 0), open, |_| true), Some((Step::Down, 8)));
+        assert_eq!(path((0, 0), (4, 0), open, |s| s != Step::Down), Some((Step::Right, 8)));
+        assert_eq!(path((1, 1), (1, 1), open, |_| true), None);
+        // The goal may itself be closed (someone stands on it).
         assert_eq!(path((0, 0), (2, 0), open, |_| true), Some((Step::Right, 2)));
         assert_eq!(room((0, 0), open, 100), 13);
         assert_eq!(room((2, 0), open, 100), 0);

@@ -114,12 +114,8 @@ pub(crate) fn turtle(_frame: usize, p: &[Fighter; 2]) -> Input {
 pub(crate) fn poker(frame: usize, p: &[Fighter; 2]) -> Input {
     let mut i = Input::default();
     let dist = (p[1].x - p[0].x).abs();
-    let toward = p[1].x > p[0].x;
-    let (fwd, back) = if toward { (&mut i.right as *mut bool, &mut i.left as *mut bool) }
-                      else { (&mut i.left as *mut bool, &mut i.right as *mut bool) };
-    // SAFETY-free alternative would need two branches everywhere; these
-    // are two distinct fields of a local struct.
-    let (fwd, back) = unsafe { (&mut *fwd, &mut *back) };
+    // Which way to walk, decided below: toward the foe, away, or not at all.
+    let mut step: Option<bool> = None;
 
     // The safe poke is the yardstick: the low kick. (Poking with the high
     // kick made the poker throw its most punishable move as its jab.)
@@ -129,7 +125,7 @@ pub(crate) fn poker(frame: usize, p: &[Fighter; 2]) -> Input {
     if whiffed && dist < my_kick {
         i.kick_high = true;                 // punish
     } else if dist > my_kick * 1.15 {
-        *fwd = true;                        // close the gap
+        step = Some(true);                  // close the gap
     } else if frame % 30 < 3 {
         i.kick_low = true;                  // poke from the edge
     } else if frame % 30 < 6 {
@@ -138,8 +134,11 @@ pub(crate) fn poker(frame: usize, p: &[Fighter; 2]) -> Input {
     } else {
         // Otherwise hold guard, and change which: one guard held all round
         // ate every high kick.
-        *back = true;
+        step = Some(false);
         i.down = frame % 96 < 52;
+    }
+    if let Some(forward) = step {
+        if (p[1].x > p[0].x) == forward { i.right = true; } else { i.left = true; }
     }
     i
 }

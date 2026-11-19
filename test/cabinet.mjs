@@ -412,12 +412,12 @@ test('the machines are silent until the first key, then the nearest is loudest a
   await page.waitForFunction(() => blipArcadeSound.state().running);
   const heard = (await room(page)).machines;
   const by = Object.fromEntries(heard.map((m) => [m.slug, m]));
-  assert.deepEqual(heard.map((m) => m.slug).sort(), ['adder', 'bouncer', 'defender', 'rally', 'warlock'],
+  assert.deepEqual(heard.map((m) => m.slug).sort(), ['bouncer', 'defender', 'rally', 'rounds', 'warlock'],
     'the faced machine and two either side');
   assert.equal(by.rally.level, 1);
   assert.equal(by.rally.pan, 0);
   assert.equal(by.bouncer.level, 0.5);
-  assert.ok(by.bouncer.pan > 0 && by.adder.pan < 0, 'neighbours on their own sides');
+  assert.ok(by.bouncer.pan > 0 && by.rounds.pan < 0, 'neighbours on their own sides');
   assert.ok(by.defender.level < by.bouncer.level);
   await page.keyboard.press('ArrowRight');
   await aisleStill(page);
@@ -493,7 +493,7 @@ test('only the machines near you fetch and play their attract loops', async (t) 
   await page.goto(`${origin}/index.html`);
   await machineReady(page);
   await page.waitForFunction(() => document.querySelectorAll('#game-grid .card[data-loop-ready]').length === 5);
-  assert.deepEqual([...fetched].sort(), ['adder', 'bouncer', 'defender', 'rally', 'warlock']);
+  assert.deepEqual([...fetched].sort(), ['bouncer', 'defender', 'rally', 'rounds', 'warlock']);
   const strip = await page.evaluate(() => {
     const card = document.querySelector('.card[data-machine="rally"]'), img = card.querySelector('.card-loop-strip');
     return { frames: img.naturalHeight / (img.naturalWidth / (480 / 540)), playing: getComputedStyle(card.querySelector('.card-loop-frame')).animationPlayState,

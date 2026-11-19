@@ -35,6 +35,12 @@ const SHIP_TURN_RATE:   f32 = 3.6; // radians/sec
 const SHIP_ACCEL:       f32 = 260.0;
 const SHIP_MAX_SPEED:   f32 = 340.0;
 const SHIP_RADIUS:      f32 = 11.0;
+/// Accuracy pays: every STREAK_PER hits in a row without a wasted shot add one to the score multiple, up to
+/// STREAK_MAX. Spraying shots breaks the run, so aiming beats firing at random.
+const STREAK_PER: i32 = 5;
+const STREAK_MAX: i32 = 4;
+/// A saucer's hit radius: the big one is the easy target.
+fn saucer_radius(big: bool) -> f32 { if big { 16.0 } else { 9.0 } }
 const SHIP_INVULN:      f32 = 2.5;
 const RESPAWN_DELAY:    f32 = 1.6;
 const SAFE_RADIUS:      f32 = 110.0;
@@ -186,6 +192,8 @@ struct Game {
     saucer_cd: f32,
     sess: Session,
     next_life_score: i32,
+    /// Hits in a row without a shot going to waste (see STREAK_PER).
+    streak: blip::Streak,
     /// Seconds since the current wave arrived, for its banner.
     wave_t: f32,
     fx: Fx,
@@ -207,6 +215,7 @@ impl Game {
             saucer_cd: 12.0,
             sess: Session::new(LIVES_START),
             next_life_score: EXTRA_LIFE_SCORE,
+            streak: blip::Streak::new(STREAK_PER, STREAK_MAX),
             wave_t: 0.0,
             fx: Fx::new(),
         }
@@ -241,6 +250,7 @@ impl Game {
     fn start_game(&mut self) {
         self.sess.reset(LIVES_START);
         self.next_life_score = EXTRA_LIFE_SCORE;
+        self.streak.miss();
         self.bullets = [BULLET_OFF; MAX_BULLETS];
         self.debris = [DEBRIS_OFF; MAX_DEBRIS];
         self.fx.clear();
@@ -253,7 +263,8 @@ impl Game {
     }
 }
 
-blip::sounds!(Sounds { fire, thrust, bang_large, bang_medium, bang_small, saucer_big, saucer_small, ship_boom = "ship_explosion", hyperspace, extra_life });
+blip::sounds!(Sounds { fire, thrust, bang_large, bang_medium, bang_small, saucer_big, saucer_small, ship_boom = "ship_explosion", hyperspace, extra_life,
+    streak_up: [blip::BlipSound; 3] = [blip::sound!("streak2"), blip::sound!("streak3"), blip::sound!("streak4")] });
 
 fn field_centre() -> (f32, f32) {
     (PLAY_W as f32 / 2.0, PLAY_Y0 + PLAY_H as f32 / 2.0)
@@ -422,11 +433,16 @@ fn kill_ship(g: &mut Game, sfx: &Sounds) {
     if !g.ship_alive { return; }
     play_sfx(&sfx.ship_boom);
     g.ship_alive = false;
+    g.streak.miss();
     let (sx, sy, svx, svy) = (g.ship.x, g.ship.y, g.ship.vx, g.ship.vy);
     burst(g, sx, sy, svx, svy, 7, 12.0, 110.0, NEON_CYAN);
     g.state = match g.sess.lose_life_after(&mut g.respawn_t, RESPAWN_DELAY) {
         LifeResult::StillAlive => State::Dead,
-        LifeResult::GameOver => State::Over,
+        LifeResult::GameOver => {
+            // A new best gets the extra-life jingle after the blast.
+            if web::beats_best(g.sess.score) { play_sfx(&sfx.extra_life); }
+            State::Over
+        }
     };
 }
 
@@ -493,6 +509,8 @@ fn fire_shot(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) {
+    // At 0.6 volume: the chime comes often, and its jingle peaks as loud as a level clear.
+    if let Some(m) = g.streak.risen() { blip::audio::play_sfx_volume(&sfx.streak_up[(m as usize - 2).min(2)], 0.6); }
     let ship_before = (g.ship.x, g.ship.y);
     let mut ship_delta = (0.0, 0.0);
     let mut ship_teleported = false;
@@ -564,7 +582,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
         }
     }
     if g.ship_alive && g.invuln_t <= 0.0 && g.saucer.active {
-        let r = if g.saucer.big { 16.0 } else { 9.0 };
+        let r = saucer_radius(g.saucer.big);
         let hit = if saucer_was_active {
             wrapped_motion_overlap(
                 (g.ship.x, g.ship.y),
@@ -685,7 +703,10 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
                 g.asteroids[ai].active = false;
                 let c = rock_color(&a, g.sess.level, blip::macroquad::time::get_time() as f32);
                 burst(g, a.x, a.y, a.vx, a.vy, 5, size.radius() * 0.5, 60.0, c);
-                award(g, sfx, size.points());
+                let times = g.streak.hit();
+                let pts = size.points() * times;
+                if times > 1 { g.fx.popup(a.x, a.y - 10.0, &format!("{pts} X{times}"), NEON_YELLOW); }
+                award(g, sfx, pts);
                 blip::bot::add(if size == ASize::Small { "rocks_dust" } else { "rocks_split" }, 1.0);
                 match size {
                     ASize::Large  => play_sfx(&sfx.bang_large),
@@ -704,7 +725,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
             if !g.bullets[bi].active || !g.bullets[bi].from_player { continue; }
             let from = bullet_starts[bi];
             let to = (from.0 + g.bullets[bi].vx * dt, from.1 + g.bullets[bi].vy * dt);
-            let r = if g.saucer.big { 16.0 } else { 9.0 };
+            let r = saucer_radius(g.saucer.big);
             let hit = if saucer_was_active {
                 wrapped_motion_overlap(
                     (g.bullets[bi].x, g.bullets[bi].y),
@@ -722,8 +743,9 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
                 blip::bot::add("saucers", 1.0);
                 let (sx, sy, svx) = (g.saucer.x, g.saucer.y, g.saucer.vx);
                 burst(g, sx, sy, svx, 0.0, 6, r, 90.0, NEON_PINK);
-                let pts = if g.saucer.big { 200 } else { 1000 };
-                g.fx.popup(sx, sy - 14.0, &format!("{pts}"), NEON_YELLOW);
+                let times = g.streak.hit();
+                let pts = if g.saucer.big { 200 } else { 1000 } * times;
+                g.fx.popup(sx, sy - 14.0, &if times > 1 { format!("{pts} X{times}") } else { format!("{pts}") }, NEON_YELLOW);
                 award(g, sfx, pts);
                 if g.saucer.big { play_sfx(&sfx.saucer_big); } else { play_sfx(&sfx.saucer_small); }
                 break;
@@ -732,7 +754,8 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 
     for (i, &expired) in player_bullet_expired.iter().enumerate() {
-        if expired { g.bullets[i].active = false; }
+        // A shot that runs out without hitting anything breaks the run.
+        if expired && g.bullets[i].active { g.bullets[i].active = false; g.streak.miss(); }
     }
 
     if pool_iter(&g.asteroids).count() == 0 {
@@ -994,7 +1017,7 @@ fn draw_rock(blip: &Blip, a: &Asteroid, level: i32, t: f32) {
 }
 
 fn draw_saucer(blip: &Blip, s: &Saucer, level: i32) {
-    let r = if s.big { 16.0 } else { 9.0 };
+    let r = saucer_radius(s.big);
     // A shot is coming: the core lights up and swells just before it fires.
     if s.fire_t < SAUCER_TELL {
         let k = 1.0 - s.fire_t / SAUCER_TELL;
@@ -1080,6 +1103,7 @@ fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
         draw_ship(blip, &g.ship, g.invuln_t, g.sess.level, NEON_CYAN);
     }
     blip.draw_hud(g.sess.score, g.sess.lives);
+    blip.draw_hud_multiple(g.sess.score, g.streak.multiple());
     // x=12 clears the shell's 3px canvas clip, which eats more of this wider canvas's units.
     let lvl = format!("LEVEL {}", g.sess.level);
     blip.draw_text(&lvl, 12.0, WIN_H as f32 - 22.0, 2.0, BLIP_GRAY);

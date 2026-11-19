@@ -42,6 +42,8 @@ thread_local! {
     /// The street being drawn: the distance along it at the camera's anchor, and the anchor's x (where height leans
     /// away from).
     static VIEW: std::cell::Cell<(f32, f32)> = const { std::cell::Cell::new((0.0, 240.0)) };
+    /// The sun's shadow, canal-pixels per unit of height (x, y): long toward the viewer at dawn, short by morning.
+    static SUN: std::cell::Cell<(f32, f32)> = const { std::cell::Cell::new((-0.3, 0.8)) };
     /// How far the camera has turned the street being drawn.
     static TURNED: std::cell::Cell<f32> = const { std::cell::Cell::new(0.0) };
     /// What stands upright whatever the camera does (towers, statues, posts), put off until the streets are drawn.
@@ -50,7 +52,20 @@ thread_local! {
 
 /// Something that stands up off the street, drawn upright on the screen.
 #[derive(Clone, Copy)]
-enum Stand { Tower, Church, Statue, Guard, Post(bool, Light), Wagon, Sign }
+enum Stand { Statue, Guard, Post(bool, Light), Wagon, Sign }
+
+/// The low sun is ahead and a little to the right: shadows fall back toward the viewer and left, 2.4 px per unit of
+/// height at dawn, 0.8 by full morning.
+fn set_sun(day: f32) {
+    let l = blip::lerp(2.4, 0.8, day.clamp(0.0, 1.0));
+    SUN.with(|s| s.set((-0.35 * l, l)));
+}
+
+/// Where the shadow of a thing `h` units tall falls, from under it.
+fn sun(h: f32) -> (f32, f32) {
+    let (x, y) = SUN.with(|s| s.get());
+    (x * h, y * h)
+}
 
 /// Draw the street from (`x`, `d`) in its own frame.
 fn set_view(d: f32, x: f32) { VIEW.with(|v| v.set((d, x))); }
@@ -66,13 +81,11 @@ fn stand(x: f32, y: f32, what: Stand) {
 }
 
 /// Everything put aside, upright: farthest up the screen first.
-fn draw_standing(blip: &Blip, g: &Game, t: f32) {
+fn draw_standing(blip: &Blip, t: f32) {
     let mut list = STANDING.with(|l| std::mem::take(&mut *l.borrow_mut()));
     list.sort_by(|a, b| a.1.total_cmp(&b.1));
     for (x, y, what) in list {
         match what {
-            Stand::Tower => rundetaarn(blip, x, y, g),
-            Stand::Church => marmorkirken(blip, x, y),
             Stand::Statue => frederik(blip, x, y, t),
             Stand::Guard => guard(blip, x, y, 0.0),
             Stand::Post(big, light) => light_post(blip, x, y, big, light),
@@ -129,6 +142,7 @@ pub fn daylight(g: &Game) -> f32 {
 /// The whole street scene: the old street and, near the turn, the new one, each through its own camera turned as
 /// the bike's heading turns; the bike upright on top.
 pub fn draw_world(blip: &Blip, g: &Game, t: f32) {
+    set_sun(daylight(g));
     blip.clear(rgb(GRASS));
     let (cx, cd, ca) = g.camera();
     let near_turn = (g.bike_d - JD).abs() < 700.0;
@@ -153,7 +167,7 @@ pub fn draw_world(blip: &Blip, g: &Game, t: f32) {
         }
     }
     blip.set_offset(0.0, 0.0);
-    draw_standing(blip, g, t);
+    draw_standing(blip, t);
     draw_bike(blip, g, t, bike_at.0, bike_at.1);
     // back to the bike's own street for what is drawn over the picture
     set_view(g.bike_d, 240.0);
@@ -198,8 +212,9 @@ pub fn draw_street(blip: &Blip, g: &Game, t: f32, seg: u8) {
             match g.houses[s][r].lot {
                 Lot::House { .. } => draw_building(blip, g, s, r, t),
                 Lot::Bakery => draw_shop(blip, g, s, r),
-                Lot::Tower => stand(mx(s, 60.0), sy(g, door_d(r)) + 34.0, Stand::Tower),
-                Lot::Church => stand(mx(s, 58.0), sy(g, door_d(r)) + 40.0, Stand::Church),
+                // drawn in the houses' own perspective, so they stand up off the street as the houses do
+                Lot::Tower => rundetaarn_up(blip, g, s, r),
+                Lot::Church => marmorkirken_up(blip, g, s, r),
                 Lot::Palace => palace(blip, g, s, r),
                 _ => {}
             }
@@ -255,7 +270,8 @@ fn bus(blip: &Blip, x: f32, y: f32, up: bool, long: bool, line: &str, doors: boo
     let (hw, hl, hh) = (13.0, if long { 60.0 } else { 44.0 }, 28.0);
     let yellow = [246, 194, 34];
     let red = [206, 40, 40];
-    blip.fill_rect(x - hw + 4.0, y - hl + 4.0, hw * 2.0, hl * 2.0, rgba([20, 20, 30], 0.3));
+    let (ox, oy) = sun(6.0);
+    blip.fill_rect(x - hw + ox, y - hl + oy, hw * 2.0, hl * 2.0, rgba([20, 20, 30], 0.3));
     let (front, rear) = if up { (y - hl, y + hl) } else { (y + hl, y - hl) };
     // the side toward the middle of the street
     let sx = if x < vanish().0 { x + hw } else { x - hw };
@@ -316,7 +332,8 @@ fn bus_stop(blip: &Blip, g: &Game, row: usize, side: Side, t: f32) {
     let y = sy(g, d);
     if !(-80.0..WIN_H as f32 + 60.0).contains(&y) { return; }
     let x = mx(s, 136.0);
-    blip.fill_rect(x - 9.0 + 3.0, y - 24.0 + 3.0, 18.0, 48.0, rgba([20, 20, 30], 0.25));
+    let (ox, oy) = sun(3.5);
+    blip.fill_rect(x - 9.0 + ox, y - 24.0 + oy, 18.0, 48.0, rgba([20, 20, 30], 0.25));
     block(x, y, 8.0, 24.0, 0.0, 22.0, rgba([170, 210, 230], 0.55), rgb([60, 64, 72]));
     let (px, py) = lift(mx(s, 146.0), y - 34.0, 26.0);
     blip.draw_line_ex(mx(s, 146.0), y - 34.0, px, py, 2.0, rgb([60, 60, 66]));
@@ -504,79 +521,154 @@ fn plaza(blip: &Blip, g: &Game, r: usize, y: f32) {
     }
 }
 
-/// Rundetaarn: the broad brick drum, its windows climbing with the ramp inside, the railed platform and the
-/// observatory on top.
-fn rundetaarn(blip: &Blip, cx: f32, base: f32, g: &Game) {
-    let (w, h) = (66.0, 150.0);
-    let top = base - h;
-    blip.fill_rect(cx - w / 2.0 + 6.0, base - 4.0, w, 10.0, rgba([20, 20, 30], 0.3));
-    // the drum, shaded round
-    let n = 11;
-    for i in 0..n {
-        let k = (i as f32 + 0.5) / n as f32;
-        let light = 0.62 + 0.42 * (k * PI).sin() - 0.12 * k;
-        blip.fill_rect(cx - w / 2.0 + w * i as f32 / n as f32, top, w / n as f32 + 0.5, h, rgb(shade_u([170, 76, 56], light)));
-    }
-    for c in 0..18 { blip.fill_rect(cx - w / 2.0, top + 6.0 + c as f32 * 8.0, w, 1.0, rgba([90, 34, 28], 0.25)); }
-    // windows climb with the spiral ramp: rows offset step by step
-    for row in 0..6 {
-        for col in 0..2 {
-            let wx = cx - 18.0 + ((row * 9 + col * 26) % 36) as f32;
-            let wy = top + 20.0 + row as f32 * 21.0;
-            blip.fill_rect(wx - 3.0, wy - 1.0, 8.0, 13.0, rgb([226, 214, 196]));
-            blip.fill_rect(wx - 2.0, wy, 6.0, 11.0, rgb(if daylight(g) < 0.4 { [255, 214, 130] } else { [60, 70, 90] }));
-            blip.fill_circle(wx + 1.0, wy, 3.0, rgb([226, 214, 196]));
-        }
-    }
-    // the door at the foot, the cornice and the iron railing round the platform
-    blip.fill_rect(cx - 7.0, base - 22.0, 14.0, 22.0, rgb([226, 214, 196]));
-    blip.fill_rect(cx - 5.0, base - 20.0, 10.0, 20.0, rgb([90, 50, 34]));
-    blip.fill_rect(cx - w / 2.0 - 3.0, top - 4.0, w + 6.0, 6.0, rgb([214, 204, 186]));
-    for i in 0..14 {
-        let x = cx - w / 2.0 + i as f32 * (w / 13.0);
-        blip.draw_line(x, top - 4.0, x, top - 14.0, rgb([40, 40, 46]));
-    }
-    blip.draw_line_ex(cx - w / 2.0, top - 14.0, cx + w / 2.0, top - 14.0, 2.0, rgb([40, 40, 46]));
-    // the observatory in the middle of the platform: a drum and its pale dome
-    blip.fill_rect(cx - 13.0, top - 22.0, 26.0, 14.0, rgb([200, 196, 190]));
-    blip.fill_circle(cx, top - 22.0, 14.0, rgb([214, 218, 224]));
-    blip.fill_rect(cx - 14.0, top - 22.0, 28.0, 2.0, rgb([170, 170, 176]));
-    blip.fill_rect(cx - 1.0, top - 36.0, 2.0, 14.0, rgb([110, 116, 126]));
+/// A point `h` up from (`x`, `y`) on the ground: the same perspective as the houses (`lift`).
+fn up(p: (f32, f32), h: f32) -> (f32, f32) { lift(p.0, p.1, h) }
+
+/// How a wall facing `n` (a unit vector on the ground) is lit by the low sun ahead and to the right: 0.62 to 1.08.
+fn sunlit(n: (f32, f32)) -> f32 {
+    let s = (0.33f32, -0.94f32);
+    0.85 + 0.23 * (n.0 * s.0 + n.1 * s.1)
 }
 
-/// Marmorkirken: the great green copper dome on its drum of paired columns, the lantern and its gilded top.
-fn marmorkirken(blip: &Blip, cx: f32, base: f32) {
-    let copper = [96, 164, 134];
-    blip.fill_rect(cx - 50.0, base - 6.0, 110.0, 12.0, rgba([20, 20, 30], 0.3));
-    // the portico and the drum
-    blip.fill_rect(cx - 48.0, base - 40.0, 96.0, 40.0, rgb([226, 220, 206]));
-    for i in 0..8 { blip.fill_rect(cx - 44.0 + i as f32 * 12.0, base - 36.0, 4.0, 34.0, rgb([244, 240, 230])); }
-    blip.fill_rect(cx - 52.0, base - 44.0, 104.0, 5.0, rgb([200, 194, 180]));
-    blip.fill_rect(cx - 42.0, base - 74.0, 84.0, 30.0, rgb([214, 208, 194]));
-    for i in 0..12 { blip.fill_rect(cx - 40.0 + i as f32 * 7.0, base - 72.0, 3.0, 26.0, rgb([236, 232, 222])); }
-    // the dome: rings of copper, ribs, a highlight
-    let (dw, dh, dy) = (46.0, 52.0, base - 76.0);
-    for i in 0..(dh as i32) {
-        let f = i as f32 / dh;
-        let half = dw * (1.0 - f * f).sqrt();
-        blip.fill_rect(cx - half, dy - i as f32, half * 2.0, 1.2, rgb(shade_u(copper, 0.82 + 0.25 * f)));
+/// A round wall from `h0` to `h1` on a circle of radius `rad` round `c`, seen from above as the houses are: only the
+/// side facing the viewer (toward the vanishing point), each strip lit by the sun; `strip` may draw on each strip.
+fn round_wall(c: (f32, f32), rad: f32, h0: f32, h1: f32, col: [u8; 3], strip: &mut dyn FnMut(f32, f32, f32)) {
+    let v = vanish();
+    let n = 36;
+    for i in 0..n {
+        let (a0, a1) = (i as f32 / n as f32 * TAU, (i + 1) as f32 / n as f32 * TAU);
+        let am = (a0 + a1) / 2.0;
+        let nrm = (am.cos(), am.sin());
+        if nrm.0 * (v.0 - c.0) + nrm.1 * (v.1 - c.1) < 0.0 { continue; }
+        let (p0, p1) = ((c.0 + rad * a0.cos(), c.1 + rad * a0.sin()), (c.0 + rad * a1.cos(), c.1 + rad * a1.sin()));
+        quad(up(p0, h0), up(p1, h0), up(p1, h1), up(p0, h1), rgb(shade_u(col, sunlit(nrm))));
+        strip(am, a0, a1);
     }
-    for rib in -4..=4 {
-        let k = rib as f32 / 5.0;
-        for i in 0..(dh as i32 - 2) {
-            let f = i as f32 / dh;
-            let half = dw * (1.0 - f * f).sqrt();
-            blip.fill_rect(cx + k * half - 0.5, dy - i as f32, 1.5, 1.0, rgb(shade_u(copper, 0.7)));
+}
+
+/// The flat top of a round wall at height `h`: a disc in the houses' perspective.
+fn round_top(c: (f32, f32), rad: f32, h: f32, col: BlipColor) {
+    let n = 36;
+    let mid = up(c, h);
+    for i in 0..n {
+        let (a0, a1) = (i as f32 / n as f32 * TAU, (i + 1) as f32 / n as f32 * TAU);
+        tri(mid, up((c.0 + rad * a0.cos(), c.1 + rad * a0.sin()), h), up((c.0 + rad * a1.cos(), c.1 + rad * a1.sin()), h), col);
+    }
+}
+
+/// Rundetaarn (1642) seen from above like the houses: the weathered brick drum, its arched windows climbing with the
+/// ramp on the side facing you, the sandstone cornice, the iron railing round the platform and the observatory with
+/// its dark dome in the middle.
+fn rundetaarn_up(blip: &Blip, g: &Game, s: usize, r: usize) {
+    let c = (mx(s, 62.0), sy(g, door_d(r)));
+    // 46 high in the houses' units (the palace is 54): taller leans so far toward the edge it reads as lying down
+    let (rad, hh) = (32.0, 46.0);
+    let (ox, oy) = sun(hh * 0.18);
+    blip.fill_circle(c.0 + ox, c.1 + oy, rad + 6.0, rgba([20, 20, 30], 0.28));
+    let glass = if daylight(g) < 0.4 { [255, 214, 130] } else { [56, 64, 84] };
+    round_wall(c, rad, 0.0, hh, [150, 88, 66], &mut |am, _, _| {
+        let _ = &glass;
+        // windows on the ramp's spiral: one strip in three has one, higher the further round
+        let turn = (am / TAU * 9.0).round() as i32;
+        if turn % 2 != 0 { return; }
+        let wh = 10.0 + ((am / TAU * 7.0).fract()) * (hh - 26.0);
+        let p = (c.0 + (rad + 0.2) * am.cos(), c.1 + (rad + 0.2) * am.sin());
+        let (b, t) = (up(p, wh), up(p, wh + 6.0));
+        blip.draw_line_ex(b.0, b.1, t.0, t.1, 3.5, rgb([226, 214, 196]));
+        blip.draw_line_ex(b.0, b.1, t.0, t.1, 2.0, rgb(glass));
+    });
+    // brick courses and the cornice ring
+    round_wall(c, rad + 2.0, hh - 3.0, hh, [216, 206, 188], &mut |_, _, _| {});
+    round_top(c, rad + 2.0, hh, rgb([196, 186, 168]));
+    round_top(c, rad - 2.0, hh, rgb([160, 150, 134]));
+    // the railing: black posts round the rim
+    for i in 0..24 {
+        let a = i as f32 / 24.0 * TAU;
+        let p = (c.0 + (rad + 1.0) * a.cos(), c.1 + (rad + 1.0) * a.sin());
+        let (b, t) = (up(p, hh), up(p, hh + 5.0));
+        blip.draw_line(b.0, b.1, t.0, t.1, rgb([30, 30, 36]));
+    }
+    // the observatory: a pale drum and its dark dome
+    round_wall(c, 11.0, hh, hh + 8.0, [214, 206, 190], &mut |_, _, _| {});
+    // the dome's grey-green (OpenStreetMap's roof colour, #74847f)
+    round_top(c, 11.0, hh + 8.0, rgb([100, 116, 110]));
+    round_top(c, 6.0, hh + 11.0, rgb([128, 144, 138]));
+    let slit = (up((c.0 - 1.0, c.1 - 10.0), hh + 9.0), up((c.0 - 1.0, c.1 + 10.0), hh + 9.0));
+    blip.draw_line_ex(slit.0 .0, slit.0 .1, slit.1 .0, slit.1 .1, 1.5, rgb([30, 34, 38]));
+}
+
+/// Marmorkirken seen from above like the houses: the round marble church, its portico toward the street, the green
+/// copper dome on top, ribbed, with the ring of round dormers, the lantern and the gilded cross.
+fn marmorkirken_up(blip: &Blip, g: &Game, s: usize, r: usize) {
+    let c = (mx(s, 56.0), sy(g, door_d(r)));
+    // kept low in the houses' units (body 22, dome 20) for the same reason as Rundetaarn
+    let (rad, hh) = (42.0, 22.0);
+    let toward = if s == 0 { 1.0 } else { -1.0 };
+    let (ox, oy) = sun(hh * 0.3);
+    blip.fill_circle(c.0 + ox, c.1 + oy, rad + 8.0, rgba([20, 20, 30], 0.28));
+    // grey Norwegian marble and pale verdigris copper (OpenStreetMap: #c6c7ce walls, #b5dbce roof)
+    let marble = [204, 205, 210];
+    // the portico: a box toward the street, its columns, its pediment roof
+    let (px0, px1, py0, py1) = (c.0 + toward * (rad - 8.0), c.0 + toward * (rad + 16.0), c.1 - 26.0, c.1 + 26.0);
+    let (pl, pr) = (px0.min(px1), px0.max(px1));
+    let front = if toward > 0.0 { pr } else { pl };
+    let ph = 18.0;
+    quad(up((front, py0), 0.0), up((front, py1), 0.0), up((front, py1), ph), up((front, py0), ph), rgb(shade_u(marble, 1.02)));
+    for i in 0..6 {
+        let yy = py0 + 5.0 + i as f32 * 8.4;
+        let (b, t) = (up((front, yy), 0.0), up((front, yy), ph - 2.0));
+        blip.draw_line_ex(b.0, b.1, t.0, t.1, 3.0, rgb([246, 242, 232]));
+    }
+    quad(up((pl, py1), 0.0), up((pr, py1), 0.0), up((pr, py1), ph), up((pl, py1), ph), rgb(shade_u(marble, 0.8)));
+    quad(up((pl, py0), ph), up((pr, py0), ph), up((pr, py1), ph), up((pl, py1), ph), rgb(shade_u(marble, 0.9)));
+    let (a, b2) = (up((front, py0), ph), up((front, py1), ph));
+    tri(a, b2, up((front, c.1), ph + 7.0), rgb(shade_u(marble, 1.05)));
+    // the body: columns all round, tall windows between
+    round_wall(c, rad, 0.0, hh, marble, &mut |am, _, _| {
+        let p = (c.0 + (rad + 0.3) * am.cos(), c.1 + (rad + 0.3) * am.sin());
+        let (b, t) = (up(p, 3.0), up(p, hh - 3.0));
+        if ((am / TAU * 36.0).round() as i32) % 3 == 0 {
+            blip.draw_line_ex(b.0, b.1, t.0, t.1, 2.0, rgb([246, 242, 232]));
+        } else if ((am / TAU * 36.0).round() as i32) % 3 == 1 {
+            let (w0, w1) = (up(p, 6.0), up(p, 16.0));
+            blip.draw_line_ex(w0.0, w0.1, w1.0, w1.1, 2.0, rgb([70, 80, 96]));
+        }
+    });
+    round_top(c, rad, hh, rgb(shade_u(marble, 0.9)));
+    // the dome: copper rings rising and narrowing, lit toward the sun, the ribs over them
+    let copper = [150, 198, 178];
+    let (dr_, dh) = (38.0, 20.0);
+    for k in 0..10 {
+        let f = k as f32 / 10.0;
+        let rr = dr_ * (1.0 - f * f).sqrt();
+        round_top(c, rr, hh + 2.0 + f * dh, rgb(shade_u(copper, 0.8 + 0.3 * f)));
+    }
+    for i in 0..16 {
+        let a = i as f32 / 16.0 * TAU;
+        let mut prev = up((c.0 + dr_ * a.cos(), c.1 + dr_ * a.sin()), hh + 2.0);
+        for k in 1..10 {
+            let f = k as f32 / 10.0;
+            let rr = dr_ * (1.0 - f * f).sqrt();
+            let p = up((c.0 + rr * a.cos(), c.1 + rr * a.sin()), hh + 2.0 + f * dh);
+            blip.draw_line(prev.0, prev.1, p.0, p.1, rgb(shade_u(copper, 0.66)));
+            prev = p;
         }
     }
-    blip.fill_circle(cx - 16.0, dy - 30.0, 6.0, rgba([200, 240, 220], 0.35));
-    // the lantern, its little cupola and the gilded ball and cross
-    blip.fill_rect(cx - 8.0, dy - dh - 18.0, 16.0, 20.0, rgb([214, 208, 194]));
-    for i in 0..3 { blip.fill_rect(cx - 6.0 + i as f32 * 5.0, dy - dh - 16.0, 2.0, 14.0, rgb([110, 120, 130])); }
-    blip.fill_circle(cx, dy - dh - 20.0, 9.0, rgb(copper));
-    blip.fill_rect(cx - 1.0, dy - dh - 36.0, 2.0, 10.0, rgb(GOLD));
-    blip.fill_circle(cx, dy - dh - 30.0, 3.0, rgb(GOLD));
-    blip.fill_rect(cx - 4.0, dy - dh - 35.0, 8.0, 2.0, rgb(GOLD));
+    // round dormers low on the dome, on the side you see
+    let v = vanish();
+    for i in 0..12 {
+        let a = i as f32 / 12.0 * TAU + 0.26;
+        if a.cos() * (v.0 - c.0) + a.sin() * (v.1 - c.1) < 0.0 { continue; }
+        let p = up((c.0 + dr_ * 0.92 * a.cos(), c.1 + dr_ * 0.92 * a.sin()), hh + 8.0);
+        blip.fill_circle(p.0, p.1, 2.6, rgb([226, 220, 206]));
+        blip.fill_circle(p.0, p.1, 1.6, rgb([50, 60, 74]));
+    }
+    // the lantern, its little copper cap, the gilded ball and cross
+    round_wall(c, 7.0, hh + dh, hh + dh + 10.0, [214, 208, 194], &mut |_, _, _| {});
+    round_top(c, 7.5, hh + dh + 10.0, rgb(copper));
+    let (b, t) = (up(c, hh + dh + 10.0), up(c, hh + dh + 20.0));
+    blip.draw_line_ex(b.0, b.1, t.0, t.1, 1.5, rgb(GOLD));
+    blip.fill_circle(t.0, t.1, 2.0, rgb(GOLD));
 }
 
 /// One of Amalienborg's four palaces: sandstone, three floors of tall windows, a copper roof.
@@ -586,7 +678,8 @@ fn palace(blip: &Blip, g: &Game, s: usize, r: usize) {
     let (back, ridge) = (mx(s, -20.0), mx(s, 40.0));
     let hh = 54.0;
     let face = |uy: f32, v: f32| lift(wall_x, uy, v);
-    let stone = [224, 208, 176];
+    // OpenStreetMap: walls #deccb7 under near-black hipped roofs #353440
+    let stone = [222, 204, 183];
     quad((back, y0), (wall_x, y0), face(y0, hh), lift(back, y0, hh), rgb(shade_u(stone, 0.8)));
     quad((back, y1), (wall_x, y1), face(y1, hh), lift(back, y1, hh), rgb(shade_u(stone, 0.8)));
     quad((wall_x, y0), (wall_x, y1), face(y1, hh), face(y0, hh), rgb(stone));
@@ -600,15 +693,28 @@ fn palace(blip: &Blip, g: &Game, s: usize, r: usize) {
             u += 15.0;
         }
     }
-    let copper = [96, 164, 134];
+    // the roof: dark slate, as the four palaces have it, with a row of white dormers
+    let slate = [58, 57, 70];
     let (e0, e1, r0, r1) = (face(y0, hh), face(y1, hh), lift(ridge, y0, hh + 24.0), lift(ridge, y1, hh + 24.0));
-    quad(lift(back, y0, hh), lift(back, y1, hh), r1, r0, rgb(shade_u(copper, 0.75)));
-    quad(e0, e1, r1, r0, rgb(copper));
-    for i in 1..5 {
-        let f = i as f32 / 5.0;
+    quad(lift(back, y0, hh), lift(back, y1, hh), r1, r0, rgb(shade_u(slate, 0.75)));
+    quad(e0, e1, r1, r0, rgb(slate));
+    for i in 1..4 {
+        let f = i as f32 / 4.0;
         let (a, b) = (mix2(e0, r0, f), mix2(e1, r1, f));
-        blip.draw_line(a.0, a.1, b.0, b.1, rgb(shade_u(copper, 0.8)));
+        blip.draw_line(a.0, a.1, b.0, b.1, rgb(shade_u(slate, 0.85)));
     }
+    let mut u = y0 + 12.0;
+    while u < y1 - 14.0 {
+        let (p0, p1) = (mix2(face(u, hh), lift(ridge, u, hh + 24.0), 0.35), mix2(face(u + 7.0, hh), lift(ridge, u + 7.0, hh + 24.0), 0.35));
+        blip.fill_rect(p0.0.min(p1.0) - 1.0, p0.1.min(p1.1) - 6.0, (p1.0 - p0.0).abs() + 3.0, 7.0, rgb([238, 234, 224]));
+        blip.fill_rect(p0.0.min(p1.0), p0.1.min(p1.1) - 5.0, (p1.0 - p0.0).abs() + 1.0, 5.0, rgb([60, 70, 86]));
+        u += 22.0;
+    }
+    // the centre: a pediment over the middle bay, in paler stone
+    let mid = (y0 + y1) / 2.0;
+    tri(face(mid - 20.0, hh), face(mid + 20.0, hh), face(mid, hh + 12.0), rgb(shade_u(stone, 1.06)));
+    let (c0, c1) = (face(mid - 20.0, hh), face(mid + 20.0, hh));
+    blip.draw_line(c0.0, c0.1, c1.0, c1.1, rgb(shade_u(stone, 0.8)));
     // a Royal Life Guard on watch by the palace: bearskin, dark blue tunic, white belts, light blue trousers
     if r == STATUE_ROW {
         stand(mx(s, 128.0), sy(g, door_d(r)), Stand::Guard);
@@ -631,16 +737,24 @@ pub fn guard(blip: &Blip, x: f32, y: f32, step: f32) {
 
 /// Frederik V on his horse, high on the pedestal in the middle of Amalienborg's square.
 fn frederik(blip: &Blip, cx: f32, base: f32, t: f32) {
-    let bronze = [70, 122, 104];
-    blip.fill_rect(cx - 20.0, base - 6.0, 46.0, 12.0, rgba([20, 20, 30], 0.3));
-    // the pedestal
-    blip.fill_rect(cx - 18.0, base - 34.0, 36.0, 34.0, rgb([214, 208, 196]));
-    blip.fill_rect(cx - 20.0, base - 38.0, 40.0, 5.0, rgb([196, 190, 178]));
-    blip.fill_rect(cx - 20.0, base - 3.0, 40.0, 4.0, rgb([196, 190, 178]));
-    blip.fill_rect(cx - 10.0, base - 26.0, 20.0, 12.0, rgb([200, 194, 182]));
+    // Saly's statue as it stands: dark green-grey bronze, a tall veined marble plinth with bronze medallions on its
+    // faces, and the black iron railing round it
+    let bronze = [62, 104, 92];
+    let lit = shade_u(bronze, 1.35);
+    blip.fill_rect(cx - 26.0, base - 6.0, 58.0, 14.0, rgba([20, 20, 30], 0.3));
+    let marble = [222, 216, 204];
+    blip.fill_rect(cx - 15.0, base - 46.0, 30.0, 46.0, rgb(marble));
+    blip.fill_rect(cx - 15.0, base - 46.0, 4.0, 46.0, rgb(shade_u(marble, 0.86)));
+    blip.fill_rect(cx - 18.0, base - 50.0, 36.0, 5.0, rgb(shade_u(marble, 0.9)));
+    blip.fill_rect(cx - 19.0, base - 6.0, 38.0, 6.0, rgb(shade_u(marble, 0.88)));
+    for k in [-6.0, 3.0, 9.0] { blip.draw_line(cx + k, base - 44.0, cx + k + 3.0, base - 8.0, rgba([170, 160, 150], 0.5)); }
+    blip.fill_circle(cx, base - 27.0, 7.0, rgb(shade_u(bronze, 0.8)));
+    blip.fill_circle(cx, base - 27.0, 5.0, rgb(bronze));
+    blip.fill_circle(cx - 1.5, base - 28.5, 2.0, rgb(lit));
     // the horse, stepping out, and the king in his Roman armour with the baton
-    let y = base - 38.0;
+    let y = base - 50.0;
     blip.fill_rect(cx - 16.0, y - 22.0, 28.0, 12.0, rgb(bronze));
+    blip.fill_rect(cx - 14.0, y - 22.0, 24.0, 3.0, rgb(lit));
     blip.fill_circle(cx - 16.0, y - 16.0, 6.0, rgb(bronze));
     blip.fill_circle(cx + 12.0, y - 16.0, 6.0, rgb(bronze));
     for (lx, lift_) in [(-14.0, 0.0), (-8.0, 0.0), (6.0, 0.0), (11.0, 6.0)] {
@@ -648,10 +762,20 @@ fn frederik(blip: &Blip, cx: f32, base: f32, t: f32) {
     }
     blip.fill_rect(cx + 12.0, y - 32.0, 7.0, 14.0, rgb(bronze));
     blip.fill_rect(cx + 15.0, y - 34.0, 9.0, 6.0, rgb(bronze));
+    blip.fill_rect(cx + 15.0, y - 34.0, 9.0, 2.0, rgb(lit));
     blip.draw_line_ex(cx - 20.0, y - 20.0, cx - 24.0, y - 6.0, 2.0, rgb(bronze));
     blip.fill_rect(cx - 4.0, y - 38.0, 8.0, 16.0, rgb(bronze));
+    blip.fill_rect(cx - 4.0, y - 38.0, 3.0, 16.0, rgb(lit));
     blip.fill_circle(cx, y - 41.0, 4.0, rgb(bronze));
     blip.draw_line_ex(cx + 3.0, y - 34.0, cx + 12.0, y - 40.0, 2.0, rgb(bronze));
+    // the railing: black posts and two rails, around the foot
+    let iron = rgb([28, 28, 32]);
+    for i in 0..9 {
+        let x = cx - 24.0 + i as f32 * 6.0;
+        blip.fill_rect(x, base - 9.0, 1.5, 10.0, iron);
+    }
+    blip.fill_rect(cx - 24.0, base - 9.0, 50.0, 1.5, iron);
+    blip.fill_rect(cx - 24.0, base - 4.0, 50.0, 1.0, iron);
     let _ = t;
 }
 
@@ -709,6 +833,25 @@ fn draw_ground(blip: &Blip, g: &Game, r: usize) {
         for x in [RAIL[0] - 36.0, RAIL[1] + 30.0] { blip.fill_rect(x, y, 6.0, LOT, rgb([206, 200, 190])); }
         for x in [RAIL[0] - 4.0, RAIL[1]] {
             blip.fill_rect(x, y, 4.0, LOT, rgb(KERB));
+        }
+        // the bridge's ornate cast-iron lamp posts on the parapets, dark green-black, a cluster of globes on top
+        let dark = daylight(g) < 0.45;
+        for x in [RAIL[0] - 33.0, RAIL[1] + 33.0] {
+            for k in [0.25, 0.75] {
+                let yc = y + LOT * k;
+                // 20 high: taller, the perspective tips a thin post toward the water as if knocked over
+                let top = lift(x, yc, 20.0);
+                blip.fill_circle(x, yc, 3.5, rgb([30, 44, 40]));
+                blip.draw_line_ex(x, yc, top.0, top.1, 2.5, rgb([34, 50, 46]));
+                let mid = lift(x, yc, 8.0);
+                blip.fill_circle(mid.0, mid.1, 2.0, rgb([40, 58, 52]));
+                for (dx, dy) in [(-4.0, 0.0), (4.0, 0.0), (0.0, -3.0)] {
+                    let (gx, gy) = (top.0 + dx, top.1 + dy);
+                    if dark { blip.fill_glow_circle(gx, gy, 2.6, rgb([255, 236, 190])); }
+                    else { blip.fill_circle(gx, gy, 2.3, rgb([226, 226, 220])); }
+                }
+                blip.fill_rect(top.0 - 1.0, top.1 - 7.0, 2.0, 4.0, rgb([34, 50, 46]));
+            }
         }
         return;
     }
@@ -792,7 +935,7 @@ fn draw_ground(blip: &Blip, g: &Game, r: usize) {
     }
 }
 
-/// What stands on the pavement where two lots meet: a street tree, a lamp post or a rack of parked bikes.
+/// What stands on the pavement where two lots meet: a street tree or a rack of parked bikes.
 fn draw_furniture(blip: &Blip, g: &Game, r: usize, y: f32) {
     for s in 0..2 {
         let pick = scatter(r * 2 + s, 91);
@@ -803,16 +946,6 @@ fn draw_furniture(blip: &Blip, g: &Game, r: usize, y: f32) {
             blip.fill_circle(x, y, 15.0, rgb([64, 128, 66]));
             blip.fill_circle(x - 4.0, y - 4.0, 8.0, rgb([94, 160, 86]));
             blip.fill_circle(x + 5.0, y + 3.0, 4.0, rgb([120, 176, 96]));
-        } else if pick < 0.0 {
-            // a red postbox
-            blip.fill_rect(x - 5.0, y - 6.0, 10.0, 12.0, rgb([200, 30, 36]));
-            blip.fill_rect(x - 5.0, y - 6.0, 10.0, 3.0, rgb([150, 20, 26]));
-            blip.fill_rect(x - 3.0, y - 1.0, 6.0, 1.0, rgb([40, 20, 20]));
-        } else if pick < 0.0 {
-            // a parked cargo bike, box in front
-            blip.fill_rect(x - 5.0, y - 16.0, 10.0, 12.0, rgb([168, 120, 70]));
-            blip.fill_rect(x - 1.0, y - 4.0, 2.0, 18.0, rgb([40, 110, 160]));
-            blip.fill_circle(x, y + 14.0, 2.5, rgb([40, 40, 46]));
         } else if pick < 0.42 {
             for b in 0..4 {
                 let by = y - 20.0 + b as f32 * 12.0;
@@ -836,7 +969,8 @@ fn draw_lot(blip: &Blip, g: &Game, s: usize, r: usize, t: f32) {
     let dy = sy(g, door_d(r));
     match h.lot {
         Lot::Bridge | Lot::Cross => {}
-        Lot::Park if r == 18 => cemetery(blip, s, r, y),
+        // the cemetery's wall runs on along the street for two lots
+        Lot::Park if (18..=19).contains(&r) => cemetery(blip, s, r, y),
         Lot::Park if r + 2 >= ROWS => amaliehaven(blip, g, s, r, y),
         Lot::Park => draw_park(blip, s, r, y),
         Lot::Bakery => draw_bakery(blip, g, s, r, y, t),
@@ -865,25 +999,67 @@ fn draw_park(blip: &Blip, s: usize, r: usize, y: f32) {
     }
 }
 
-/// Assistens Kirkegaard: old trees, gravestones in the grass, and the long yellow wall along the street.
+/// Assistens Kirkegaard as it meets Nørrebrogade: the long ochre wall with its red tile coping and pillars, and over
+/// it the cemetery's rows of tall poplars, broad lindens, box-hedged plots and old stones in the grass.
 fn cemetery(blip: &Blip, s: usize, r: usize, y: f32) {
-    side_rect(blip, s, 0.0, y, FENCE[0], LOT, rgb([86, 140, 74]));
-    for k in 0..14 {
-        let gx = mx(s, 10.0 + scatter(r * 14 + k, 11) * 90.0);
-        let gy = y + 8.0 + scatter(r * 14 + k, 12) * (LOT - 16.0);
-        blip.fill_rect(gx - 3.0, gy - 2.0, 6.0, 4.0, rgb([170, 168, 160]));
-        blip.fill_rect(gx - 3.0, gy - 2.0, 6.0, 1.0, rgb([200, 198, 190]));
+    side_rect(blip, s, 0.0, y, FENCE[0], LOT, rgb([78, 128, 68]));
+    // a gravel path between the plots
+    side_rect(blip, s, 44.0, y, 10.0, LOT, rgb([196, 182, 146]));
+    for k in 0..12 {
+        let i = r * 12 + k;
+        let gx = mx(s, 8.0 + scatter(i, 11) * 34.0 + if scatter(i, 15) > 0.5 { 52.0 } else { 0.0 });
+        let gy = y + 8.0 + scatter(i, 12) * (LOT - 16.0);
+        match (scatter(i, 16) * 4.0) as i32 {
+            // a plot edged in clipped box, its stone at the head
+            0 => {
+                blip.fill_rect(gx - 6.0, gy - 5.0, 12.0, 10.0, rgb([44, 96, 52]));
+                blip.fill_rect(gx - 4.0, gy - 3.0, 8.0, 6.0, rgb([110, 90, 70]));
+                blip.fill_rect(gx - 3.0, gy - 6.0, 6.0, 3.0, rgb([176, 174, 166]));
+            }
+            // a white cross
+            1 => {
+                blip.fill_rect(gx - 0.5, gy - 5.0, 2.0, 9.0, rgb([232, 230, 222]));
+                blip.fill_rect(gx - 2.5, gy - 3.0, 6.0, 2.0, rgb([232, 230, 222]));
+            }
+            // a dark polished headstone
+            2 => {
+                blip.fill_rect(gx - 3.0, gy - 2.0, 6.0, 4.0, rgb([46, 46, 52]));
+                blip.fill_rect(gx - 3.0, gy - 2.0, 6.0, 1.0, rgb([96, 96, 104]));
+            }
+            // an old grey slab, weathered
+            _ => {
+                blip.fill_rect(gx - 3.0, gy - 2.0, 7.0, 5.0, rgb([164, 162, 152]));
+                blip.fill_rect(gx - 3.0, gy - 2.0, 7.0, 1.0, rgb([196, 194, 186]));
+            }
+        }
     }
+    // tall poplars in a row along the path, and a broad linden leaning over the wall
     for k in 0..3 {
-        let tx = mx(s, 26.0 + scatter(r * 3 + k, 13) * 60.0);
-        let ty = y + 14.0 + k as f32 * 38.0;
-        blip.fill_circle(tx + 3.0, ty + 4.0, 18.0, rgba([20, 40, 20], 0.35));
-        blip.fill_circle(tx, ty, 18.0, rgb([52, 108, 58]));
-        blip.fill_circle(tx - 6.0, ty - 5.0, 9.0, rgb([78, 140, 76]));
+        let (tx, ty) = (mx(s, 60.0), y + 18.0 + k as f32 * 37.0);
+        blip.fill_rect(tx - 4.0 + 6.0, ty - 14.0 + 10.0, 9.0, 30.0, rgba([20, 40, 20], 0.30));
+        for (dy, rad, c) in [(10.0, 6.0, [40, 88, 46]), (2.0, 7.0, [48, 100, 52]), (-6.0, 6.5, [56, 112, 58]), (-13.0, 5.0, [70, 128, 66])] {
+            blip.fill_circle(tx, ty + dy, rad, rgb(c));
+        }
     }
-    // the wall: yellow, capped with red tile
-    side_rect(blip, s, FENCE[0] - 8.0, y, 8.0, LOT, rgb([232, 184, 80]));
-    side_rect(blip, s, FENCE[0] - 8.0, y, 3.0, LOT, rgb([176, 70, 46]));
+    let (lx, ly) = (mx(s, 96.0), y + 30.0 + scatter(r, 17) * 50.0);
+    blip.fill_circle(lx + 4.0, ly + 5.0, 21.0, rgba([20, 40, 20], 0.32));
+    blip.fill_circle(lx, ly, 21.0, rgb([50, 104, 56]));
+    blip.fill_circle(lx - 6.0, ly - 6.0, 12.0, rgb([72, 132, 70]));
+    blip.fill_circle(lx + 7.0, ly + 5.0, 8.0, rgb([42, 92, 48]));
+    // the wall: an ochre face with its pillars, the coping of red tiles, the shade it throws inside
+    side_rect(blip, s, FENCE[0] - 22.0, y, 10.0, LOT, rgba([20, 40, 20], 0.25));
+    side_rect(blip, s, FENCE[0] - 12.0, y, 12.0, LOT, rgb([214, 166, 82]));
+    let mut py = y + 6.0;
+    while py < y + LOT {
+        side_rect(blip, s, FENCE[0] - 12.0, py, 12.0, 3.0, rgb([196, 148, 70]));
+        py += 22.0;
+    }
+    side_rect(blip, s, FENCE[0] - 14.0, y, 5.0, LOT, rgb([166, 66, 44]));
+    let mut ty2 = y;
+    while ty2 < y + LOT {
+        side_rect(blip, s, FENCE[0] - 14.0, ty2, 5.0, 1.0, rgb([120, 44, 30]));
+        ty2 += 3.0;
+    }
 }
 
 /// Amaliehaven at the end of the route: lawns and box hedges down to the harbour, and across the water the Opera
@@ -1052,11 +1228,11 @@ fn house_colours(s: usize, r: usize, k: usize) -> ([u8; 3], [u8; 3]) {
         District::Norrebro => (pick(&[[168, 74, 54], [212, 168, 96], [192, 188, 178], [230, 206, 150], [142, 60, 48], [200, 140, 96]], 1),
             pick(&[[84, 86, 96], [120, 56, 42], [96, 98, 108]], 2)),
         District::IndreBy => (pick(&WALLS, 1), pick(&ROOFS, 2)),
-        // Nyboder yellow, red tile
-        District::Nyboder => ([238, 184, 70], pick(&[[186, 72, 46], [176, 66, 42]], 2)),
-        // sandstone and grey, slate and copper
+        // Nyboder's ochre-orange (it reads orange in the street, not lemon), red tile
+        District::Nyboder => (pick(&[[226, 150, 62], [220, 142, 58]], 1), pick(&[[163, 51, 30], [172, 60, 38]], 2)),
+        // sandstone and grey under dark slate (OpenStreetMap: #21213a, #3f4155), not copper
         District::Frederiksstaden => (pick(&[[220, 206, 180], [200, 196, 188], [228, 214, 190], [212, 190, 160]], 1),
-            pick(&[[86, 88, 98], [96, 164, 134], [90, 92, 102]], 2)),
+            pick(&[[52, 52, 68], [63, 65, 85], [72, 74, 88]], 2)),
     }
 }
 
@@ -1066,7 +1242,9 @@ fn draw_building(blip: &Blip, g: &Game, s: usize, r: usize, t: f32) {
     let h = g.houses[s][r];
     let k = r * 2 + s;
     let (wall, roof) = house_colours(s, r, k);
-    let door = DOORS[(scatter(k, 3) * DOORS.len() as f32) as usize % DOORS.len()];
+    let nyboder = district(side_of(s), r) == District::Nyboder;
+    // Nyboder's doors are all bottle green
+    let door = if nyboder { [44, 96, 64] } else { DOORS[(scatter(k, 3) * DOORS.len() as f32) as usize % DOORS.len()] };
     let (y0, y1) = (sy(g, (r + 1) as f32 * LOT), sy(g, r as f32 * LOT));
     let dy = sy(g, door_d(r));
     let (w, back, ridge) = (mx(s, WALL[0]), mx(s, -30.0), mx(s, 30.0));
@@ -1083,9 +1261,13 @@ fn draw_building(blip: &Blip, g: &Game, s: usize, r: usize, t: f32) {
     }
     // the front wall
     quad((w, y0), (w, y1), face(y1, hh), face(y0, hh), rgb(wall));
-    quad((w, y0), (w, y1), face(y1, 3.0), face(y0, 3.0), shade(wall, 0.7));
-    // windows: two floors either side of the door, white frames, oxblood shutters upstairs
-    let frame = rgb([246, 240, 228]);
+    // the plinth: Nyboder's is tarred black, elsewhere the wall darkened
+    if nyboder { quad((w, y0), (w, y1), face(y1, 4.0), face(y0, 4.0), rgb([38, 34, 32])); }
+    else { quad((w, y0), (w, y1), face(y1, 3.0), face(y0, 3.0), shade(wall, 0.7)); }
+    // windows: two floors either side of the door, white frames (Nyboder's green), shutters upstairs (Nyboder's on
+    // every floor, a dusty raspberry)
+    let frame = rgb(if nyboder { [58, 106, 70] } else { [246, 240, 228] });
+    let shutter = if nyboder { [168, 70, 78] } else { SHUTTER };
     let lit_now = |i: usize| lit(g, s, (r * 4 + i) % (ROWS * 4) / 4) && scatter(k * 8 + i, 9) > 0.3;
     let floors: Vec<(f32, f32)> = if hh < 30.0 { vec![(7.0, 17.0)] } else {
         (0..((hh - 4.0) / 13.0) as i32).map(|f| (5.0 + f as f32 * 13.0, 13.0 + f as f32 * 13.0)).collect()
@@ -1095,9 +1277,9 @@ fn draw_building(blip: &Blip, g: &Game, s: usize, r: usize, t: f32) {
         for (i, off) in [-40.0f32, -18.0, 18.0, 40.0].into_iter().enumerate() {
             if fi == 0 && off.abs() < 20.0 { continue; }
             let (a, b) = (dy + off - 7.0, dy + off + 7.0);
-            if fi > 0 && shutters {
-                quad(face(a - 4.0, v0), face(a, v0), face(a, v1), face(a - 4.0, v1), rgb(SHUTTER));
-                quad(face(b, v0), face(b + 4.0, v0), face(b + 4.0, v1), face(b, v1), rgb(SHUTTER));
+            if (fi > 0 || nyboder) && shutters {
+                quad(face(a - 4.0, v0), face(a, v0), face(a, v1), face(a - 4.0, v1), rgb(shutter));
+                quad(face(b, v0), face(b + 4.0, v0), face(b + 4.0, v1), face(b, v1), rgb(shutter));
             }
             quad(face(a - 1.0, v0 - 1.0), face(b + 1.0, v0 - 1.0), face(b + 1.0, v1 + 1.0), face(a - 1.0, v1 + 1.0), frame);
             let glass = if lit_now(i + fi * 4) { [255, 214, 120] } else { [70, 90, 116] };
@@ -1227,17 +1409,104 @@ fn draw_bunting(blip: &Blip, g: &Game, r: usize, t: f32) {
 // ---- what is on the street -------------------------------------------------
 
 fn person(blip: &Blip, x: f32, y: f32, coat: [u8; 3], hair: [u8; 3], swing: f32) {
-    blip.fill_circle(x + 2.0, y + 2.0, 7.0, rgba([20, 20, 30], 0.25));
+    let (ox, oy) = sun(2.5);
+    blip.fill_circle(x + ox, y + oy, 7.0, rgba([20, 20, 30], 0.25));
     blip.fill_rect(x - 8.0, y - 2.0 + swing, 4.0, 4.0, rgb(coat));
     blip.fill_rect(x + 4.0, y - 2.0 - swing, 4.0, 4.0, rgb(coat));
     blip.fill_circle(x, y, 6.0, rgb(coat));
     blip.fill_circle(x, y - 1.0, 4.0, rgb(hair));
 }
 
+/// Are bike lamps on: in the blue hour before the sun is up, and in fog (the law asks for lights in the dark).
+pub fn lamps_on(g: &Game) -> bool {
+    daylight(g) < 0.45 || g.weather() == Weather::Fog
+}
+
+/// A bicycle as Copenhagen rides them, seen from above: tyres showing past the mudguards, a thin frame, the crank
+/// and pedals, a saddle, black swept-back bars with grips and a bell, a rack (or a wicker basket on the front), and
+/// lamps, lit white ahead and red behind when `lit`. `dir` is +1 riding down the screen, -1 up; `wheelbase` is
+/// axle to axle; `bars` how far ahead of `y` the bars are; `steer` turns the front wheel and bars.
+#[allow(clippy::too_many_arguments)]
+fn bicycle(blip: &Blip, x: f32, y: f32, dir: f32, wheelbase: f32, bars: f32, steer: f32, frame: [u8; 3], basket: bool, lit: bool) {
+    let (front, rear) = (y + dir * wheelbase / 2.0, y - dir * wheelbase / 2.0);
+    let bars_y = y + dir * bars;
+    // the shadow: the wheels' line and the bars, a little to the side
+    let shade = rgba([16, 16, 24], 0.28);
+    let (ox, oy) = sun(2.0);
+    blip.fill_rect(x - 1.5 + ox, y - wheelbase / 2.0 - 6.0 + oy, 3.0, wheelbase + 12.0, shade);
+    blip.fill_rect(x + steer - 6.5 + ox * 1.5, bars_y + oy * 1.5, 13.0, 2.0, shade);
+    let tyre = rgb([20, 20, 24]);
+    let guard = rgb(shade_u(frame, 0.75));
+    for (wx, wy) in [(x, rear), (x + steer, front)] {
+        blip.fill_rect(wx - 1.5, wy - 6.5, 3.0, 13.0, tyre);
+        blip.fill_rect(wx - 1.0, wy - 4.0, 2.0, 8.0, guard);
+    }
+    blip.draw_line_ex(x, rear + dir * 3.0, x + steer * 0.6, bars_y, 2.5, rgb(frame));
+    // the crank and pedals, turning
+    let crank = y - dir * 1.0;
+    blip.fill_circle(x, crank, 1.8, rgb([150, 150, 156]));
+    // rack and rear lamp, or a basket in front
+    blip.fill_rect(x - 2.0, rear - 3.5, 4.0, 7.0, rgb([46, 46, 52]));
+    blip.fill_rect(x - 1.0, rear - 3.0, 2.0, 6.0, rgb([90, 90, 98]));
+    if basket {
+        blip.fill_rect(x + steer - 4.0, front - 4.0, 8.0, 7.0, rgb([150, 108, 56]));
+        blip.fill_rect(x + steer - 3.0, front - 3.0, 6.0, 5.0, rgb([196, 150, 88]));
+        blip.fill_rect(x + steer - 3.0, front - 1.0, 6.0, 1.0, rgb([150, 108, 56]));
+    }
+    // the saddle, brown leather, nose forward
+    blip.fill_rect(x - 1.5, y - dir * 5.0 - 2.0, 3.0, 4.0, rgb([70, 46, 30]));
+    blip.fill_rect(x - 0.5, y - dir * 3.0 - 1.0, 1.0, 2.0, rgb([70, 46, 30]));
+    // black bars swept back to dark grips, the bell's silver dome on the left
+    let ink = rgb([18, 18, 22]);
+    let (l, r) = (x + steer - 6.5, x + steer + 6.5);
+    blip.draw_line_ex(l + 2.5, bars_y, r - 2.5, bars_y, 1.5, ink);
+    blip.draw_line_ex(l + 2.5, bars_y, l, bars_y - dir * 2.5, 1.5, ink);
+    blip.draw_line_ex(r - 2.5, bars_y, r, bars_y - dir * 2.5, 1.5, ink);
+    blip.fill_circle(x + steer - 3.0, bars_y + dir * 0.5, 1.3, rgb([222, 226, 232]));
+    // lamps: white on the front mudguard, red on the rack
+    let (fx, fy, ry) = (x + steer, front + dir * 6.0, rear - dir * 4.5);
+    if lit {
+        blip.fill_glow_circle(fx, fy, 2.0, rgb([255, 252, 230]));
+        blip.fill_glow_circle(x, ry, 1.7, rgb([255, 40, 40]));
+    } else {
+        blip.fill_rect(fx - 1.0, fy - 1.0, 2.0, 2.0, rgb([196, 196, 190]));
+        blip.fill_rect(x - 1.0, ry - 1.0, 2.0, 2.0, rgb([130, 30, 30]));
+    }
+}
+
+/// A rider sitting up on a bicycle, seen from above as Copenhagen rides: knees rising either side of the frame in
+/// turn, the coat's back over the saddle, shoulders square, arms forward to the grips, the head (a helmet or hair)
+/// on top. `bars` is how far ahead of `y` the bars are.
+#[allow(clippy::too_many_arguments)]
+fn rider_on(blip: &Blip, x: f32, y: f32, dir: f32, bars: f32, steer: f32, coat: [u8; 3], head: [u8; 3], t: f32, s: f32) {
+    let pedal = (t * 9.0).sin();
+    let legs = rgb([44, 48, 64]);
+    // knees: the one coming up shows further forward
+    blip.fill_rect(x - 4.0 * s, y + dir * (1.5 + pedal * 2.0) * s - 1.5 * s, 2.5 * s, 3.0 * s, legs);
+    blip.fill_rect(x + 1.5 * s, y + dir * (1.5 - pedal * 2.0) * s - 1.5 * s, 2.5 * s, 3.0 * s, legs);
+    let back = rgb(shade_u(coat, 0.8));
+    blip.fill_rect(x - 3.0 * s, y - dir * 4.0 * s - 2.0 * s, 6.0 * s, 5.0 * s, back);
+    let shoulders = y - dir * 0.5 * s;
+    let grips = y + dir * (bars - 2.0);
+    let sleeve = rgb(shade_u(coat, 0.9));
+    blip.draw_line_ex(x - 3.5 * s, shoulders, x + steer - 5.5, grips, 2.0 * s, sleeve);
+    blip.draw_line_ex(x + 3.5 * s, shoulders, x + steer + 5.5, grips, 2.0 * s, sleeve);
+    blip.fill_rect(x + steer - 6.5, grips - 1.0, 2.0, 2.0, rgb([226, 180, 140]));
+    blip.fill_rect(x + steer + 4.5, grips - 1.0, 2.0, 2.0, rgb([226, 180, 140]));
+    // square shoulders, the head on top, a touch forward
+    blip.fill_rect(x - 4.5 * s, shoulders - 2.0 * s, 9.0 * s, 4.0 * s, rgb(coat));
+    blip.fill_circle(x - 4.0 * s, shoulders, 2.0 * s, rgb(coat));
+    blip.fill_circle(x + 4.0 * s, shoulders, 2.0 * s, rgb(coat));
+    let hy = shoulders + dir * 1.0 * s;
+    blip.fill_circle(x + steer * 0.2, hy, 2.9 * s, rgb(head));
+    blip.fill_rect(x + steer * 0.2 - 1.0 * s, hy - 2.5 * s, 2.0 * s, 1.0 * s, rgba([255, 255, 255], 0.35));
+}
+
 fn car(blip: &Blip, x: f32, y: f32, across: bool, body: [u8; 3]) {
     // a small box in height: the body, then the glasshouse and the roof
     let (hw, hh) = if across { (20.0, 11.0) } else { (11.0, 20.0) };
-    blip.fill_rect(x - hw + 3.0, y - hh + 3.0, hw * 2.0, hh * 2.0, rgba([20, 20, 30], 0.3));
+    let (ox, oy) = sun(4.0);
+    blip.fill_rect(x - hw + ox, y - hh + oy, hw * 2.0, hh * 2.0, rgba([20, 20, 30], 0.3));
     block(x, y, hw, hh, 0.0, 10.0, rgb(shade_u(body, 0.85)), rgb(body));
     let (cw, ch) = if across { (hw * 0.5, hh - 1.5) } else { (hw - 1.5, hh * 0.5) };
     block(x, y, cw, ch, 10.0, 17.0, rgb([110, 140, 170]), rgb(shade_u(body, 0.92)));
@@ -1301,14 +1570,17 @@ fn draw_hazard(blip: &Blip, g: &Game, h: &Hazard, t: f32) {
             let up = h.side == Side::Right;
             let dir = if up { -1.0 } else { 1.0 };
             let lean = if h.guide { 0.0 } else { (tourist_x(h.home, h.side, h.t + h.beat + 0.1) - x) * 0.6 };
-            blip.fill_rect(x - 2.0, y - 14.0, 4.0, 28.0, rgb([232, 232, 228]));
-            blip.fill_rect(x - 3.0, y - 4.0, 6.0, 8.0, rgb([90, 90, 96]));
-            blip.fill_rect(x - 2.5 + lean, y + dir * 13.0 - 3.0, 5.0, 6.0, rgb([40, 40, 44]));
-            blip.fill_rect(x - 2.5, y - dir * 13.0 - 3.0, 5.0, 6.0, rgb([40, 40, 44]));
+            bicycle(blip, x, y, dir, 26.0, 9.0, lean, [236, 236, 232], false, lamps_on(g));
+            // the e-bike's battery on the down tube
+            blip.fill_rect(x - 1.5, y + dir * 2.0 - 3.0, 3.0, 6.0, rgb([70, 70, 78]));
+            rider_on(blip, x, y, dir, 9.0, lean, [250, 120, 60], [240, 210, 150], t * 0.8 + h.beat, 1.0);
+            // the backpack on the rider's back, and the big tablet on the bars, glowing when stared at
+            blip.fill_rect(x - 3.5, y - dir * 4.0 - 2.5, 7.0, 5.0, rgb([60, 130, 90]));
             let glow = if staring && (t * 8.0).fract() < 0.6 { [160, 230, 255] } else { [70, 110, 140] };
-            blip.fill_rect(x - 5.0 + lean, y + dir * 9.0 - 2.0, 10.0, 5.0, rgb(glow));
-            person(blip, x + lean * 0.5, y - dir * 2.0, [250, 120, 60], [240, 210, 150], (t * 7.0).sin() * 3.0);
-            blip.fill_rect(x - 4.0, y - dir * 6.0 - 3.0, 8.0, 5.0, rgb([60, 130, 90]));
+            let sy0 = y + dir * 11.5;
+            if staring { blip.fill_glow_circle(x + lean, sy0, 6.0, rgba(glow, 0.25)); }
+            blip.fill_rect(x - 4.0 + lean, sy0 - 2.0, 8.0, 4.0, rgb([30, 30, 34]));
+            blip.fill_rect(x - 3.0 + lean, sy0 - 1.0, 6.0, 2.0, rgb(glow));
             if staring && !h.guide { label(blip, "?", x + 10.0, y - 26.0, 2.0, rgb([255, 255, 255])); }
             if h.guide {
                 // the guide's flag, held high so the flock can follow it
@@ -1356,7 +1628,8 @@ fn draw_hazard(blip: &Blip, g: &Game, h: &Hazard, t: f32) {
                 return;
             }
             let wag = (t * 18.0).sin() * 4.0;
-            blip.fill_circle(x + 2.0, y + 3.0, 8.0, rgba([20, 20, 30], 0.25));
+            let (ox, oy) = sun(2.5);
+            blip.fill_circle(x + ox, y + oy, 8.0, rgba([20, 20, 30], 0.25));
             blip.fill_rect(x - 5.0, y - 7.0, 10.0, 15.0, rgb([170, 112, 64]));
             blip.fill_circle(x, y - 9.0, 5.5, rgb([186, 126, 74]));
             blip.fill_rect(x - 6.0, y - 13.0, 3.0, 5.0, rgb([110, 70, 40]));
@@ -1399,7 +1672,8 @@ fn draw_hazard(blip: &Blip, g: &Game, h: &Hazard, t: f32) {
             // a white delivery van in height: the cargo box, the cab in front, hazard lights when it is parked
             let up = h.side == Side::Right;
             let cab = if up { y - 22.0 } else { y + 22.0 };
-            blip.fill_rect(x - 13.0 + 3.0, y - 30.0 + 4.0, 26.0, 60.0, rgba([20, 20, 30], 0.3));
+            let (ox, oy) = sun(5.0);
+            blip.fill_rect(x - 13.0 + ox, y - 30.0 + oy, 26.0, 60.0, rgba([20, 20, 30], 0.3));
             block(x, y + if up { 6.0 } else { -6.0 }, 13.0, 24.0, 0.0, 30.0, rgb([214, 214, 210]), rgb([240, 240, 236]));
             block(x, cab, 12.0, 8.0, 0.0, 20.0, rgb([110, 140, 170]), rgb([236, 236, 232]));
             if h.side == Side::Left && blink {
@@ -1439,7 +1713,8 @@ fn draw_hazard(blip: &Blip, g: &Game, h: &Hazard, t: f32) {
             }
         }
         Hz::Cart => {
-            blip.fill_rect(x - 12.0 + 2.0, y - 14.0 + 3.0, 24.0, 28.0, rgba([20, 20, 30], 0.3));
+            let (ox, oy) = sun(3.0);
+            blip.fill_rect(x - 12.0 + ox, y - 14.0 + oy, 24.0, 28.0, rgba([20, 20, 30], 0.3));
             blip.fill_rect(x - 12.0, y - 14.0, 24.0, 28.0, rgb([200, 60, 50]));
             for k in 0..4 { blip.fill_rect(x - 9.0, y - 11.0 + k as f32 * 6.0, 18.0, 4.0, rgb([248, 244, 232])); }
             blip.fill_circle(x - 12.0, y + 10.0, 3.0, rgb([40, 40, 40]));
@@ -1449,7 +1724,8 @@ fn draw_hazard(blip: &Blip, g: &Game, h: &Hazard, t: f32) {
         }
         Hz::Stall => {
             let c = [[220, 70, 70], [70, 140, 210], [240, 180, 60], [90, 170, 110]][(h.d as usize / 11) % 4];
-            blip.fill_rect(x - 25.0 + 3.0, y - 32.0 + 4.0, 50.0, 64.0, rgba([20, 20, 30], 0.3));
+            let (ox, oy) = sun(4.0);
+            blip.fill_rect(x - 25.0 + ox, y - 32.0 + oy, 50.0, 64.0, rgba([20, 20, 30], 0.3));
             for k in 0..8 {
                 let col = if k % 2 == 0 { c } else { [250, 246, 236] };
                 blip.fill_rect(x - 25.0, y - 32.0 + k as f32 * 8.0, 50.0, 8.0, rgb(col));
@@ -1471,17 +1747,29 @@ fn draw_hazard(blip: &Blip, g: &Game, h: &Hazard, t: f32) {
             // a commuter on a Copenhagen bike, upright, now and then a cargo bike with a child in the box
             let up = h.side == Side::Right;
             let dir = if up { -1.0 } else { 1.0 };
-            let cargo = (h.d as usize / 17) % 3 == 0;
-            blip.fill_rect(x - 1.5, y - 13.0, 3.0, 26.0, rgb([40, 40, 46]));
-            blip.fill_rect(x - 2.0, y + dir * 12.0 - 3.0, 4.0, 6.0, rgb([30, 30, 34]));
-            blip.fill_rect(x - 2.0, y - dir * 12.0 - 3.0, 4.0, 6.0, rgb([30, 30, 34]));
+            let pick = |n: usize, m: usize| (h.d as usize / n) % m;
+            let cargo = pick(17, 3) == 0;
+            let coat = if g.rain() { [[250, 210, 40], [40, 60, 110], [230, 60, 60], [60, 140, 90]][pick(5, 4)] }
+                else { [[60, 70, 90], [180, 60, 60], [230, 220, 200], [70, 120, 90]][pick(5, 4)] };
+            // frames: black, racing green, cream, sky blue, the classic red of a Danish city bike
+            let frame = [[34, 34, 38], [40, 90, 60], [226, 214, 186], [110, 160, 200], [176, 40, 40]][pick(7, 5)];
+            // half wear a helmet (white, black or orange), half ride in their hair
+            let head = [[240, 240, 236], [90, 60, 40], [30, 30, 34], [230, 200, 120], [236, 120, 40], [40, 30, 30]][pick(3, 6)];
+            let lit = lamps_on(g);
             if cargo {
-                blip.fill_rect(x - 7.0, y + dir * 18.0 - 7.0, 14.0, 14.0, rgb([170, 120, 70]));
-                blip.fill_circle(x, y + dir * 18.0, 3.5, rgb([230, 120, 90]));
+                // a long-john cargo bike: the wooden box between the rider and the small front wheel, a child in it
+                bicycle(blip, x, y - dir * 4.0, dir, 36.0, 5.0, 0.0, frame, false, lit);
+                let bx = y + dir * 9.0;
+                blip.fill_rect(x - 7.0, bx - 6.0, 14.0, 12.0, rgb([150, 104, 60]));
+                blip.fill_rect(x - 6.0, bx - 5.0, 12.0, 10.0, rgb([188, 140, 84]));
+                for k in [-2.5, 0.5, 3.5] { blip.fill_rect(x - 6.0, bx + k - 0.5, 12.0, 1.0, rgb([150, 104, 60])); }
+                blip.fill_circle(x, bx, 3.0, rgb([230, 120, 90]));
+                blip.fill_circle(x, bx - dir * 0.5, 2.0, rgb([240, 200, 140]));
+                rider_on(blip, x, y - dir * 4.0, dir, 5.0, 0.0, coat, head, t + h.d * 0.01, 1.0);
+            } else {
+                bicycle(blip, x, y, dir, 26.0, 9.0, 0.0, frame, pick(11, 3) == 0, lit);
+                rider_on(blip, x, y, dir, 9.0, 0.0, coat, head, t + h.d * 0.01, 1.0);
             }
-            let coat = if g.rain() { [[250, 210, 40], [40, 60, 110], [230, 60, 60], [60, 140, 90]][(h.d as usize / 5) % 4] }
-                else { [[60, 70, 90], [180, 60, 60], [230, 220, 200], [70, 120, 90]][(h.d as usize / 5) % 4] };
-            person(blip, x, y - dir * 3.0, coat, [[90, 60, 40], [230, 200, 120], [40, 30, 30]][(h.d as usize / 3) % 3], (t * 6.0).sin() * 2.0);
         }
         Hz::Walker => {
             let swing = (t * 6.0).sin() * 2.0;
@@ -1510,6 +1798,9 @@ pub fn draw_paper(blip: &Blip, g: &Game, p: &Paper) {
     blip.draw_line_ex(cx - dx * 0.3, cy - dy * 0.3, cx + dx * 0.3, cy + dy * 0.3, 5.5, rgba([200, 60, 60], fade));
 }
 
+/// The player's riders are drawn this much larger than the town's, so the bike is found at a glance.
+const PLAYER_SIZE: f32 = 1.3;
+
 pub fn draw_bike(blip: &Blip, g: &Game, t: f32, x: f32, y: f32) {
     if g.state == State::Crash {
         // over it goes: the bike on its side, papers out, the rider sitting up with stars
@@ -1529,39 +1820,42 @@ pub fn draw_bike(blip: &Blip, g: &Game, t: f32, x: f32, y: f32) {
     if g.safe > 0.0 && (t * 12.0).fract() < 0.5 { return; }
     let lean = (g.steer_v / STEER_V) * 3.0;
     let tandem = g.two_player;
-    let tail = if tandem { 34.0 } else { 16.0 };
-    let shadow = rgba([20, 20, 30], 0.28);
-    blip.fill_rect(x - 9.0 + 3.0, y - 32.0 + 4.0, 18.0, tail + 36.0, shadow);
-    // wheels, the frame and the front box with the papers in it
-    blip.fill_rect(x - 2.0 + lean, y - 34.0, 4.0, 10.0, rgb([30, 30, 36]));
-    blip.fill_rect(x - 2.0, y + tail - 6.0, 4.0, 12.0, rgb([30, 30, 36]));
-    blip.fill_rect(x - 1.5, y - 8.0, 3.0, tail + 4.0, rgb([40, 110, 160]));
-    blip.fill_rect(x - 10.0 + lean, y - 28.0, 20.0, 20.0, rgb([176, 120, 70]));
-    blip.fill_rect(x - 8.0 + lean, y - 26.0, 16.0, 16.0, rgb([132, 86, 50]));
+    let lit = lamps_on(g);
+    // a long-john: the small front wheel, the box ahead of the bars, the rider (two on the tandem) sitting up behind
+    let rear = if tandem { 28.0 } else { 10.0 };
+    let (front, centre) = (-34.0, (rear - 34.0) / 2.0);
+    bicycle(blip, x, y + centre, -1.0, rear - front, 7.0 + centre, lean, [40, 110, 160], false, lit);
+    let rain = g.rain();
+    let coat1 = if rain { [250, 210, 40] } else { [236, 110, 60] };
+    let arm = |cd: f32| if cd > THROW_GAP - 0.14 { 8.0 } else { 0.0 };
+    let (al, ar) = (arm(g.throw_cd[0]), arm(g.throw_cd[1]));
+    // the box: a plywood tub with a dark rim, the day's papers stacked in it
+    let (bx, by) = (x + lean, y - 18.0);
+    let (ox, oy) = sun(2.0);
+    blip.fill_rect(bx - 10.0 + ox, by - 10.0 + oy, 20.0, 20.0, rgba([16, 16, 24], 0.28));
+    blip.fill_rect(bx - 10.0, by - 10.0, 20.0, 20.0, rgb([120, 80, 44]));
+    blip.fill_rect(bx - 9.0, by - 9.0, 18.0, 18.0, rgb([186, 136, 80]));
+    for k in [-4.5, 0.5, 5.5] { blip.fill_rect(bx - 9.0, by + k - 0.5, 18.0, 1.0, rgb([160, 112, 64])); }
     let shown = g.stock.clamp(0, 6);
     for i in 0..shown {
-        let (px, py) = (x - 5.0 + lean + (i % 2) as f32 * 10.0 - 0.0, y - 23.0 + (i / 2) as f32 * 5.0);
+        let (px, py) = (bx - 5.0 + (i % 2) as f32 * 10.0, by - 6.0 + (i / 2) as f32 * 5.0);
         blip.fill_rect(px - 4.0, py, 8.0, 4.0, rgb([248, 246, 236]));
         blip.fill_rect(px - 1.0, py, 2.0, 4.0, rgb([200, 60, 60]));
     }
-    // the handlebars and the riders
-    blip.draw_line_ex(x - 9.0 + lean, y - 6.0, x + 9.0 + lean, y - 6.0, 2.0, rgb([50, 50, 60]));
-    let rain = g.rain();
-    let coat1 = if rain { [250, 210, 40] } else { [236, 110, 60] };
-    let arm = |cd: f32| if cd > THROW_GAP - 0.14 { 10.0 } else { 0.0 };
-    let (al, ar) = (arm(g.throw_cd[0]), arm(g.throw_cd[1]));
-    let rider = |rx: f32, ry: f32, coat: [u8; 3], helmet: [u8; 3], reach_l: f32, reach_r: f32| {
-        blip.fill_rect(rx - 9.0 - reach_l, ry - 6.0, 5.0 + reach_l, 4.0, rgb(coat));
-        blip.fill_rect(rx + 4.0, ry - 6.0, 5.0 + reach_r, 4.0, rgb(coat));
-        blip.fill_circle(rx, ry, 7.0, rgb(coat));
-        blip.fill_circle(rx, ry - 1.0, 5.5, rgb(helmet));
-        blip.fill_rect(rx - 1.0, ry - 6.0, 2.0, 8.0, rgb(shade_u(helmet, 0.7)));
+    // the riders; a throwing arm reaches out to its side
+    let throw = |rx: f32, ry: f32, coat: [u8; 3], l: f32, r: f32| {
+        if l > 0.0 { blip.draw_line_ex(rx - 3.5, ry, rx - 4.0 - l, ry - 3.0, 2.0, rgb(coat)); }
+        if r > 0.0 { blip.draw_line_ex(rx + 3.5, ry, rx + 4.0 + r, ry - 3.0, 2.0, rgb(coat)); }
     };
     if tandem {
-        rider(x, y + 20.0, if rain { [120, 220, 120] } else { [80, 170, 110] }, [250, 250, 250], 0.0, ar);
-        rider(x + lean * 0.5, y + 2.0, coat1, [220, 60, 60], al, 0.0);
+        let coat2 = if rain { [120, 220, 120] } else { [80, 170, 110] };
+        rider_on(blip, x, y + 20.0, -1.0, 9.0, 0.0, coat2, [250, 250, 250], t + 0.3, PLAYER_SIZE);
+        throw(x, y + 20.0, coat2, 0.0, ar);
+        rider_on(blip, x + lean * 0.5, y + 2.0, -1.0, 7.0, lean * 0.5, coat1, [220, 60, 60], t, PLAYER_SIZE);
+        throw(x + lean * 0.5, y + 2.0, coat1, al, 0.0);
     } else {
-        rider(x + lean * 0.5, y + 2.0, coat1, [220, 60, 60], al, ar);
+        rider_on(blip, x + lean * 0.5, y + 2.0, -1.0, 7.0, lean * 0.5, coat1, [220, 60, 60], t, PLAYER_SIZE);
+        throw(x + lean * 0.5, y + 2.0, coat1, al, ar);
     }
 }
 
@@ -1624,8 +1918,15 @@ pub fn draw_weather(blip: &Blip, g: &Game, t: f32) {
         }
         _ => {}
     }
-    // dawn: a cool blue hour warming to a golden morning, the low sun ahead up the street
+    // the low sun ahead and to the right leaves the right-hand houses' fronts and their pavement in shade, a band
+    // that draws back to the houses as the sun climbs (not while the view turns at the corner)
     let k = 1.0 - daylight(g);
+    if k > 0.05 && TURNED.with(|a| a.get()).abs() < 0.01 && g.state != State::Canal {
+        let edge = CURB[1] + 40.0 - 70.0 * k;
+        blip.fill_rect(edge, top, w - edge, bottom - top, rgba([24, 26, 52], 0.20 * k));
+        blip.fill_rect(edge - 4.0, top, 4.0, bottom - top, rgba([24, 26, 52], 0.10 * k));
+    }
+    // dawn: a cool blue hour warming to a golden morning, the low sun ahead up the street
     if k > 0.01 {
         let mut y = top;
         while y < bottom {
@@ -1640,6 +1941,7 @@ pub fn draw_weather(blip: &Blip, g: &Game, t: f32) {
 // ---- the Canal Run ------------------------------------------------------------
 
 pub fn draw_canal(blip: &Blip, g: &Game, t: f32) {
+    set_sun(1.0);
     let w = WIN_W as f32;
     let water = [52, 104, 120];
     blip.clear(rgb(water));
@@ -2128,8 +2430,12 @@ fn skyline(blip: &Blip, t: f32) {
 pub fn draw_over(blip: &Blip, g: &Game, hi: i32) {
     blip.fill_rect(0.0, 0.0, WIN_W as f32, WIN_H as f32, rgba([20, 14, 30], 0.72));
     let title = if g.subscribers() == 0 { "NO ONE LEFT" } else { "GAME OVER" };
+    let offering = g.offering();
     blip.draw_end_screen(title, g.sess.score + g.score2, if g.two_player { 0 } else { hi }, rgb([255, 150, 130]),
-        rgb([255, 214, 90]), BLIP_WHITE, !g.wait.active());
+        rgb([255, 214, 90]), BLIP_WHITE, !offering && !g.wait.active());
+    if offering && g.cont.showing() {
+        blip.draw_game_over_prompt(&format!("CONTINUE? {}", g.cont.seconds()), rgb([255, 214, 90]));
+    }
     let note = if g.two_player { format!("1P {}   2P {}", g.sess.score, g.score2) } else {
         format!("WEEK {} {}   {} HOMES", g.week, WEEKDAYS[g.day], g.subscribers())
     };

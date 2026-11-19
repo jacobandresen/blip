@@ -6,7 +6,8 @@
 //! (to reach HURRY and the skull), `BLIP_BOT_GOD=1` cannot be caught.
 
 use super::*;
-use blip::bot::{Goal::*, Pad, Playthrough};
+use blip::bot::rollout::Mover;
+use blip::bot::{best, chance, remember, Goal::*, Pad, Playthrough};
 
 /// What the bot must show it can do in Bubbler.
 pub const PLAYTHROUGHS: &[Playthrough] = &[
@@ -39,6 +40,13 @@ pub const PLAYTHROUGHS: &[Playthrough] = &[
         ..Playthrough::DEFAULT
     },
     Playthrough {
+        name: "a dragon out of hearts plays on from the same round",
+        settings: &[("PASSIVE", "1"), ("CONTINUES", "1")],
+        seconds: 300.0,
+        goals: &[AtLeast("continues", 1.0), AtLeast("deaths", 6.0)],
+        ..Playthrough::DEFAULT
+    },
+    Playthrough {
         name: "it clears the last round and wins",
         level: ROUNDS as u32,
         seconds: 240.0,
@@ -49,7 +57,7 @@ pub const PLAYTHROUGHS: &[Playthrough] = &[
 
 /// What one dragon's autopilot remembers between frames.
 #[derive(Default)]
-pub struct Mind {
+struct Mind {
     jump_wait: f32,
     wander_t: f32,
     wander_dir: f32,
@@ -74,21 +82,14 @@ fn think(g: &Game, pi: usize, mem: &mut Mind) -> Input {
         .flat_map(|e| [0.0, 0.25].map(|t| (e.x + e.vx * t + E_W / 2.0 - px, e.y + e.vy * t + E_H / 2.0 - py)))
         .find(|(dx, dy)| dx.abs() < 34.0 && dy.abs() < 22.0);
     // trapped bubbles are the priority, when popping them is worth it
-    let trapped = g.bubbles.iter().filter(|b| ready_to_pop(g, b)).min_by(|a, b| (a.x - px).abs().total_cmp(&(b.x - px).abs()));
-    let fruit = g
-        .fruits
-        .iter()
-        .filter(|f| f.on_ground && (f.y + 8.0 - py).abs() < 30.0)
-        .min_by(|a, b| (a.x - px).abs().total_cmp(&(b.x - px).abs()));
+    let trapped = best(g.bubbles.iter().filter(|b| ready_to_pop(g, b)), |b| (b.x - px).abs());
+    let fruit = best(g.fruits.iter().filter(|f| f.on_ground && (f.y + 8.0 - py).abs() < 30.0), |f| (f.x - px).abs());
     let target = if let Some(b) = trapped {
         Some((b.x, b.y, true))
     } else if let Some(f) = fruit.filter(|f| (f.x - px).abs() < 160.0) {
         Some((f.x + 8.0, py, true))
     } else {
-        g.enemies
-            .iter()
-            .filter(|e| e.active && e.pop_in >= 1.0)
-            .min_by(|a, b| ((a.x - px).hypot((a.y - py) * 1.6)).total_cmp(&(b.x - px).hypot((b.y - py) * 1.6)))
+        best(g.enemies.iter().filter(|e| e.active && e.pop_in >= 1.0), |e| (e.x - px).hypot((e.y - py) * 1.6))
             .map(|e| (e.x + E_W / 2.0, e.y + E_H / 2.0, false))
     };
     // a rock or spark about to hit: hop over one along the ground, else step aside
@@ -118,7 +119,7 @@ fn think(g: &Game, pi: usize, mem: &mut Mind) -> Input {
         // hop away / over
         k.left = dx > 0.0;
         k.right = dx < 0.0;
-        if p.on_ground && blip::rand_range_f32(0.0, 1.0) < 0.25 {
+        if p.on_ground && chance(0.25) {
             k.jump = true;
         }
         // and bubble it if we face it
@@ -148,7 +149,7 @@ fn think(g: &Game, pi: usize, mem: &mut Mind) -> Input {
                 if (dx > 0.0) != (p.face > 0.0) {
                     k.left = dx < 0.0;
                     k.right = dx > 0.0;
-                } else if blip::rand_range_f32(0.0, 1.0) < 0.5 && !passive {
+                } else if chance(0.5) && !passive {
                     k.blow = true;
                 }
                 if dx.abs() > 70.0 {
@@ -162,7 +163,7 @@ fn think(g: &Game, pi: usize, mem: &mut Mind) -> Input {
                     k.left = dir < 0.0;
                     k.right = dir > 0.0;
                 }
-                if dy < -30.0 && p.on_ground && mem.jump_wait <= 0.0 && blip::rand_range_f32(0.0, 1.0) < 0.12 {
+                if dy < -30.0 && p.on_ground && mem.jump_wait <= 0.0 && chance(0.12) {
                     k.jump = true;
                     mem.jump_wait = 0.4;
                 }
@@ -172,7 +173,7 @@ fn think(g: &Game, pi: usize, mem: &mut Mind) -> Input {
         mem.wander_t -= 1.0 / 60.0;
         if (p.vx.abs() < 5.0 && (k.left || k.right)) && mem.wander_t <= 0.0 {
             mem.wander_t = 0.8;
-            mem.wander_dir = if blip::rand_range_f32(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 };
+            mem.wander_dir = if chance(0.5) { -1.0 } else { 1.0 };
         }
     }
     k.jump_held = k.jump_held || k.jump;
@@ -194,17 +195,45 @@ fn incoming_shot<'a>(g: &'a Game, p: &Player) -> Option<&'a Shot> {
 /// takes both), when it is about to break out, or when no monster is left free.
 fn ready_to_pop(g: &Game, b: &Bubble) -> bool {
     if b.trapped.is_none() { return false; }
+    // Within easy reach, pop it now: waiting for a pair let 8 of 13 trapped monsters float off and break out (seed 2).
+    let reach = g.p.iter().any(|p| p.joined && (b.x - p.cx()).abs() < POP_NOW_X && (b.y - p.cy()).abs() < POP_NOW_Y);
     let touching = g.bubbles.iter().any(|o| o.trapped.is_some() && !std::ptr::eq(o, b)
         && (o.x - b.x).hypot(o.y - b.y) < TRAP_R * 2.4);
-    let breaking_out = b.age > trap_life(g.round) - 3.0;
+    let breaking_out = b.age > trap_life(g.round) - BREAKOUT_MARGIN;
     let none_free = !g.enemies.iter().any(|e| e.active);
-    touching || breaking_out || none_free
+    reach || touching || breaking_out || none_free
 }
 
+/// A trapped bubble this close (pixels) is popped at once.
+const POP_NOW_X: f32 = 60.0;
+const POP_NOW_Y: f32 = 50.0;
+/// Seconds before a monster breaks out that the bot sets off to pop it (bubbles drift; 3 s was often too late).
+const BREAKOUT_MARGIN: f32 = 5.0;
+
 /// This frame's controls: both dragons' wishes, through their own key sets.
-pub fn drive(g: &Game, minds: &mut [Mind; 2]) {
+/// Player one's hit boxes as the game tests them, for the fun meter: bodies shrunk by `CONTACT_INSET`, and a thrown
+/// shot's box sized so that it touches the shrunk dragon where the game's `SHOT_REACH` would.
+fn hit_boxes(g: &Game) {
+    let p = &g.p[0];
+    if !p.joined || !p.alive || p.dead_t > 0.0 || p.safe > 0.0 { return; }
+    let (ix, iy) = CONTACT_INSET;
+    let me = Mover::still(p.cx(), p.cy()).sized(P_W / 2.0 - ix, P_H / 2.0 - iy);
+    let mut hazards: Vec<Mover> = g.enemies.iter().filter(|e| e.active && e.pop_in >= 1.0)
+        .map(|e| Mover::still(e.x + E_W / 2.0, e.y + E_H / 2.0).sized(E_W / 2.0 - ix, E_H / 2.0 - iy)).collect();
+    hazards.extend(g.shots.iter().filter(|s| s.active).map(|s| Mover::still(s.x, s.y).sized(SHOT_REACH.0 + ix, SHOT_REACH.1 + iy)));
+    blip::bot::near(&[me], &hazards);
+}
+
+pub fn drive(g: &Game) {
+    if g.state != State::Title { hit_boxes(g); }
+    remember(|minds: &mut [Mind; 2]| play(g, minds));
+}
+
+fn play(g: &Game, minds: &mut [Mind; 2]) {
     let mut pad = Pad::new();
-    if g.state == State::Title {
+    if g.state == State::Over {
+        if blip::bot::may_continue() { pad.tap(P1_KEYS.blow[0]); }
+    } else if g.state == State::Title {
         // P2's blow key starts a two-player game, P1's a solo one.
         let two = blip::bot::num("PLAYERS") == Some(2.0);
         pad.tap(if two { P2_KEYS.blow[0] } else { P1_KEYS.blow[0] });

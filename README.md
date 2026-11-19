@@ -44,6 +44,7 @@ npm test                  # fast unit tests
 npm run test:web          # browser suites (headless Chromium and WebKit)
 npm run test:visual       # every game starts and responds to input
 npm run test:playthrough  # the playtest bots play every game
+node tools/fun_report.mjs # how much fun each game is; CI fails a PR that lowers it (crates/blip/src/bot/FUN.md)
 ```
 
 ## Deploy

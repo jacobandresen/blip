@@ -29,7 +29,7 @@ pub fn setup(g: &mut Game) {
         "title" => g.state = State::Title,
         "over" => {
             g.state = State::Over;
-            g.dead_timer.start(0.1);
+            g.cont.start(CONTINUE_SECS - 1.0);
         }
         "bonus" => {
             g.state = State::Bonus;

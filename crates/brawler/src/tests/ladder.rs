@@ -182,7 +182,7 @@ pub(crate) fn a_continue_is_the_same_fight_again_from_nothing() {
     assert!((g.difficulty - (fair - MERCY)).abs() < 1e-4);
     g.mercy = MERCY * 3.0;
     g.state = State::Continue;
-    g.phase.start(CONTINUE_SECS);
+    g.cont.start(CONTINUE_SECS);
     for _ in 0..60 { update_continue(&mut g, F, false); }
     update_continue(&mut g, F, true);
     assert!((g.mercy - MERCY * 3.0).abs() < 1e-4, "mercy without end");

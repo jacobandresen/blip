@@ -23,15 +23,19 @@ use blip::input::{
     BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::{
-    lerp, rand_int, web, window_conf, Blip, BlipColor, Fx, GAME_OVER_MIN_WAIT, Jukebox,
+    lerp, rand_int, web, window_conf, Blip, BlipColor, Fx, Jukebox,
     Session, Timer, BLIP_BLACK, BLIP_GRAY, BLIP_WHITE, BLIP_YELLOW,
 };
 
 // ---- layout ---------------------------------------------------------------
 /// A chamber's title card: on screen this long, holding play for the first part.
 const INTRO_SECS: f32 = 2.0;
+/// How long a continue is offered at game over.
+const CONTINUE_SECS: f32 = 9.0;
 const INTRO_HOLD: f32 = 1.1;
 const CELL: i32 = 32;
+/// A monster or fireball touches a wizard when their drawn centres are this close (px): the bodies, not the tiles.
+const TOUCH_R: f32 = CELL as f32 * 0.45;
 pub const HUD_H: i32 = 28;
 /// The carved panel under the cellar: chamber name, scrying glass, lives.
 const PANEL_H: i32 = 96;
@@ -117,12 +121,18 @@ impl Walls {
 }
 
 /// The pixel centre of a cell.
+/// Where something stepping from `from` to `to` is drawn, `t` of the way.
+fn lerp_px(from: Cell, to: Cell, t: f32) -> (f32, f32) {
+    let (a, b) = (center(from), center(to));
+    (lerp(a.0, b.0, t), lerp(a.1, b.1, t))
+}
+
 fn center(c: Cell) -> (f32, f32) {
     ((c.c * CELL + CELL / 2) as f32, (HUD_H + c.r * CELL + CELL / 2) as f32)
 }
 
 // ---- entities ---------------------------------------------------------------
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum EnemyKind {
     Imp,
     Wraith,
@@ -342,6 +352,10 @@ struct Game {
     bonus: Option<Bonus>,
     fx: Fx,
     dead_timer: Timer,
+    /// The continue offered at game over, and the best score of the run before one was taken (a continue starts
+    /// the score afresh; the run's best is what is reported).
+    cont: blip::Continue,
+    run_best: i32,
     died_this_room: bool,
     cleared_no_death: i32,
     sfx: Option<Sounds>,
@@ -391,6 +405,8 @@ impl Game {
             bonus: None,
             fx: Fx::new(),
             dead_timer: Timer::default(),
+            cont: blip::Continue::default(),
+            run_best: 0,
             died_this_room: false,
             cleared_no_death: 0,
             sfx: None,
@@ -596,6 +612,7 @@ impl Game {
 
     fn start_game(&mut self) {
         self.sess.reset(LIVES_START);
+        self.run_best = 0;
         blip::bot::levels(levels::ROOMS.len());
         self.lives = [LIVES_START, LIVES_START];
         self.active = [true, false];
@@ -639,10 +656,7 @@ impl Game {
 
     fn wizard_px(&self, idx: usize) -> (f32, f32) {
         let w = &self.wizards[idx];
-        let a = center(w.from);
-        let b = center(w.tile);
-        let t = w.lerp;
-        (lerp(a.0, b.0, t), lerp(a.1, b.1, t))
+        lerp_px(w.from, w.tile, w.lerp)
     }
 
     /// Is an active wizard standing on `tile` (other than the one moving)?
@@ -651,10 +665,7 @@ impl Game {
     }
 
     fn enemy_px(&self, e: &Enemy) -> (f32, f32) {
-        let a = center(e.from);
-        let b = center(e.tile);
-        let t = e.lerp;
-        (lerp(a.0, b.0, t), lerp(a.1, b.1, t))
+        lerp_px(e.from, e.tile, e.lerp)
     }
 
     fn enemy_occupied(&self, c: Cell) -> bool {
@@ -1139,17 +1150,27 @@ impl Game {
             }
             f.tile = next;
             f.lerp = 0.0;
-            for k in 0..2 {
-                if self.active[k] && f.tile == self.wizards[k].tile {
-                    hit_idx = Some(k);
-                    f.gone = true;
-                    break;
-                }
+        }
+        // A fireball burns a wizard when the two drawn bodies meet, as monsters do (`check_contact`): testing tiles
+        // would hit as it enters her cell, while it is still drawn a whole cell (32 px) away, and miss her when she
+        // steps into its cell instead.
+        let r2 = TOUCH_R.powi(2);
+        for f in self.fires.iter_mut().filter(|f| !f.gone) {
+            let (fx, fy) = art::proj_px(f);
+            let burnt = (0..2).find(|&k| self.active[k] && {
+                let (wx, wy) = lerp_px(self.wizards[k].from, self.wizards[k].tile, self.wizards[k].lerp);
+                (fx - wx).powi(2) + (fy - wy).powi(2) <= r2
+            });
+            if let Some(k) = burnt {
+                hit_idx = hit_idx.or(Some(k));
+                f.gone = true;
             }
         }
         self.fires.retain(|p| !p.gone);
         if let Some(k) = hit_idx {
+            let lives = self.lives[k];
             self.hit_wizard(k);
+            if self.lives[k] < lives { blip::bot::add("death_fire", 1.0); }
         }
     }
 
@@ -1350,7 +1371,7 @@ impl Game {
     /// so this measures the real, interpolated positions of both. Runs every
     /// frame, after wizards and enemies have moved.
     fn check_contact(&mut self) {
-        let r = CELL as f32 * 0.45;
+        let r = TOUCH_R;
         let r2 = r * r;
         let mut victim = None;
         for e in self.enemies.iter().filter(|e| !e.gone) {
@@ -1363,7 +1384,7 @@ impl Game {
                 let dx = ex - wx;
                 let dy = ey - wy;
                 if dx * dx + dy * dy <= r2 {
-                    victim = Some(k);
+                    victim = Some((k, e.kind));
                     break;
                 }
             }
@@ -1371,8 +1392,10 @@ impl Game {
                 break;
             }
         }
-        if let Some(k) = victim {
+        if let Some((k, kind)) = victim {
+            let lives = self.lives[k];
             self.hit_wizard(k);
+            if self.lives[k] < lives { blip::bot::add(&format!("death_{kind:?}").to_lowercase(), 1.0); }
         }
     }
 
@@ -1396,12 +1419,10 @@ impl Game {
         } else {
             self.active[idx] = false; // downed: out until a partner clears the chamber
             if self.active.iter().all(|&a| !a) {
-                self.dead_timer.start(GAME_OVER_MIN_WAIT);
+                self.cont.start(CONTINUE_SECS);
                 self.state = State::Over;
-                self.sfx(Sfx::Over);
-                if !self.two_player {
-                    web::report_score(self.sess.score);
-                }
+                // A new best (over the run's continues) rings the chamber-cleared chord instead of the knell.
+                self.sfx(if web::beats_best(self.sess.score.max(self.run_best)) { Sfx::Chamber } else { Sfx::Over });
             }
         }
     }
@@ -1728,10 +1749,27 @@ impl Game {
         }
     }
 
+    /// Game over offers a continue: a bolt within CONTINUE_SECS tries the same chamber again with full lives (and
+    /// the score afresh); otherwise the run's best is reported and the title returns.
     fn check_over_again(&mut self, dt: f32) {
-        self.dead_timer.tick(dt);
-        if !self.dead_timer.active() && self.fire_start() {
-            self.start_game();
+        match self.cont.update(dt, self.bolt_pressed(0)) {
+            Some(true) => {
+                blip::bot::add("continues", 1.0);
+                self.run_best = self.run_best.max(self.sess.score);
+                self.sess.score = 0;
+                self.lives = [LIVES_START, LIVES_START];
+                self.active = [true, self.two_player];
+                self.dead_index = None;
+                self.load_room();
+                self.state = State::Play;
+            }
+            Some(false) => {
+                if !self.two_player {
+                    web::report_score(self.sess.score.max(self.run_best));
+                }
+                self.state = State::Title;
+            }
+            None => if self.cont.ticked() { self.sfx(Sfx::Pulse); },
         }
     }
 
@@ -1804,35 +1842,16 @@ fn is_taken(blocked: &[Cell], c: Cell) -> bool {
     blocked.contains(&c)
 }
 
+/// The first step (the cell and the way) of a shortest walk from `from` to `to` over the floor, around `blocked`;
+/// none when `to` itself is a wall or taken.
 fn bfs_next(walls: &Walls, blocked: &[Cell], from: Cell, to: Cell) -> Option<(Cell, Dir)> {
-    use std::collections::VecDeque;
-    if from == to {
-        return None;
-    }
-    let mut seen = [[false; ROWS]; COLS];
-    let mut q = VecDeque::new();
-    for d in DIRS {
-        let (dc, dr) = d.delta();
-        let n = Cell { c: from.c + dc, r: from.r + dr };
-        if walls.floor(n.c, n.r) && !is_taken(blocked, n) {
-            seen[n.c as usize][n.r as usize] = true;
-            q.push_back((n, d));
-        }
-    }
-    while let Some((cell, first)) = q.pop_front() {
-        if cell == to {
-            return Some((cell, first));
-        }
-        for d in DIRS {
-            let (dc, dr) = d.delta();
-            let n = Cell { c: cell.c + dc, r: cell.r + dr };
-            if walls.floor(n.c, n.r) && !seen[n.c as usize][n.r as usize] && !is_taken(blocked, n) {
-                seen[n.c as usize][n.r as usize] = true;
-                q.push_back((n, first));
-            }
-        }
-    }
-    None
+    let open = |c: i32, r: i32| walls.floor(c, r) && !is_taken(blocked, Cell { c, r });
+    if !open(to.c, to.r) { return None; }
+    use blip::grid::Step;
+    let (step, _) = blip::grid::path((from.c, from.r), (to.c, to.r), open, |_| true)?;
+    let d = match step { Step::Up => Dir::Up, Step::Down => Dir::Down, Step::Left => Dir::Left, Step::Right => Dir::Right };
+    let (dc, dr) = d.delta();
+    Some((Cell { c: from.c + dc, r: from.r + dr }, d))
 }
 
 /// Pick the next step for a patrolling enemy: prefer straight, else a random
@@ -1934,15 +1953,11 @@ fn hud_lives(g: &Game) -> i32 {
 
 fn draw_over(blip: &Blip, g: &Game) {
     let hi = web::high_score();
-    blip.draw_game_over(
-        g.sess.score,
-        hi,
-        WARLOCK_C,
-        BLIP_YELLOW,
-        BLIP_WHITE,
-        !g.dead_timer.active(),
-    );
+    blip.draw_game_over(g.sess.score, hi, WARLOCK_C, BLIP_YELLOW, BLIP_WHITE, false);
     blip.draw_game_over_note(&format!("WINGS CLEARED {}", g.cleared_no_death), BLIP_GRAY);
+    if g.cont.showing() {
+        blip.draw_game_over_prompt(&format!("CONTINUE? {}", g.cont.seconds()), BLIP_YELLOW);
+    }
 }
 
 // ---- entry ----------------------------------------------------------------

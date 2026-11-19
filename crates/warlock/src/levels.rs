@@ -317,8 +317,6 @@ pub fn walls_for(room: &Room) -> Walls {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::Cell;
-    use std::collections::VecDeque;
 
     fn floor(w: &Walls, c: i32, r: i32) -> bool {
         (0..COLS as i32).contains(&c) && (0..ROWS as i32).contains(&r) && !w.get(c, r)
@@ -345,23 +343,11 @@ pub mod tests {
             }
 
             let w = walls_for(room);
-            let mut reachable = std::collections::HashSet::new();
-            let mut q = VecDeque::new();
-            let start = Cell { c: room.player.0, r: room.player.1 };
-            reachable.insert(start);
-            q.push_back(start);
-            while let Some(cell) = q.pop_front() {
-                for d in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
-                    let n = Cell { c: cell.c + d.0, r: cell.r + d.1 };
-                    if floor(&w, n.c, n.r) && reachable.insert(n) {
-                        q.push_back(n);
-                    }
-                }
-            }
+            let reachable = blip::grid::reachable(room.player, |c, r| floor(&w, c, r), usize::MAX);
             let on_floor = |p: (i32, i32)| floor(&w, p.0, p.1);
             let must = |p: (i32, i32), what: &str| {
                 assert!(on_floor(p), "{tag}: {what} at {p:?} not on floor");
-                assert!(reachable.contains(&Cell { c: p.0, r: p.1 }), "{tag}: {what} at {p:?} unreachable");
+                assert!(reachable.contains(&p), "{tag}: {what} at {p:?} unreachable");
             };
             must(room.player, "player start");
             for p in room.runes { must(*p, "rune"); }

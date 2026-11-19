@@ -3,7 +3,7 @@
 //! turn into a pocket smaller than the snake. One tap per turn, like a player.
 
 use super::*;
-use blip::bot::grid::{self, Step};
+use blip::grid::{self, Step};
 use blip::bot::{Goal::*, Pad, Playthrough};
 
 /// What the bot must show it can do in Serpent.

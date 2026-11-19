@@ -3,9 +3,9 @@
 //! avoiding things (velocity obstacles, scored rather than pruned): cheap, and fair to what the bot can see.
 //!
 //! ```ignore
-//! let movers: Vec<Mover> = bullets.iter().map(|b| Mover::moving(b.x, b.y, b.vx, b.vy).sized(3.0, 3.0)).collect();
+//! let movers: Vec<Mover> = hazards.iter().map(|b| Mover::moving(b.x, b.y, b.vx, b.vy).sized(3.0, 3.0)).collect();
 //! let look = Rollout { me: (10.0, 10.0), ..Rollout::DEFAULT };
-//! let best = rollout::best([-1, 0, 1], |dx| look.risk(&path_for(dx), &movers) + distance_to_goal(dx));
+//! let best = blip::bot::best([-1, 0, 1], |dx| look.risk(&path_for(dx), &movers) + distance_to_goal(dx));
 //! ```
 
 /// Something moving in a straight line: a box `hw` x `hh` either side of (`x`, `y`), from `from` seconds on.
@@ -17,11 +17,11 @@ pub struct Mover {
     pub vy: f32,
     pub hw: f32,
     pub hh: f32,
-    /// Seconds from now until it is there (a shot not fired yet).
+    /// Seconds from now until it is there (something not launched yet).
     pub from: f32,
     /// How much hitting it matters: 1 a crash, less for a nuisance, negative for something worth touching.
     pub weight: f32,
-    /// Seconds from now when it stops where it has got to (a car that pulls into its lane and waits).
+    /// Seconds from now when it stops where it has got to (something that moves into place and waits).
     pub until: f32,
 }
 
@@ -102,7 +102,7 @@ impl Rollout {
 
 /// A path along one axis: from `at` toward `to` at up to `speed` per second, `steps` points `dt` apart, while
 /// the other axis runs on at `along` per second from `y`. Good enough for a bot that steers left and right while it
-/// rides, drives or flies on.
+/// keeps moving along the other.
 pub fn glide(at: f32, to: f32, speed: f32, y: f32, along: f32, dt: f32, steps: usize) -> Vec<(f32, f32)> {
     let mut x = at;
     (1..=steps).map(|k| {
@@ -111,14 +111,10 @@ pub fn glide(at: f32, to: f32, speed: f32, y: f32, along: f32, dt: f32, steps: u
     }).collect()
 }
 
-/// The candidate with the lowest cost.
-pub fn best<C: Copy>(candidates: impl IntoIterator<Item = C>, cost: impl Fn(C) -> f32) -> Option<C> {
-    candidates.into_iter().map(|c| (c, cost(c))).min_by(|a, b| a.1.total_cmp(&b.1)).map(|(c, _)| c)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bot::best;
 
     #[test]
     fn a_path_through_a_mover_costs_a_hit_and_one_beside_it_only_a_little() {
@@ -132,20 +128,20 @@ mod tests {
     }
 
     #[test]
-    fn a_shot_not_yet_fired_is_not_there_and_a_car_stops_in_its_lane() {
-        let shot = Mover::moving(0.0, 0.0, 10.0, 0.0).from(0.5);
-        assert_eq!(shot.at(0.2), None);
-        assert_eq!(shot.at(1.5), Some((10.0, 0.0)));
-        let car = Mover::moving(0.0, 0.0, 10.0, 0.0).stops(2.0);
-        assert_eq!(car.at(5.0), Some((20.0, 0.0)));
+    fn a_mover_not_yet_launched_is_not_there_and_one_that_stops_stays_put() {
+        let late = Mover::moving(0.0, 0.0, 10.0, 0.0).from(0.5);
+        assert_eq!(late.at(0.2), None);
+        assert_eq!(late.at(1.5), Some((10.0, 0.0)));
+        let stopping = Mover::moving(0.0, 0.0, 10.0, 0.0).stops(2.0);
+        assert_eq!(stopping.at(5.0), Some((20.0, 0.0)));
     }
 
     #[test]
     fn the_best_move_steps_out_of_the_way() {
         let look = Rollout { me: (5.0, 5.0), ..Rollout::DEFAULT };
-        // a car coming straight down the middle lane
-        let car = [Mover::moving(0.0, 60.0, 0.0, -100.0).sized(8.0, 12.0)];
-        let pick = best([-30.0, 0.0, 30.0], |x| look.risk(&glide(0.0, x, 150.0, 0.0, 0.0, 0.1, 10), &car) + x.abs() * 0.001);
+        // a hazard coming straight at the middle
+        let hazard = [Mover::moving(0.0, 60.0, 0.0, -100.0).sized(8.0, 12.0)];
+        let pick = best([-30.0, 0.0, 30.0], |x| look.risk(&glide(0.0, x, 150.0, 0.0, 0.0, 0.1, 10), &hazard) + x.abs() * 0.001);
         assert_ne!(pick, Some(0.0));
     }
 }

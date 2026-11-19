@@ -51,10 +51,14 @@ pub const STEER_V: f32 = 175.0;
 pub const STEER_ACC: f32 = 900.0;
 pub const BIKE_HW: f32 = 8.0;
 pub const BIKE_HL: f32 = 18.0;
+/// A solid thing and the bike crash only once their boxes overlap this far (px across, along): a brush is forgiven.
+pub const CRASH_INSET: (f32, f32) = (2.0, 3.0);
 /// Where the bike can ride: kerb to kerb.
 pub const RIDE: [f32; 2] = [CURB[0] + BIKE_HW + 2.0, CURB[1] - BIKE_HW - 2.0];
 
 pub const LIVES: i32 = 3;
+/// How long a continue is offered at game over.
+pub const CONTINUE_SECS: f32 = 9.0;
 pub const MAX_PAPERS: i32 = 40;
 pub const CRASH_SECS: f32 = 1.6;
 pub const SAFE_SECS: f32 = 2.0;
@@ -99,6 +103,10 @@ pub const MOUTH_HALF: f32 = 90.0;
 pub const WORKS_D: f32 = NEW_STREET_ROW as f32 * LOT + 26.0;
 /// How fast the handlebars turn the bike in the junction, rad/s, and how round the bike is there.
 pub const TURN_RATE: f32 = 1.9;
+/// How long before meeting the bike a cyclist in its line rings its bell, seconds (a person's reaction and then some).
+pub const BELL_SECS: f32 = 1.4;
+/// Seconds stood unsteered at the junction's barrier before the bike turns itself.
+pub const JUNCTION_ASSIST: f32 = 3.0;
 pub const BIKE_R: f32 = 10.0;
 
 /// Store Kongensgade's point (`x`, `d`) in the world, where it is the frame; Frederiksgade's runs off to the left of
@@ -259,6 +267,8 @@ pub struct Hazard {
     pub guide: bool,
     /// Which street it is on: 0 the old, 1 the new after the turn.
     pub seg: u8,
+    /// A cyclist has rung its bell at the bike (once).
+    pub rang: bool,
 }
 
 // Hazard phases.
@@ -301,7 +311,7 @@ impl Hazard {
             Hz::Bus => (if side == Side::Left { CURB[0] + 28.0 + 14.0 } else { CURB[1] - 28.0 - 14.0 }, d),
             Hz::Walker => ([140.0, 340.0][s], d),
         };
-        Self { kind, side, x, d, home: x, phase: WAIT, t: 0.0, gone: false, touched: false, oncoming: false, fetch: None, bus: false, held: false, beat: 0.0, guide: false,
+        Self { kind, side, x, d, home: x, phase: WAIT, t: 0.0, gone: false, touched: false, oncoming: false, fetch: None, bus: false, held: false, beat: 0.0, guide: false, rang: false,
             seg: (d >= NEW_STREET_ROW as f32 * LOT) as u8 }
     }
 
@@ -456,6 +466,10 @@ pub const HARBOUR_D: f32 = CANAL_SECS * CRUISE + 260.0;
 
 pub struct Game {
     pub state: State,
+    /// The continue offered at game over while homes remain, and the best score of the run before one was taken (a
+    /// continue starts the score afresh; the run's best is what is posted).
+    pub cont: blip::Continue,
+    pub run_best: i32,
     pub sess: Session,
     /// Player two's score; the session's is player one's.
     pub score2: i32,
@@ -501,6 +515,8 @@ pub struct Game {
     pub cycle_next: [f32; 2],
     /// The bike's heading in the junction (0 straight on, a quarter turn to the left onto the new street).
     pub heading: f32,
+    /// Seconds the bike has stood against the junction's barrier unsteered (JUNCTION_ASSIST then turns it).
+    pub stuck: f32,
     /// What is left of a jump in the camera (world x, d and its turn), easing away.
     pub cam_off: [f32; 3],
 }
@@ -508,12 +524,12 @@ pub struct Game {
 impl Game {
     pub fn new() -> Self {
         let mut g = Self {
-            state: State::Title, sess: Session::new(LIVES), score2: 0, two_player: false, week: 1, day: 0,
+            state: State::Title, sess: Session::new(LIVES), cont: blip::Continue::default(), run_best: 0, score2: 0, two_player: false, week: 1, day: 0,
             houses: [Vec::new(), Vec::new()], hazards: Vec::new(), papers: Vec::new(), stock: 0,
             bike_x: 240.0, bike_d: LOT * 1.2, steer_v: 0.0, speed: CRUISE, safe: 0.0, throw_cd: [0.0; 2],
             timer: Timer::default(), wait: Timer::default(), tally: Tally::default(), pops: Vec::new(), bits: Vec::new(),
             cues: Vec::new(), clock: 0.0, targets: Vec::new(), crash_dir: 1.0, banner: None, splash: 0.0,
-            place: 0, place_t: 0.0, ride_t: 0.0, turned: false, cross_next: [[0.0; 2]; 2], cycle_next: [0.0; 2], heading: 0.0, cam_off: [0.0; 3],
+            place: 0, place_t: 0.0, ride_t: 0.0, turned: false, cross_next: [[0.0; 2]; 2], cycle_next: [0.0; 2], heading: 0.0, stuck: 0.0, cam_off: [0.0; 3],
         };
         g.reset_route();
         g.load_day();
@@ -549,6 +565,7 @@ impl Game {
     /// A new game: the week from Monday (a bot run may start on another day).
     pub fn start(&mut self, two: bool) {
         self.sess.reset(LIVES);
+        self.run_best = 0;
         self.score2 = 0;
         self.two_player = two;
         self.week = 1 + (self.sess.level - 1) / 7;
@@ -718,8 +735,35 @@ impl Game {
         (x + self.cam_off[0], d + self.cam_off[1], a + self.cam_off[2])
     }
 
+    /// A car on the old street coming toward the bike, near enough that turning across it now is unsafe.
+    pub fn oncoming_near(&self) -> bool {
+        self.hazards.iter().any(|h| h.seg == 0 && !h.gone && h.velocity(self.bike_x, self.bike_d).1 < -20.0
+            && h.x < 260.0 && h.d > self.bike_d - 30.0 && h.d < self.bike_d + 320.0)
+    }
+
     /// Steering in the junction turns the bike; it rides where it points, and stops against a kerb or the barrier.
+    /// A rider who never steers left still gets round: stood unsteered at the barrier (not braking to wait in the
+    /// bike box) for JUNCTION_ASSIST seconds, the handlebars ease left once nothing is coming (the day stalled there).
     fn ride_junction(&mut self, steer: f32, pedal: f32, dt: f32) {
+        let blocked = self.speed < 5.0;
+        // Steering or braking is the rider's own: it ends the assist at once.
+        self.stuck = if steer != 0.0 || pedal < 0.0 { 0.0 } else if blocked { self.stuck + dt } else { self.stuck };
+        let assist = self.stuck > JUNCTION_ASSIST && !self.oncoming_near();
+        let steer = if assist {
+            if !self.pops.iter().any(|p| p.text == "TURN LEFT") {
+                let (x, d) = (self.bike_x, self.bike_d);
+                self.pop(x, d + 36.0, "TURN LEFT", [255, 214, 90]);
+            }
+            // Past the mouth, at the barrier, the rider walks the bike back (straight, 40 px/s) into the new street's
+            // mouth; straight on short of it, a quarter turn left inside it.
+            let past = self.bike_d > JD + MOUTH_HALF - BIKE_R - 8.0;
+            if past {
+                self.bike_d -= 40.0 * dt;
+                self.speed = 0.0;
+            }
+            let target = if past || self.bike_d <= JD - 30.0 { 0.0 } else { std::f32::consts::FRAC_PI_2 };
+            if self.heading < target - 0.05 { -0.6 } else if self.heading > target + 0.05 { 0.6 } else { 0.0 }
+        } else { steer };
         if self.heading == 0.0 && self.steer_v != 0.0 {
             self.heading = (-self.steer_v / self.speed.max(40.0)).atan();
             self.steer_v = 0.0;
@@ -747,6 +791,7 @@ impl Game {
         let (h, v) = (self.heading, self.speed);
         let (x, d) = world_to_new_street(self.bike_x, self.bike_d);
         self.turned = true;
+        self.stuck = 0.0;
         self.bike_x = x;
         self.bike_d = d;
         self.speed = (v * h.sin()).max(SPEED_MIN * 0.5);
@@ -829,7 +874,7 @@ impl Game {
             self.crash("THE RAILING");
             return;
         }
-        if (self.bike_x - 240.0).abs() < STATUE_HALF + BIKE_HW - 2.0 && (self.bike_d - statue_d()).abs() < STATUE_HALF + BIKE_HL - 3.0 {
+        if (self.bike_x - 240.0).abs() < STATUE_HALF + BIKE_HW - CRASH_INSET.0 && (self.bike_d - statue_d()).abs() < STATUE_HALF + BIKE_HL - CRASH_INSET.1 {
             self.crash("FREDERIK V");
             return;
         }
@@ -848,10 +893,11 @@ impl Game {
             .filter(|(_, h)| !h.gone && h.solid() && h.kind != Hz::Dog)
             .map(|(i, h)| {
                 // a car about to back out, or backing, needs room in its lane for its whole length
+                // ... and across the bike lane on the way there: the whole sweep from the drive to the lane
                 if h.kind == Hz::Car && !h.oncoming && (h.phase == TELL || h.phase == GO) {
                     let (hw, hl) = h.size_driving();
                     let lane = CAR_LANE[h.side.index()];
-                    return (i, lane, h.d, hw, hl, (lane - h.x).signum() * 0.001, 0.0);
+                    return (i, (lane + h.x) / 2.0, h.d, hw + (lane - h.x).abs() / 2.0, hl, (lane - h.x).signum() * 0.001, 0.0);
                 }
                 // a car waiting to pull away looks along the way it is about to drive, at its full length
                 if h.phase == PAUSE {
@@ -937,7 +983,9 @@ impl Game {
             let Some(row) = row_at(d) else { continue };
             if !self.turned && d > JD - MOUTH_HALF { continue; }
             if self.houses[0][row].lot == Lot::Bridge { continue; }
-            if self.hazards.iter().any(|h| matches!(h.kind, Hz::Cyclist | Hz::Tourist | Hz::Bus | Hz::Blader) && h.side == side && (h.d - d).abs() < 30.0) { continue; }
+            // not on top of anyone in the lane: riders 30 px, a bus or a van parked on the track its length and more
+            let room = |h: &Hazard| match h.kind { Hz::Cyclist | Hz::Tourist | Hz::Blader => 30.0, Hz::Bus | Hz::Van => 60.0, _ => -1.0 };
+            if self.hazards.iter().any(|h| !h.gone && h.side == side && (h.d - d).abs() < room(h)) { continue; }
             let mut c = Hazard::new(Hz::Cyclist, side, row);
             c.d = d;
             c.phase = GO;
@@ -1086,17 +1134,41 @@ impl Game {
     }
 
     fn update_hazards(&mut self, dt: f32) {
-        let (bx, bd) = (self.bike_x, self.bike_d);
+        let (bx, bd, speed) = (self.bike_x, self.bike_d, self.speed);
         let mut cues = Vec::new();
         let mut hits = Vec::new();
         for h in &mut self.hazards { h.held = false; }
         self.queue_cyclists();
         self.give_way();
         let seg = self.seg();
+        // where the riders are, so a dog waits rather than run through one
+        let riders: Vec<(f32, f32, u8)> = self.hazards.iter().filter(|h| !h.gone && matches!(h.kind, Hz::Cyclist | Hz::Tourist | Hz::Blader))
+            .map(|h| (h.x, h.d, h.seg)).collect();
+        let rider_at = |x: f32, d: f32, s: u8| riders.iter().any(|&(rx, rd, rs)| rs == s && (rx - x).abs() < 18.0 && (rd - d).abs() < 24.0);
+        // how close the nearest rider is (a dog already near one may only move away from it)
+        let rider_gap = |x: f32, d: f32, s: u8| riders.iter().filter(|r| r.2 == s).map(|&(rx, rd, _)| ((rx - x) / 18.0).abs().max(((rd - d) / 24.0).abs())).fold(f32::MAX, f32::min);
+        let dog_may = |x: f32, d: f32, nx: f32, nd: f32, s: u8| !rider_at(nx, nd, s) || rider_at(x, d, s) && rider_gap(nx, nd, s) > rider_gap(x, d, s);
+        // vans parked on the cycle track, which riders swing out around
+        let vans: Vec<(f32, f32, u8)> = self.hazards.iter().filter(|h| !h.gone && h.kind == Hz::Van && h.solid())
+            .map(|h| (h.x, h.d, h.seg)).collect();
+        // every vehicle's box, so a tourist's swerve never takes it into one
+        let vehicles: Vec<(f32, f32, f32, f32, u8)> = self.hazards.iter()
+            .filter(|h| !h.gone && h.solid() && matches!(h.kind, Hz::Car | Hz::Bus | Hz::Van | Hz::CrossCar))
+            .map(|h| { let (w, l) = h.size(); (h.x, h.d, w, l, h.seg) }).collect();
+        let vehicle_at = |x: f32, d: f32, s: u8| vehicles.iter().any(|&(vx, vd, w, l, vs)| vs == s && (vx - x).abs() < w + 8.0 && (vd - d).abs() < l + 15.0);
         for (i, h) in self.hazards.iter_mut().enumerate() {
             if h.gone || h.seg > seg { continue; }
             h.t += dt;
             let ahead = h.d - bd;
+            // A cyclist in the bike's line rings its bell about BELL_SECS before they would meet: a tell you hear.
+            if h.kind == Hz::Cyclist && h.phase == GO && !h.rang && h.seg == seg && (h.x - bx).abs() < 20.0 + BIKE_HW {
+                let closing = speed - h.velocity(bx, bd).1;
+                if ahead > 0.0 && closing > 20.0 && ahead / closing < BELL_SECS {
+                    h.rang = true;
+                    cues.push(Cue::Bell);
+                    blip::bot::add("bells", 1.0);
+                }
+            }
             match h.kind {
                 Hz::Car if h.oncoming => if h.phase == WAIT && ahead < 620.0 { h.phase = GO; },
                 Hz::Car => match h.phase {
@@ -1137,25 +1209,47 @@ impl Game {
             }
             // move
             let (vx, vd) = h.velocity(bx, bd);
-            h.x += vx * dt;
-            h.d += vd * dt;
+            let dog_waits = h.kind == Hz::Dog && !dog_may(h.x, h.d, h.x + vx * 0.15, h.d + vd * 0.15, h.seg);
+            if !dog_waits {
+                h.x += vx * dt;
+                h.d += vd * dt;
+            }
+            // Leaving its stop a bus pulls out into its lane (30 px/s), clear of the riders beside it (on the narrow
+            // bridge they rode into a bus still at the stop's line).
+            if h.kind == Hz::Bus && h.phase == AWAY && !h.held {
+                let lane = CAR_LANE[h.side.index()];
+                h.x += (lane - h.x).clamp(-30.0 * dt, 30.0 * dt);
+            }
             if h.kind == Hz::Car && h.phase == GO && !h.oncoming {
                 let lane = CAR_LANE[h.side.index()];
                 h.x = if h.side == Side::Left { h.x.min(lane) } else { h.x.max(lane) };
             }
-            if h.kind == Hz::Tourist && h.phase == GO && !h.guide && !h.held { h.x = tourist_x(h.home, h.side, h.t + h.beat); }
+            if h.kind == Hz::Tourist && h.phase == GO && !h.guide && !h.held {
+                let x = tourist_x(h.home, h.side, h.t + h.beat);
+                // the swerve waits while a vehicle stands beside the lane (it took tourists into buses at their stops)
+                h.x = if vehicle_at(x, h.d, h.seg) { h.x + (h.home - h.x).clamp(-60.0 * dt, 60.0 * dt) } else { x };
+            }
             if h.kind == Hz::Tourist && h.held { h.t -= dt; }
-            if matches!(h.kind, Hz::Cyclist | Hz::Tourist | Hz::Blader) {
+            // Back to the lane (the bridge's is narrower), but not while held: a rider waiting beside a bus drifted into it.
+            if matches!(h.kind, Hz::Cyclist | Hz::Tourist | Hz::Blader) && !h.held {
                 let on_bridge = row_at(h.d).is_some_and(bridge_rows);
                 let lane = if on_bridge { [RAIL[0] + 9.0, RAIL[1] - 9.0][h.side.index()] } else { h.home };
+                // a van on the track ahead (or alongside): out into the road past it, 13 + 6 px clear and a margin
+                let (_, vd) = h.velocity(bx, bd);
+                let lane = vans.iter().find(|&&(vx, vd0, vs)| vs == h.seg && (vx - h.home).abs() < 10.0
+                    && (-50.0..90.0).contains(&((vd0 - h.d) * vd.signum())))
+                    .map_or(lane, |&(vx, _, _)| vx - h.side.sign() * 24.0);
                 if h.kind != Hz::Tourist || h.guide { h.x += (lane - h.x).clamp(-60.0 * dt, 60.0 * dt); }
             }
             if h.kind == Hz::Dog && (h.phase == HOME || h.phase == AWAY) {
                 // a fetch first, then home through the gate
                 let (tx, td) = h.fetch.filter(|_| h.phase == AWAY).unwrap_or((h.home, h.d));
-                let k = (160.0 * dt) / ((tx - h.x).hypot(td - h.d)).max(1.0);
-                h.x += (tx - h.x) * k.min(1.0);
-                h.d += (td - h.d) * k.min(1.0);
+                let k = ((160.0 * dt) / ((tx - h.x).hypot(td - h.d)).max(1.0)).min(1.0);
+                let (nx, nd) = (h.x + (tx - h.x) * k * 9.0, h.d + (td - h.d) * k * 9.0);
+                if dog_may(h.x, h.d, nx, nd, h.seg) {
+                    h.x += (tx - h.x) * k;
+                    h.d += (td - h.d) * k;
+                }
                 if h.phase == AWAY && (tx - h.x).abs() < 3.0 && (td - h.d).abs() < 3.0 && h.t > 0.8 { h.phase = HOME; h.fetch = None; }
                 if h.phase == HOME && (h.x - h.home).abs() < 3.0 { h.phase = PAUSE; }
             }
@@ -1178,7 +1272,7 @@ impl Game {
                     && self.safe <= 0.0 => {
                     hits.push((i, true));
                 }
-                _ if h.solid() && near_x < hw + BIKE_HW - 2.0 && near_d < hl + BIKE_HL - 3.0 => hits.push((i, true)),
+                _ if h.solid() && near_x < hw + BIKE_HW - CRASH_INSET.0 && near_d < hl + BIKE_HL - CRASH_INSET.1 => hits.push((i, true)),
                 _ => {}
             }
         }
@@ -1270,6 +1364,7 @@ impl Game {
         self.burst(x, d, 14, 90.0, [245, 240, 225]);
         self.pop(x, d + 36.0, &format!("OOF! {what}"), [255, 150, 120]);
         blip::bot::add("crashes", 1.0);
+        blip::bot::add("hit_crash", 1.0);
         blip::bot::add(&format!("crash_{}", what.split(' ').last().unwrap_or("x").to_lowercase()), 1.0);
         self.timer.start(CRASH_SECS);
     }
@@ -1290,6 +1385,7 @@ impl Game {
         self.bike_x = 240.0;
         self.steer_v = 0.0;
         self.heading = 0.0;
+        self.stuck = 0.0;
         self.speed = CRUISE * 0.8;
         self.safe = SAFE_SECS;
         self.state = State::Play;
@@ -1300,8 +1396,26 @@ impl Game {
         self.clock = 0.0;
         self.wait.start(blip::GAME_OVER_MIN_WAIT);
         blip::bot::set("subscribers", self.subscribers() as f64);
-        // Two riders share the tandem: their game posts no best.
-        if self.two_player { blip::bot::finish("over"); } else { blip::web::report_score(self.sess.score); }
+        // While homes remain the day can be ridden again; with none left the round is over for good.
+        if self.subscribers() > 0 { self.cont.start(CONTINUE_SECS); } else { self.post_score(); }
+    }
+
+    /// Is a continue on offer?
+    pub fn offering(&self) -> bool { self.subscribers() > 0 && self.cont.remaining() > 0.0 }
+
+    /// The run is over: post its best (two riders share the tandem, and their game posts no best).
+    pub fn post_score(&mut self) {
+        if self.two_player { blip::bot::finish("over"); } else { blip::web::report_score(self.sess.score.max(self.run_best)); }
+    }
+
+    /// A continue taken: the same day again from its card, with fresh lives and the score afresh.
+    pub fn continue_day(&mut self) {
+        blip::bot::add("continues", 1.0);
+        self.run_best = self.run_best.max(self.sess.score);
+        self.sess.score = 0;
+        self.score2 = 0;
+        self.sess.lives = LIVES;
+        self.begin_day();
     }
 
     fn end_day(&mut self) {
@@ -1491,6 +1605,20 @@ mod tests {
     }
 
     #[test]
+    fn a_continue_rides_the_same_day_again_with_fresh_lives_and_keeps_the_runs_best() {
+        let mut g = playing();
+        g.day = 3;
+        g.begin_day();
+        g.sess.score = 500;
+        g.sess.lives = 0;
+        g.end_game();
+        assert!(g.offering(), "homes remain, so a continue is offered");
+        g.continue_day();
+        assert!(g.state == State::Card, "the day starts again from its card");
+        assert_eq!((g.day, g.sess.lives, g.sess.score, g.run_best), (3, LIVES, 0, 500));
+    }
+
+    #[test]
     fn a_close_throw_reaches_the_wall_and_a_far_one_lands_short() {
         let near = flight(200.0, 0.0, CRUISE, Side::Left, 0.0, false);
         assert!(near.wall && near.x == WALL[0]);
@@ -1621,6 +1749,23 @@ mod tests {
     }
 
     #[test]
+    fn a_rider_who_never_steers_still_gets_round_the_corner() {
+        for pedal in [0.0, 1.0] {
+            let mut g = playing();
+            g.bike_d = JD - MOUTH_HALF - 60.0;
+            g.bike_x = 200.0;
+            for _ in 0..(60 * 30) {
+                if g.state != State::Play { g.state = State::Play; }
+                g.ride(0.0, pedal, 1.0 / 60.0);
+                g.update_play(1.0 / 60.0);
+                g.safe = 1.0;
+                if g.turned { break; }
+            }
+            assert!(g.turned, "pedal {pedal}: stalled at x {} d {} heading {}", g.bike_x, g.bike_d, g.heading);
+        }
+    }
+
+    #[test]
     fn buses_and_cars_never_drive_into_each_other() {
         for day in 0..7 {
             let mut g = playing();
@@ -1646,6 +1791,38 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn riders_never_ride_through_cars_dogs_or_buses() {
+        let mut found = Vec::new();
+        for day in 0..7 {
+            let mut g = playing();
+            g.day = day;
+            g.begin_day();
+            g.state = State::Play;
+            for frame in 0..(60 * 100) {
+                g.state = State::Play;
+                let steer = if g.in_junction() && g.bike_d > JD - 30.0 && g.heading < 1.5 { -1.0 } else { 0.0 };
+                g.ride(steer, 0.0, 1.0 / 60.0);
+                g.safe = 5.0;
+                g.update_play(1.0 / 60.0);
+                if g.state != State::Play { break; }
+                let riders: Vec<&Hazard> = g.hazards.iter().filter(|h| !h.gone && matches!(h.kind, Hz::Cyclist | Hz::Tourist | Hz::Blader)).collect();
+                let others: Vec<&Hazard> = g.hazards.iter().filter(|h| !h.gone && h.solid() && matches!(h.kind, Hz::Car | Hz::Bus | Hz::Van | Hz::CrossCar | Hz::Dog)).collect();
+                for a in &riders {
+                    for b in &others {
+                        if a.seg != b.seg { continue; }
+                        let ((aw, al), (bw, bl)) = (a.size(), b.size());
+                        if (a.x - b.x).abs() < aw + bw - 3.0 && (a.d - b.d).abs() < al + bl - 3.0 && found.len() < 12 {
+                            found.push(format!("day {day} frame {frame}: {:?} p{} held {} at ({:.0},{:.0}) through {:?} p{} at ({:.0},{:.0})",
+                                a.kind, a.phase, a.held, a.x, a.d, b.kind, b.phase, b.x, b.d));
+                        }
+                    }
+                }
+            }
+        }
+        assert!(found.is_empty(), "{}", found.join("\n"));
     }
 
     #[test]

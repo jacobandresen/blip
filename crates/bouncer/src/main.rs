@@ -3,7 +3,7 @@
 use std::f32::consts::PI;
 
 use blip::input::{
-    coin_start, play_again, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
+    coin_start, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::rand::rand;
@@ -77,6 +77,8 @@ const MULTI_FAN: f32 = 0.45;
 
 // ---- tuning -----------------------------------------------------------
 const LIVES_START: i32 = 3;
+/// How long a continue is offered at game over.
+const CONTINUE_SECS: f32 = 9.0;
 // Per brick. At 18 the ball hit its cap after 10 of 60 bricks and stayed
 // there for the rest of the game; at 7 the cap arrives about halfway through.
 const SPEED_INC: f32 = 7.0;
@@ -180,6 +182,10 @@ struct Game {
     ball_speed: f32,
     sess: Session,
     dead_timer: Timer,
+    /// The continue offered at game over, and the best score of the run before one was taken (a continue starts the
+    /// score afresh; the run's best is what is reported).
+    cont: blip::Continue,
+    run_best: i32,
     state: State,
     /// Seconds since a brick last broke (see SEEK_AFTER).
     since_break: f32,
@@ -212,6 +218,8 @@ impl Game {
             ball_speed: BALL_SPEED_0,
             sess: Session::new(LIVES_START),
             dead_timer: Timer::default(),
+            cont: blip::Continue::default(),
+            run_best: 0,
             state: State::Title,
             since_break: 0.0,
             chain: 0,
@@ -331,11 +339,25 @@ impl Game {
 
     fn start_game(&mut self) {
         self.sess.reset(LIVES_START);
+        self.run_best = 0;
         blip::bot::levels(LAYOUTS as usize);
         self.ball_speed = BALL_SPEED_0;
         self.reset_drops();
         self.pad_x = ((WIN_W - PAD_W) / 2) as f32;
         self.build_bricks();
+        self.new_ball();
+        self.state = State::Launch;
+    }
+
+    /// A continue taken: the same bricks, fresh lives, the score afresh, a new ball on the paddle.
+    fn continue_play(&mut self) {
+        blip::bot::add("continues", 1.0);
+        self.run_best = self.run_best.max(self.sess.score);
+        self.sess.score = 0;
+        self.sess.lives = LIVES_START;
+        self.ball_speed = BALL_SPEED_0;
+        self.reset_drops();
+        self.pad_x = ((WIN_W - PAD_W) / 2) as f32;
         self.new_ball();
         self.state = State::Launch;
     }
@@ -449,9 +471,14 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             blip::bot::add(&format!("lost_at_speed{}", (g.ball_vx.hypot(g.ball_vy) / 50.0) as i32 * 50), 1.0);
             play_sfx(&sfx.life_lost);
             g.reset_drops();
-            g.state = match g.sess.lose_life_after(&mut g.dead_timer, 1.2) {
-                LifeResult::StillAlive => State::Dead,
-                LifeResult::GameOver => State::Over,
+            g.state = match g.sess.lose_life() {
+                LifeResult::StillAlive => { g.dead_timer.start(1.2); State::Dead }
+                LifeResult::GameOver => {
+                    // A new best (over the run's continues) gets the win jingle after the lost ball.
+                    if web::beats_best(g.sess.score.max(g.run_best)) { play_sfx(&sfx.win); }
+                    g.cont.start(CONTINUE_SECS);
+                    State::Over
+                }
             };
             return;
         }
@@ -870,8 +897,17 @@ fn update_clear(g: &mut Game, dt: f32) {
     if g.dead_timer.tick(dt) { g.next_level(); }
 }
 
+/// Game over offers a continue: fire within CONTINUE_SECS plays on against the bricks still standing, with fresh
+/// lives (and the score afresh); otherwise the run's best is reported and the title returns.
 fn update_over(g: &mut Game, dt: f32) {
-    if play_again(&mut g.dead_timer, dt) { g.start_game(); }
+    match g.cont.update(dt, blip::input::btn1_pressed()) {
+        Some(true) => g.continue_play(),
+        Some(false) => {
+            web::report_score(g.sess.score.max(g.run_best));
+            g.state = State::Title;
+        }
+        None => {}
+    }
 }
 
 fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9], drops: &[Texture2D; 5]) {
@@ -1053,12 +1089,18 @@ async fn main() {
             State::Win    => update_clear(&mut g, dt),
             State::Over   => update_over(&mut g, dt),
         }
+        if g.state == State::Over && g.cont.ticked() { play_sfx(&sfx.wall_hit); }
 
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title => draw_title(&blip, web::high_score(), &paddle, &ball, &ball_shade, &brick),
             State::Win   => draw_clear(&blip, g.sess.level),
-            State::Over  => blip.draw_game_over(g.sess.score, web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active()),
+            State::Over  => {
+                blip.draw_game_over(g.sess.score, web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, false);
+                if g.cont.showing() {
+                    blip.draw_game_over_prompt(&format!("CONTINUE? {}", g.cont.seconds()), BLIP_YELLOW);
+                }
+            }
             State::Launch | State::Play | State::Dead => {
                 draw_play(&blip, &g, &paddle, &ball, &ball_shade, &brick, &drops);
                 // The ball waits on the paddle after every lost life; say so.
@@ -1076,6 +1118,22 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_continue_plays_on_against_the_bricks_left_with_fresh_lives() {
+        let mut g = Game::new();
+        g.start_game();
+        g.bricks[0].alive = false;
+        g.sess.score = 700;
+        g.sess.lives = 1;
+        assert!(g.sess.lose_life() == LifeResult::GameOver);
+        g.cont.start(CONTINUE_SECS);
+        g.state = State::Over;
+        g.continue_play();
+        assert!(!g.bricks[0].alive, "the bricks already broken stay broken");
+        assert!(g.state == State::Launch);
+        assert_eq!((g.sess.lives, g.sess.score, g.run_best), (LIVES_START, 0, 700));
+    }
 
     fn rot_z(t: f32) -> Mat3 { let (s, c) = t.sin_cos(); [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]] }
 

@@ -40,6 +40,11 @@ const PLAYER_H: i32 = 58;
 // The hit box stays the size it was on the smaller 54x48 sprite, so drawing
 // the plane bigger does not make it easier to hit.
 const PLAYER_HIT: (f32, f32) = (38.0, 34.0);
+/// The top left of the plane's hit box (`PLAYER_HIT`) for a plane drawn at (`x`, `y`): the fuselage and inner wings,
+/// centred across and at 47 % of the sprite's height.
+fn plane_hit_box(x: f32, y: f32) -> (f32, f32) {
+    (x + (PLAYER_W as f32 - PLAYER_HIT.0) / 2.0, y + PLAYER_H as f32 * 0.47 - PLAYER_HIT.1 / 2.0)
+}
 const PLAYER_SPEED: f32 = 252.0; // a touch quicker — the d-pad is digital, so response has to carry it
 const PLAYER_ACCEL: f32 = 2600.0;
 const PLAYER_BRAKE: f32 = 3400.0;
@@ -88,6 +93,8 @@ const CARRIER_DECK_X: f32 = 88.0;  // the deck centreline in the sprite
 const CARRIER_BOW: f32 = 42.0;     // where the flight deck starts in the sprite
 const CARRIER_DECK_LEN: f32 = 700.0;
 const LAUNCH_TIME: f32 = 7.6;
+/// How much faster the take-off plays while fire is held: 7.6 s becomes 1.9 s.
+const LAUNCH_HURRY: f32 = 4.0;
 const LAUNCH_START_END: f32 = 1.7;  // engine start
 const LAUNCH_SIGNAL_END: f32 = 2.5; // the launch officer's signal
 const LAUNCH_ROLL_END: f32 = 4.9;   // the deck run
@@ -167,6 +174,12 @@ const FLAK_GUNS: [&[(f32, f32)]; 3] = [
 ];
 const FLAK_RELOAD: (f32, f32) = (2.2, 3.2); // seconds between one gun's shots
 const FLAK_SPEED: f32 = 240.0;
+/// Flying clean pays: every STREAK_PER things destroyed without taking a hit add one to the score multiple, up to
+/// STREAK_MAX; any hit starts the count again. Dodging well is worth more than spraying.
+const STREAK_PER: i32 = 5;
+const STREAK_MAX: i32 = 4;
+/// Guns hold fire at a plane closer than this: a shell's flight (0.46 s) must leave time to see it and turn away.
+const FLAK_MIN_RANGE: f32 = 110.0;
 const FLAK_BURST_R: f32 = 24.0;    // how far a burst reaches
 const FLAK_LETHAL: f32 = 0.25;     // seconds a burst can hurt; then it is smoke
 const FLAK_SMOKE: f32 = 1.4;
@@ -202,6 +215,8 @@ const MAX_POWER_BANNER_TIME: f32 = 1.6;
 
 // ---- tuning -------------------------------------------------------------
 const LIVES_START: i32 = 3;
+/// How long a continue is offered at game over.
+const CONTINUE_SECS: f32 = 9.0;
 const DEAD_PAUSE: f32 = 1.6;
 const RESPAWN_GRACE: f32 = 1.5;
 const WIN_PAUSE: f32 = 2.2;
@@ -506,6 +521,12 @@ struct Game {
     boss_intro: Timer,
     /// Points rising from whatever was just shot down.
     fx: Fx,
+    /// Things destroyed in a row without being hit (see STREAK_PER).
+    streak: blip::Streak,
+    /// The continue offered at game over, and the best score of the run before one was taken (a continue starts
+    /// the score afresh; the run's best is what is reported).
+    cont: blip::Continue,
+    run_best: i32,
 }
 
 fn wave_target_for(level: i32) -> i32 {
@@ -660,13 +681,19 @@ impl Game {
             max_power_banner: Timer::default(),
             boss_intro: Timer::default(),
             fx: Fx::new(),
+            streak: blip::Streak::new(STREAK_PER, STREAK_MAX),
+            cont: blip::Continue::default(),
+            run_best: 0,
         }
     }
 
     /// Score `pts` for something destroyed at (`x`, `y`), shown where it was.
     fn score_at(&mut self, x: f32, y: f32, pts: i32) {
+        let times = self.streak.hit();
+        let pts = pts * times;
         self.sess.add_score(pts);
-        self.fx.popup(x, y - 12.0, &pts.to_string(), POPUP_GOLD);
+        let text = if times > 1 { format!("{pts} X{times}") } else { pts.to_string() };
+        self.fx.popup(x, y - 12.0, &text, POPUP_GOLD);
     }
 
     fn spawn_explosion(&mut self, x: f32, y: f32, scale: f32, color: BlipColor) {
@@ -765,6 +792,8 @@ impl Game {
 
     fn start_game(&mut self) {
         self.sess.reset(LIVES_START);
+        self.streak.miss();
+        self.run_best = 0;
         self.sess.level = self.sess.level.min(MAX_LEVEL);
         blip::bot::levels(MAX_LEVEL as usize);
         blip::bot::reached_level(self.sess.level);
@@ -804,6 +833,8 @@ blip::sounds!(Sounds {
     // the "already maxed, bonus points" catch.
     powerup_up: [blip::BlipSound; 4] = [blip::sound!("powerup2"), blip::sound!("powerup3"), blip::sound!("powerup4"), blip::sound!("max_power")],
     health_pickup,
+    tick,
+    streak_up: [blip::BlipSound; 3] = [blip::sound!("streak2"), blip::sound!("streak3"), blip::sound!("streak4")],
     stage_clear,
     victory,
     game_over,
@@ -946,6 +977,7 @@ fn fire_flak(g: &mut Game, x: f32, y: f32, sfx: &Sounds) {
     let (px, py) = (g.player_x + PLAYER_W as f32 / 2.0, g.player_y + PLAYER_H as f32 / 2.0);
     let (dx, dy) = (px - x, py - y);
     let dist = (dx * dx + dy * dy).sqrt().max(1.0);
+    if dist < FLAK_MIN_RANGE { return; }
     // The pool is the cap on shells in the air: a full sky holds its fire.
     if pool_spawn(&mut g.flak, FlakShell { x, y, vx: dx / dist * FLAK_SPEED, vy: dy / dist * FLAK_SPEED, left: dist, active: true }) {
         play_sfx_volume(&sfx.turret_fire, 0.8);
@@ -1765,14 +1797,10 @@ fn hit_with_bullets(g: &mut Game, sfx: &Sounds, bullet_starts: &[(f32, f32); MAX
 }
 
 /// A power-up the plane flew through this frame: one more weapon level, or a bonus at the top.
-fn catch_powerups(g: &mut Game, player_before: (f32, f32), starts: &[(f32, f32); MAX_POWERUPS], was_active: &[bool; MAX_POWERUPS], sfx: &Sounds) {
+fn catch_powerups(g: &mut Game, player_before: (f32, f32), starts: &[Option<(f32, f32)>], sfx: &Sounds) {
     for i in 0..MAX_POWERUPS {
         if !g.powerups[i].active { continue; }
-        let (from_x, from_y) = if was_active[i] {
-            starts[i]
-        } else {
-            (g.powerups[i].x, g.powerups[i].y)
-        };
+        let (from_x, from_y) = blip::swept_from(starts[i], (g.powerups[i].x, g.powerups[i].y));
         if caught(g, player_before, (from_x, from_y), (g.powerups[i].x, g.powerups[i].y), POW_W, POW_H) {
             g.powerups[i].active = false;
             blip::bot::add("powerups", 1.0);
@@ -1796,14 +1824,10 @@ fn catch_powerups(g: &mut Game, player_before: (f32, f32), starts: &[(f32, f32);
 }
 
 /// A health pickup the plane flew through this frame.
-fn catch_health(g: &mut Game, player_before: (f32, f32), starts: &[(f32, f32); MAX_HEALTH_PICKUPS], was_active: &[bool; MAX_HEALTH_PICKUPS], sfx: &Sounds) {
+fn catch_health(g: &mut Game, player_before: (f32, f32), starts: &[Option<(f32, f32)>], sfx: &Sounds) {
     for i in 0..MAX_HEALTH_PICKUPS {
         if !g.health_pickups[i].active { continue; }
-        let (from_x, from_y) = if was_active[i] {
-            starts[i]
-        } else {
-            (g.health_pickups[i].x, g.health_pickups[i].y)
-        };
+        let (from_x, from_y) = blip::swept_from(starts[i], (g.health_pickups[i].x, g.health_pickups[i].y));
         if caught(g, player_before, (from_x, from_y), (g.health_pickups[i].x, g.health_pickups[i].y), HEALTH_W, HEALTH_H) {
             g.health_pickups[i].active = false;
             let (cx, cy) = (g.health_pickups[i].x + HEALTH_W / 2.0, g.health_pickups[i].y + HEALTH_H / 2.0);
@@ -1816,21 +1840,13 @@ fn catch_health(g: &mut Game, player_before: (f32, f32), starts: &[(f32, f32); M
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     let player_before = (g.player_x, g.player_y);
-    let powerup_starts: [(f32, f32); MAX_POWERUPS] =
-        std::array::from_fn(|i| (g.powerups[i].x, g.powerups[i].y));
-    let powerup_was_active: [bool; MAX_POWERUPS] =
-        std::array::from_fn(|i| g.powerups[i].active);
-    let health_starts: [(f32, f32); MAX_HEALTH_PICKUPS] =
-        std::array::from_fn(|i| (g.health_pickups[i].x, g.health_pickups[i].y));
-    let health_was_active: [bool; MAX_HEALTH_PICKUPS] =
-        std::array::from_fn(|i| g.health_pickups[i].active);
-    let enemy_starts: [(f32, f32); MAX_ENEMIES] =
-        std::array::from_fn(|i| (g.enemies[i].x, g.enemies[i].y));
-    let enemy_was_active: [bool; MAX_ENEMIES] =
-        std::array::from_fn(|i| g.enemies[i].active);
+    let powerup_starts = blip::frame_starts(&g.powerups, |p| p.active.then_some((p.x, p.y)));
+    let health_starts = blip::frame_starts(&g.health_pickups, |p| p.active.then_some((p.x, p.y)));
+    let enemy_starts = blip::frame_starts(&g.enemies, |e| e.active.then_some((e.x, e.y)));
     let mut powerup_expired = [false; MAX_POWERUPS];
     let mut health_expired = [false; MAX_HEALTH_PICKUPS];
     g.fx.update(dt);
+    if let Some(m) = g.streak.risen() { play_sfx(&sfx.streak_up[(m as usize - 2).min(2)]); }
     g.respawn_grace.tick(dt);
     g.boss_intro.tick(dt);
     g.max_power_banner.tick(dt);
@@ -1841,8 +1857,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     // ---- simple movement (no cross-entity reads) ----
     let bullet_starts: [(f32, f32); MAX_PLAYER_BULLETS] =
         std::array::from_fn(|i| (g.bullets[i].x, g.bullets[i].y));
-    let enemy_bullet_starts: [(f32, f32); MAX_ENEMY_BULLETS] =
-        std::array::from_fn(|i| (g.enemy_bullets[i].x, g.enemy_bullets[i].y));
+    // Rounds fired later this frame land in free slots and sweep from where they are.
+    let enemy_bullet_starts = blip::frame_starts(&g.enemy_bullets, |b| b.active.then_some((b.x, b.y)));
     let mut enemy_bullet_left_screen = [false; MAX_ENEMY_BULLETS];
     let mut bullet_left_screen = [false; MAX_PLAYER_BULLETS];
     for (i, b) in g.bullets.iter_mut().enumerate() {
@@ -1909,8 +1925,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         if left_screen { g.bullets[i].active = false; }
     }
 
-    catch_powerups(g, player_before, &powerup_starts, &powerup_was_active, sfx);
-    catch_health(g, player_before, &health_starts, &health_was_active, sfx);
+    catch_powerups(g, player_before, &powerup_starts, sfx);
+    catch_health(g, player_before, &health_starts, sfx);
     for (i, &expired) in powerup_expired.iter().enumerate() {
         if expired { g.powerups[i].active = false; }
     }
@@ -1923,18 +1939,14 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     if g.state == State::Play && !g.respawn_grace.active() && g.stall_fall == 0.0 {
         let (px, py) = (g.player_x, g.player_y);
         let (hw, hh) = PLAYER_HIT;
-        let (hx, hy) = (px + (PLAYER_W as f32 - hw) / 2.0, py + PLAYER_H as f32 * 0.47 - hh / 2.0);
-        let (hx0, hy0) = (
-            player_before.0 + (PLAYER_W as f32 - hw) / 2.0,
-            player_before.1 + PLAYER_H as f32 * 0.47 - hh / 2.0,
-        );
+        let (hx, hy) = plane_hit_box(px, py);
+        let (hx0, hy0) = plane_hit_box(player_before.0, player_before.1);
         let mut hit = false;
         for i in 0..MAX_ENEMY_BULLETS {
             if !g.enemy_bullets[i].active && !enemy_bullet_left_screen[i] { continue; }
-            let start = enemy_bullet_starts[i];
-            if segment_rect_overlap(start.0 - hx0, start.1 - hy0,
-                g.enemy_bullets[i].x - hx, g.enemy_bullets[i].y - hy,
-                -2.0, -2.0, hw + 4.0, hh + 4.0) {
+            let now = (g.enemy_bullets[i].x, g.enemy_bullets[i].y);
+            let start = blip::swept_from(enemy_bullet_starts[i], now);
+            if blip::sweep_hits(start, now, (hx0, hy0), (hx, hy), (-2.0, -2.0, hw + 4.0, hh + 4.0)) {
                 g.enemy_bullets[i].active = false;
                 enemy_bullet_left_screen[i] = false;
                 blip::bot::add(if g.boss.active { "hit_boss_round" } else { "hit_round" }, 1.0);
@@ -1960,21 +1972,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         for i in 0..MAX_ENEMIES {
             if !g.enemies[i].active { continue; }
             let (ew, eh) = (ENEMY_W as f32 * 0.6, ENEMY_H as f32 * 0.6);
-            let (ex0, ey0) = if enemy_was_active[i] {
-                enemy_starts[i]
-            } else {
-                (g.enemies[i].x, g.enemies[i].y)
-            };
-            if segment_rect_overlap(
-                hx0 - (ex0 + ENEMY_W as f32 * 0.2),
-                hy0 - (ey0 + ENEMY_H as f32 * 0.2),
-                hx - (g.enemies[i].x + ENEMY_W as f32 * 0.2),
-                hy - (g.enemies[i].y + ENEMY_H as f32 * 0.2),
-                -hw,
-                -hh,
-                ew + hw,
-                eh + hh,
-            ) {
+            let (ex, ey) = (g.enemies[i].x, g.enemies[i].y);
+            let (ex0, ey0) = blip::swept_from(enemy_starts[i], (ex, ey));
+            let (ox, oy) = (ENEMY_W as f32 * 0.2, ENEMY_H as f32 * 0.2);
+            if blip::sweep_hits((hx0, hy0), (hx, hy), (ex0 + ox, ey0 + oy), (ex + ox, ey + oy), (-hw, -hh, ew + hw, eh + hh)) {
                 g.spawn_explosion(g.enemies[i].x, g.enemies[i].y, 1.0, EXPLOSION_ORANGE);
                 g.enemies[i].active = false;
                 blip::bot::add("hit_ram", 1.0);
@@ -2032,9 +2033,7 @@ fn fly_plane(g: &mut Game, dt: f32, sfx: &Sounds) {
         update_splutter(g, dt, sfx);
         // Sideways: spool up and brake over ~0.1s so the plane has weight.
         let dx = right as i32 as f32 - left as i32 as f32;
-        let target = dx * PLAYER_SPEED;
-        let rate = if dx == 0.0 || target * g.player_vx < 0.0 { PLAYER_BRAKE } else { PLAYER_ACCEL } * dt;
-        g.player_vx += clamp(target - g.player_vx, -rate, rate);
+        g.player_vx = blip::spool(g.player_vx, dx * PLAYER_SPEED, PLAYER_ACCEL, PLAYER_BRAKE, dt);
         // Up and down the screen is only gaining on or falling behind the
         // scrolling world.
         let vy_target = (1.0 - g.airspeed) * AIRSPEED_DRIFT;
@@ -2205,6 +2204,7 @@ fn hit_boss(g: &mut Game, bx: f32, by: f32, sfx: &Sounds) {
 /// The plane is hit at `px`,`py`: a health point and a gun tier, or the plane.
 fn hurt_plane(g: &mut Game, px: f32, py: f32, sfx: &Sounds) {
     g.health -= 1;
+    g.streak.miss();
     // A non-fatal hit drops the gun one tier, never below 2; a fatal
     // one leaves it.
     if g.health > 0 && g.weapon_level > 2 {
@@ -2220,7 +2220,7 @@ fn hurt_plane(g: &mut Game, px: f32, py: f32, sfx: &Sounds) {
         play_take(&sfx.player_explode, 1.0);
         match g.sess.lose_life() {
             LifeResult::StillAlive => { g.dead_timer.start(DEAD_PAUSE); g.state = State::Dead; }
-            LifeResult::GameOver   => { g.over_timer.start(OVER_MIN_WAIT); g.state = State::Over; }
+            LifeResult::GameOver   => { g.cont.start(CONTINUE_SECS); g.state = State::Over; }
         }
     }
 }
@@ -2414,7 +2414,7 @@ fn update_stall(g: &mut Game, dt: f32, sfx: &Sounds) {
         blip::bot::add("death_stall", 1.0);
         match g.sess.lose_life() {
             LifeResult::StillAlive => { g.dead_timer.start(DEAD_PAUSE); g.state = State::Dead; }
-            LifeResult::GameOver   => { g.over_timer.start(OVER_MIN_WAIT); g.state = State::Over; }
+            LifeResult::GameOver   => { g.cont.start(CONTINUE_SECS); g.state = State::Over; }
         }
     }
 }
@@ -2506,11 +2506,23 @@ fn update_won(g: &mut Game, dt: f32) {
     if play_again(&mut g.over_timer, dt) { g.start_game(); }
 }
 
+/// Game over offers a continue: fire within CONTINUE_SECS flies the same level again with fresh lives (and the
+/// score afresh), so a player can see the later stages; otherwise the run's best is reported and the title returns.
 fn update_over(g: &mut Game, dt: f32) {
-    // OVER_MIN_WAIT has to actually elapse before any key can dismiss this —
-    // otherwise the fire button still held down from the fight that killed
-    // you bounces straight back to the title screen.
-    if play_again(&mut g.over_timer, dt) { g.start_game(); }
+    match g.cont.update(dt, blip::input::btn1_pressed()) {
+        Some(true) => {
+            blip::bot::add("continues", 1.0);
+            g.run_best = g.run_best.max(g.sess.score);
+            g.sess.lives = LIVES_START;
+            g.sess.score = 0;
+            g.start_round();
+        }
+        Some(false) => {
+            web::report_score(g.sess.score.max(g.run_best));
+            g.state = State::Title;
+        }
+        None => {}
+    }
 }
 
 /// The ocean: a gradient lighter and hazier toward the top (distance), two
@@ -2830,6 +2842,7 @@ fn draw_launch(
         blip.fill_circle(p.x, p.y, p.r, BlipColor::new(0.78, 0.8, 0.84, 0.55 * a));
     }
     blip.draw_hud(g.sess.score, g.sess.lives);
+    blip.draw_hud_multiple(g.sess.score, g.streak.multiple());
 }
 
 fn draw_play(
@@ -2993,14 +3006,7 @@ fn draw_play(
         blip.fill_rect(mx, my - 8.0, MOTOR_W * hp_frac, 4.0, BLIP_RED);
     }
 
-    // Everyone's rounds are slugs: steel for the fighters' and gunners',
-    // heavier flak shells from the islands, brass from the player's guns.
-    for b in pool_iter(&g.enemy_bullets) {
-        draw_slug(blip, b.x, b.y, b.vx, b.vy, 6.0, 2.2, BlipColor::new(0.78, 0.74, 0.66, 1.0));
-    }
-    for s in pool_iter(&g.flak) {
-        draw_slug(blip, s.x, s.y, s.vx, s.vy, 8.0, 3.2, BlipColor::new(0.62, 0.58, 0.5, 1.0));
-    }
+    // Everyone's rounds are slugs: the enemies' (draw_enemy_rounds, on top of everything), brass from the player's guns.
     draw_flak_bursts(blip, g);
     let brass = BlipColor::new(0.82, 0.64, 0.28, 1.0);
     let copper = BlipColor::new(0.72, 0.38, 0.20, 1.0);
@@ -3106,7 +3112,9 @@ fn draw_play(
     }
 
     g.fx.draw(blip);
+    draw_enemy_rounds(blip, g);
     blip.draw_hud(g.sess.score, g.sess.lives);
+    blip.draw_hud_multiple(g.sess.score, g.streak.multiple());
     draw_bottom_hud(blip, g, player_tex);
 
     if g.max_power_banner.active() {
@@ -3262,6 +3270,17 @@ fn draw_laser(blip: &Blip, g: &Game, i: usize) {
     blip.fill_circle(x, y, r * 0.35, BlipColor::new(1.0, 0.25, 0.2, glow));
 }
 
+/// The enemies' rounds, drawn after explosions and score popups so nothing hides a danger (a kill's "+300" and its
+/// blast sat over the rounds coming at the plane): steel for the fighters' and gunners', heavier flak shells.
+fn draw_enemy_rounds(blip: &Blip, g: &Game) {
+    for b in pool_iter(&g.enemy_bullets) {
+        draw_slug(blip, b.x, b.y, b.vx, b.vy, 6.0, 2.2, BlipColor::new(0.78, 0.74, 0.66, 1.0));
+    }
+    for s in pool_iter(&g.flak) {
+        draw_slug(blip, s.x, s.y, s.vx, s.vy, 8.0, 3.2, BlipColor::new(0.62, 0.58, 0.5, 1.0));
+    }
+}
+
 fn draw_bottom_hud(blip: &Blip, g: &Game, player_tex: &Texture2D) {
     let y = (WIN_H - 30) as f32;
     // Kept in from the edges, clear of the curved glass's rim.
@@ -3392,19 +3411,22 @@ async fn main() {
         let prev_state = g.state;
         match g.state {
             State::Title  => update_title(&mut g),
-            State::Launch => update_launch(&mut g, dt, &sfx),
+            // Fire held hurries the take-off: it plays before every level, and a player who has seen it can skip ahead.
+            State::Launch => update_launch(&mut g, if key_active(BLIP_KEY_SPACE) { dt * LAUNCH_HURRY } else { dt }, &sfx),
             State::Play   => update_play(&mut g, dt, &sfx),
             State::Dead   => update_dead(&mut g, dt),
             State::Win    => update_win(&mut g, dt),
             State::Won    => update_won(&mut g, dt),
             State::Over   => update_over(&mut g, dt),
         }
+        if g.state == State::Over && g.cont.ticked() { play_sfx(&sfx.tick); }
         if prev_state != State::Win  && g.state == State::Win  { play_sfx(&sfx.stage_clear); }
-        if prev_state != State::Over && g.state == State::Over { play_sfx(&sfx.game_over); }
-        if (prev_state != State::Over && g.state == State::Over)
-            || (prev_state != State::Won && g.state == State::Won)
-        {
-            web::report_score(g.sess.score);
+        if prev_state != State::Over && g.state == State::Over {
+            // A new best (over the whole run's continues) ends on the stage-clear fanfare.
+            play_sfx(if web::beats_best(g.sess.score.max(g.run_best)) { &sfx.stage_clear } else { &sfx.game_over });
+        }
+        if prev_state != State::Won && g.state == State::Won {
+            web::report_score(g.sess.score.max(g.run_best));
         }
         // In flight the engine is the crossfaded bank; it starts when play
         // does and stops when it ends (death, stage clear, game over).
@@ -3428,7 +3450,12 @@ async fn main() {
             State::Launch => draw_launch(&blip, &g, &player_tex, &enemy_tex, &carrier_tex, &boat_tex, &cloud_tex, &island_tex),
             State::Win    => draw_win(&blip, g.sess.level),
             State::Won    => draw_won(&blip, g.sess.score, web::high_score(), g.over_timer.active()),
-            State::Over   => blip.draw_game_over(g.sess.score, web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.over_timer.active()),
+            State::Over   => {
+                blip.draw_game_over(g.sess.score, web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, false);
+                if g.cont.showing() {
+                    blip.draw_game_over_prompt(&format!("CONTINUE? {}", g.cont.seconds()), BLIP_YELLOW);
+                }
+            }
             State::Play | State::Dead => {
                 draw_play(&blip, &g, &player_tex, &enemy_tex, &boss_tex, &powerup_tex, &health_tex, &boss_name_ja_tex, &boat_tex, &cloud_tex, &island_tex);
             }

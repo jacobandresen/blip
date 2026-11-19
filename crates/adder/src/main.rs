@@ -230,9 +230,30 @@ fn draw_viper(blip: &Blip, s: &arena::Snake) {
     if let Some(p) = s.path.front() {
         blip.draw_line_ex(s.head.x, s.head.y, p.x, p.y, thick, c);
     }
-    let head_len = arena::BODY_R * 3.0;
-    blip.draw_line_ex(s.head.x - s.heading.cos() * head_len,
-        s.head.y - s.heading.sin() * head_len, s.head.x, s.head.y, thick + 1.0, c);
+    // the viper's head: a wedge a little wider than the body, a darker edge, two eyes, the tongue flicking now and
+    // then (drawing only: the collision is the body's)
+    let (dx, dy) = (s.heading.cos(), s.heading.sin());
+    let (px, py) = (-dy, dx);
+    let at = |f: f32, w: f32| macroquad::math::vec2(s.head.x + dx * f + px * w, s.head.y + dy * f + py * w);
+    let dark = BlipColor { r: c.r * 0.55, g: c.g * 0.55, b: c.b * 0.55, ..c };
+    macroquad::shapes::draw_triangle(at(7.0, 0.0), at(-2.5, 6.5), at(-2.5, -6.5), dark);
+    macroquad::shapes::draw_triangle(at(-2.5, 6.5), at(-2.5, -6.5), at(-9.0, 0.0), dark);
+    macroquad::shapes::draw_triangle(at(5.5, 0.0), at(-2.0, 5.0), at(-2.0, -5.0), c);
+    macroquad::shapes::draw_triangle(at(-2.0, 5.0), at(-2.0, -5.0), at(-7.5, 0.0), c);
+    for side in [-2.6f32, 2.6] {
+        let e = at(1.0, side);
+        blip.fill_rect(e.x - 1.0, e.y - 1.0, 2.0, 2.0, BLIP_WHITE);
+        blip.fill_rect(e.x - 0.5, e.y - 0.5, 1.0, 1.0, BLIP_BLACK);
+    }
+    let t = macroquad::time::get_time() as f32;
+    if (t * 1.3 + s.seat as f32 * 0.37).fract() < 0.18 {
+        let (a, b) = (at(7.0, 0.0), at(11.0, 0.0));
+        let red = BlipColor { r: 0.9, g: 0.2, b: 0.25, a: 1.0 };
+        blip.draw_line(a.x, a.y, b.x, b.y, red);
+        let (l, r) = (at(13.0, 1.6), at(13.0, -1.6));
+        blip.draw_line(b.x, b.y, l.x, l.y, red);
+        blip.draw_line(b.x, b.y, r.x, r.y, red);
+    }
     if s.human {
         let label = if s.seat == 0 { "YOU" } else { "P2" };
         let x = (s.head.x - 10.0).clamp(arena::PIT_X + 2.0, arena::PIT_X + arena::PIT_W - 24.0);

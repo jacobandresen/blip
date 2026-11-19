@@ -46,7 +46,7 @@ impl Lot {
 /// the left, then the left turn into Frederiksgade, past Marmorkirken to Amalienborg and the harbour.
 pub const ROUTE: [&str; 2] = [
     "PPHhhDhhBhHCHdhHhhhH==hRdHhBhJJXHdhMhdhHAAHhPP",
-    "PPhhDhhHhHdChhHBhdPh==HdhHhhHhHdhhHhhhHhAADhPP",
+    "PPhhDhhHhHdChhHBhdPP==HdhHhhHhHdhhHhhhHhAADhPP",
 ];
 
 /// Where the street is: the name shown as the bike rides into it, from that row on.

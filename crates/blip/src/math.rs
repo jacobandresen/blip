@@ -54,6 +54,14 @@ pub fn angle_diff(from: f32, to: f32) -> f32 {
     (to - from + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
 }
 
+/// A speed with mass: `v` moves toward `target` by up to `accel` per second, or `brake` when stopping or
+/// turning back. A bot rolling a mover ahead calls the same function the game does.
+#[inline]
+pub fn spool(v: f32, target: f32, accel: f32, brake: f32, dt: f32) -> f32 {
+    let rate = if target == 0.0 || target * v < 0.0 { brake } else { accel } * dt;
+    v + clamp(target - v, -rate, rate)
+}
+
 /// Cubic ease-out for normalized input; clamps `t` to `[0, 1]`.
 #[inline]
 pub fn ease_out_cubic(t: f32) -> f32 {
@@ -123,6 +131,27 @@ pub fn segment_rect_overlap(x0: f32, y0: f32, x1: f32, y1: f32, rx: f32, ry: f32
     true
 }
 
+/// Where each thing in a pool was as the frame began, for swept hit tests: `at` gives a live thing's position and
+/// `None` for an empty slot. A thing spawned into an empty slot during the frame then sweeps from where it is, not
+/// from where the slot's previous thing ended (which can be anywhere, often right where it last hit something).
+pub fn frame_starts<T>(pool: &[T], at: impl Fn(&T) -> Option<(f32, f32)>) -> Vec<Option<(f32, f32)>> {
+    pool.iter().map(at).collect()
+}
+
+/// Where a swept test begins: the frame's start, or where the thing is now when it arrived during the frame.
+#[inline]
+pub fn swept_from(start: Option<(f32, f32)>, now: (f32, f32)) -> (f32, f32) {
+    start.unwrap_or(now)
+}
+
+/// Did a point moving from `from` to `to` touch a box carried by an anchor moving from `anchor_from` to `anchor_to`?
+/// `rect` is the box (x, y, w, h) relative to its anchor. Tested in the box's own frame, so neither passes through
+/// the other however fast both move.
+#[inline]
+pub fn sweep_hits(from: (f32, f32), to: (f32, f32), anchor_from: (f32, f32), anchor_to: (f32, f32), rect: (f32, f32, f32, f32)) -> bool {
+    segment_rect_overlap(from.0 - anchor_from.0, from.1 - anchor_from.1, to.0 - anchor_to.0, to.1 - anchor_to.1, rect.0, rect.1, rect.2, rect.3)
+}
+
 /// Deterministic scatter in `[0, 1)`: the same value for the same `k` and
 /// `salt` on every frame, so scenery (a crowd, stars, windows) can be placed
 /// without storing it. `k` indexes the thing, `salt` separates two uses.
@@ -161,6 +190,16 @@ mod tests {
         assert_eq!(smoothstep01(0.0), 0.0);
         assert_eq!(smoothstep01(1.0), 1.0);
         assert_eq!(smoothstep01(2.0), 1.0);
+    }
+
+    #[test]
+    fn a_thing_spawned_mid_frame_sweeps_from_where_it_is_and_a_moving_box_is_swept_in_its_own_frame() {
+        let starts = super::frame_starts(&[(true, 5.0), (false, 99.0)], |&(live, x)| live.then_some((x, 0.0)));
+        assert_eq!(super::swept_from(starts[0], (6.0, 0.0)), (5.0, 0.0));
+        assert_eq!(super::swept_from(starts[1], (7.0, 0.0)), (7.0, 0.0));
+        // A point and a 2x2 box move right together: they never meet, though the point's path crosses where the box was.
+        assert!(!super::sweep_hits((0.0, 0.0), (10.0, 0.0), (5.0, -1.0), (15.0, -1.0), (0.0, 0.0, 2.0, 2.0)));
+        assert!(super::sweep_hits((0.0, 0.0), (10.0, 0.0), (5.0, -1.0), (5.0, -1.0), (0.0, 0.0, 2.0, 2.0)));
     }
 
     #[test]

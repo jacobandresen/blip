@@ -569,11 +569,13 @@ pub(crate) fn the_finishing_blow_plays_in_slow_motion_and_the_bar_drains_after_i
 #[ignore = "a measurement, printed; takes a while"]
 fn bot_round_wins_up_the_ladder() {
     let _sim = super::balance::simulating(7);
+    let pick: usize = std::env::var("PICK").ok().and_then(|p| p.parse().ok()).unwrap_or(0);
     let mut total = 0;
     for rung in 0..RUNGS {
         let (mut won, mut fought) = (0, 0);
         for _ in 0..30 {
             let mut g = Game::new();
+            g.pick = pick;
             g.start_match(rung);
             g.state = State::Fight;
             let mut frames = 0;
@@ -587,14 +589,54 @@ fn bot_round_wins_up_the_ladder() {
             if g.p[0].rounds > 0 { won += 1; }
         }
         total += won;
-        eprintln!("rung {:2} {:>8}: bot won {won}/{fought} rounds", rung + 1, FIGHTERS[foe_at(rung)].name);
+        eprintln!("rung {:2} {:>8}: bot won {won}/{fought} rounds", rung + 1, FIGHTERS[foe_at(pick, rung)].name);
     }
     eprintln!("in all: {total} of {} rounds", 30 * RUNGS);
 }
 
+/// For each fighter as the CPU: the difficulty dial at which the bot wins half its rounds, over every pick. A
+/// fighter whose dial is far from the others' is a wall (or a gift) wherever the ladder puts it.
+#[test]
+#[ignore = "a measurement, a few seconds: cargo test --release -p brawler foe_strength -- --ignored --nocapture"]
+fn foe_strength() {
+    let _sim = super::balance::simulating(7);
+    let win_rate = |foe: usize, dial: f32| {
+        let (mut won, mut fought) = (0, 0);
+        for pick in (0..FIGHTERS.len()).filter(|&p| p != foe) {
+            for _ in 0..8 {
+                let mut g = Game::new();
+                g.pick = pick;
+                g.start_match(0);
+                g.p[1] = Fighter::new(foe, 440.0, -1.0);
+                g.difficulty = dial;
+                g.state = State::Fight;
+                let mut frames = 0;
+                while g.p[0].rounds + g.p[1].rounds == 0 && frames < 8100 {
+                    let p = bot::fight(&g, F);
+                    let cpu = cpu_turn(&mut g, 1, F);
+                    step_fight(&mut g, F, p, cpu);
+                    frames += 1;
+                }
+                fought += 1;
+                if g.p[0].rounds > 0 { won += 1; }
+            }
+        }
+        won as f32 / fought as f32
+    };
+    for (foe, fighter) in FIGHTERS.iter().enumerate() {
+        let (mut lo, mut hi) = (-1.5f32, 1.5f32);
+        for _ in 0..6 {
+            let mid = (lo + hi) / 2.0;
+            if win_rate(foe, mid) > 0.5 { lo = mid; } else { hi = mid; }
+        }
+        eprintln!("{:>8}: half the rounds at dial {:.2}", fighter.name, (lo + hi) / 2.0);
+    }
+}
+
 /// Who the ladder puts up at `rung`.
-fn foe_at(rung: usize) -> usize {
+fn foe_at(pick: usize, rung: usize) -> usize {
     let mut g = Game::new();
+    g.pick = pick;
     g.start_match(rung);
     g.p[1].who
 }

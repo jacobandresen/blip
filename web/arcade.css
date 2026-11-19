@@ -1277,6 +1277,18 @@ body.cabinet-page .screen-bezel {bottom:0!important}
 .machine-deck-cheek {position:absolute;top:0;left:0;width:calc(var(--deck-height,42px) * .45);height:var(--deck-height,42px);transform-origin:0 0;transform:rotateY(90deg);
   clip-path:polygon(0 0,0 100%,100% 72%);background:linear-gradient(90deg,#393039,#17131a 35%,#0b090e);}
 .machine-deck-cheek.right {left:100%;background:linear-gradient(90deg,#211c24,#0b090e 80%)}
+/* A vinyl sticker on the cabinet's front, put on by hand just above and right of Start: askew, die-cut with a
+   white edge, a sheen, one corner peeling, lit as dimly as the cabinet around it. */
+.machine-sticker {position:absolute;z-index:5;left:calc(50% + 14px);top:calc(69.5% - 30px);transform:rotate(-13deg) skewX(-3deg);
+  filter:brightness(.82) saturate(.92) drop-shadow(0 1px .5px #000a);pointer-events:none}
+.machine-sticker b {display:block;padding:5px 8px 4px;border:2.5px solid #fbf6ee;border-radius:11px;
+  font:900 11px/1 'Hiragino Maru Gothic ProN','M PLUS Rounded 1c','Noto Sans CJK JP','Noto Sans JP','Noto Sans CJK TC',sans-serif;letter-spacing:.02em;
+  color:#fff;text-shadow:-1px -1px #d2367f,1px -1px #d2367f,-1px 1px #d2367f,1px 1px #d2367f,0 2px #a8215f;
+  background:linear-gradient(112deg,transparent 38%,#fff6 46%,transparent 54%),radial-gradient(circle,#fff5 0 1.4px,transparent 1.8px) 0 0/7px 7px,linear-gradient(160deg,#ffa3d2,#ff62ae 70%,#f04f9c);
+  clip-path:polygon(0 0,calc(100% - 9px) 0,100% 9px,100% 100%,0 100%)}
+.machine-sticker b::after {content:'♡';margin-left:2px;font-size:9px}
+.machine-sticker::after {content:'';position:absolute;right:0;top:0;width:9px;height:9px;border-radius:0 0 0 3px;
+  background:linear-gradient(225deg,transparent 50%,#d9d2c8 50%,#fbf8f2 85%);box-shadow:-1px 1px 1px #0005}
 /* On a small screen the cabinet shrinks but Start does not: it stays a thumb wide (30px tall at least). */
 .card {--start-grow:max(1,calc(.76 / var(--arc-scale,1)))}
 .machine-start {appearance:none;position:absolute;z-index:5;left:50%;top:69.5%;bottom:auto;min-width:84px;height:40px;padding:0 8px;transform:translateX(-50%) scale(var(--start-grow));transform-origin:50% 0;

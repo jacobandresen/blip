@@ -2,23 +2,28 @@
 //! to play it; this module does the rest.
 //!
 //! - [`Pad`]: the controls a bot works this frame, said as a player would
-//!   ("steer toward the ball", "tap fire"); presses get their release frames.
-//! - [`Playthrough`]: a named run that shows one theme of the game ("the snake
-//!   eats and grows into level 2") and the stats that prove it.
-//! - [`grid`] and [`predict`]: path finding and influence maps on tile maps, and where a moving
+//!   ("steer toward the target", "tap fire"); presses get their release frames.
+//! - [`Playthrough`]: a named run that shows one theme of the game ("the player
+//!   reaches level 2") and the stats that prove it.
+//! - [`crate::grid`] and [`predict`]: path finding and influence maps on tile maps, and where a moving
 //!   thing will be.
 //! - [`rollout`]: try each move, roll everything forward, keep the clearest path (sampled look-ahead).
 //! - [`utility`]: score every option on curved considerations and take the best; [`utility::Commit`] holds a
 //!   choice against close rivals.
-//! - [`remember`]: what a bot keeps between frames.
+//! - [`remember`]: what a bot keeps between frames; [`best`] the cheapest of some options (nearest, soonest,
+//!   safest); [`chance`] a coin with odds; [`may_continue`] whether to take a continue offered at game over.
 //! - Stats: [`add`], [`set`], [`reached_level`]; the run ends with one
-//!   `RESULT` line ([`finish`]).
+//!   `RESULT` line ([`finish`]), with the fun measures of [`fun`] (`fun_*`); [`near`] feeds them.
 //!
 //! Switches (native only; the web build never runs a bot):
 //! `BLIP_BOT=1` plays at a fixed 60 Hz. `BLIP_BOT_MAXT` sets the time limit,
 //! `BLIP_BOT_LEVEL=<n>` starts at level n, `BLIP_BOT_TITLE=<secs>` waits on the
 //! title, `BLIP_BOT_SHOTS=<dir>` saves frames every `BLIP_BOT_SHOT_EVERY`
 //! seconds, `BLIP_BOT_FUZZ=<seed>` mashes random keys instead of playing.
+//! `BLIP_BOT_REACT=<ms>` delays every control by a person's reaction time, to find hazards only a bot can dodge.
+//! `BLIP_BOT_NEAR=<dir>` saves each near miss and hit with its hit boxes drawn. Only one frame in
+//! `BLIP_BOT_DRAW` (30) is drawn, which plays the same and runs several times faster; 1 draws them all.
+//! `BLIP_BOT_CONTINUES=<n>` takes up to n continues (none by default, so a run ends at game over).
 //! `BLIP_BOT_PLAYTHROUGH=<name>` runs one of the game's playthroughs and
 //! `BLIP_BOT_LIST=1` lists them. `BLIP_BOT_SEED=<n>` fixes the random numbers
 //! (a playthrough has its own), so a run repeats exactly. A game's own switches are `BLIP_BOT_<NAME>`:
@@ -28,7 +33,7 @@ use macroquad::input::KeyCode;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
-pub mod grid;
+mod fun;
 mod memory;
 mod pad;
 mod playthrough;
@@ -60,6 +65,15 @@ struct Run {
     title: f32,
     /// The playthrough being run, if any.
     playthrough: Option<&'static Playthrough>,
+    fun: fun::Meter,
+    /// Frames every control is delayed (BLIP_BOT_REACT), the controls on their way, and what the bot meant last
+    /// frame (a delayed bot taps by what it meant, not by what has arrived).
+    react: usize,
+    queue: std::collections::VecDeque<Vec<KeyCode>>,
+    meant: Vec<KeyCode>,
+    meant_before: Vec<KeyCode>,
+    /// Draw one frame in this many (BLIP_BOT_DRAW).
+    every: u64,
 }
 
 static RUN: Mutex<Option<Run>> = Mutex::new(None);
@@ -76,7 +90,7 @@ fn with<R>(f: impl FnOnce(&mut Run) -> R) -> R {
         prev: Vec::new(),
         clock: 0.0,
         maxt: env_num("BLIP_BOT_MAXT", 600.0),
-        shots: std::env::var("BLIP_BOT_SHOTS").ok(),
+        shots: out_dir("SHOTS"),
         shot_every: env_num("BLIP_BOT_SHOT_EVERY", 4.0),
         next_shot: 1.0,
         shot_n: 0,
@@ -87,6 +101,12 @@ fn with<R>(f: impl FnOnce(&mut Run) -> R) -> R {
         fuzz_keys: Vec::new(),
         title: env_num("BLIP_BOT_TITLE", 0.0),
         playthrough: None,
+        fun: fun::Meter::saving_to(out_dir("NEAR")),
+        every: env_num("BLIP_BOT_DRAW", 30.0).max(1.0) as u64,
+        react: (env_num("BLIP_BOT_REACT", 0.0) * 0.06).round() as usize,
+        queue: std::collections::VecDeque::new(),
+        meant: Vec::new(),
+        meant_before: Vec::new(),
     });
     f(run)
 }
@@ -134,6 +154,18 @@ pub fn level(count: usize) -> usize {
     num("LEVEL").map_or(0, |n| (n.max(1.0) as usize).min(count.max(1)) - 1)
 }
 
+// ---- choosing ----------------------------------------------------------------
+
+/// The candidate with the lowest cost: the nearest target, the soonest arrival, the safest move. The first wins a tie.
+pub fn best<C: Copy>(candidates: impl IntoIterator<Item = C>, cost: impl Fn(C) -> f32) -> Option<C> {
+    candidates.into_iter().map(|c| (c, cost(c))).min_by(|a, b| a.1.total_cmp(&b.1)).map(|(c, _)| c)
+}
+
+/// True with odds `p` (0 to 1), from the game's random numbers, so a seeded run repeats.
+pub fn chance(p: f32) -> bool {
+    macroquad::rand::gen_range(0.0f32, 1.0) < p
+}
+
 // ---- stats -------------------------------------------------------------------
 
 /// Game seconds since the run began.
@@ -141,19 +173,38 @@ pub fn clock() -> f32 {
     with(|r| r.clock)
 }
 
-/// Add to a named stat.
+/// Add to a named stat. A rise in `deaths` or a `hit_*` stat is the player being hit, for the fun meter.
 pub fn add(key: &str, n: f64) {
-    with(|r| if r.on { *r.stats.entry(key.to_string()).or_insert(0.0) += n; });
+    with(|r| if r.on {
+        *r.stats.entry(key.to_string()).or_insert(0.0) += n;
+        if n > 0.0 && is_hit(key) { let c = r.clock; r.fun.hit(c, key == "deaths"); }
+    });
 }
 
 /// Set a named stat (last value wins).
 pub fn set(key: &str, v: f64) {
-    with(|r| if r.on { r.stats.insert(key.to_string(), v); });
+    with(|r| if r.on {
+        let before = r.stats.insert(key.to_string(), v).unwrap_or(0.0);
+        if v > before && is_hit(key) { let c = r.clock; r.fun.hit(c, key == "deaths"); }
+    });
 }
+
+fn is_hit(key: &str) -> bool { key == "deaths" || key.starts_with("hit_") }
 
 /// A stat's value so far (0 when never set).
 pub fn stat(key: &str) -> f64 {
     with(|r| r.stats.get(key).copied().unwrap_or(0.0))
+}
+
+/// The reaction delay every control has in this run (BLIP_BOT_REACT), in seconds; 0 normally.
+pub fn react_secs() -> f32 {
+    with(|r| r.react as f32 / 60.0)
+}
+
+/// On a continue offer: should the bot take it? While fewer continues (the `continues` stat, which a game adds to
+/// when one is taken) than `BLIP_BOT_CONTINUES` allows; none by default, so a measured run ends at game over.
+pub fn may_continue() -> bool {
+    stat("continues") < num("CONTINUES").unwrap_or(0.0)
 }
 
 /// Record that play is now on level `n`: the `level` stat and `t_level<n>`,
@@ -175,6 +226,8 @@ pub fn finish(outcome: &str) {
     let line = with(|r| {
         if !r.on { return None; }
         let mut line = format!("RESULT outcome={outcome} t={:.0}", r.clock);
+        let fun = r.fun.stats(r.clock);
+        r.stats.extend(fun.into_iter().map(|(k, v)| (k.to_string(), v)));
         for (k, v) in &r.stats {
             if v.fract() == 0.0 { line += &format!(" {k}={v}"); } else { line += &format!(" {k}={v:.2}"); }
         }
@@ -202,8 +255,14 @@ const FUZZ_KEYS: [KeyCode; 11] = [
 pub fn hold(keys: &[KeyCode]) {
     with(|r| {
         r.held.clear();
+        r.meant = keys.to_vec();
         if r.clock < r.title { return; }
-        if r.fuzz == 0 { r.held.extend_from_slice(keys); return; }
+        if r.fuzz == 0 && r.react == 0 { r.held.extend_from_slice(keys); return; }
+        if r.fuzz == 0 {
+            r.queue.push_back(keys.to_vec());
+            if r.queue.len() > r.react { r.held = r.queue.pop_front().unwrap_or_default(); }
+            return;
+        }
         if r.fuzz_left == 0 {
             r.fuzz_left = 4;
             r.fuzz = r.fuzz.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
@@ -223,7 +282,7 @@ pub(crate) fn held(k: KeyCode) -> bool {
 
 /// Was `k` down last frame? A fresh press needs it up first.
 pub(crate) fn held_before(k: KeyCode) -> bool {
-    with(|r| r.prev.contains(&k))
+    with(|r| if r.react == 0 { r.prev.contains(&k) } else { r.meant_before.contains(&k) })
 }
 
 pub(crate) fn pressed(k: KeyCode) -> bool {
@@ -234,10 +293,59 @@ pub(crate) fn any_pressed() -> bool {
     with(|r| r.on && r.held.iter().any(|k| !r.prev.contains(k)))
 }
 
+// ---- fun hooks ---------------------------------------------------------------
+
+/// This frame's hit boxes, in canvas pixels: the player's (one or more) and every hazard's, as the game tests
+/// them. Near misses, hits and the warning before a hit go into the fun stats; with `BLIP_BOT_NEAR` set, each
+/// pass's closest frame is saved with the boxes drawn.
+pub fn near(me: &[rollout::Mover], hazards: &[rollout::Mover]) {
+    with(|r| if r.on { let c = r.clock; r.fun.near(me, hazards, c); });
+}
+
+/// Is this frame one nobody will see? A bot run draws one frame in `BLIP_BOT_DRAW` (30 by default; 1 draws every
+/// frame), unless it saves frames. The game still runs all its drawing code (so its random numbers are drawn the same
+/// way), but onto a one-pixel viewport, and the frame is not shown: software rendering is most of a run's time.
+pub(crate) fn unseen() -> bool {
+    with(|r| r.on && r.every > 1 && r.shots.is_none() && !r.fun.saving() && !((r.clock * 60.0).round() as u64).is_multiple_of(r.every))
+}
+
+/// Called by `Blip::next_frame` with the canvas camera on, before the frame is shown: draws the hit boxes of a
+/// frame being saved.
+pub(crate) fn overlay() {
+    use macroquad::color::Color;
+    let boxes = with(|r| if r.fun.capture { r.fun.boxes.clone() } else { Vec::new() });
+    let me: Vec<rollout::Mover> = boxes.iter().filter(|(_, p)| *p == fun::Paint::Player).map(|(m, _)| *m).collect();
+    for (m, paint) in &boxes {
+        let c = match paint {
+            fun::Paint::Player => Color::new(0.2, 1.0, 0.3, 1.0),
+            fun::Paint::Nearest => Color::new(1.0, 0.2, 0.2, 1.0),
+            fun::Paint::Other => Color::new(1.0, 0.85, 0.2, 0.8),
+        };
+        let (w, h) = ((2.0 * m.hw).max(2.0), (2.0 * m.hh).max(2.0));
+        macroquad::shapes::draw_rectangle_lines(m.x - w / 2.0, m.y - h / 2.0, w, h, 2.0, c);
+        // A point (a bullet's tip) gets a ring so it can be found.
+        if m.hw < 3.0 && m.hh < 3.0 { macroquad::shapes::draw_circle_lines(m.x, m.y, 7.0, 1.5, c); }
+        if *paint == fun::Paint::Nearest {
+            let g = me.iter().map(|p| fun::gap(p, m)).fold(f32::INFINITY, f32::min);
+            if let Some(p) = me.first() {
+                macroquad::text::draw_text(&format!("GAP {g:.0}"), p.x - 20.0, p.y - p.hh - 22.0, 16.0, c);
+            }
+        }
+    }
+}
+
 // ---- the frame ---------------------------------------------------------------
 
 /// Called by `Blip::next_frame` just before the frame is shown: saves a frame
 /// when one is due, and ends a run that has met its goals or its time limit.
+/// A `BLIP_BOT_<name>` folder for frames, made if it is missing (saving a frame to a missing one panics).
+fn out_dir(name: &str) -> Option<String> {
+    let dir = std::env::var(format!("BLIP_BOT_{name}")).ok()?;
+    #[cfg(not(target_arch = "wasm32"))]
+    let _ = std::fs::create_dir_all(&dir);
+    Some(dir)
+}
+
 pub(crate) fn before_present() {
     let (shot, met, over) = with(|r| {
         if !r.on { return (None, false, false); }
@@ -256,6 +364,11 @@ pub(crate) fn before_present() {
     if let Some(p) = shot { macroquad::texture::get_screen_data().export_png(&p); }
     #[cfg(target_arch = "wasm32")]
     let _ = shot;
+    #[cfg(not(target_arch = "wasm32"))]
+    if with(|r| r.fun.capture) {
+        let img = macroquad::texture::get_screen_data();
+        with(|r| r.fun.captured(img));
+    }
     if met { finish("goals"); }
     if over { finish("timeout"); }
 }
@@ -264,7 +377,9 @@ pub(crate) fn before_present() {
 pub(crate) fn after_present() -> Option<f32> {
     with(|r| {
         if !r.on { return None; }
+        r.fun.frame(&r.held, &r.prev);
         r.prev = r.held.clone();
+        r.meant_before = std::mem::take(&mut r.meant);
         r.clock += 1.0 / 60.0;
         Some(1.0 / 60.0)
     })

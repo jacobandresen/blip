@@ -134,6 +134,11 @@ fn extra_life() -> Vec<u8> {
     cosy::jingle_with(&[76, 83, 88, H, 90, 88, 95, H, H], 0.09, Voice::Glass, 0, Some((Voice::Bell, -1)))
 }
 
+/// A streak's multiple rising: a short glass run, one note longer for each step up (x2, x3, x4).
+fn streak_up(times: usize) -> Vec<u8> {
+    cosy::jingle_with(&[83, 88, 90, 95][..times], 0.06, Voice::Glass, 0, Some((Voice::Bell, -1)))
+}
+
 /// The effects, as `sounds/NAME.wav`.
 pub fn sounds() -> Vec<Asset> {
     vec![
@@ -146,6 +151,9 @@ pub fn sounds() -> Vec<Asset> {
         ("sounds/saucer_small.wav", saucer(true)),
         ("sounds/hyperspace.wav", hyperspace()),
         ("sounds/extra_life.wav", extra_life()),
+        ("sounds/streak2.wav", streak_up(2)),
+        ("sounds/streak3.wav", streak_up(3)),
+        ("sounds/streak4.wav", streak_up(4)),
         ("sounds/ship_explosion.wav", ship_explosion()),
     ]
 }

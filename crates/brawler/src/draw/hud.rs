@@ -146,7 +146,7 @@ pub(crate) fn draw_banner(blip: &Blip, g: &Game) {
                 BlipColor { r: 0.02, g: 0.02, b: 0.05, a: 0.78 });
             stamp(blip, "CONTINUE", cy - 14.0, 4.0, BLIP_YELLOW);
             // The count lands big each second and settles.
-            let left = g.phase.remaining();
+            let left = g.cont.remaining();
             let sz = if left.fract() > 0.82 { 9.0 } else { 7.0 };
             let n = format!("{}", left.ceil() as i32);
             stamp(blip, &n, cy + 26.0 - (sz - 7.0) * 4.0, sz, BLIP_WHITE);

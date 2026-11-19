@@ -146,6 +146,12 @@ pub fn report_score(score: i32) {
     }
 }
 
+/// Whether `score` beats this browser's best, when there is one to beat: game over plays a happy sting instead.
+pub fn beats_best(score: i32) -> bool {
+    let hi = high_score();
+    hi > 0 && score > hi
+}
+
 /// This browser's best score for the current game, kept by the shell. 0 when
 /// none is known, which is always the case natively unless `BLIP_HI=180940`
 /// fakes one so the HUD's centre field can be checked.
