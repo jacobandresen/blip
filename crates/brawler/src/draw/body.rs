@@ -596,6 +596,6 @@ pub(crate) fn stamp(blip: &Blip, text: &str, y: f32, sz: f32, c: BlipColor) {
 /// The same, centred on `cx`.
 pub(crate) fn stamp_at(blip: &Blip, text: &str, cx: f32, y: f32, sz: f32, c: BlipColor) {
     let d = (sz * 0.5).max(1.0);
-    blip.draw_text(text, cx - text_w(text, sz) / 2.0 + d, y + d * 2.5, sz, BlipColor { a: 0.55, ..INK });
+    blip.draw_text(text, cx - text_w(text, sz) / 2.0 + d, y + d * 2.5, sz, BlipColor { a: 0.55 * c.a, ..INK });
     blip.draw_centered_outlined(text, cx, y, sz, c, INK);
 }

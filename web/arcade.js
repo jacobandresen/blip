@@ -436,6 +436,9 @@ document.querySelectorAll('#game-grid .card').forEach(function(card){
   controls.appendChild(deck);
   ['left','right'].forEach(function(side){var cheek=document.createElement('span');cheek.className='machine-deck-cheek '+side;cheek.setAttribute('aria-hidden','true');controls.appendChild(cheek);});
   card.appendChild(controls.querySelector('.machine-start'));
+  // A sticker a small fan slapped on the cabinet, just over Start where she could reach.
+  var sticker=(BLIP_GAMES[slug]||{}).sticker;
+  if(sticker){var tag=document.createElement('span');tag.className='machine-sticker';tag.setAttribute('aria-hidden','true');tag.innerHTML='<b></b>';tag.firstChild.textContent=sticker;card.appendChild(tag);}
   card.querySelector('.machine-start').addEventListener('click',function(event){
     event.preventDefault();event.stopPropagation();
     if(!card.classList.contains('card-focused')){if(focusArcadeCard)focusArcadeCard(card);return;}

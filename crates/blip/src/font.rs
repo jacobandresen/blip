@@ -37,6 +37,11 @@ pub fn draw_text(text: &str, x: f32, y: f32, sz: f32, color: Color) {
 /// Draw a string with an outline of `ink` all round it, one font pixel thick
 /// at small sizes: lettering that has to be read over a picture.
 pub fn draw_text_outlined(text: &str, x: f32, y: f32, sz: f32, color: Color, ink: Color) {
+    // The outline is never more solid than the text: fading text left a dark smudge of outline behind. Each pass
+    // gets the alpha that its OUTLINE_OFFSETS.len() overlapping copies stack up to (solid stays solid).
+    let target = ink.a.min(color.a);
+    let a = if target >= 1.0 { 1.0 } else { 1.0 - (1.0 - target).powf(1.0 / OUTLINE_OFFSETS.len() as f32) };
+    let ink = Color { a, ..ink };
     let d = (sz * 0.5).max(1.0);
     for (dx, dy) in OUTLINE_OFFSETS {
         draw_text(text, x + dx * d, y + dy * d, sz, ink);

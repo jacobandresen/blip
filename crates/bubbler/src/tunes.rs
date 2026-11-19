@@ -4,7 +4,7 @@
 use std::f32::consts::PI;
 
 use blip::cosy::{midi_hz, note, pulse, Voice, SR};
-use blip::song::{hat, kick, snare};
+use blip::song::{hat, kick};
 use blip::wav::{encode_pcm16_half, encode_pcm16_mono, encode_pcm16_music, soft_limit_to_pcm16, warm, Rng, MIX_KNEE};
 use blip::Asset;
 
@@ -13,7 +13,9 @@ const RR: i32 = -1;
 
 /// The theme: 152 bpm, sixteen bars of eighths, C major. Bouncy bass on
 /// root-octave-fifth, a quiet chord arpeggio in sixteenths, a lead that
-/// leaps and skips — written to be hummed after one round.
+/// leaps and skips — written to be hummed after one round. Kawaii: the lead
+/// is a toy glockenspiel over a soft pulse, handclaps on the backbeat, a
+/// twinkling run at each phrase's end and now and then a squeaky toy.
 pub fn theme_wav() -> Vec<u8> {
     theme(152.0)
 }
@@ -83,7 +85,8 @@ fn theme(bpm: f32) -> Vec<u8> {
                 while k + len < 8 && lead[b][k + len] == H {
                     len += 1;
                 }
-                note(&mut buf, b0 + k * eighth, len * eighth - eighth / 6, n - 12, 0.30, Voice::Lead);
+                note(&mut buf, b0 + k * eighth, len * eighth - eighth / 6, n - 12, 0.16, Voice::Lead);
+                note(&mut buf, b0 + k * eighth, len * eighth, n, 0.2, Voice::Glock);
                 // a harmony a third below in the second half, bell-soft
                 if b >= 8 {
                     note(&mut buf, b0 + k * eighth, len * eighth, n - 16, 0.10, Voice::Bell);
@@ -93,8 +96,7 @@ fn theme(bpm: f32) -> Vec<u8> {
                 k += 1;
             }
         }
-        for half in 0..2 {
-            let (root, iv) = chords[b][half];
+        for (half, &(root, iv)) in chords[b].iter().enumerate() {
             let h0 = b0 + half * 4 * eighth;
             // bass: root, octave, fifth, octave
             for (s, off) in [0, 12, 7, 12].iter().enumerate() {
@@ -112,17 +114,26 @@ fn theme(bpm: f32) -> Vec<u8> {
             if beat % 2 == 0 {
                 kick(&mut buf, t0, 0.55);
             } else {
-                snare(&mut buf, t0, &mut rng, 0.32);
+                clap(&mut buf, t0, &mut rng, 0.3);
             }
             hat(&mut buf, t0 + eighth, &mut rng, 0.08);
             hat(&mut buf, t0, &mut rng, 0.045);
         }
         if b % 4 == 3 {
-            // a snare fill into the next phrase
-            for s in 0..4 {
-                snare(&mut buf, b0 + 6 * eighth + s * eighth / 2, &mut rng, 0.14 + 0.05 * s as f32);
+            // kira-kira: a twinkling pentatonic run up into the next phrase
+            for (s, n) in [84, 86, 88, 91, 93, 96, 98, 100].iter().enumerate() {
+                note(&mut buf, b0 + 4 * eighth + s * eighth / 2, eighth / 2, *n, 0.07, Voice::Glass);
             }
             kick(&mut buf, b0 + 7 * eighth, 0.4);
+        }
+        if b % 4 == 1 {
+            // a squeaky toy answers the tune on the last beat
+            let at = b0 + 7 * eighth;
+            for (i, v) in squeak(0.16, 1250.0, 1.0).iter().enumerate() {
+                if let Some(o) = buf.get_mut(at + i) {
+                    *o += v * 0.12;
+                }
+            }
         }
     }
     // A dotted-eighth echo on everything, quiet: the room the chiptune plays in.
@@ -138,6 +149,43 @@ fn theme(bpm: f32) -> Vec<u8> {
     warm(&mut buf);
     let scaled: Vec<f32> = buf.iter().map(|v| v * 21_000.0).collect();
     encode_pcm16_music(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
+}
+
+/// A handclap: three quick bursts of filtered noise, then a short tail.
+fn clap(buf: &mut [f32], start: usize, rng: &mut Rng, vol: f32) {
+    let n = (0.12 * SR) as usize;
+    let mut lp = 0.0f32;
+    let mut prev = 0.0f32;
+    for i in 0..n {
+        let t = i as f32 / SR;
+        let burst = (0..3).map(|k| { let d = t - k as f32 * 0.009; if d >= 0.0 { (-d / 0.004).exp() } else { 0.0 } }).sum::<f32>()
+            + 0.5 * (-(t - 0.027).max(0.0) / 0.03).exp() * f32::from(t > 0.027);
+        let w = rng.next_f32() * 2.0 - 1.0;
+        // a band of the noise round 1-2 kHz
+        lp += (w - lp) * 0.35;
+        let band = lp - prev;
+        prev += (lp - prev) * 0.08;
+        if let Some(o) = buf.get_mut(start + i) {
+            *o += band * burst * vol * 2.2;
+        }
+    }
+}
+
+/// A squeaky plush toy: a reedy tone that bends up and back (`bend` 1) or
+/// only up (`bend` 0), with the flutter of air squeezed through it.
+fn squeak(dur: f32, f0: f32, bend: f32) -> Vec<f32> {
+    let n = (dur * SR) as usize;
+    let mut ph = 0.0f32;
+    (0..n)
+        .map(|i| {
+            let t = i as f32 / SR;
+            let k = t / dur;
+            let arc = if bend > 0.5 { (PI * k).sin() } else { k.sqrt() };
+            ph += (f0 * (1.0 + 0.45 * arc) + f0 * 0.04 * (2.0 * PI * 30.0 * t).sin()) / SR;
+            let wave = (2.0 * PI * ph).sin() + 0.35 * (4.0 * PI * ph).sin() + 0.12 * (6.0 * PI * ph).sin();
+            wave * (t / 0.012).min(1.0) * (1.0 - k).powf(1.1) * 0.55
+        })
+        .collect()
 }
 
 /// Short tunes: `which` 0 round start, 1 round clear, 2 hurry, 3 game over,
@@ -168,7 +216,7 @@ const JINGLE_PATHS: [&str; 5] = [
     "sounds/jingle_won.wav",
 ];
 
-const SOUND_PATHS: [&str; 9] = [
+const SOUND_PATHS: [&str; 11] = [
     "sounds/blow.wav",
     "sounds/pop.wav",
     "sounds/trap.wav",
@@ -178,12 +226,40 @@ const SOUND_PATHS: [&str; 9] = [
     "sounds/lost.wav",
     "sounds/bounce.wav",
     "sounds/sparkle.wav",
+    "sounds/huff.wav",
+    "sounds/hop.wav",
 ];
 
-/// Effects. `which`: 0 blow a bubble, 1 pop, 2 trap an enemy, 3 an enemy
-/// defeated (a bright chirp), 4 fruit, 5 jump, 6 player lost, 7 bounce on
-/// a bubble, 8 extra points sparkle.
+/// Effects. `which`: 0 blow a bubble, 1 pop, 2 trap a plush ("kyu!"), 3 a
+/// plush popped into candy ("pyon!"), 4 fruit, 5 jump, 6 player lost, 7 bounce
+/// on a bubble, 8 extra points sparkle, 9 a plush breaking out in a huff
+/// ("puu!"), 10 a plush crouching to hop ("pyo", its jump's tell).
 pub fn sfx_wav(which: usize) -> Vec<u8> {
+    // the plush toys' voices: squeaks, like squeezing a soft toy
+    match which {
+        2 => return blip::cosy::sfx(&squeak(0.24, 1050.0, 1.0)),
+        3 => {
+            let a = squeak(0.14, 950.0, 0.0);
+            let b = squeak(0.2, 1350.0, 1.0);
+            return blip::cosy::sfx(&blip::cosy::mix(a, &b, 0.12, 1.0));
+        }
+        9 => {
+            // a low pouty "puu!": buzzier and falling
+            let n = (0.26 * SR) as usize;
+            let mut ph = 0.0f32;
+            let buf: Vec<f32> = (0..n)
+                .map(|i| {
+                    let t = i as f32 / SR;
+                    let k = t / 0.26;
+                    ph += (520.0 - 160.0 * k + 25.0 * (2.0 * PI * 24.0 * t).sin()) / SR;
+                    pulse(ph, 0.35) * (t / 0.01).min(1.0) * (1.0 - k) * 0.4
+                })
+                .collect();
+            return blip::cosy::sfx(&buf);
+        }
+        10 => return blip::cosy::sfx(&squeak(0.09, 800.0, 0.0)),
+        _ => {}
+    }
     let mut rng = Rng(0x5EED_0001 + which as u32 * 977);
     let dur = match which {
         0 => 0.16,

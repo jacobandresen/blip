@@ -124,6 +124,11 @@ fn level_clear_sfx() -> Vec<u8> {
     cosy::jingle_with(&[69, 72, 76, 81, H, 79, 81, H, H], 0.1, Voice::Theremin, -1, Some((Voice::Bell, -2)))
 }
 
+/// The hit streak's multiple rising (x2 up): a quick rising bell pair, one note more each step, A minor like the clear.
+fn streak_up(times: usize) -> Vec<u8> {
+    cosy::jingle_with(&[81, 84, 88, 93, 96][..times], 0.06, Voice::Bell, -2, None)
+}
+
 /// The player's shot: a quick theremin "pew" falling an octave.
 fn shoot_sfx() -> Vec<u8> {
     cosy::finish_warm(cosy::glide(0.11, 1300.0, 620.0, Tone::Sine, 1.2, 25.0), 15_000.0)
@@ -153,6 +158,10 @@ pub fn sounds() -> Vec<Asset> {
         ("sounds/march3.wav", march_thump(78.0)),
         ("sounds/march4.wav", march_thump(70.0)),
         ("sounds/level_clear.wav", level_clear_sfx()),
+        ("sounds/streak2.wav", streak_up(2)),
+        ("sounds/streak3.wav", streak_up(3)),
+        ("sounds/streak4.wav", streak_up(4)),
+        ("sounds/streak5.wav", streak_up(5)),
         ("sounds/ufo_siren.wav", ufo_siren()),
         ("sounds/laser_charge.wav", laser_charge_sfx()),
         ("sounds/laser_blast.wav", laser_blast_sfx()),

@@ -192,8 +192,10 @@ struct Game {
     boss_fire: Timer,
     boss_flash: f32,
     fx: Fx,
-    /// Alien hits in a row without a miss (see STREAK_PER).
-    streak: i32,
+    /// Alien hits in a row without a miss: one more multiple every STREAK_PER, up to STREAK_MAX.
+    streak: blip::Streak,
+    /// A run that just broke, and seconds it stays shown (in red, under the ground).
+    lost_run: (i32, f32),
     /// Seconds to the next dive; the alien shaking before it goes and how
     /// long it has; the one in the air.
     dive_cd: f32,
@@ -267,7 +269,8 @@ impl Game {
             boss_fire: Timer::default(),
             boss_flash: 0.0,
             fx: Fx::new(),
-            streak: 0,
+            streak: blip::Streak::new(STREAK_PER, STREAK_MAX),
+            lost_run: (0, 0.0),
             dive_cd: 0.0,
             dive_pick: None,
             diver: None,
@@ -400,7 +403,7 @@ impl Game {
         self.bullets.iter_mut().for_each(|b| b.active = false);
         self.explosions.iter_mut().for_each(|e| e.active = false);
         self.fx.clear();
-        self.streak = 0;
+        self.streak.miss();
         self.dive_cd = rand_int(DIVE_EVERY.0, DIVE_EVERY.1) as f32;
         self.dive_pick = None;
         self.diver = None;
@@ -475,6 +478,7 @@ blip::sounds!(Sounds {
     shoot, explosion, dive, level_clear, ufo_siren,
     march: [blip::BlipSound; 4] = [blip::sound!("march1"), blip::sound!("march2"), blip::sound!("march3"), blip::sound!("march4")],
     laser_charge, laser_blast, game_over,
+    streak_up: [blip::BlipSound; 4] = [blip::sound!("streak2"), blip::sound!("streak3"), blip::sound!("streak4"), blip::sound!("streak5")],
 });
 
 const UFO_Y: f32 = (PLAY_Y + 8) as f32;
@@ -517,6 +521,8 @@ fn fire_laser(g: &mut Game) -> bool {
     let player_hit = g.player_x < bx1 && g.player_x + ALIEN_W as f32 > bx0;
     if player_hit {
         blip::bot::add("death_laser", 1.0);
+        // Losing the cannon breaks the run of hits too: the multiple is for shooting well and staying alive.
+        g.streak.miss();
         let px = g.player_x;
         g.spawn_player_death(px, (GROUND_Y - 28) as f32);
         match g.sess.lose_life() {
@@ -891,23 +897,14 @@ fn bullet_hits_moving_rect(
     w: f32,
     h: f32,
 ) -> bool {
-    segment_rect_overlap(
-        from.0 + 4.0 - rect_from.0,
-        from.1 + 8.0 - rect_from.1,
-        to.0 + 4.0 - rect_to.0,
-        to.1 + 8.0 - rect_to.1,
-        -4.0,
-        -8.0,
-        w + 8.0,
-        h + 16.0,
-    )
+    blip::sweep_hits((from.0 + 4.0, from.1 + 8.0), (to.0 + 4.0, to.1 + 8.0), rect_from, rect_to, (-4.0, -8.0, w + 8.0, h + 16.0))
 }
 
 fn expire_player_shots(g: &mut Game, went_over_top: &[bool; MAX_PLAYER_BULLETS]) {
     for (i, &expired) in went_over_top.iter().enumerate() {
         if expired && g.bullets[i].active {
             g.bullets[i].active = false;
-            g.streak = 0;
+            g.streak.miss();
         }
     }
 }
@@ -927,6 +924,8 @@ fn lose_ship(g: &mut Game, sfx: &Sounds, why: &str) {
     g.spawn_player_death(px, (GROUND_Y - 28) as f32);
     play_sfx(&sfx.explosion);
     blip::bot::add(why, 1.0);
+    // Losing the cannon breaks the run of hits too: the multiple is for shooting well and staying alive.
+    g.streak.miss();
     g.dive_pick = None;
     g.diver = None;
     match g.sess.lose_life() {
@@ -1041,8 +1040,7 @@ fn move_ship(g: &mut Game, dt: f32) {
         moving_left = gap < -1.0;
         moving_right = gap > 1.0;
     }
-    let rate = if target == 0.0 || target * g.player_vx < 0.0 { PLAYER_BRAKE } else { PLAYER_ACCEL } * dt;
-    g.player_vx += clamp(target - g.player_vx, -rate, rate);
+    g.player_vx = blip::spool(g.player_vx, target, PLAYER_ACCEL, PLAYER_BRAKE, dt);
     g.player_x += g.player_vx * dt;
     let max_x = (WIN_W - ALIEN_W) as f32;
     if g.player_x < 0.0 || g.player_x > max_x { g.player_vx = 0.0; }
@@ -1163,8 +1161,7 @@ fn shoot_aliens(g: &mut Game, bullet_starts: &[(f32, f32); N_BULLETS], sfx: &Sou
                 g.aliens[ai].alive = false;
                 g.bullets[bi].active = false;
                 blip::bot::add("invaders", 1.0);
-                g.streak += 1;
-                let times = streak_multiple(g.streak);
+                let times = g.streak.hit();
                 let pts = match kind { 0 => 30, 1 => 20, _ => 10 } * g.sess.level * times;
                 g.sess.add_score(pts);
                 let (cx, cy) = (ax + ALIEN_W as f32 / 2.0, ay + ALIEN_H as f32 / 2.0);
@@ -1192,7 +1189,7 @@ fn shoot_diver(g: &mut Game, bullet_starts: &[(f32, f32); N_BULLETS], sfx: &Soun
                 blip::bot::add("divers", 1.0);
                 play_sfx(&sfx.explosion);
                 g.spawn_explosion(d.x, d.y);
-                g.streak += 1;
+                g.streak.hit();
                 let pts = match d.kind { 0 => 30, 1 => 20, _ => 10 } * g.sess.level * 2;
                 g.sess.add_score(pts);
                 let (cx, cy) = (d.x + ALIEN_W as f32 / 2.0, d.y + ALIEN_H as f32 / 2.0);
@@ -1258,6 +1255,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     let player_x_before = g.player_x;
     let ufo_start_x = g.ufo_x;
     let ufo_was_active = g.ufo_active;
+    // At 0.6 volume: the chime comes often, and its jingle peaks as loud as a level clear.
+    if let Some(m) = g.streak.risen() { blip::audio::play_sfx_volume(&sfx.streak_up[(m as usize - 2).min(3)], 0.6); }
     g.respawn_grace.tick(dt);
     move_ship(g, dt);
     fire(g, sfx);
@@ -1497,10 +1496,8 @@ fn draw_play(blip: &Blip, g: &Game,
         );
     }
 
-    for b in g.bullets.iter() {
-        if !b.active { continue; }
-        let tint = if b.player { BLIP_WHITE } else { BLIP_ORANGE };
-        blip.draw_texture_tinted(bullet, b.x, b.y, 4.0, 12.0, tint);
+    for b in g.bullets.iter().filter(|b| b.active && b.player) {
+        blip.draw_texture_tinted(bullet, b.x, b.y, 4.0, 12.0, BLIP_WHITE);
     }
 
     for e in g.explosions.iter() {
@@ -1520,24 +1517,32 @@ fn draw_play(blip: &Blip, g: &Game,
 
     draw_ufo(blip, g, saucer);
     g.fx.draw(blip);
+    // Bombs last, so a kill's burst and score never hide one falling from the formation.
+    for b in g.bullets.iter().filter(|b| b.active && !b.player) {
+        blip.draw_texture_tinted(bullet, b.x, b.y, 4.0, 12.0, BLIP_ORANGE);
+    }
     blip.draw_hud(g.sess.score, g.sess.lives);
-    if g.streak > 0 {
-        let x = blip.text_cx(&streak_label(g.streak), 2) as f32;
-        blip.draw_text(&streak_label(g.streak), x, (GROUND_Y + 10) as f32, 2.0, BLIP_YELLOW);
+    if g.streak.count > 0 {
+        let label = streak_label(&g.streak);
+        let x = blip.text_cx(&label, 2) as f32;
+        blip.draw_text(&label, x, (GROUND_Y + 10) as f32, 2.0, BLIP_YELLOW);
+    } else if g.lost_run.1 > 0.0 {
+        let label = format!("{} IN A ROW", g.lost_run.0);
+        let x = blip.text_cx(&label, 2) as f32;
+        blip.draw_text(&label, x, (GROUND_Y + 10) as f32, 2.0, BLIP_RED);
     }
 }
 
-/// Score multiple for `streak` hits in a row: one more every `STREAK_PER` hits.
-fn streak_multiple(streak: i32) -> i32 {
-    (1 + (streak - 1) / STREAK_PER).clamp(1, STREAK_MAX)
-}
+/// How long a broken run stays shown, seconds.
+const LOST_RUN_SECS: f32 = 0.8;
 
 /// The strip under the ground line: the run of hits, the multiple it earns, and how many more raise it.
-fn streak_label(streak: i32) -> String {
-    let times = streak_multiple(streak);
-    if times == STREAK_MAX { return format!("{streak} IN A ROW  X{times}"); }
-    let to_next = times * STREAK_PER + 1 - streak;
-    format!("{streak} IN A ROW  X{times}  {to_next} FOR X{}", times + 1)
+fn streak_label(s: &blip::Streak) -> String {
+    let (n, times) = (s.count, s.multiple());
+    match s.to_next() {
+        None => format!("{n} IN A ROW  X{times}"),
+        Some(to_next) => format!("{n} IN A ROW  X{times}  {to_next} FOR X{}", times + 1),
+    }
 }
 
 fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: i32) {
@@ -1626,8 +1631,12 @@ async fn main() {
             State::Over  => update_over(&mut g, dt),
         }
         if prev_state == State::Play && matches!(g.state, State::Dead | State::Over) { web::haptic(); }
+        // A broken run of 2 or more shows a moment in red where the streak was, so the rule that broke it is seen.
+        if let Some(n) = g.streak.broken().filter(|&n| n >= 2) { g.lost_run = (n, LOST_RUN_SECS); }
+        g.lost_run.1 -= dt;
         if prev_state != State::Over && g.state == State::Over {
-            play_sfx(&sfx.game_over);
+            // A new best ends on the level-clear jingle, not the game-over one.
+            play_sfx(if web::beats_best(g.sess.score) { &sfx.level_clear } else { &sfx.game_over });
             web::report_score(g.sess.score);
         }
 
@@ -1667,10 +1676,17 @@ mod tests {
         }
     }
 
+    /// A run of `n` hits.
+    fn run_of(n: i32) -> blip::Streak {
+        let mut s = blip::Streak::new(STREAK_PER, STREAK_MAX);
+        for _ in 0..n { s.hit(); }
+        s
+    }
+
     #[test]
     fn the_strip_counts_down_to_the_next_multiple() {
         let shown: Vec<(i32, i32, String)> = [1, 3, 4, 6, 7]
-            .into_iter().map(|n| (n, streak_multiple(n), streak_label(n))).collect();
+            .into_iter().map(|n| (n, run_of(n).multiple(), streak_label(&run_of(n)))).collect();
         assert_eq!(shown[0], (1, 1, "1 IN A ROW  X1  3 FOR X2".to_string()));
         assert_eq!(shown[1], (3, 1, "3 IN A ROW  X1  1 FOR X2".to_string()));
         assert_eq!(shown[2], (4, 2, "4 IN A ROW  X2  3 FOR X3".to_string()));
@@ -1680,8 +1696,8 @@ mod tests {
 
     #[test]
     fn the_multiple_stops_at_its_cap() {
-        assert_eq!(streak_multiple(STREAK_PER * STREAK_MAX * 3), STREAK_MAX);
-        assert_eq!(streak_label(100), format!("100 IN A ROW  X{STREAK_MAX}"));
+        assert_eq!(run_of(STREAK_PER * STREAK_MAX * 3).multiple(), STREAK_MAX);
+        assert_eq!(streak_label(&run_of(100)), format!("100 IN A ROW  X{STREAK_MAX}"));
     }
 
     #[test]

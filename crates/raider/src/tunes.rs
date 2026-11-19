@@ -1442,6 +1442,12 @@ pub fn sounds() -> Vec<Asset> {
         ("sounds/boss_explode1.wav",  half_rate(&explosion_sfx(BOSS_BLASTS[1]))),
         ("sounds/boss_warning.wav",   halved(&boss_warning_sfx())),
         ("sounds/powerup2.wav",       encode_pcm16_half(&ascending_run(&[880.00, 1318.51], 55.0, 85.0, 0.5))),
+        // The no-damage streak's multiple rising (x2, x3, x4): high, quick and quieter than a pickup, as it comes often.
+        // The continue's count: one short high blip a second.
+        ("sounds/tick.wav",           encode_pcm16_half(&ascending_run(&[1046.50], 0.0, 60.0, 0.3))),
+        ("sounds/streak2.wav",        encode_pcm16_half(&ascending_run(&[1174.66, 1567.98], 40.0, 70.0, 0.32))),
+        ("sounds/streak3.wav",        encode_pcm16_half(&ascending_run(&[1174.66, 1567.98, 1975.53], 40.0, 70.0, 0.32))),
+        ("sounds/streak4.wav",        encode_pcm16_half(&ascending_run(&[1174.66, 1567.98, 1975.53, 2349.32], 40.0, 70.0, 0.32))),
         ("sounds/powerup3.wav",       encode_pcm16_half(&ascending_run(&[987.77, 1479.98], 50.0, 90.0, 0.5))),
         ("sounds/powerup4.wav",       encode_pcm16_half(&ascending_run(&[740.00, 987.77, 1318.51], 55.0, 95.0, 0.5))),
         ("sounds/max_power.wav",      halved(&max_power_sfx())),

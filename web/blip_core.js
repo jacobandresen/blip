@@ -130,7 +130,7 @@ var BLIP_GAMES = {
   // A tribute to Bubble Bobble. Two caps: bubble (fire) and jump; up
   // jumps too. Like Brawler, player one is WASD so the arrows are player
   // two's, who drops in with their own bubble or jump.
-  bubbler:            { name: 'BUBBLER', legend: 'RUN · BUBBLE · JUMP', accent: '120, 210, 255', touchControls: [['RUN',['SLIDE']],['BUBBLE',['TAP']],['JUMP',['FLICK UP']]], controls: [['RUN',['←','→'],['A','D']],['BUBBLE',['SPACE'],['F']],['JUMP',['↑'],['W']],['2ND PLAYER',['J','K']]],
+  bubbler:            { name: 'BUBBLER', sticker: 'かわいい', legend: 'RUN · BUBBLE · JUMP', accent: '120, 210, 255', touchControls: [['RUN',['SLIDE']],['BUBBLE',['TAP']],['JUMP',['FLICK UP']]], controls: [['RUN',['←','→'],['A','D']],['BUBBLE',['SPACE'],['F']],['JUMP',['↑'],['W']],['2ND PLAYER',['J','K']]],
                          players: 2,
                          touch: { kind: 'platform', hint: 'Touch to bubble &middot; slide to run &middot; swipe up to jump',
                                   mouseHint: 'Drag to run &middot; click to bubble &middot; drag up to jump' },

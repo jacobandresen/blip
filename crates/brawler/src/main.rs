@@ -183,11 +183,10 @@ async fn main() {
             }
             State::Continue => {
                 let m = read_menu(&mut g);
-                let before = g.phase.remaining().ceil();
                 update_continue(&mut g, dt, m[0].fire);
                 match g.state {
                     State::Vs => g.snd(Sfx::Gong),
-                    State::Continue if g.phase.remaining().ceil() < before => g.snd(Sfx::Tick),
+                    State::Continue if g.cont.ticked() => g.snd(Sfx::Tick),
                     _ => {}
                 }
             }

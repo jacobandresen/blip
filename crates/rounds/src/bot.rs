@@ -9,6 +9,7 @@
 
 use super::*;
 use blip::bot::rollout::{self, Mover, Rollout};
+use blip::bot::best;
 use blip::bot::utility::{self, norm, Commit, Curve};
 use blip::bot::{remember, Goal::*, Pad, Playthrough};
 use blip::macroquad::input::KeyCode;
@@ -106,6 +107,7 @@ pub fn drive(g: &Game) {
     let two = blip::bot::is("PLAYERS", "2");
     match g.state {
         State::Title if two => { pad.tap(BLIP_KEY_J); }
+        State::Over if g.offering() => { if blip::bot::may_continue() { pad.press_start(); } }
         State::Title | State::Over | State::Card | State::Tally | State::Week => { pad.press_start(); }
         State::Play => ride(g, &mut pad),
         State::Canal => canal(g, &mut pad),
@@ -288,17 +290,26 @@ const LOOK: Rollout = Rollout { me: (BIKE_HW, BIKE_HL), margin: 5.0, dt: 0.1, hi
 fn turn_left(g: &Game, pad: &mut Pad) {
     let ((less, more), (slower, _)) = keys(g);
     let target = if g.bike_d > JD - 30.0 { std::f32::consts::FRAC_PI_2 } else { 0.0 };
-    let coming = g.hazards.iter().any(|h| h.seg == 0 && !h.gone && h.velocity(g.bike_x, g.bike_d).1 < -20.0
-        && h.x < 260.0 && h.d > g.bike_d - 30.0 && h.d < g.bike_d + 320.0);
-    if coming && g.heading < 0.5 {
+    if g.oncoming_near() && g.heading < 0.5 {
         pad.hold(slower);
         return;
     }
     if g.heading < target - 0.05 { pad.hold(less); } else if g.heading > target + 0.05 { pad.hold(more); }
 }
 
+/// The hit boxes the game tests (`solid` hazards: each box shrunk by half of `CRASH_INSET`), for the fun meter, on the canvas (`draw::sy`); not while the view turns at the junction.
+fn hit_boxes(g: &Game) {
+    let seg = g.seg();
+    let (ix, iy) = (CRASH_INSET.0 / 2.0, CRASH_INSET.1 / 2.0);
+    let me = Mover::still(g.bike_x, crate::draw::sy(g, g.bike_d)).sized(BIKE_HW - ix, BIKE_HL - iy);
+    let hazards: Vec<Mover> = g.hazards.iter().filter(|h| !h.gone && h.seg == seg && h.solid())
+        .map(|h| { let (hw, hl) = h.size(); Mover::still(h.x, crate::draw::sy(g, h.d)).sized(hw - ix, hl - iy) }).collect();
+    blip::bot::near(&[me], &hazards);
+}
+
 fn ride(g: &Game, pad: &mut Pad) {
     if g.in_junction() { return turn_left(g, pad); }
+    hit_boxes(g);
     throws(g, pad);
     let doors = doors(g);
     let chosen = remember(|m: &mut Mind| m.door.pick(doors.iter().map(|(d, s)| ((d.side, d.row), *s)), 0.25));
@@ -322,7 +333,7 @@ fn ride(g: &Game, pad: &mut Pad) {
         let pace = match pedal { 0 => 0.0, 1 if !busy => -0.02, _ => 0.12 };
         danger + off + pace + (x - g.bike_x).abs() / 2000.0
     };
-    let Some((x, (pedal, _))) = rollout::best(options, cost) else { return };
+    let Some((x, (pedal, _))) = best(options, cost) else { return };
     let ((less, more), (slower, faster)) = keys(g);
     // coming up to the left turn: over to the left half of the road
     let x = if !g.turned && g.bike_d > JD - MOUTH_HALF - 260.0 { 200.0 } else { x };

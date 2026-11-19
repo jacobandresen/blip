@@ -230,8 +230,11 @@ pub(crate) fn update_challenger(g: &mut Game, dt: f32) {
 /// it, for another coin (the kiosk asks for one if there is none); no press
 /// by the end of the count and the run is over.
 pub(crate) fn update_continue(g: &mut Game, dt: f32, fire: bool) {
-    if fire && g.phase.remaining() < CONTINUE_SECS - 0.8 {
-        web::spend_coin();
+    let taken = g.cont.update(dt, fire);
+    if taken == Some(true) {
+        // A continue starts the score afresh; the run's best is what is reported at the end.
+        blip::bot::add("continues", 1.0);
+        g.run_best = g.run_best.max(g.sess.score);
         g.sess.reset(1);
         g.p[0].rounds = 0;
         g.p[1].rounds = 0;
@@ -239,8 +242,8 @@ pub(crate) fn update_continue(g: &mut Game, dt: f32, fire: bool) {
         g.continues += 1;
         g.start_match(g.opponent_index);
         g.announce();
-    } else if g.phase.tick(dt) {
-        web::report_score(g.sess.score);
+    } else if taken == Some(false) {
+        web::report_score(g.sess.score.max(g.run_best));
         g.state = State::Over;
         g.phase.start(1.2);
     }
@@ -281,7 +284,7 @@ pub(crate) fn update_match_end(g: &mut Game, dt: f32) {
     blip::bot::add(if won { "fights_won" } else { "fights_lost" }, 1.0);
     if !won {
         g.state = State::Continue;
-        g.phase.start(CONTINUE_SECS);
+        g.cont.start(CONTINUE_SECS);
         return;
     }
     if BONUS_AFTER.contains(&g.opponent_index) {

@@ -69,6 +69,7 @@ npm test                         # unit tests, seconds
 npm run test:web                 # browser suites, two lanes
 npm run test:visual              # every game starts and responds (BLIP_VISUAL_GAME=BRAWLER for one)
 npm run test:playthrough         # every bot playthrough (BLIP_PLAYTHROUGH_GAME=serpent for one)
+node tools/fun_report.mjs [game] # fun score per game; CI fails a PR that lowers one (crates/blip/src/bot/FUN.md)
 ```
 
 Run the narrowest check while working, then the wider ones for shared code. Browser tests are headless and
@@ -92,6 +93,12 @@ Natively: `BLIP_BOT=1` plays and prints a `RESULT` line; `BLIP_BOT_LEVEL=<n>` st
 are `BLIP_BOT_<NAME>`. A refactor that must not change play: the same `BLIP_BOT=1 BLIP_BOT_SEED=n` run prints the same `RESULT` line
 before and after. `node tools/playtest_levels.mjs [game ...]` plays every level and fails on a panic
 or a level the bot cannot start.
+
+Every bot run also reports fun measures (`fun_*`; [FUN.md](crates/blip/src/bot/FUN.md)): a game whose player can be hit
+gives its bot a `blip::bot::near` hook with the hit boxes its collision code tests (one named source for both). Bot
+runs draw one frame in 30 (`BLIP_BOT_DRAW=1` draws all); `BLIP_BOT_NEAR=<dir>` saves near misses and hits with their
+boxes drawn, and `BLIP_BOT_REACT=<ms>` plays at a person's reaction time. A mechanic tweak carries a brief comment with
+the measured reason; [FUN-LOG.md](crates/blip/src/bot/FUN-LOG.md) keeps the early takeaways and is not maintained.
 
 ## Conventions
 

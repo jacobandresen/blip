@@ -4,7 +4,7 @@
 //! ```ignore
 //! pub const PLAYTHROUGHS: &[Playthrough] = &[
 //!     Playthrough {
-//!         name: "the snake eats and grows into level 2",
+//!         name: "the player reaches level 2",
 //!         goals: &[Goal::AtLeast("level", 2.0)],
 //!         ..Playthrough::DEFAULT
 //!     },

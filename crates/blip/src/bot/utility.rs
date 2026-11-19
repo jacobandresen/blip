@@ -3,9 +3,9 @@
 //! together. A bot written this way weighs everything at once instead of following a fixed order of ifs.
 //!
 //! ```ignore
-//! let target = utility::choose(rocks, |r| utility::score(&[
+//! let target = utility::choose(targets, |r| utility::score(&[
 //!     Curve::Inverse.of(norm(r.distance, 0.0, 400.0)),     // near is better
-//!     Curve::Logistic { mid: 0.5, steep: 10.0 }.of(norm(r.closing, -50.0, 150.0)), // coming at me matters
+//!     Curve::Logistic { mid: 0.5, steep: 10.0 }.of(norm(r.closing, -50.0, 150.0)), // closing in matters
 //! ]));
 //! ```
 

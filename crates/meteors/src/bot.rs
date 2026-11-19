@@ -3,7 +3,8 @@
 //! jump through hyperspace from a saucer's shot about to hit.
 
 use super::*;
-use blip::bot::{predict, Goal::*, Pad, Playthrough};
+use blip::bot::rollout::Mover;
+use blip::bot::{best, predict, Goal::*, Pad, Playthrough};
 
 /// What the bot must show it can do in Meteors.
 pub const PLAYTHROUGHS: &[Playthrough] = &[
@@ -52,15 +53,26 @@ pub fn drive(g: &Game) {
     let mut pad = Pad::new();
     match g.state {
         State::Title => { pad.press_start(); }
-        State::Play if g.ship_alive => fly(g, &mut pad),
+        State::Play if g.ship_alive => { hit_boxes(g); fly(g, &mut pad); }
         _ => {}
     }
     pad.send();
 }
 
+/// The hit circles the game tests, for the fun meter, as their bounding boxes: the ship (`SHIP_RADIUS`), each rock,
+/// the saucer and saucer shots (points). Not while the ship is invulnerable after a respawn.
+fn hit_boxes(g: &Game) {
+    if g.invuln_t > 0.0 { return; }
+    let me = Mover::still(g.ship.x, g.ship.y).sized(SHIP_RADIUS, SHIP_RADIUS);
+    let mut hazards: Vec<Mover> = pool_iter(&g.asteroids).map(|a| { let r = a.size.radius(); Mover::still(a.x, a.y).sized(r, r) }).collect();
+    if g.saucer.active { let r = saucer_radius(g.saucer.big); hazards.push(Mover::still(g.saucer.x, g.saucer.y).sized(r, r)); }
+    hazards.extend(g.bullets.iter().filter(|b| b.active && !b.from_player).map(|b| Mover::still(b.x, b.y)));
+    blip::bot::near(&[me], &hazards);
+}
+
 fn fly(g: &Game, pad: &mut Pad) {
     let targets = rocks_and_saucer(g);
-    if let Some(t) = targets.iter().min_by(|a, b| a.urgency.total_cmp(&b.urgency)) {
+    if let Some(t) = best(&targets, |t| t.urgency) {
         pad.turn_to(g.ship.angle, t.aim, 0.06);
         let lined_up = blip::angle_diff(g.ship.angle, t.aim).abs() < 0.12;
         if lined_up && t.distance < BULLET_SPEED * BULLET_TTL + 30.0 { pad.fire(); }

@@ -10,7 +10,7 @@
 //! It fights through the game's own `Input`, so tests can stage fights without a window.
 
 use super::*;
-use blip::bot::{Goal::*, Pad, Playthrough};
+use blip::bot::{chance, remember, Goal::*, Pad, Playthrough};
 use blip::macroquad::rand::gen_range;
 
 /// What the bot must show it can do in Brawler.
@@ -71,7 +71,6 @@ struct Bot {
     run_kicks: bool,
 }
 
-static BOT: std::sync::Mutex<Bot> = std::sync::Mutex::new(Bot { react: 0.0, next_attack: 0.0, blocking: 0.0, switching: 0, run: 0, run_kicks: false });
 
 /// Menus: fire through the title, pick the fighter, fire again.
 pub fn menus(g: &mut Game) {
@@ -91,16 +90,7 @@ pub fn menus(g: &mut Game) {
             g.p[1] = Fighter { rounds: g.p[1].rounds, ..Fighter::new(foe, 440.0, -1.0) };
         }
     }
-    // BLIP_BOT_CONTINUES=n takes a lost fight again, up to n times.
-    static USED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-    static LAST: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-    let allowed = blip::bot::num("CONTINUES").unwrap_or(0.0) as u32;
-    let at_continue = g.state == State::Continue;
-    if at_continue && !LAST.swap(true, std::sync::atomic::Ordering::Relaxed) {
-        USED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    }
-    if !at_continue { LAST.store(false, std::sync::atomic::Ordering::Relaxed); }
-    let again = at_continue && USED.load(std::sync::atomic::Ordering::Relaxed) <= allowed;
+    let again = g.state == State::Continue && blip::bot::may_continue();
     // (It taps through the result screen too, as a player does.)
     let fire = again || matches!(g.state, State::Title | State::Select | State::MatchEnd | State::Over | State::Won);
     let mut pad = Pad::new();
@@ -115,9 +105,19 @@ fn block_odds() -> f32 {
 
 /// One frame of the fight for player one, through the game's own `Input`.
 pub fn fight(g: &Game, dt: f32) -> Input {
-    blip::bot::hold(&[]);
-    let mut guard = BOT.lock().unwrap();
-    let b = &mut *guard;
+    let inp = remember(|b: &mut Bot| think(b, g, dt));
+    // The fight reads `inp`, not the keys; holding the keys it stands for lets the fun meter see the play.
+    let mut pad = Pad::new();
+    for (on, key) in [(inp.left, BLIP_KEY_LEFT), (inp.right, BLIP_KEY_RIGHT), (inp.up, BLIP_KEY_UP), (inp.down, BLIP_KEY_DOWN),
+        (inp.punch_low || inp.punch_high, BLIP_KEY_SPACE), (inp.kick_low || inp.kick_high, BLIP_KEY_BUTTON2),
+        (inp.special, BLIP_KEY_F)] {
+        if on { pad.hold(key); }
+    }
+    pad.send();
+    inp
+}
+
+fn think(b: &mut Bot, g: &Game, dt: f32) -> Input {
     let (me, foe) = (g.p[0], g.p[1]);
     b.react -= dt;
     b.next_attack -= dt;
@@ -157,7 +157,7 @@ fn block(b: &mut Bot, me: &Fighter, foe: &Fighter) -> Option<Input> {
     let dist = (foe.x - me.x).abs();
     if foe.act == Act::Attack && dist < 150.0 && b.react <= 0.0 && b.blocking <= 0.0 {
         b.react = 0.2;
-        if gen_range(0.0, 1.0) < block_odds() { b.blocking = 0.35; }
+        if chance(block_odds()) { b.blocking = 0.35; }
     }
     if b.blocking <= 0.0 { return None; }
     let mut inp = Input::default();
@@ -201,7 +201,7 @@ fn uppercut(b: &mut Bot, me: &Fighter, foe: &Fighter) -> Option<Input> {
     let dist = (foe.x - me.x).abs();
     if !(foe.airborne() && dist < attack_range(me, MoveId::Uppercut) && me.free() && b.next_attack <= 0.0) { return None; }
     b.next_attack = 0.5;
-    if gen_range(0.0, 1.0) >= 0.7 { return None; }
+    if !chance(0.7) { return None; }
     Some(Input { down: true, punch_low: true, ..Input::default() })
 }
 
@@ -210,7 +210,7 @@ fn uppercut(b: &mut Bot, me: &Fighter, foe: &Fighter) -> Option<Input> {
 fn switch_stance(b: &mut Bot, me: &Fighter, foe: &Fighter) -> Option<Input> {
     if b.switching == 0 {
         let far = (foe.x - me.x).abs() > attack_range(me, MoveId::HighKick) + 30.0;
-        if !(far && me.free() && !blip::bot::is("STYLE", "simple") && gen_range(0.0, 1.0) < 0.02) { return None; }
+        if !(far && me.free() && !blip::bot::is("STYLE", "simple") && chance(0.02)) { return None; }
     }
     b.switching += 1;
     let down = !(3..6).contains(&b.switching);
@@ -226,7 +226,7 @@ fn close_in_and_attack(b: &mut Bot, me: &Fighter, foe: &Fighter) -> Input {
     let reach = attack_range(me, MoveId::HighKick);
     if dist > reach + 10.0 {
         walk(&mut inp, me, true);
-        if dist > 220.0 && b.next_attack <= 0.0 && gen_range(0.0, 1.0) < 0.02 {
+        if dist > 220.0 && b.next_attack <= 0.0 && chance(0.02) {
             inp.up = true;
             inp.kick_high = true;
             b.next_attack = 0.8;
@@ -251,8 +251,8 @@ fn close_in_and_attack(b: &mut Bot, me: &Fighter, foe: &Fighter) -> Input {
         b.next_attack = gen_range(0.25, 0.7);
         // Often a punch starts a run to the hook, and a low kick is followed
         // by the roundhouse.
-        if !simple && (inp.punch_low || inp.punch_high) && gen_range(0.0, 1.0) < 0.4 { (b.run, b.run_kicks) = (2, false); }
-        if !simple && inp.kick_low && !inp.down && gen_range(0.0, 1.0) < 0.4 { (b.run, b.run_kicks) = (1, true); }
+        if !simple && (inp.punch_low || inp.punch_high) && chance(0.4) { (b.run, b.run_kicks) = (2, false); }
+        if !simple && inp.kick_low && !inp.down && chance(0.4) { (b.run, b.run_kicks) = (1, true); }
         if b.run > 0 { b.next_attack = 0.2; }
     }
     inp

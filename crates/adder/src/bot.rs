@@ -35,6 +35,8 @@ pub fn title() {
 
 /// Turn each person's viper the way the CPU brain would.
 pub fn drive(w: &World) {
+    // The score as it stands (the game reports it only at the end).
+    blip::bot::set("score", w.score_of(0) as f64);
     let mut pad = Pad::new();
     for (i, s) in w.snakes.iter().enumerate().filter(|(_, s)| s.human && s.alive) {
         let [left, right, _] = seat_keys(s.seat);

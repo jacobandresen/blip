@@ -7,7 +7,9 @@
 //! walks to each stone in the order shown and touches it.
 
 use super::*;
-use blip::bot::{grid, Goal::*, Pad, Playthrough};
+use blip::bot::rollout::Mover;
+use blip::bot::{Goal::*, Pad, Playthrough};
+use blip::grid;
 use blip::macroquad::input::KeyCode;
 
 /// What the bot must show it can do in Warlock: every chamber of the
@@ -51,6 +53,15 @@ pub const PLAYTHROUGHS: &[Playthrough] = &[
         ..Playthrough::DEFAULT
     },
     Playthrough {
+        name: "after game over it tries the same chamber again",
+        level: 3,
+        settings: &[("CONTINUES", "1")],
+        seconds: 300.0,
+        // Still in chamber 3 or beyond after the continue: a continue does not send the wizard back to the first.
+        goals: &[AtLeast("continues", 1.0), AtLeast("deaths", 4.0), AtLeast("level", 3.0)],
+        ..Playthrough::DEFAULT
+    },
+    Playthrough {
         name: "a bolt right after a reveal combines into a lance",
         level: 2,
         seconds: 240.0,
@@ -66,7 +77,8 @@ const SPELL: KeyCode = BLIP_KEY_G;
 pub fn drive(g: &Game) {
     let mut pad = Pad::new();
     match g.state {
-        State::Title | State::Over => { pad.press_start(); }
+        State::Title => { pad.press_start(); }
+        State::Over if blip::bot::may_continue() => { pad.tap(BOLT); }
         State::Play => play(g, &mut pad),
         State::Bonus => bonus(g, &mut pad),
         _ => {}
@@ -74,9 +86,29 @@ pub fn drive(g: &Game) {
     pad.send();
 }
 
+/// The hit boxes the game tests, for the fun meter: a monster or fireball touches the wizard within `TOUCH_R` of
+/// her drawn centre, here as two boxes each half that wide.
+fn hit_boxes(g: &Game) {
+    // Nothing can hit the wizard while she is protected after a respawn.
+    if !g.active[0] || g.wizards[0].protect > 0.0 { return; }
+    let half = TOUCH_R / 2.0;
+    let (wx, wy) = g.wizard_px(0);
+    let mut hazards: Vec<Mover> = g.enemies.iter().filter(|e| !e.gone).map(|e| { let (x, y) = g.enemy_px(e); Mover::still(x, y).sized(half, half) }).collect();
+    hazards.extend(g.fires.iter().filter(|f| !f.gone).map(|f| { let (x, y) = art::proj_px(f); Mover::still(x, y).sized(half, half) }));
+    blip::bot::near(&[Mover::still(wx, wy).sized(half, half)], &hazards);
+}
+
 /// One frame in a chamber: the first thing worth doing.
 fn play(g: &Game, pad: &mut Pad) {
+    hit_boxes(g);
     let me = &g.wizards[0];
+    // A monster at its side and nothing lined up to bolt: step away first, as a player would.
+    if !los(g, me.facing) {
+        if let Some(d) = flee(g) {
+            pad.hold(dir_key(d));
+            return;
+        }
+    }
     let spell_ready = me.reveal_cd <= 0.0;
     let rune_in_reach = g.runes.iter().any(|r| !r.cleansed && distance_lt(me.tile, r.tile, 1.5));
     let hidden_wraith = g.enemies.iter().any(|e| !e.gone && e.kind == EnemyKind::Wraith && !e.visible);
@@ -92,6 +124,47 @@ fn play(g: &Game, pad: &mut Pad) {
     } else if let Some((_, d)) = bot_path(g) {
         pad.hold(dir_key(d));
     }
+}
+
+/// How close the monsters are, as an influence map (`blip::grid::influence`): each walking monster counts 1 on its
+/// tile, half that a step away, a quarter two steps away. At FLEE_AT (a monster beside the wizard) she steps away.
+/// A wraith that has shown itself to pounce counts LUNGER, so she backs off from two steps, as a player who sees it
+/// appear does (wraiths were the top killer: a death on every seed of the Bone Crypt). A hound sitting where a spell
+/// was cast is no danger until it moves (backing off from one and walking back to it looped for 40 s). Fireballs count too.
+const FLEE_AT: f32 = 0.5;
+const LUNGER: f32 = 2.0;
+
+/// The neighbouring step that lowers the danger most, when the wizard stands at FLEE_AT or more; none if no step
+/// lowers it (cornered: better to fight).
+fn flee(g: &Game) -> Option<Dir> {
+    let me = g.wizards[0].tile;
+    let open = |c: i32, r: i32| Walls::in_bounds(c, r) && !g.walls.get(c, r);
+    let monsters: Vec<(grid::Cell, f32)> = g.enemies.iter()
+        .filter(|e| !e.gone && e.kind != EnemyKind::Gargoyle)
+        .map(|e| ((e.tile.c, e.tile.r), match e.kind {
+            EnemyKind::Wraith if e.lunging && e.visible => LUNGER,
+            EnemyKind::Spellhound if e.hunting && e.tile == e.target => 0.0,
+            _ => 1.0,
+        }))
+        // A fireball counts on its tile and the next one it flies into, so she steps out of its line: gargoyle fire
+        // killed about one life in three in the Kennels, and it is slower than she is (0.11 s a tile to her 0.09 s).
+        .chain(g.fires.iter().filter(|p| !p.gone).flat_map(|p| {
+            let (dc, dr) = p.dir.delta();
+            [((p.tile.c, p.tile.r), 1.0), ((p.tile.c + dc, p.tile.r + dr), 1.0)]
+        }))
+        .collect();
+    let field = grid::influence(&monsters, open, 0.5, 3);
+    let danger = |c: Cell| field.get(&(c.c, c.r)).copied().unwrap_or(0.0);
+    let here = danger(me);
+    if here < FLEE_AT { return None; }
+    let blocked = blocked_cells(g);
+    DIRS.into_iter()
+        .map(|d| { let (dc, dr) = d.delta(); (d, Cell { c: me.c + dc, r: me.r + dr }) })
+        .filter(|&(_, n)| open(n.c, n.r) && !blocked.contains(&n))
+        .map(|(d, n)| (d, danger(n)))
+        .filter(|&(_, x)| x < here)
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .map(|(d, _)| d)
 }
 
 /// The bonus room: walk to the next stone in the order shown, and touch it.

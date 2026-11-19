@@ -54,6 +54,10 @@ fn crt_curve(p: macroquad::math::Vec2) -> macroquad::math::Vec2 {
     p * 0.5 + 0.5
 }
 
+const SEAL_FRAGMENT: &str = r#"#version 100
+void main() { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); }
+"#;
+
 const CRT_VERTEX: &str = r#"#version 100
 attribute vec3 position;
 attribute vec2 texcoord;
@@ -223,6 +227,7 @@ pub struct Blip {
     // Scanline dimming shader (SCANLINE_FRAGMENT); None falls back to a
     // rectangle per row, like `crt` above.
     scanline:    Option<Material>,
+    seal:        Option<Material>, // SEAL_FRAGMENT: sets the frame's alpha to 1
     screen_rt:   Option<RenderTarget>, // offscreen composite target, window-sized
     screen_rt_w: i32,
     screen_rt_h: i32,
@@ -232,6 +237,8 @@ pub struct Blip {
     fx_settle:     u8,  // frames to ignore after startup / a level change
     fx_slow_accum: f32, // seconds run slow at the current level
     fx_frame_ema:  f32, // smoothed frame time, seconds
+    // ---- the HUD's score multiple: the last one drawn, and seconds since it last rose or broke ----
+    multiple: std::cell::Cell<(i32, i32, f32)>, // (shown, before the change, seconds since)
     // ---- screenshot capture (native only) ----
     pub screenshot_mode:   bool,
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
@@ -271,6 +278,20 @@ impl Blip {
             MaterialParams {
                 uniforms: vec![UniformDesc::new("ScreenSize", UniformType::Float2),
                                UniformDesc::new("Bloom", UniformType::Float1)],
+                ..Default::default()
+            },
+        )
+        .ok();
+
+        // Seals the frame's alpha to 1 (writes alpha only): a translucent shape lowers the target's alpha where it
+        // blends, and the frame is then blitted with alpha onto black, so glass and glows came out darkened.
+        let seal = load_material(
+            ShaderSource::Glsl { vertex: CRT_VERTEX, fragment: SEAL_FRAGMENT },
+            MaterialParams {
+                pipeline_params: macroquad::miniquad::PipelineParams {
+                    color_write: (false, false, false, true),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         )
@@ -320,6 +341,7 @@ impl Blip {
             interlace_field: 0,
             field_dim: 0.25,
             crt,
+            seal,
             bloom: 1.0,
             scanline,
             screen_rt: None,
@@ -327,6 +349,7 @@ impl Blip {
             screen_rt_h: 0,
             fx_level: 0,
             fx_settle: 45, // ~0.75s of warmup (asset decode, shader compile, JIT)
+            multiple: std::cell::Cell::new((1, 1, f32::INFINITY)),
             fx_slow_accum: 0.0,
             fx_frame_ema: 1.0 / 60.0,
             screenshot_mode,
@@ -347,6 +370,7 @@ impl Blip {
             Rect::new(0.0, 0.0, self.width as f32, self.height as f32),
         );
         cam.render_target = Some(self.rt.clone());
+        if crate::bot::unseen() { cam.viewport = Some((0, 0, 1, 1)); }
         set_camera(&cam);
     }
 
@@ -357,6 +381,7 @@ impl Blip {
             Rect::new(-dx, -dy, self.width as f32, self.height as f32),
         );
         cam.render_target = Some(self.rt.clone());
+        if crate::bot::unseen() { cam.viewport = Some((0, 0, 1, 1)); }
         set_camera(&cam);
     }
 
@@ -368,6 +393,7 @@ impl Blip {
         );
         cam.rotation = degrees;
         cam.render_target = Some(self.rt.clone());
+        if crate::bot::unseen() { cam.viewport = Some((0, 0, 1, 1)); }
         set_camera(&cam);
     }
 
@@ -385,6 +411,7 @@ impl Blip {
         let (rx, ry) = (vx * c + vy * s, -vx * s + vy * c);
         cam.target = macroquad::math::vec2(pivot.0 - rx, pivot.1 - ry);
         cam.render_target = Some(self.rt.clone());
+        if crate::bot::unseen() { cam.viewport = Some((0, 0, 1, 1)); }
         set_camera(&cam);
     }
 
@@ -427,6 +454,14 @@ impl Blip {
     /// then yield to macroquad and wait for the next frame.
     /// Call this exactly once at the bottom of your game loop.
     pub async fn next_frame(&mut self, _target_fps: i32) {
+        // A playtest's hit boxes go on the canvas, under the glass like the game.
+        self.apply_camera();
+        crate::bot::overlay();
+        if let Some(seal) = &self.seal {
+            gl_use_material(seal);
+            draw_rectangle(0.0, 0.0, self.width as f32, self.height as f32, WHITE);
+            gl_use_default_material();
+        }
         // A screen-space camera, not set_default_camera(): that leaves
         // camera_matrix on the RT projection, which clips blits when the
         // window is larger than the canvas.
@@ -437,7 +472,7 @@ impl Blip {
             set_camera(&cam);
         }
         clear_background(macroquad::color::BLACK);
-        self.draw_post_process();
+        if !crate::bot::unseen() { self.draw_post_process(); }
 
         // Screenshot capture: save after frame 2 (title screen fully rendered) and exit.
         #[cfg(not(target_arch = "wasm32"))]
@@ -910,6 +945,37 @@ impl Blip {
 
     /// Draw SCORE, the best score and LIVES across the top.
     /// The high-score field is clipped between the left and right fields.
+    /// Where the HUD's SCORE starts: the shell clips 3 screen pixels, which at half scale is 6 game pixels.
+    fn hud_score_x(&self) -> f32 {
+        (self.width as f32 * 0.012).max(4.0).round()
+    }
+
+    /// The right edge of the HUD's SCORE cluster: the label and one digit cell per digit.
+    fn hud_score_right(&self, score: i32) -> f32 {
+        self.hud_score_x() + 64.0 + score.max(0).to_string().len().max(1) as f32 * 12.0
+    }
+
+    /// A score multiple (a streak's xN), just after the HUD's score, while there is one (`times` above 1). Call once a
+    /// frame. A rise pops: bigger and flashing for MULTIPLE_POP seconds. A broken streak shows the lost multiple in red
+    /// for MULTIPLE_LOST, so a player sees the rule that broke it as it happens.
+    pub fn draw_hud_multiple(&self, score: i32, times: i32) {
+        const MULTIPLE_POP: f32 = 0.6;
+        const MULTIPLE_LOST: f32 = 0.5;
+        let (shown, before, since) = self.multiple.get();
+        let (before, since) = if times != shown { (shown, 0.0) } else { (before, since + self.delta_time) };
+        self.multiple.set((times, before, since));
+        let x = self.hud_score_right(score) + 12.0;
+        if times > before && since < MULTIPLE_POP {
+            // Size 3 sits 3 px higher to stay centred in the 28 px bar; white and yellow alternate every 0.1 s.
+            let color = if (since * 10.0) as i32 % 2 == 0 { BLIP_WHITE } else { BLIP_YELLOW };
+            self.draw_text(&format!("X{times}"), x, 4.0, 3.0, color);
+        } else if times > 1 {
+            self.draw_text(&format!("X{times}"), x, 7.0, 2.0, BLIP_YELLOW);
+        } else if before > 1 && since < MULTIPLE_LOST {
+            self.draw_text(&format!("X{before}"), x, 7.0, 2.0, BLIP_RED);
+        }
+    }
+
     pub fn draw_hud(&self, score: i32, lives: i32) {
         let hud_h = 28.0;
         // Text baseline: low enough in the bar that the curved-glass shader's
@@ -921,13 +987,10 @@ impl Blip {
         );
 
         // ---- SCORE, left ----
-        // The shell clips 3 screen pixels; at half scale that removes 6 game pixels.
-        let x0 = (self.width as f32 * 0.012).max(4.0).round();
+        let x0 = self.hud_score_x();
         self.draw_text("SCORE", x0, ty, 2.0, BLIP_YELLOW);
         self.draw_number(score, x0 + 64.0, ty, 2.0, BLIP_WHITE);
-        // right edge of the SCORE cluster: label + one digit-cell per digit
-        let score_digits = score.max(0).to_string().len().max(1) as f32;
-        let score_right = x0 + 64.0 + score_digits * 12.0;
+        let score_right = self.hud_score_right(score);
 
         // ---- LIVES, right ----
         // Inset from the right edge to clear the curved glass's black rim on
@@ -998,6 +1061,12 @@ impl Blip {
         self.draw_centered(text, (best_end + Self::game_over_prompt_y(h)) / 2.0 - 8.0, 2.0, color);
     }
 
+    /// A line in place of the game-over screen's prompt (a continue's count, say), drawn with `ready` false.
+    pub fn draw_game_over_prompt(&self, text: &str, color: Color) {
+        let h = self.height as f32;
+        self.draw_centered(text, Self::game_over_prompt_y(h), 3.0, color);
+    }
+
     /// Two thirds down, or lower on a short screen, to leave the note its line.
     fn game_over_prompt_y(h: f32) -> f32 {
         (h * 2.0 / 3.0).max(h / 2.0 + 80.0)
@@ -1008,7 +1077,9 @@ impl Blip {
     /// best is known.
     pub fn draw_best(&self, score: i32, hi: i32, y: f32, new_color: Color) {
         if hi > 0 && score >= hi {
-            self.draw_centered("NEW BEST!", y, 2.0, new_color);
+            // It flashes (its colour and white, four times a second): the moment a player most wants to see.
+            let lit = (macroquad::time::get_time() * 4.0) as i64 % 2 == 0;
+            self.draw_centered("NEW BEST!", y, 2.0, if lit { new_color } else { BLIP_WHITE });
         } else if hi > 0 {
             self.draw_centered(&format!("BEST {hi}"), y, 2.0, BLIP_GRAY);
         }

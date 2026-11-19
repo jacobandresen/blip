@@ -96,8 +96,8 @@ struct Game {
     shears_ttl: f32,
     sess: Session,
     foods_eaten: i32,
-    /// See STREAK_STEPS.
-    streak: i32,
+    /// Quick meals in a row (see STREAK_STEPS): one more multiple each, up to STREAK_MAX.
+    streak: blip::Streak,
     steps_since_food: i32,
     move_timer: f32,
     dead_timer: Timer,
@@ -129,7 +129,7 @@ impl Game {
             shears: Cell { c: 0, r: 0 },
             shears_ttl: 0.0,
             foods_eaten: 0,
-            streak: 0,
+            streak: blip::Streak::new(1, STREAK_MAX),
             steps_since_food: 0,
             move_timer: 0.0,
             dead_timer: Timer::default(),
@@ -350,7 +350,7 @@ impl Game {
         }
         self.spawn_food();
         self.move_timer = 0.0;
-        self.streak = 0;
+        self.streak.miss();
         self.steps_since_food = 0;
     }
 
@@ -410,6 +410,8 @@ fn step_snake(g: &mut Game, sfx: &Sounds) {
     let ate = h == g.food;
     let offers = if ate { eat_food(g, h, sfx) } else { (false, false) };
     g.steps_since_food += 1;
+    // The run breaks the step the window closes (not at the next meal), so the HUD's multiple is never one already lost.
+    if g.steps_since_food > STREAK_STEPS { g.streak.miss(); }
     for k in g.gulps.iter_mut() { *k += 1.0; }
     let len = g.snake_len as f32;
     g.gulps.retain(|&k| k < len);
@@ -436,9 +438,15 @@ fn lose_life(g: &mut Game, sfx: &Sounds, why: &str) {
     let (x, y) = cell_centre(g.snake_at(0));
     g.fx.burst(x, y, 16, 140.0, BLIP_RED);
     play_sfx(&sfx.game_over);
+    // A lost life breaks the run of quick meals, as it breaks every streak in the arcade.
+    g.streak.miss();
     g.state = match g.sess.lose_life_after(&mut g.dead_timer, 1.5) {
         LifeResult::StillAlive => State::Dead,
-        LifeResult::GameOver => State::Over,
+        LifeResult::GameOver => {
+            // A new best gets the level-up chime after the crash.
+            if web::beats_best(g.sess.score) { play_sfx(&sfx.level); }
+            State::Over
+        }
     };
 }
 
@@ -474,14 +482,14 @@ fn eat_food(g: &mut Game, h: Cell, sfx: &Sounds) -> (bool, bool) {
     play_sfx(&sfx.eat);
     blip::bot::add("food", 1.0);
     g.gulps.push(0.0);
-    g.streak = if g.steps_since_food <= STREAK_STEPS { (g.streak + 1).min(STREAK_MAX) } else { 1 };
+    let times = g.streak.hit();
     g.steps_since_food = 0;
-    let points = 10 * g.sess.level * g.streak;
+    let points = 10 * g.sess.level * times;
     g.sess.add_score(points);
     let (x, y) = cell_centre(h);
     g.fx.ring(x, y, CELL as f32 * 1.3, 0.3, BlipColor { r: 1.0, g: 0.85, b: 0.4, a: 1.0 });
-    if g.streak > 1 {
-        g.fx.popup(x, y - 10.0, &format!("+{points} X{}", g.streak), GOLD);
+    if times > 1 {
+        g.fx.popup(x, y - 10.0, &format!("+{points} X{times}"), GOLD);
     } else {
         g.fx.popup(x, y - 10.0, &format!("+{points}"), BLIP_WHITE);
     }
@@ -626,6 +634,7 @@ fn draw_play(blip: &Blip, g: &Game, food: &Texture2D) {
             BlipColor { a: a.min(1.0), ..BLIP_YELLOW });
     }
     blip.draw_hud(g.sess.score, g.sess.lives);
+    blip.draw_hud_multiple(g.sess.score, g.streak.multiple());
 }
 
 /// A new layout blinks in, see-through, until it is solid.

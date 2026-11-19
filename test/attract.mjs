@@ -97,6 +97,10 @@ for (const engine of ['webkit', 'chromium']) {
     await page.route(/\/brawler\/attract\.(webp|png)$/, (route) => route.abort());
     await page.goto(`${origin}/index.html`);
     await page.waitForSelector('.card-focused[data-loop-ready]');
+    // Face Brawler: four machines from Rally, the aisle no longer draws it.
+    await page.evaluate(() => focusArcadeCard(document.querySelector('.card[data-machine="brawler"]')));
+    await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.machine === 'brawler' &&
+      !document.getElementById('game-grid').hasAttribute('data-aisle-moving'));
     const fallback = await page.locator('.card[data-machine="brawler"]').evaluate((card) => ({
       ready: card.hasAttribute('data-loop-ready'), still: getComputedStyle(card.querySelector('.card-shot')).visibility,
       loop: getComputedStyle(card.querySelector('.card-loop')).visibility,

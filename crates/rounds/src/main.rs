@@ -169,6 +169,15 @@ async fn main() {
                 g.update_canal(dt);
             }
             State::Week => g.update_week(dt, skip()),
+            State::Over if g.offering() => match g.cont.update(dt, blip::input::btn1_pressed()) {
+                Some(true) => g.continue_day(),
+                Some(false) => {
+                    g.post_score();
+                    web::set_players(2);
+                    g.state = State::Title;
+                }
+                None => if g.cont.ticked() { g.cues.push(Cue::Ting); },
+            },
             State::Over => {
                 if play_again(&mut g.wait, dt) {
                     web::set_players(2);
@@ -178,7 +187,10 @@ async fn main() {
         }
         if g.state != was {
             if g.state == State::Crash { web::haptic(); }
-            if g.state == State::Over { play_sfx_volume(&sfx.game_over, 0.8); }
+            // A new best (over the run's continues) ends on the perfect-day fanfare instead.
+            if g.state == State::Over {
+                if web::beats_best(g.sess.score.max(g.run_best)) { play_sfx_volume(&sfx.perfect, 1.0); } else { play_sfx_volume(&sfx.game_over, 0.8); }
+            }
         }
         for cue in std::mem::take(&mut g.cues) { play(&sfx, cue); }
         match track(&g) { Some(i) => music.play(i), None => music.stop() }
