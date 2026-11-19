@@ -1382,7 +1382,10 @@ impl Game {
         for h in &mut self.hazards {
             if h.solid() && h.d > bd - 160.0 && h.d < bd + 260.0 { h.gone = true; }
         }
-        self.bike_x = 240.0;
+        // Mid-road, unless that is Frederik V's pedestal: back there the bike met it again at once, and three
+        // lives went in 3.3 s (Tuesday, seed 3).
+        let at_statue = (bd - statue_d()).abs() < STATUE_HALF + BIKE_HL + 120.0;
+        self.bike_x = if at_statue { 240.0 + STATUE_HALF + BIKE_HW + 12.0 } else { 240.0 };
         self.steer_v = 0.0;
         self.heading = 0.0;
         self.stuck = 0.0;
@@ -1746,6 +1749,21 @@ mod tests {
         }
         assert!(g.turned, "never round the corner: x {} d {} heading {}", g.bike_x, g.bike_d, g.heading);
         assert!(g.bike_d >= NEW_STREET_ROW as f32 * LOT - 30.0 && (RIDE[0]..=RIDE[1]).contains(&g.bike_x), "on the new street at {} {}", g.bike_x, g.bike_d);
+    }
+
+    #[test]
+    fn a_crash_at_the_statue_does_not_put_the_bike_back_on_it() {
+        let mut g = playing();
+        g.bike_d = statue_d() - STATUE_HALF;
+        g.bike_x = 240.0;
+        g.update_play(1.0 / 60.0);
+        assert_eq!(g.state, State::Crash, "rode into the pedestal");
+        while g.state == State::Crash { g.update_crash(1.0 / 60.0); }
+        for _ in 0..60 {
+            g.ride(0.0, 0.0, 1.0 / 60.0);
+            g.update_play(1.0 / 60.0);
+            assert_eq!(g.state, State::Play, "crashed again straight after getting back on, at {} {}", g.bike_x, g.bike_d);
+        }
     }
 
     #[test]

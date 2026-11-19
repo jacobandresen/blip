@@ -31,7 +31,7 @@ const PLAY_Y: i32 = HUD_H;
 const GROUND_Y: i32 = WIN_H - 32;
 
 // ---- alien grid -------------------------------------------------------
-const ALIEN_COLS: i32 = 11; // max across all themes (theme 2 uses 11)
+const ALIEN_COLS: i32 = 10; // max across all themes
 const ALIEN_ROWS: i32 = 6;  // max across all themes (theme 1 uses 6)
 const ALIEN_W: i32 = 36;
 const ALIEN_H: i32 = 28;
@@ -88,7 +88,9 @@ const N_BULLETS: usize = MAX_PLAYER_BULLETS + MAX_BOMBS + MAX_UFO_BOMBS;
 const N_EXPLOSIONS: usize = ALIEN_TOTAL + 4;
 
 // ---- player death / respawn --------------------------------------------
-const DEAD_PAUSE: f32 = 3.6;         // total time in State::Dead before play resumes
+// Total time in State::Dead before play resumes. 2.4 (was 3.6): at a person's 250 ms reaction a lost cannon came
+// every 20-30 s, and the pauses were a quarter of the run.
+const DEAD_PAUSE: f32 = 2.4;
 const DEATH_EXPLOSION_PHASE: f32 = 0.7; // seconds of that pause spent on the giant explosion
                                          // before the ship starts fading back in — the
                                          // remainder (DEAD_PAUSE - this) is the mist fade-in
@@ -285,8 +287,10 @@ impl Game {
         let alive = self.aliens_alive();
         if alive <= 0 { return MARCH_MIN as f32; }
         let theme_total = (self.active_cols * self.active_rows).max(1);
-        // Each level the march is 7% faster, capping at a 50% speedup by level 8.
-        let level_scale = (1.0 - (self.sess.level - 1) as f32 * 0.07).max(0.5);
+        // Each level the march is 7% faster, up to level 5. It went on to twice as fast by level 8, and the full
+        // formations of levels 6, 7, 11 and 12 then landed in 7 of 12 bot runs: one shot at a time cannot clear
+        // 50-60 invaders in the 25-30 s they took to land.
+        let level_scale = (1.0 - (self.sess.level - 1) as f32 * 0.07).max(0.72);
         let ms = (MARCH_START as f32 * alive as f32 / theme_total as f32 * level_scale) as i32;
         ms.max(MARCH_MIN) as f32
     }
@@ -351,7 +355,9 @@ impl Game {
         let (rows, cols) = match theme {
             0 => (if self.sess.level == 1 { 4 } else { 5 }, 10_i32),
             1 => (if self.sess.level == 2 { 5 } else { 6 }, 10),
-            2 => (3,     11),
+            // 10 wide, not 11: at 446 of 480 px it met an edge every third step and dropped so often that it landed
+            // in 21 s on wave 8 (seed 3).
+            2 => (3,     10),
             3 => (4,     10),
             _ => (6,     8),
         };

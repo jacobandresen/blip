@@ -147,6 +147,7 @@ pub(crate) struct Game {
     pub(crate) demo: bool,
     pub(crate) idle: f32,
     pub(crate) demo_cpu: (CpuPlan, f32),
+    pub(crate) demo_style: Plan,
     /// Sounds asked for this frame, for the main loop to play.
     pub(crate) sounds: Vec<(Sfx, f32)>,
     pub(crate) helpers: [Option<Helper>; 6],
@@ -205,6 +206,8 @@ pub(crate) struct Game {
     pub(crate) difficulty: f32,
     pub(crate) cpu_delay: f32,
     pub(crate) cpu_plan: CpuPlan,
+    /// How the CPU means to fight this round (plan.rs), picked at the bell.
+    pub(crate) cpu_style: Plan,
     /// Held so a punch and a kick pressed together read as one input
     /// rather than two — see read_special(). One per player: shared,
     /// each player's punch armed the other player's special.
@@ -262,6 +265,7 @@ impl Game {
             demo: false,
             idle: 0.0,
             demo_cpu: (CpuPlan::Wait, 0.0),
+            demo_style: Plan::Pressure,
             sounds: Vec::new(),
             helpers: [None; 6],
             barrels: [Barrel {
@@ -307,6 +311,7 @@ impl Game {
             difficulty: 0.0,
             cpu_delay: 0.0,
             cpu_plan: CpuPlan::Wait,
+            cpu_style: Plan::Pressure,
             punch_at: [-1.0; 2],
             kick_at: [-1.0; 2],
             now: 0.0,
@@ -496,6 +501,9 @@ impl Game {
         self.bowed = false;
         self.cpu_plan = CpuPlan::Wait;
         self.cpu_delay = 0.4;
+        let salt = (self.now * 977.0) as u32 ^ (self.round as u32) << 20 ^ (self.opponent_index as u32) << 24;
+        self.cpu_style = Plan::pick_by(&self.p[1], salt);
+        self.demo_style = Plan::pick_by(&self.p[0], salt ^ 0x5A5A);
     }
 
     /// The other turtles come in from behind whoever called, one after

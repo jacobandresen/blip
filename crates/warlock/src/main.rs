@@ -156,6 +156,8 @@ struct Enemy {
     from: Cell,
     lerp: f32,
     step_t: f32,
+    /// The current step's length (s): the body is drawn sliding from `from` to `tile` over it.
+    step: f32,
     dir: Dir,
     visible: bool,
     revealed: f32,
@@ -478,6 +480,7 @@ impl Game {
             from: Cell { c, r },
             lerp: 1.0,
             step_t: rand_int(0, 50) as f32 / 100.0,
+            step: 1.0,
             dir,
             visible: kind != EnemyKind::Wraith,
             revealed: 0.0,
@@ -1026,6 +1029,7 @@ impl Game {
                 self.enemies[i].dir = dir;
                 self.enemies[i].lerp = 0.0;
                 self.enemies[i].step_t = interval;
+                self.enemies[i].step = interval;
             } else {
                 self.enemies[i].step_t = interval;
             }
@@ -1063,7 +1067,7 @@ impl Game {
         }
         // advance render lerp
         for e in &mut self.enemies {
-            e.lerp = (e.lerp + dt).min(1.0);
+            e.lerp = (e.lerp + dt / e.step).min(1.0);
         }
     }
 
@@ -1093,7 +1097,9 @@ impl Game {
             }
             b.tile = next;
             b.lerp = 0.0;
-            if let Some(idx) = self.enemies.iter().position(|e| !e.gone && e.tile == b.tile) {
+            // A moving monster is hit in the cell it leaves as well as the one it enters: testing only the
+            // one it enters let a bolt pass through an imp stepping toward the wizard (seed 4 lost a life so).
+            if let Some(idx) = self.enemies.iter().position(|e| !e.gone && (e.tile == b.tile || (e.lerp < 1.0 && e.from == b.tile))) {
                 if !kills.contains(&idx) {
                     kills.push(idx);
                 }
@@ -2311,6 +2317,7 @@ mod tests {
             from: Cell { c: w.c + 1, r: w.r },
             lerp: 0.0,
             step_t: 100.0,
+            step: 1.0,
             dir: Dir::Left,
             visible: true,
             revealed: 0.0,

@@ -27,9 +27,12 @@ pub(crate) fn mood_of(f: &Fighter) -> Mood {
     match f.act {
         Act::Attack => Mood::Shout,
         Act::Hitstun | Act::Knockdown | Act::Defeat => Mood::Hurt,
+        // The crunch is roared, every other win smiled.
+        Act::Victory if STYLES[f.who].win == Win::Flex && f.t > 0.3 => Mood::Shout,
         Act::Victory => Mood::Happy,
-        // Rocked, and it shows on the face too.
+        // Rocked, and it shows on the face too; and gritted teeth behind a guard taking a blow.
         _ if f.stagger > 0.0 => Mood::Hurt,
+        Act::Block if f.stun > 0.0 => Mood::Hurt,
         _ => Mood::Calm,
     }
 }
@@ -39,7 +42,11 @@ pub(crate) fn mood_of(f: &Fighter) -> Mood {
 pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop: f32, i: usize, shadow: bool) {
     let a = f.arch();
     let prone = down_time(f).is_some_and(|t| t < 0.9);
-    let rig = Rig::upright(f.x, f.y + shift, f.facing, f.facing, a.size);
+    // Held in the hitstop, the one struck shudders on the spot.
+    let shudder = if hitstop > 0.0 && f.act == Act::Hitstun { 2.0 * if ((now * 60.0) as i32) % 2 == 0 { 1.0 } else { -1.0 } } else { 0.0 };
+    // Turning round, the face goes with the body: still the old way until halfway.
+    let face = if f.turn > 0.5 { -f.facing } else { f.facing };
+    let rig = Rig::upright(f.x + shudder, f.y + shift, f.facing, face, a.size);
 
     let flash = if hitstop > 0.0 && f.act == Act::Hitstun { 0.5 }
                 else if invulnerable(f) && ((now * 30.0) as i32) % 2 == 0 { 0.3 }
@@ -48,6 +55,8 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
     // the way down, with a small flutter at rest.
     let drift = match f.act {
         Act::Walk => a.walk,
+        // The head snaps back and the loose ends are left behind it, flung forward.
+        Act::Hitstun if !f.struck_body && !f.struck_legs => -300.0 * (1.0 - f.t * 3.4).clamp(0.0, 1.0) * f.struck_force,
         _ => f.vx * f.facing,
     };
     let rise = if f.airborne() { f.vy } else { 0.0 };
@@ -62,6 +71,22 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
         let pulse = 38.0 + 4.0 * (now * 14.0).sin();
         blip.fill_glow_circle(f.x, f.y + shift - 60.0, pulse,
             BlipColor { r: 0.62, g: 0.22, b: 0.94, a: 0.53 });
+    }
+
+    // A special gathers before it goes: a glow in the fighter's own colour swells through the startup.
+    // It is the tell (the laser has the eyes, and Regent his own violet).
+    if shadow && f.act == Act::Attack && f.mv == MoveId::Special && a.build != Build::Uniform
+        && a.special != Special::LaserVision {
+        let start = f.scaled(move_data(MoveId::Special)).startup * F;
+        if f.t < start + 3.0 * F {
+            let k = (f.t / start).min(1.0);
+            let fade = if f.t > start { 1.0 - (f.t - start) / (3.0 * F) } else { 1.0 };
+            // Half white, so a red trim does not read as the rage behind a fighter.
+            let (r, g, b) = a.trim;
+            let (r, g, b) = (0.5 + 0.5 * r, 0.5 + 0.5 * g, 0.5 + 0.5 * b);
+            blip.fill_glow_circle(f.x, f.y + shift - f.height() * 0.5, f.height() * (0.16 + 0.14 * k),
+                BlipColor { r, g, b, a: (0.12 + 0.24 * k) * fade });
+        }
     }
 
     // Dust off the boards where a body lands. Knockdowns are the one
@@ -86,6 +111,40 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
             blip.fill_circle(x, FLOOR_Y + shift - 2.0 - 5.0 * age, (3.0 + 5.0 * age) * size,
                 BlipColor { r: 0.66, g: 0.60, b: 0.52, a: 0.42 * (1.0 - age) });
         }
+    }
+
+    // Pushing off for a jump kicks up a puff where the feet left the boards (it stays there).
+    if f.act == Act::Air && f.vy < 0.0 && f.t < 0.16 && !f.soaring() {
+        let age = f.t / 0.16;
+        let size = f.size().max(0.6);
+        let at = f.x - f.vx * f.t;
+        for side in [-1.0f32, 1.0] {
+            blip.fill_circle(at + side * (8.0 + 14.0 * age) * size, FLOOR_Y + shift - 2.0 - 3.0 * age, (2.5 + 4.0 * age) * size,
+                BlipColor { r: 0.66, g: 0.60, b: 0.52, a: 0.36 * (1.0 - age) });
+        }
+    }
+    // The heavy ones raise a little dust with every step: each foot as it comes down.
+    if f.act == Act::Walk && a.bulk >= 1.12 {
+        let ph = f.x * f.facing * STRIDE / f.size();
+        for off in [0.0f32, std::f32::consts::PI] {
+            let u = ((ph + off) / std::f32::consts::TAU).rem_euclid(1.0);
+            // The first fifth of the planted half: the foot just down.
+            if u < 0.10 {
+                let age = u / 0.10;
+                let (fwd, _) = foot_cycle(ph + off, 0.0);
+                let x = f.x + f.facing * (WALK_MID + fwd) * f.size();
+                blip.fill_circle(x, FLOOR_Y + shift - 2.0, (2.0 + 4.0 * age) * f.size(),
+                    BlipColor { r: 0.66, g: 0.60, b: 0.52, a: 0.30 * (1.0 - age) });
+            }
+        }
+    }
+
+    // A guard driven back by a blow scuffs the boards behind the back foot.
+    if f.act == Act::Block && f.stun > 0.0 && !f.airborne() {
+        let k = (f.stun / (10.0 * F)).clamp(0.0, 1.0);
+        let x = f.x - f.facing * (24.0 + 10.0 * (1.0 - k)) * f.size();
+        blip.fill_circle(x, FLOOR_Y + shift - 2.0 - 3.0 * (1.0 - k), (2.0 + 4.0 * (1.0 - k)) * f.size(),
+            BlipColor { r: 0.66, g: 0.60, b: 0.52, a: 0.38 * k });
     }
 
     // A flat oval on the boards, smaller under a jump: what glues the body
@@ -165,8 +224,10 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
     draw_belt(blip, &near, k.hip, k.neck, rig.fwd);
     draw_arm(blip, &near, k.sh_lead, k.elbow_lead, k.hand_lead, q.open, rig.fwd);
 
-    // Stars going round the head of a dizzy fighter, in front and behind.
-    if f.dizzy > 0.0 {
+    // Stars going round the head of a dizzy fighter, in front and behind; and over one knocked out cold,
+    // once they have stopped moving.
+    let out_cold = f.act == Act::Defeat && f.health <= 0 && f.t > 0.7;
+    if f.dizzy > 0.0 || out_cold {
         let r = head_r(a.bulk) * f.size().max(0.6);
         for j in 0..3 {
             let ang = now * 6.0 + j as f32 * std::f32::consts::TAU / 3.0;
@@ -180,8 +241,10 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
 
     // The laser's tell: the eyes light up through the whole of its startup.
     if f.act == Act::Attack && f.mv == MoveId::Special && a.special == Special::LaserVision {
-        let charge = (f.t / (move_data(f.mv).startup * F)).min(1.0);
-        if f.t < (move_data(f.mv).startup + 6.0) * F {
+        // The stare is the fighter's own (scaled), not the table's: it lasts the whole LASER_STARE.
+        let stare = f.scaled(move_data(f.mv)).startup;
+        let charge = (f.t / (stare * F)).min(1.0);
+        if f.t < (stare + 6.0) * F {
             let r = head_r(a.bulk) * a.size;
             let eye = V(k.head.0 + rig.face * 0.5 * r, k.head.1 - 0.08 * r);
             blip.fill_glow_circle(eye.0, eye.1, 6.0 + 12.0 * charge,

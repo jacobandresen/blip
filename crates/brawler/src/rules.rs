@@ -448,6 +448,12 @@ pub(crate) fn note_handover(f: &mut Fighter, dt: f32) {
         f.shown_vy = f.vy;
     }
     if f.blend > 0.0 { f.blend = (f.blend - dt / f.blend_len).max(0.0); }
+    if f.facing != f.shown_facing {
+        f.shown_facing = f.facing;
+        f.turn = 1.0;
+    } else if f.turn > 0.0 {
+        f.turn = (f.turn - dt / TURN_BLEND).max(0.0);
+    }
 }
 
 /// Is this fighter untouchable right now? Only on the way up from a
@@ -501,7 +507,8 @@ pub(crate) fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: 
     }
 
     // Caught in the middle of their own attack, before its recovery.
-    let theirs = move_data(defender.mv);
+    // (Their own timing: the laser's stare is longer than the table's special.)
+    let theirs = defender.scaled(move_data(defender.mv));
     let counter = defender.act == Act::Attack && defender.t <= (theirs.startup + theirs.active) * F;
     attacker.countered = counter;
     let bonus = if counter { COUNTER } else { 1.0 };
@@ -523,12 +530,14 @@ pub(crate) fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: 
     let floored = m.knockdown || attacker.epic_punch();
     if floored || defender.airborne() {
         defender.act = Act::Knockdown;
+        defender.downed_by = if defender.airborne() { MoveId::LowPunch } else { attacker.mv };
         defender.t = 0.0;
         defender.vy = 0.0;
         defender.vx = 0.0;
         defender.y = FLOOR_Y;
     } else {
         defender.act = Act::Hitstun;
+        defender.struck(if m.level == Level::Overhead { defender.height() } else { m.height }, damage);
         defender.stun = m.hitstun * F + if counter { COUNTER_STUN } else { 0.0 };
         defender.t = 0.0;
         // The blow that finds a dizzy fighter wakes them; the one that fills

@@ -205,6 +205,16 @@ impl World {
         w
     }
 
+    /// A new pit at `round`, as full as playing up to it would have made it: a CPU more each round.
+    pub fn at_round(humans: usize, round: i32) -> Self {
+        let mut w = Self::new(humans);
+        w.round = round.max(1);
+        for _ in 1..w.round {
+            if w.snakes.len() < MAX_SNAKES { w.join(w.snakes.len(), false); }
+        }
+        w
+    }
+
     fn empty(humans: usize) -> Self {
         Self {
             snakes: Vec::new(),

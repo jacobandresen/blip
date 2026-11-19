@@ -3,10 +3,12 @@
 //! then punch, kick, sweep or throw the special at random, often stringing
 //! punches into a run that ends in the hook, or a low kick into the roundhouse;
 //! block about half the attacks it sees start, low against a sweep; uppercut
-//! anyone coming down on top of it.
+//! anyone coming down on top of it. Each round it fights to a plan (plan.rs, which the CPU uses too):
+//! pressure, spacing at the edge of the foe's reach, zoning with a thrown special, or jumping in; well behind,
+//! it tries another. It jumps a special thrown along the ground.
 //! `BLIP_BOT_PICK` (fighter), `BLIP_BOT_FOE` and `BLIP_BOT_LEVEL` (the ladder
 //! fight, from 1) choose the matchup; `BLIP_BOT_CONTINUES=n` takes a lost
-//! fight again up to n times; `BLIP_BOT_STYLE` and `BLIP_BOT_BLOCK` change how it fights.
+//! fight again up to n times; `BLIP_BOT_STYLE`, `BLIP_BOT_PLAN` and `BLIP_BOT_BLOCK` change how it fights.
 //! It fights through the game's own `Input`, so tests can stage fights without a window.
 
 use super::*;
@@ -69,7 +71,14 @@ struct Bot {
     /// Blows still to come in a run (punches to the hook, or the second kick).
     run: u8,
     run_kicks: bool,
+    plan: Plan,
+    /// The round the plan was made for, and how long it has been tried.
+    plan_round: i32,
+    plan_t: f32,
+    /// The distance last frame: smaller now means the foe is stepping in.
+    last_dist: f32,
 }
+
 
 
 /// Menus: fire through the title, pick the fighter, fire again.
@@ -122,12 +131,110 @@ fn think(b: &mut Bot, g: &Game, dt: f32) -> Input {
     b.react -= dt;
     b.next_attack -= dt;
     b.blocking -= dt;
-    punish(b, &me, &foe)
+    choose_plan(b, g, &me, &foe, dt);
+    let inp = punish(b, &me, &foe)
+        .or_else(|| duck_laser(&me, &foe))
+        .or_else(|| jump_bolt(g, &me))
         .or_else(|| block(b, &me, &foe))
         .or_else(|| style(b, &me, &foe))
         .or_else(|| uppercut(b, &me, &foe))
         .or_else(|| switch_stance(b, &me, &foe))
-        .unwrap_or_else(|| close_in_and_attack(b, &me, &foe))
+        .unwrap_or_else(|| match b.plan {
+            Plan::Pressure => close_in_and_attack(b, &me, &foe),
+            Plan::Spacing => space(b, &me, &foe),
+            Plan::Zoning => zone(b, &me, &foe),
+            Plan::JumpIn => jump_in(b, &me, &foe),
+        });
+    b.last_dist = (foe.x - me.x).abs();
+    inp
+}
+
+/// A plan at the bell, at random; another after four seconds well behind on health. With plans the bot took
+/// 7 of 14 rounds from Jade on fight 8 (1 of 9 before) and 4 of 12 from Regent (0 of 8).
+fn choose_plan(b: &mut Bot, g: &Game, me: &Fighter, foe: &Fighter, dt: f32) {
+    if blip::bot::is("STYLE", "simple") { return; }
+    b.plan_t += dt;
+    let behind = well_behind(me, foe);
+    let round = g.round * 10 + me.rounds + foe.rounds;
+    if round == b.plan_round && !(behind && b.plan_t > 4.0) { return; }
+    let was = b.plan;
+    b.plan = Plan::pick(me);
+    // BLIP_BOT_PLAN=pressure|spacing|zoning|jump_in fights the whole run one way.
+    for &p in Plan::open_to(me) {
+        if blip::bot::is("PLAN", p.name()) { b.plan = p; }
+    }
+    if round != b.plan_round || b.plan != was { blip::bot::add(&format!("plan_{}", b.plan.name()), 1.0); }
+    (b.plan_round, b.plan_t) = (round, 0.0);
+}
+
+/// A ball of chi (or a web, or a pizza) coming at it along the ground: jump it, toward the thrower.
+fn jump_bolt(g: &Game, me: &Fighter) -> Option<Input> {
+    if !me.free() || me.airborne() || blip::bot::is("STYLE", "simple") { return None; }
+    let coming = g.bolts.iter().any(|t| t.active && t.owner == 1 && g.p[1].arch().special != Special::LaserVision
+        && (t.vx > 0.0) == (me.x > t.x) && (40.0..150.0).contains(&(me.x - t.x).abs()));
+    if !coming { return None; }
+    let mut inp = Input { up: true, ..Input::default() };
+    walk(&mut inp, me, true);
+    Some(inp)
+}
+
+/// Spacing: hover at the edge of the foe's longest kick and poke with its own longest low blow whenever the
+/// foe steps in (and now and then anyway). In a corner there is no room to wait, so it fights its way out.
+fn space(b: &mut Bot, me: &Fighter, foe: &Fighter) -> Input {
+    let dist = (foe.x - me.x).abs();
+    if !room_behind(me) { return close_in_and_attack(b, me, foe); }
+    let mut inp = Input::default();
+    let (poke, mine) = longest_poke(me);
+    let edge = spacing_edge(foe);
+    let stepping_in = dist < b.last_dist - 0.5;
+    if b.next_attack <= 0.0 && me.free() && dist < mine && (stepping_in || chance(0.04)) {
+        inp.kick_low = true;
+        inp.down = poke == MoveId::Sweep && chance(0.6);
+        b.next_attack = gen_range(0.4, 0.8);
+    } else if dist < edge - 20.0 {
+        walk(&mut inp, me, false);
+    } else if dist > edge + 25.0 {
+        walk(&mut inp, me, true);
+    }
+    inp
+}
+
+/// Zoning: across the stage, throw the special and wait for the next; up close, fight.
+fn zone(b: &mut Bot, me: &Fighter, foe: &Fighter) -> Input {
+    let dist = (foe.x - me.x).abs();
+    if dist < 160.0 { return close_in_and_attack(b, me, foe); }
+    let mut inp = Input::default();
+    if b.next_attack <= 0.0 && me.free() {
+        inp.special = true;
+        b.next_attack = gen_range(0.9, 1.6);
+    } else if dist > 380.0 {
+        walk(&mut inp, me, true);
+    }
+    inp
+}
+
+/// Jump-in: from just outside reach, jump forward, kick on the way down and land in a run of punches.
+fn jump_in(b: &mut Bot, me: &Fighter, foe: &Fighter) -> Input {
+    let dist = (foe.x - me.x).abs();
+    let mut inp = Input::default();
+    if me.airborne() {
+        inp.kick_low = me.act == Act::Air && me.vy > 0.0 && dist < attack_range(me, MoveId::JumpKick) + 30.0;
+        return inp;
+    }
+    // (From the high kick's reach it lost both rounds of fight 1 on seed 2, where every other plan won;
+    // from a jump's length, 3-0 on four seeds.)
+    let travel = jump_travel(me);
+    if dist > travel * 1.15 {
+        walk(&mut inp, me, true);
+    } else if dist > travel * 0.8 && b.next_attack <= 0.0 && me.free() {
+        inp.up = true;
+        walk(&mut inp, me, true);
+        b.next_attack = 0.3;
+        (b.run, b.run_kicks) = (2, false);
+    } else {
+        return close_in_and_attack(b, me, foe);
+    }
+    inp
 }
 
 /// Step toward the foe (`forward`) or back from it, whichever way it faces.
@@ -148,6 +255,17 @@ fn punish(b: &mut Bot, me: &Fighter, foe: &Fighter) -> Option<Input> {
     else if dist < attack_range(me, MoveId::LowKick) { inp.kick_low = true; }
     else { return None; }
     b.next_attack = 0.25;
+    Some(inp)
+}
+
+/// The laser's stare is the tell (it fires where the eyes looked): sit under one from the ground, guard one from the
+/// air, as a player who has met it once does. Without this the bot lost every round to it within a second.
+fn duck_laser(me: &Fighter, foe: &Fighter) -> Option<Input> {
+    let staring = foe.arch().special == Special::LaserVision && foe.act == Act::Attack && foe.mv == MoveId::Special;
+    if !staring || !me.free() || blip::bot::is("STYLE", "simple") { return None; }
+    let mut inp = Input::default();
+    walk(&mut inp, me, false);
+    inp.down = !foe.airborne();
     Some(inp)
 }
 
