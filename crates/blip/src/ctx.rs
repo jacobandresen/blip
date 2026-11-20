@@ -263,6 +263,7 @@ fn retire(rt: RenderTarget) {
 
 impl Blip {
     pub fn new(width: i32, height: i32) -> Self {
+        crate::bot::canvas(width as f32, height as f32);
         // sample_count=0 avoids the MSAA resolve path in miniquad, which calls
         // glCheckFramebufferStatus — a WebGL function missing from the JS bundle.
         let rt = render_target_ex(width as u32, height as u32, RenderTargetParams {

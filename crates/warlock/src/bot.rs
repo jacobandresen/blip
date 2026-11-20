@@ -55,10 +55,11 @@ pub const PLAYTHROUGHS: &[Playthrough] = &[
     Playthrough {
         name: "after game over it tries the same chamber again",
         level: 3,
-        settings: &[("CONTINUES", "1")],
+        // One life, so game over comes soon: with three the bot could outlive the run (and its potions add more).
+        settings: &[("CONTINUES", "1"), ("LIVES", "1")],
         seconds: 300.0,
-        // Still in chamber 3 or beyond after the continue: a continue does not send the wizard back to the first.
-        goals: &[AtLeast("continues", 1.0), AtLeast("deaths", 4.0), AtLeast("level", 3.0)],
+        // A death after the continue, still in chamber 3 or beyond: a continue does not send the wizard back to the first.
+        goals: &[AtLeast("continues", 1.0), AtLeast("deaths", 2.0), AtLeast("level", 3.0)],
         ..Playthrough::DEFAULT
     },
     Playthrough {

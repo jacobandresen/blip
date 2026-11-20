@@ -40,7 +40,12 @@ struct Game {
     state: State,
     timer: Timer,
     humans: usize,
+    /// Seconds of screen shake left after a person's viper goes out (see OUT_SHAKE).
+    shake: f32,
 }
+
+/// A person's viper going out shakes the pit this long, up to 4 px.
+const OUT_SHAKE: f32 = 0.3;
 
 impl Game {
     fn new() -> Self {
@@ -50,6 +55,7 @@ impl Game {
             state: State::Title,
             timer: Timer::default(),
             humans: 1,
+            shake: 0.0,
         }
     }
 
@@ -142,9 +148,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             Event::Through => play_sfx(&sfx.through),
             Event::Kill => play_sfx(&sfx.kill),
             Event::RoundWin => play_sfx(&sfx.round),
-            Event::Die => {
+            Event::Die { human } => {
                 play_sfx(&sfx.game_over);
                 web::haptic();
+                if human { g.shake = OUT_SHAKE; }
             }
         }
     }
@@ -194,9 +201,15 @@ async fn main() {
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title => draw_title(&blip, &g, &pit),
-            State::Play => draw_play(&blip, &g, &pit),
+            State::Play => {
+                let (dx, dy) = blip::shake(g.shake, OUT_SHAKE, 4.0);
+                blip.set_offset(dx, dy);
+                draw_play(&blip, &g, &pit);
+                blip.set_offset(0.0, 0.0);
+            }
             State::Over => draw_over(&blip, &g),
         }
+        g.shake = (g.shake - dt).max(0.0);
 
         blip.next_frame(60).await;
     }
@@ -224,7 +237,14 @@ fn draw_viper(blip: &Blip, s: &arena::Snake) {
     let c = s.colour();
     let gap = BlipColor { r: c.r * 0.23, g: c.g * 0.23, b: c.b * 0.23, ..c };
     let thick = arena::BODY_R * 2.0;
-    blip.draw_polyline(s.path.iter().enumerate().rev().map(|(i, p)| (p.x, p.y, s.in_hole(i))), thick, c, gap);
+    let pts = || s.path.iter().enumerate().rev().map(|(i, p)| (p.x, p.y, s.in_hole(i)));
+    // A dark edge under the body and a light stripe along its back; gaps keep only their dim stroke.
+    let ink = BlipColor { r: c.r * 0.3, g: c.g * 0.3, b: c.b * 0.3, ..c };
+    let none = BlipColor { a: 0.0, ..c };
+    blip.draw_polyline(pts(), thick + 2.0, ink, none);
+    blip.draw_polyline(pts(), thick, c, gap);
+    let back = BlipColor { r: (c.r + 0.3).min(1.0), g: (c.g + 0.3).min(1.0), b: (c.b + 0.3).min(1.0), ..c };
+    blip.draw_polyline(pts(), (thick * 0.3).max(1.0), back, none);
     if !s.alive { return; }
     if let Some(p) = s.path.front() {
         blip.draw_line_ex(s.head.x, s.head.y, p.x, p.y, thick, c);
@@ -286,6 +306,11 @@ fn draw_play(blip: &Blip, g: &Game, pit: &Texture2D) {
     draw_standings(blip, &g.world);
     if g.world.round_wait > 0.0 {
         let won = g.world.snakes.iter().any(|s| s.alive && s.human);
+        if won {
+            let colours: Vec<BlipColor> = (0..4).map(arena::seat_colour).collect();
+            blip::draw_fireworks(blip, arena::ROUND_WAIT - g.world.round_wait,
+                (arena::PIT_X + 40.0, arena::PIT_Y + 40.0, arena::PIT_W - 80.0, arena::PIT_H * 0.45), &colours);
+        }
         blip.draw_centered(if won { "YOU WIN" } else { "ROUND LOST" },
             arena::PIT_Y + arena::PIT_H / 2.0, 4.0, if won { HOLE } else { BLIP_RED });
     } else if g.world.banner_t < BANNER {

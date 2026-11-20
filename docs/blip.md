@@ -43,7 +43,7 @@ lost life is `sess.lose_life_after(&mut timer, respawn)`: it starts the respawn 
 
 - pictures and effects are embedded: `load_png(blip::png!("food"))`, `blip::sound!("eat")`; a game names its effects
   once with `blip::sounds!(Sounds { eat, kill = "defeated" })` and loads them with `Sounds::load().await`;
-- music is written to `web/<game>/music/<NAME>.wav` and streamed: `Jukebox::new("serpent", &["SLITHER", "FRENZY"])`.
+- music is written to `web/<game>/music/<NAME>.wav` and streamed: `Jukebox::new("serpent", &["SLITHER", "PROWL", "FRENZY"])`.
 
 `blip::image`, `blip::wav`, `blip::song`, `blip::cosy` and `blip::techno` are the generators the asset files build on.
 

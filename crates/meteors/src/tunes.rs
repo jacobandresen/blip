@@ -3,7 +3,8 @@
 
 use blip::song::{Groove, Song, H, R};
 
-// Two device-synthesized E Lydian tracks: DRIFT for early waves, STORM from wave 5.
+// Three device-synthesized E Lydian tracks: DRIFT for early waves, BLOOM as the flowers come (waves 3 and 4), STORM
+// from wave 5.
 use blip::cosy::{self, Tone, Voice};
 use blip::Asset;
 use blip::song::chords::{E, FS, GSM, CSM, B};
@@ -55,6 +56,56 @@ pub fn drift_song() -> Song<'static> {
         bass: [0, R, 7, R],
         groove: Groove::Brush,
         seed: 0x3E7E_0001,
+        ..Song::DEFAULT
+    }
+}
+
+/// Unfolding: figures that open upward like petals, over a gentle backbeat.
+pub fn bloom_song() -> Song<'static> {
+    Song {
+        bpm: 118.0,
+        melody: &[
+            [76, H, 80, 83, 88, H, 87, H],
+            [85, H, 83, H, 82, H, 78, H],
+            [80, H, 83, 85, 87, H, 85, H],
+            [83, H, H, H, R, R, 82, 83],
+            [76, H, 80, 83, 88, H, 87, H],
+            [85, H, 87, H, 88, H, 85, H],
+            [82, H, 83, H, 82, H, 78, H],
+            [76, H, H, H, R, R, R, R],
+            [88, H, 87, 85, 83, H, 80, H],
+            [82, H, 83, H, 85, H, R, R],
+            [87, H, 85, 83, 80, H, 78, H],
+            [83, H, H, H, R, R, 85, 87],
+            [88, H, 83, H, 80, H, 83, H],
+            [85, H, 82, H, 78, H, 82, H],
+            [80, H, 82, H, 83, H, 78, H],
+            [76, H, H, H, R, R, R, R],
+        ],
+        chords: &[
+            [E, E],
+            [FS, FS],
+            [GSM, B],
+            [B, B],
+            [E, E],
+            [CSM, CSM],
+            [FS, FS],
+            [E, E],
+            [E, GSM],
+            [FS, FS],
+            [GSM, CSM],
+            [B, B],
+            [E, E],
+            [FS, FS],
+            [CSM, FS],
+            [E, E],
+        ],
+        lead: Voice::Glass,
+        lead_vol: 0.36,
+        harmony: Some((Voice::Bell, -12)),
+        bass: [0, 7, 12, 7],
+        groove: Groove::Backbeat,
+        seed: 0x3E7E_0003,
         ..Song::DEFAULT
     }
 }
@@ -139,11 +190,17 @@ fn streak_up(times: usize) -> Vec<u8> {
     cosy::jingle_with(&[83, 88, 90, 95][..times], 0.06, Voice::Glass, 0, Some((Voice::Bell, -1)))
 }
 
+/// A crystal taken: two high glass notes with a sparkle over them.
+fn crystal() -> Vec<u8> {
+    cosy::sfx(&cosy::mix(cosy::run(&[88, 95], 0.05, Voice::Glass, 0.5), &cosy::sparkle(0.25, 100, 4, 7), 0.05, 0.3))
+}
+
 /// The effects, as `sounds/NAME.wav`.
 pub fn sounds() -> Vec<Asset> {
     vec![
         ("sounds/fire.wav", fire_zap()),
         ("sounds/thrust.wav", thrust()),
+        ("sounds/crystal.wav", crystal()),
         ("sounds/bang_large.wav", bang(0)),
         ("sounds/bang_medium.wav", bang(1)),
         ("sounds/bang_small.wav", bang(2)),
@@ -160,5 +217,9 @@ pub fn sounds() -> Vec<Asset> {
 
 /// The music: each tune as a WAV to play.
 pub fn music() -> Vec<(String, Vec<u8>)> {
-    blip::wav::tunes(&[("DRIFT", &|| drift_song().render()), ("STORM", &|| storm_song().render())])
+    blip::wav::tunes(&[
+        ("DRIFT", &|| drift_song().render()),
+        ("BLOOM", &|| bloom_song().render()),
+        ("STORM", &|| storm_song().render()),
+    ])
 }

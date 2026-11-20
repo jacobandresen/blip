@@ -109,7 +109,9 @@ pub static ROOMS: &[Room] = &[
         player: (1, 1),
         runes: &[(7, 6)],
         exit: (13, 11),
-        imps: &[(5, 5), (9, 7)],
+        // Away from the start and the rune: at (5, 5) and (9, 7) an imp met a player at a person's reaction time
+        // (BLIP_BOT_REACT=250) within 4 s, and room 1 cost 5.3 lives a minute against 2.6 for the game.
+        imps: &[(11, 3), (12, 9)],
         wraiths: &[],
         hounds: &[],
         gargoyles: &[],

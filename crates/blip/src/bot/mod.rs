@@ -178,6 +178,12 @@ pub fn add(key: &str, n: f64) {
     with(|r| if r.on {
         *r.stats.entry(key.to_string()).or_insert(0.0) += n;
         if n > 0.0 && is_hit(key) { let c = r.clock; r.fun.hit(c, key == "deaths"); }
+        if n > 0.0 && key == "deaths" {
+            let c = r.clock;
+            r.fun.death(c);
+            let level = r.stats.get("level").copied().unwrap_or(1.0);
+            *r.stats.entry(format!("fun_deaths_l{level}")).or_insert(0.0) += n;
+        }
     });
 }
 
@@ -300,6 +306,17 @@ pub(crate) fn any_pressed() -> bool {
 /// pass's closest frame is saved with the boxes drawn.
 pub fn near(me: &[rollout::Mover], hazards: &[rollout::Mover]) {
     with(|r| if r.on { let c = r.clock; r.fun.near(me, hazards, c); });
+}
+
+/// Where the player is this frame, in canvas pixels, for the variety measure; games that report hit boxes with
+/// [`near`] need not call it.
+pub fn at(x: f32, y: f32) {
+    with(|r| if r.on { r.fun.at(x, y); });
+}
+
+/// The canvas size, which the variety grid divides; `Blip::new` sets it.
+pub(crate) fn canvas(w: f32, h: f32) {
+    with(|r| r.fun.canvas(w, h));
 }
 
 /// Is this frame one nobody will see? A bot run draws one frame in `BLIP_BOT_DRAW` (30 by default; 1 draws every

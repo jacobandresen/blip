@@ -5,7 +5,7 @@ use blip::song::{Groove, Song, H, R};
 
 // ---- music: two tunes on the marimba -------------------------------------
 // Synthesised on the device (see `song`): A minor pentatonic, the notes a
-// snake winds through. SLITHER plays the early levels, FRENZY from level 5.
+// snake winds through. SLITHER plays the early levels, PROWL from level 3, FRENZY from level 5.
 use blip::cosy::{self, Voice, H as HOLD};
 use blip::Asset;
 use blip::song::chords::{AM, C, DM, EM, F, G};
@@ -57,6 +57,57 @@ pub fn slither_song() -> Song<'static> {
         bass: [0, R, 7, R],
         groove: Groove::Brush,
         seed: 0x5111_7000,
+        ..Song::DEFAULT
+    }
+}
+
+/// The middle tune: the snake on the hunt, a backbeat under it and the melody answering itself, a step between the
+/// calm and the fast one.
+pub fn prowl_song() -> Song<'static> {
+    Song {
+        bpm: 122.0,
+        melody: &[
+            [69, H, 72, H, 76, 74, 72, H],
+            [74, H, 76, H, 79, H, 76, H],
+            [81, H, 79, 76, 74, H, 72, 74],
+            [76, H, H, H, R, R, 72, 74],
+            [69, H, 72, H, 76, 74, 72, H],
+            [74, H, 76, H, 79, H, 81, H],
+            [84, H, 81, 79, 76, H, 74, 72],
+            [69, H, H, H, R, R, R, R],
+            [81, 81, R, 79, 81, H, 84, H],
+            [79, H, 76, H, 74, H, 76, H],
+            [72, 72, R, 74, 76, H, 79, H],
+            [76, H, 74, H, 72, H, R, R],
+            [69, H, 72, H, 76, 74, 72, H],
+            [74, H, 76, H, 79, H, 76, 79],
+            [81, H, 84, H, 81, 79, 76, 74],
+            [69, H, H, H, R, R, R, R],
+        ],
+        chords: &[
+            [AM, AM],
+            [G, C],
+            [F, F],
+            [EM, EM],
+            [AM, AM],
+            [G, C],
+            [F, G],
+            [AM, AM],
+            [F, F],
+            [C, C],
+            [DM, DM],
+            [EM, EM],
+            [AM, AM],
+            [G, C],
+            [F, G],
+            [AM, AM],
+        ],
+        lead: Voice::Marimba,
+        lead_vol: 0.5,
+        harmony: Some((Voice::Marimba, -12)),
+        bass: [0, 7, 12, 7],
+        groove: Groove::Backbeat,
+        seed: 0x9A01_3000,
         ..Song::DEFAULT
     }
 }
@@ -155,6 +206,12 @@ fn game_over_sfx() -> Vec<u8> {
     )
 }
 
+/// The golden mouse hopping away: a tiny squeak, two quick chirps sliding up.
+fn squeak_sfx() -> Vec<u8> {
+    let chirp = cosy::glide(0.05, 1700.0, 2500.0, cosy::Tone::Sine, 0.5, 0.0);
+    cosy::sfx(&cosy::mix(chirp.clone(), &chirp, 0.07, 0.8))
+}
+
 /// The effects, as `sounds/NAME.wav`.
 pub fn sounds() -> Vec<Asset> {
     vec![
@@ -163,6 +220,7 @@ pub fn sounds() -> Vec<Asset> {
         ("sounds/bonus.wav", bonus_sfx()),
         ("sounds/bonus_eat.wav", bonus_eat_sfx()),
         ("sounds/level.wav", level_sfx()),
+        ("sounds/squeak.wav", squeak_sfx()),
     ]
 }
 
@@ -170,6 +228,7 @@ pub fn sounds() -> Vec<Asset> {
 pub fn music() -> Vec<(String, Vec<u8>)> {
     blip::wav::tunes(&[
         ("SLITHER", &|| slither_song().render()),
+        ("PROWL", &|| prowl_song().render()),
         ("FRENZY", &|| frenzy_song().render()),
     ])
 }

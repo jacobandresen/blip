@@ -146,7 +146,7 @@ pub use ctx::{window_conf, Blip};
 #[cfg(feature = "engine")]
 pub use draw::{load_png, load_png_smooth};
 #[cfg(feature = "engine")]
-pub use fx::Fx;
+pub use fx::{draw_fireworks, shake, Fx};
 #[cfg(feature = "engine")]
 pub use fx::{EffectParticle, EffectParticles};
 #[cfg(feature = "engine")]

@@ -148,7 +148,83 @@ const BOMB_CHANCE: u32 = 5; // percent of plain bricks
 const BOMB_MAX: usize = 4;
 
 #[derive(Copy, Clone)]
-struct Brick { kind: usize, hp: u8, alive: bool }
+struct Brick { kind: usize, hp: u8, alive: bool, wobble: f32 }
+
+/// A shard of a broken brick, tumbling off the bottom of the screen: its outline around its centre.
+struct Shard { x: f32, y: f32, vx: f32, vy: f32, turn: f32, spin: f32, pts: Vec<(f32, f32)>, color: BlipColor }
+
+/// The shards' own random numbers (xorshift), so breaking a brick never moves the game's.
+struct ShardRng(u32);
+impl ShardRng {
+    fn next(&mut self) -> f32 {
+        self.0 ^= self.0 << 13;
+        self.0 ^= self.0 >> 17;
+        self.0 ^= self.0 << 5;
+        (self.0 >> 8) as f32 / (1u32 << 24) as f32
+    }
+}
+
+/// Crack a brick at `(bx, by)` from the impact point `hit` into 3 to 7 shards: cuts run out from the impact at
+/// uneven angles, and each shard is the piece of the rectangle between two cuts. Shards fly out from the impact,
+/// pushed along the ball's travel.
+fn shatter(bx: f32, by: f32, hit: (f32, f32), push: (f32, f32), base: BlipColor, rng: &mut ShardRng) -> Vec<Shard> {
+    let (w, h) = (BRICK_W as f32, BRICK_H as f32);
+    let n = 3 + (rng.next() * 5.0) as usize;
+    // Cuts jitter within the middle of their share of the circle: wider jitter left slivers that read as lines.
+    let mut cuts: Vec<f32> = (0..n).map(|k| (k as f32 + 0.35 + rng.next() * 0.3) / n as f32 * std::f32::consts::TAU).collect();
+    cuts.sort_by(f32::total_cmp);
+    // Where a ray from the impact leaves the rectangle.
+    let exit = |a: f32| {
+        let (dx, dy) = (a.cos(), a.sin());
+        let tx = if dx > 0.0 { (bx + w - hit.0) / dx } else if dx < 0.0 { (bx - hit.0) / dx } else { f32::MAX };
+        let ty = if dy > 0.0 { (by + h - hit.1) / dy } else if dy < 0.0 { (by - hit.1) / dy } else { f32::MAX };
+        let t = tx.min(ty);
+        (hit.0 + dx * t, hit.1 + dy * t)
+    };
+    let corners = [(bx + w, by + h), (bx, by + h), (bx, by), (bx + w, by)];
+    let corner_angle = |c: (f32, f32)| (c.1 - hit.1).atan2(c.0 - hit.0).rem_euclid(std::f32::consts::TAU);
+    let mut out = Vec::new();
+    for k in 0..n {
+        let (a0, a1) = (cuts[k], if k + 1 < n { cuts[k + 1] } else { cuts[0] + std::f32::consts::TAU });
+        let mut poly = vec![hit, exit(a0)];
+        let mut inside: Vec<(f32, f32)> = corners.iter().copied().filter(|&c| {
+            let a = corner_angle(c);
+            (a > a0 && a < a1) || (a + std::f32::consts::TAU > a0 && a + std::f32::consts::TAU < a1)
+        }).collect();
+        inside.sort_by(|p, q| {
+            let ap = (corner_angle(*p) - a0).rem_euclid(std::f32::consts::TAU);
+            let aq = (corner_angle(*q) - a0).rem_euclid(std::f32::consts::TAU);
+            ap.total_cmp(&aq)
+        });
+        poly.extend(inside);
+        poly.push(exit(a1));
+        let (cx, cy) = poly.iter().fold((0.0, 0.0), |s, p| (s.0 + p.0, s.1 + p.1));
+        let (cx, cy) = (cx / poly.len() as f32, cy / poly.len() as f32);
+        let mid = (a0 + a1) / 2.0;
+        let fling = 50.0 + rng.next() * 90.0;
+        let light = 0.75 + rng.next() * 0.4;
+        out.push(Shard {
+            x: cx, y: cy,
+            vx: mid.cos() * fling + push.0 * 0.15, vy: mid.sin() * fling + push.1 * 0.15 - 60.0,
+            turn: 0.0, spin: (rng.next() - 0.5) * 14.0,
+            pts: poly.iter().map(|p| (p.0 - cx, p.1 - cy)).collect(),
+            color: BlipColor { r: (base.r * light).min(1.0), g: (base.g * light).min(1.0), b: (base.b * light).min(1.0), a: 1.0 },
+        });
+    }
+    // Crumbs: a few small chips thrown wider than the shards.
+    for _ in 0..(5 + (rng.next() * 5.0) as usize) {
+        let a = rng.next() * std::f32::consts::TAU;
+        let (s, v) = (1.0 + rng.next() * 1.5, 60.0 + rng.next() * 120.0);
+        let dark = 0.6 + rng.next() * 0.3;
+        out.push(Shard {
+            x: hit.0, y: hit.1, vx: a.cos() * v + push.0 * 0.1, vy: a.sin() * v - 40.0,
+            turn: 0.0, spin: (rng.next() - 0.5) * 20.0,
+            pts: vec![(-s, -s), (s, -s), (s, s), (-s, s)],
+            color: BlipColor { r: base.r * dark, g: base.g * dark, b: base.b * dark, a: 1.0 },
+        });
+    }
+    out
+}
 
 /// One ball's own state. The game's `ball_*` fields are the ball in hand;
 /// the others wait in `extra` and are swapped in for their turn.
@@ -192,12 +268,13 @@ struct Game {
     /// Bricks broken since the ball last left the paddle (see CHAIN_MAX).
     chain: i32,
     fx: Fx,
+    shards: Vec<Shard>,
 }
 
 impl Game {
     fn new() -> Self {
         Self {
-            bricks: [Brick { kind: 0, hp: 1, alive: false }; BRICK_TOTAL],
+            bricks: [Brick { kind: 0, hp: 1, alive: false, wobble: 0.0 }; BRICK_TOTAL],
             drops: [DEAD_DROP; MAX_DROPS],
             pad_x: 0.0,
             pad_w: PAD_W as f32,
@@ -224,6 +301,7 @@ impl Game {
             since_break: 0.0,
             chain: 0,
             fx: Fx::new(),
+            shards: Vec::new(),
         }
     }
 
@@ -273,7 +351,7 @@ impl Game {
                     && bombs < BOMB_MAX && rand() % 100 < BOMB_CHANCE;
                 if is_bomb { bombs += 1; }
                 let (kind, hp) = if is_steel { (BRICK_STEEL, 2) } else if is_bomb { (BRICK_BOMB, 1) } else { (r as usize, 1) };
-                self.bricks[i] = Brick { kind, hp, alive };
+                self.bricks[i] = Brick { kind, hp, alive, wobble: 0.0 };
             }
         }
     }
@@ -365,6 +443,7 @@ impl Game {
     fn next_level(&mut self) {
         self.sess.next_level();
         self.fx.clear();
+        self.shards.clear();
         self.ball_speed = BALL_SPEED_0;
         self.reset_drops();
         self.build_bricks();
@@ -446,6 +525,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.slow_timer.tick(dt);
     move_drops(g, dt, sfx);
     g.fx.update(dt);
+    shake_and_tumble(g, dt);
     g.since_break += dt;
 
     let active_speed = if g.slow_timer.active() {
@@ -489,6 +569,19 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.dead_timer.start(1.5);
         g.state = State::Win;
     }
+}
+
+/// Hit bricks settle; broken halves fall under gravity until they leave the screen.
+fn shake_and_tumble(g: &mut Game, dt: f32) {
+    for b in g.bricks.iter_mut() { b.wobble = (b.wobble - dt * 3.5).max(0.0); }
+    for s in g.shards.iter_mut() {
+        // Lighter than real gravity, so the pieces are seen to tumble before they leave.
+        s.vy += 520.0 * dt;
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+        s.turn += s.spin * dt;
+    }
+    g.shards.retain(|s| s.y < WIN_H as f32 + 30.0);
 }
 
 /// The screwball curve: the velocity turns (speed kept) at the spin's rate,
@@ -724,6 +817,18 @@ fn break_brick(g: &mut Game, i: usize, speed: f32, sfx: &Sounds, blasted: bool) 
     let points = (BRICK_ROWS - row) * 10 * g.sess.level * times;
     g.sess.add_score(points);
     g.fx.burst(mx, my, 10, 120.0, BRICK_COLORS[g.bricks[i].kind]);
+    // The brick shatters from where the ball struck it (its centre when blasted), and its neighbours shake.
+    let hit = if blasted { (mx, my) } else {
+        ((g.ball_x + BALL_W as f32 / 2.0).clamp(bx + 2.0, bx + BRICK_W as f32 - 2.0),
+         (g.ball_y + BALL_H as f32 / 2.0).clamp(by + 2.0, by + BRICK_H as f32 - 2.0))
+    };
+    let mut rng = ShardRng((i as u32 + 1).wrapping_mul(2654435761) ^ (g.sess.score as u32).wrapping_mul(40503) ^ g.ball_x.to_bits() | 1);
+    let shards = shatter(bx, by, hit, (g.ball_vx, g.ball_vy), BRICK_COLORS[g.bricks[i].kind], &mut rng);
+    g.shards.extend(shards);
+    for (dr, dc) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+        let (r, c) = (row + dr, col + dc);
+        if (0..BRICK_ROWS).contains(&r) && (0..BRICK_COLS).contains(&c) { g.bricks[(r * BRICK_COLS + c) as usize].wobble = 1.0; }
+    }
     if times > 1 {
         g.fx.popup(mx, my, &format!("{points} X{times}"), BLIP_YELLOW);
     } else {
@@ -818,6 +923,7 @@ fn hit_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
             // Steel brick survived — the cracked texture warns the next hit
             // finishes it.
             g.bricks[i].kind = BRICK_STEEL_CRACKED;
+            g.bricks[i].wobble = 1.0;
             blip::bot::add("steel_cracked", 1.0);
             g.fx.burst(mx, my, 5, 70.0, BRICK_COLORS[BRICK_STEEL]);
             play_variant(&sfx.brick_hit, speed);
@@ -910,15 +1016,48 @@ fn update_over(g: &mut Game, dt: f32) {
     }
 }
 
+/// A shard: its face as a fan of triangles, then a darker edge so neighbouring shards read apart.
+fn draw_shard(blip: &Blip, s: &Shard) {
+    let (sn, cs) = s.turn.sin_cos();
+    let at = |p: (f32, f32)| blip::macroquad::math::vec2(s.x + p.0 * cs - p.1 * sn, s.y + p.0 * sn + p.1 * cs);
+    let centre = blip::macroquad::math::vec2(s.x, s.y);
+    let edge = BlipColor { r: s.color.r * 0.5, g: s.color.g * 0.5, b: s.color.b * 0.5, a: 1.0 };
+    let n = s.pts.len();
+    for k in 0..n {
+        let (a, b) = (at(s.pts[k]), at(s.pts[(k + 1) % n]));
+        blip::macroquad::shapes::draw_triangle(centre, a, b, s.color);
+    }
+    for k in 0..n {
+        let (a, b) = (at(s.pts[k]), at(s.pts[(k + 1) % n]));
+        blip.draw_line(a.x, a.y, b.x, b.y, edge);
+    }
+}
+
+/// A dark wash behind the bricks, a new hue each level, fading to black at the paddle.
+fn draw_backdrop(blip: &Blip, level: i32) {
+    const HUES: [(f32, f32, f32); 5] = [(0.10, 0.14, 0.32), (0.26, 0.10, 0.28), (0.06, 0.22, 0.24), (0.28, 0.16, 0.08), (0.12, 0.20, 0.10)];
+    let (r, g, b) = HUES[((level - 1).max(0) as usize) % HUES.len()];
+    const BANDS: i32 = 24;
+    let (top, h) = (HUD_H as f32, (WIN_H - HUD_H) as f32 / BANDS as f32);
+    for i in 0..BANDS {
+        let k = 1.0 - i as f32 / BANDS as f32;
+        let k = k * k * 0.6;
+        blip.fill_rect(0.0, top + i as f32 * h, WIN_W as f32, h + 1.0, BlipColor { r: r * k, g: g * k, b: b * k, a: 1.0 });
+    }
+}
+
 fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9], drops: &[Texture2D; 5]) {
+    draw_backdrop(blip, g.sess.level);
     for i in 0..BRICK_TOTAL {
         if !g.bricks[i].alive { continue; }
         let r = i as i32 / BRICK_COLS;
         let c = i as i32 % BRICK_COLS;
+        let w = g.bricks[i].wobble;
         let bx = (BRICK_OX + c * (BRICK_W + BRICK_GAP)) as f32;
-        let by = (BRICK_OY + r * (BRICK_H + BRICK_GAP)) as f32;
+        let by = (BRICK_OY + r * (BRICK_H + BRICK_GAP)) as f32 + (w * 22.0).sin() * w * 2.5;
         blip.draw_texture(&brick[g.bricks[i].kind], bx, by, BRICK_W as f32, BRICK_H as f32);
     }
+    for s in &g.shards { draw_shard(blip, s); }
 
     // Pickups sway as they fall.
     for d in pool_iter(&g.drops) {
@@ -973,6 +1112,14 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
         let ball_cx = b.x + BALL_W as f32 / 2.0;
         let ball_cy = b.y + BALL_H as f32 / 2.0;
         let speed = b.vx.hypot(b.vy).max(1.0);
+        // A fading streak behind a fast ball, longer the faster it goes.
+        let streak = ((speed - 260.0) / 160.0).clamp(0.0, 1.0);
+        for i in (1..=4).rev() {
+            if streak <= 0.0 { break; }
+            let back = i as f32 * 6.0 * streak;
+            blip.fill_circle(ball_cx - b.vx / speed * back, ball_cy - b.vy / speed * back, BALL_W as f32 * (0.5 - i as f32 * 0.07),
+                BlipColor { r: 0.6, g: 0.85, b: 1.0, a: 0.22 * streak * (1.0 - i as f32 / 5.0) });
+        }
         blip.fill_circle(
             ball_cx + (b.vx / speed) * 4.0, ball_cy + (b.vy / speed) * 4.0 + 3.0, BALL_W as f32 * 0.42,
             BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.35 },
@@ -991,12 +1138,15 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
 }
 
 fn draw_title(blip: &Blip, hi: i32, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9]) {
-    for (row, (start, count)) in [(1, 8), (2, 6)].into_iter().enumerate() {
-        let x0 = (WIN_W - count * (BRICK_W + BRICK_GAP) + BRICK_GAP) / 2;
-        for col in 0..count {
-            let kind = ((start + col) % 6) as usize;
-            let x = (x0 + col * (BRICK_W + BRICK_GAP)) as f32;
-            let y = (HUD_H + 36 + row as i32 * (BRICK_H + BRICK_GAP)) as f32;
+    draw_backdrop(blip, 1);
+    // A full wall of the game's bricks, a ripple running along it.
+    let t0 = blip::macroquad::time::get_time() as f32;
+    for row in 0..3 {
+        for col in 0..BRICK_COLS {
+            let kind = ((row + col) % 6) as usize;
+            let x = (BRICK_OX + col * (BRICK_W + BRICK_GAP)) as f32;
+            let lift = ((t0 * 3.0 - col as f32 * 0.5).sin().max(0.0)).powi(4) * 4.0;
+            let y = (HUD_H + 26 + row * (BRICK_H + BRICK_GAP)) as f32 - lift;
             blip.draw_texture(&brick[kind], x, y, BRICK_W as f32, BRICK_H as f32);
         }
     }
@@ -1031,7 +1181,9 @@ fn draw_title(blip: &Blip, hi: i32, paddle: &Texture2D, ball: &Texture2D, shade:
     blip.draw_texture_region(paddle, sw - cap, 0.0, cap, 24.0, pad_x + PAD_W as f32 - cap * 0.5, PAD_Y as f32, cap * 0.5, PAD_H as f32);
 }
 
-fn draw_clear(blip: &Blip, level: i32) {
+fn draw_clear(blip: &Blip, level: i32, t: f32) {
+    draw_backdrop(blip, level);
+    blip::draw_fireworks(blip, t, (60.0, (HUD_H + 50) as f32, (WIN_W - 120) as f32, 260.0), &BRICK_COLORS[..6]);
     let buf = format!("LEVEL {}", level + 1);  // level just incremented in next_level
     blip.draw_centered("CLEARED", (WIN_H / 3) as f32, 5.0, BLIP_GREEN);
     blip.draw_centered(&buf,      (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
@@ -1065,7 +1217,7 @@ async fn main() {
 
     let sfx = Sounds::load().await;
     // Two tunes, alternating by level.
-    let mut music = Jukebox::new("bouncer", &["BOUNCE", "REBOUND"]);
+    let mut music = Jukebox::new("bouncer", &["BOUNCE", "REBOUND", "RICOCHET"]);
 
     if blip.screenshot_mode {
         g.start_game();
@@ -1077,7 +1229,7 @@ async fn main() {
     loop {
         let dt = blip.delta_time;
 
-        music.play(if g.state == State::Title { 0 } else { (g.sess.level as usize + 1) % 2 });
+        music.play(if g.state == State::Title { 0 } else { (g.sess.level as usize + 2) % 3 });
 
         g.touch_x = blip.touch(0).map(|p| p.x);
         if blip::bot::active() { bot::drive(&g); }
@@ -1094,8 +1246,9 @@ async fn main() {
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title => draw_title(&blip, web::high_score(), &paddle, &ball, &ball_shade, &brick),
-            State::Win   => draw_clear(&blip, g.sess.level),
+            State::Win   => draw_clear(&blip, g.sess.level, 1.5 - g.dead_timer.remaining()),
             State::Over  => {
+                draw_backdrop(&blip, g.sess.level);
                 blip.draw_game_over(g.sess.score, web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, false);
                 if g.cont.showing() {
                     blip.draw_game_over_prompt(&format!("CONTINUE? {}", g.cont.seconds()), BLIP_YELLOW);
@@ -1118,6 +1271,27 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A polygon's area (shoelace).
+    fn area(pts: &[(f32, f32)]) -> f32 {
+        (0..pts.len()).map(|k| { let (a, b) = (pts[k], pts[(k + 1) % pts.len()]); a.0 * b.1 - b.0 * a.1 }).sum::<f32>().abs() / 2.0
+    }
+
+    #[test]
+    fn a_shattered_brick_is_three_to_seven_shards_that_make_up_the_whole_brick() {
+        for seed in 1..40u32 {
+            let mut rng = ShardRng(seed.wrapping_mul(2654435761) | 1);
+            let hit = (100.0 + (seed % 7) as f32 * 6.0, 50.0 + (seed % 3) as f32 * 6.0);
+            let pieces = shatter(100.0, 50.0, hit, (0.0, -200.0), BLIP_RED, &mut rng);
+            // Crumbs are squares centred on their own middle; shards are the rest.
+            let crumb = |s: &&Shard| s.pts.len() == 4 && s.pts[0].0 == s.pts[0].1 && s.pts[2] == (-s.pts[0].0, -s.pts[0].1);
+            let shards: Vec<&Shard> = pieces.iter().filter(|s| !crumb(s)).collect();
+            assert!((3..=7).contains(&shards.len()), "seed {seed}: {} shards", shards.len());
+            let total: f32 = shards.iter().map(|s| area(&s.pts)).sum();
+            let brick = (BRICK_W * BRICK_H) as f32;
+            assert!((total - brick).abs() < brick * 0.01, "seed {seed}: shards cover {total} of {brick}");
+        }
+    }
 
     #[test]
     fn a_continue_plays_on_against_the_bricks_left_with_fresh_lives() {

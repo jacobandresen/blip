@@ -46,6 +46,8 @@ pub fn drive(g: &Game) {
         State::Title => { pad.press_start(); }
         // A turn is waiting to be taken: let it happen first.
         State::Play if g.turns_len == 0 => {
+            let (x, y) = crate::cell_centre(g.snake_at(0));
+            blip::bot::at(x, y);
             if let Some(turn) = choose_way(g) {
                 if turn != step(g.cur_dir) { pad.hold(turn.key()); }
             }

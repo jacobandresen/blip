@@ -115,6 +115,7 @@ fn block_odds() -> f32 {
 /// One frame of the fight for player one, through the game's own `Input`.
 pub fn fight(g: &Game, dt: f32) -> Input {
     let inp = remember(|b: &mut Bot| think(b, g, dt));
+    blip::bot::at(g.p[0].x, g.p[0].y - 40.0);
     // The fight reads `inp`, not the keys; holding the keys it stands for lets the fun meter see the play.
     let mut pad = Pad::new();
     for (on, key) in [(inp.left, BLIP_KEY_LEFT), (inp.right, BLIP_KEY_RIGHT), (inp.up, BLIP_KEY_UP), (inp.down, BLIP_KEY_DOWN),

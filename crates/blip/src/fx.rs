@@ -47,7 +47,17 @@ impl<T> EffectParticles<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{EffectParticle, EffectParticles};
+    use super::{shake, EffectParticle, EffectParticles};
+
+    #[test]
+    fn a_shake_stays_within_its_amplitude_and_ends_still() {
+        for k in 0..100 {
+            let (dx, dy) = shake(k as f32 * 0.003, 0.3, 5.0);
+            assert!(dx.abs() <= 5.0 && dy.abs() <= 5.0);
+        }
+        assert_eq!(shake(0.0, 0.3, 5.0), (0.0, 0.0));
+        assert_eq!(shake(-0.1, 0.3, 5.0), (0.0, 0.0));
+    }
 
     #[test]
     fn effect_particles_share_motion_and_lifetime_updates() {
@@ -74,6 +84,44 @@ const POPUP_RISE: f32 = 28.0;
 struct Popup { x: f32, y: f32, t: f32, text: String, c: Color }
 struct Spark { x: f32, y: f32, vx: f32, vy: f32, t: f32, life: f32, c: Color, size: f32 }
 struct Ring { x: f32, y: f32, t: f32, life: f32, r: f32, c: Color }
+
+/// A screen shake's offset now, for `Blip::set_offset`: `left` of `secs` to go, at most `amp` canvas pixels, easing
+/// out. Driven by the time left, so it draws none of the game's random numbers.
+pub fn shake(left: f32, secs: f32, amp: f32) -> (f32, f32) {
+    if left <= 0.0 || secs <= 0.0 { return (0.0, 0.0); }
+    let k = (left / secs).min(1.0);
+    let a = amp * k * k;
+    ((left * 97.0).sin() * a, (left * 71.0).cos() * a)
+}
+
+/// Fireworks for a level cleared, `t` seconds in: a few bursts going off one after another inside `area`
+/// (x, y, w, h), each a ring of streaks that opens, droops and fades, in turn through `colours`. Placed by the clock and
+/// the burst's number, so it draws none of the game's random numbers.
+pub fn draw_fireworks(blip: &Blip, t: f32, area: (f32, f32, f32, f32), colours: &[Color]) {
+    const BURSTS: u32 = 5;
+    const EVERY: f32 = 0.28;
+    const LIFE: f32 = 0.9;
+    const STREAKS: u32 = 18;
+    for k in 0..BURSTS {
+        let age = (t - k as f32 * EVERY) / LIFE;
+        if !(0.0..1.0).contains(&age) { continue; }
+        let h = (k + 1).wrapping_mul(2_654_435_761).rotate_left(9);
+        let cx = area.0 + (h % 1000) as f32 / 1000.0 * area.2;
+        let cy = area.1 + ((h >> 10) % 1000) as f32 / 1000.0 * area.3;
+        let c = colours[k as usize % colours.len().max(1)];
+        let reach = 50.0 + (h >> 20) as f32 % 30.0;
+        let r = reach * (1.0 - (1.0 - age) * (1.0 - age));
+        let droop = 26.0 * age * age;
+        let fade = Color { a: c.a * (1.0 - age), ..c };
+        for s in 0..STREAKS {
+            let (sn, cs) = (s as f32 / STREAKS as f32 * std::f32::consts::TAU).sin_cos();
+            let (x0, y0) = (cx + cs * r * 0.7, cy + sn * r * 0.7 + droop);
+            let (x1, y1) = (cx + cs * r, cy + sn * r + droop);
+            blip.draw_line_ex(x0, y0, x1, y1, 2.0, fade);
+        }
+        if age < 0.15 { blip.fill_glow_circle(cx, cy, 10.0 * (1.0 - age / 0.15), Color { a: 0.9, ..c }); }
+    }
+}
 
 /// The effects layer: popups, sparks and rings together.
 #[derive(Default)]

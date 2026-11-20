@@ -614,10 +614,12 @@ impl Game {
     }
 
     fn start_game(&mut self) {
-        self.sess.reset(LIVES_START);
+        // A playtest can start with fewer lives (BLIP_BOT_LIVES), to reach game over soon.
+        let lives = blip::bot::num("LIVES").map_or(LIVES_START, |n| n as i32);
+        self.sess.reset(lives);
         self.run_best = 0;
         blip::bot::levels(levels::ROOMS.len());
-        self.lives = [LIVES_START, LIVES_START];
+        self.lives = [lives, LIVES_START];
         self.active = [true, false];
         self.two_player = false;
         self.dead_index = None;
