@@ -47,6 +47,7 @@ fn play(g: &Game, b: &mut Bot) {
         State::Over => blip::bot::finish(if g.score_l > g.score_r { "won" } else { "lost" }),
         State::Play => {
             count_returns(g, b);
+            blip::bot::at(crate::LPAD_X + PAD_W * 0.5, g.lpad_y + PAD_H * 0.5);
             pad.climb(g.lpad_y + PAD_H * 0.5, arrival_y(g) + b.aim_error, 4.0);
         }
         State::Point => b.rally = 0,

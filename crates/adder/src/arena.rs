@@ -65,7 +65,8 @@ enum Hit {
 pub enum Event {
     Through,
     Kill,
-    Die,
+    /// A viper is out; `human` when a person steered it.
+    Die { human: bool },
     RoundWin,
 }
 
@@ -516,11 +517,20 @@ impl World {
         if !self.snakes[i].alive {
             return;
         }
+        // A person who outlasted a CPU this round keeps the life: at a person's reaction time (BLIP_BOT_REACT=250)
+        // every lost round cost one, and three were gone in about 22 s (fun report difficulty 0.58, calm 0.63).
+        let outlasted = self.snakes[i].human && self.snakes.iter().any(|o| !o.human && !o.alive);
         let s = &mut self.snakes[i];
         s.alive = false;
-        s.lives -= 1;
+        if outlasted {
+            self.fx.popup(s.head.x, s.head.y - 14.0, "LIFE KEPT", s.colour());
+            if s.human { blip::bot::add("lives_kept", 1.0); }
+        } else {
+            s.lives -= 1;
+        }
+        let s = &self.snakes[i];
         self.fx.burst(s.head.x, s.head.y, 10, 100.0, s.colour());
-        self.events.push(Event::Die);
+        self.events.push(Event::Die { human: s.human });
         if let Some(k) = killer {
             if k != i {
                 self.snakes[k].score += KILL_POINTS;
@@ -528,7 +538,7 @@ impl World {
                 self.events.push(Event::Kill);
             }
         }
-        if self.snakes[i].human { blip::bot::add("deaths", 1.0); }
+        if self.snakes[i].human && !outlasted { blip::bot::add("deaths", 1.0); }
     }
 
     /// Once every person in the pit is down, the CPUs' finish is only waiting.
@@ -737,6 +747,19 @@ mod tests {
         assert!(w.snakes[0].alive);
         assert_eq!(w.snakes[0].lives, LIVES - 1);
         assert!(w.snakes.iter().all(|s| s.path.len() == START_S && s.holes.is_empty()));
+    }
+
+    #[test]
+    fn a_person_who_outlasts_a_cpu_keeps_the_life() {
+        let mut w = World::new(1);
+        w.join(2, false);
+        w.eliminate(1, None);
+        w.eliminate(0, None);
+        assert_eq!(w.snakes[0].lives, LIVES, "a CPU went first");
+        let mut w = World::new(1);
+        w.join(2, false);
+        w.eliminate(0, None);
+        assert_eq!(w.snakes[0].lives, LIVES - 1, "first out");
     }
 
     #[test]

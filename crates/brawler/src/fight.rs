@@ -547,6 +547,8 @@ fn call_round(g: &mut Game) {
         if g.result == RoundResult::P1 { g.sess.add_score(1000 + g.p[0].health * 20); }
         let side = match g.result { RoundResult::P1 => "won", RoundResult::P2 => "lost", RoundResult::Draw => "drew" };
         blip::bot::add(&format!("rounds_{side}"), 1.0);
+        // A round lost is Brawler's lost life, for the fun report's calm and difficulty measures.
+        if g.result == RoundResult::P2 && g.mode == Mode::Solo { blip::bot::add("deaths", 1.0); }
         blip::bot::add(&format!("round_{side}_vs{}_{}", g.opponent_index, if ko { "ko" } else { "time" }), 1.0);
     }
 }

@@ -5,6 +5,14 @@
 //   2. close  (weight 2): (near misses + 1) / (near misses + hits + 2), from hit boxes; only games whose bot reports them.
 //   3. busy   (weight 1): 1 - the share of time with nothing to do (crates/blip/src/bot/fun.rs).
 //
+//   4. variety (weight 1): how evenly the player spreads over the screen (fun_variety; Yannakakis & Hallam 2007).
+//   5. calm (weight 1): 1 - the share of lives lost soon after the last (clustered deaths; Pedersen et al. 2010):
+//      (deaths - quick deaths + 1) / (deaths + 1).
+//   6. difficulty (weight 1): deaths a minute in a run at a person's reaction time (BLIP_BOT_REACT=250; Isaksen et
+//      al. 2015): 1 up to 3 a minute (three lives a minute), falling to 0 at ten times that. Levels whose death rate
+//      at that speed is twice the game's are listed as spikes.
+//   Calm and difficulty count only for games where a life can be lost.
+//
 // fun = 100 x the weighted mean of the measures a game has, per seed; a game's fun is the mean over seeds.
 // Needs cargo; on Linux, xvfb-run or a desktop display. One game runs at a time.
 //
@@ -50,7 +58,10 @@ if (changedSince) {
 const from = opt('--from', null);
 const saved = from ? JSON.parse(readFileSync(from, 'utf8')).report : null;
 const games = argv.length ? argv : saved ? Object.keys(saved) : GAME_SLUGS;
-const WEIGHTS = { skill: 3, close: 2, busy: 1 };
+const WEIGHTS = { skill: 3, close: 2, busy: 1, variety: 1, calm: 1, difficulty: 1 };
+/** A person's reaction time for the difficulty run (ms), and the deaths a minute that are still fair at it. */
+const REACT_MS = '250';
+const FAIR_DEATHS_PM = 3;
 
 if (!saved) {
   const build = spawnSync('cargo', ['build', '--release', ...games.flatMap((g) => ['-p', g])], { cwd: root, stdio: 'inherit' });
@@ -78,13 +89,23 @@ const sd = (xs) => xs.length < 2 ? 0 : Math.sqrt(xs.reduce((a, b) => a + (b - me
 const round = (v, d = 1) => Math.round(v * 10 ** d) / 10 ** d;
 
 /** One seed's measures: its bot run against random play over all seeds (random play is a baseline, not a pair). */
-function measures(bot, randomScore) {
+function measures(bot, randomScore, react, lives) {
   const m = { skill: clamp01(Math.log10(((bot.score ?? 0) + 1) / (randomScore + 1)) / 2) };
   // Counted passes, with one near miss and one hit added (Laplace's rule): a run has only a few passes, and one hit in
   // a run with none else scored close calls 0 and moved a seed's fun by 33 points.
   const [near, hits] = [bot.fun_near_pm ?? 0, bot.fun_hits_pm ?? 0].map((pm) => pm * (bot.t ?? Number(secs)) / 60);
   if (bot.fun_near_pm !== undefined && near + hits > 0) m.close = (near + 1) / (near + hits + 2);
   m.busy = 1 - (bot.fun_dead ?? 0);
+  if (bot.fun_variety !== undefined) m.variety = bot.fun_variety;
+  if (lives) {
+    const deaths = bot.deaths ?? 0;
+    // An older build counts no quick deaths: no calm measure then, rather than a perfect one.
+    if (deaths === 0 || bot.fun_quick_deaths !== undefined) m.calm = (deaths - (bot.fun_quick_deaths ?? 0) + 1) / (deaths + 1);
+    if (react && !react.error) {
+      const rate = (react.deaths ?? 0) / Math.max(1, react.t ?? Number(secs)) * 60;
+      m.difficulty = rate <= FAIR_DEATHS_PM ? 1 : clamp01(1 - Math.log10(rate / FAIR_DEATHS_PM));
+    }
+  }
   return m;
 }
 
@@ -98,22 +119,43 @@ for (const game of games) {
     : seeds.map((s, i) => run(game, { BLIP_BOT_SEED: String(s), ...(near && i === 0 ? { BLIP_BOT_NEAR: mkdir(path.join(near, game)) } : {}) }));
   const randoms = saved ? saved[game].runs.map((r) => r.random).filter(Boolean)
     : seeds.map((s) => run(game, { BLIP_BOT_SEED: String(s), BLIP_BOT_FUZZ: String(s) }));
+  const reacts = saved ? saved[game].runs.map((r) => r.react)
+    : seeds.map((s) => run(game, { BLIP_BOT_SEED: String(s), BLIP_BOT_REACT: REACT_MS }));
   const randomScore = mean(randoms.filter((r) => !r.error).map((r) => r.score ?? 0));
-  const perSeed = bots.map((b, i) => (b.error ? null : { seed: playedSeeds[i], m: measures(b, randomScore) }));
+  const lives = [...bots, ...randoms, ...reacts].some((r) => r && (r.deaths ?? 0) > 0);
+  const perSeed = bots.map((b, i) => (b.error ? null : { seed: playedSeeds[i], m: measures(b, randomScore, reacts[i], lives) }));
   const ok = perSeed.filter(Boolean);
   const funs = ok.map((p) => fun(p.m));
   const avg = (k) => { const v = ok.map((p) => p.m[k]).filter((x) => x !== undefined); return v.length ? round(mean(v), 2) : undefined; };
   report[game] = {
     fun: round(mean(funs)), sd: round(sd(funs)),
     skill: avg('skill'), close: avg('close'), busy: avg('busy'),
+    variety: avg('variety'), calm: avg('calm'), difficulty: avg('difficulty'), spikes: spikes(reacts.filter((r) => r && !r.error)),
     seeds: Object.fromEntries(ok.map((p, i) => [p.seed, round(funs[i])])),
     errors: bots.length - ok.length + randoms.filter((r) => r.error).length,
     runs: bots.map((bot, i) => {
       const k = ok.findIndex((p) => p.seed === playedSeeds[i]);
-      return { seed: playedSeeds[i], fun: k < 0 ? undefined : round(funs[k]), measures: k < 0 ? undefined : ok[k].m, bot, random: randoms[i] };
+      return { seed: playedSeeds[i], fun: k < 0 ? undefined : round(funs[k]), measures: k < 0 ? undefined : ok[k].m, bot, random: randoms[i], react: reacts[i] };
     }),
   };
   console.error(game, report[game].fun, '±', report[game].sd);
+}
+
+/** Levels whose deaths a minute, pooled over the reaction-time runs, are twice the game's (at least 3 deaths). */
+function spikes(runs) {
+  const per = {};
+  for (const r of runs) {
+    const starts = Object.keys(r).filter((k) => /^t_level\d+$/.test(k)).map((k) => [Number(k.slice(7)), r[k]]).sort((a, b) => a[1] - b[1]);
+    starts.forEach(([lv, t0], i) => {
+      const p = (per[lv] ??= { secs: 0, deaths: 0 });
+      p.secs += (i + 1 < starts.length ? starts[i + 1][1] : r.t ?? Number(secs)) - t0;
+      p.deaths += r[`fun_deaths_l${lv}`] ?? 0;
+    });
+  }
+  const all = Object.values(per).reduce((a, p) => ({ secs: a.secs + p.secs, deaths: a.deaths + p.deaths }), { secs: 0, deaths: 0 });
+  const rate = all.deaths / Math.max(1, all.secs);
+  return Object.entries(per).filter(([, p]) => p.deaths >= 3 && p.deaths / Math.max(1, p.secs) > 2 * rate)
+    .map(([lv, p]) => `L${lv} ${round(p.deaths / p.secs * 60)}/min`);
 }
 
 function mkdir(dir) { mkdirSync(dir, { recursive: true }); return dir; }
@@ -139,11 +181,13 @@ const CHECKS = [
   { name: 'score (log ratio)', limit: Math.log10(1 / 0.9), worse: -1, value: (r) => Math.log10((r.bot.score ?? 0) + 1) },
   { name: 'hits a minute', limit: 1, worse: 1, value: (r) => r.bot.fun_hits_pm },
   { name: 'dead time', limit: 0.05, worse: 1, value: (r) => r.bot.fun_dead },
+  { name: 'variety', limit: 0.05, worse: -1, value: (r) => r.bot.fun_variety },
+  { name: 'deaths a minute at human speed', limit: 0.5, worse: 1, value: (r) => r.react && !r.react.error ? (r.react.deaths ?? 0) / Math.max(1, r.react.t ?? 60) * 60 : NaN },
 ];
 
 const before = against ? JSON.parse(readFileSync(against, 'utf8')).report : null;
 const falls = [];
-const lines = [`| game | fun |${before ? ' before | change |' : ''} skill | close | busy |`, `|---|---|${before ? '---|---|' : ''}---|---|---|`];
+const lines = [`| game | fun |${before ? ' before | change |' : ''} skill | close | busy | variety | calm | difficulty | spikes |`, `|---|---|${before ? '---|---|' : ''}---|---|---|---|---|---|---|`];
 for (const [game, r] of Object.entries(report)) {
   const c = before?.[game] ? change(before[game], r, sharedFun) : undefined;
   if (before?.[game]) {
@@ -155,13 +199,14 @@ for (const [game, r] of Object.entries(report)) {
     }
   }
   const shown = c ? ` ${before[game].fun} | ${c.mean >= 0 ? '+' : ''}${round(c.mean)} ± ${round(c.se)} |` : before ? ' | |' : '';
-  lines.push(`| ${game} | ${r.fun} ± ${r.sd} |${shown} ${r.skill ?? ''} | ${r.close ?? ''} | ${r.busy ?? ''} |`);
+  lines.push(`| ${game} | ${r.fun} ± ${r.sd} |${shown} ${r.skill ?? ''} | ${r.close ?? ''} | ${r.busy ?? ''} | ${r.variety ?? ''} | ${r.calm ?? ''} | ${r.difficulty ?? ''} | ${(r.spikes ?? []).join(', ')} |`);
 }
 const table = lines.join('\n');
 console.log(table);
 if (json) writeFileSync(json, JSON.stringify({ secs, seeds, report }, null, 1));
 if (process.env.GITHUB_STEP_SUMMARY) {
-  appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Fun estimate (${seeds.length} seeds, ${secs} s each)\n\n${table}\n\n`
+  const doc = `${process.env.GITHUB_SERVER_URL ?? 'https://github.com'}/${process.env.GITHUB_REPOSITORY}/blob/${process.env.GITHUB_SHA ?? 'main'}/crates/blip/src/bot/FUN.md`;
+  appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Fun estimate (${seeds.length} seeds, ${secs} s each)\n\n${table}\n\nThe measures and their research, with links: [FUN.md](${doc}#references)\n\n`
     + (falls.length ? `**Less fun:** ${falls.join('; ')}\n` : ''));
 }
 if (falls.length) {

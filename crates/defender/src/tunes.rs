@@ -59,6 +59,58 @@ pub fn invasion_song() -> Song<'static> {
     }
 }
 
+/// Every other wave: D dorian, the raised sixth (B) for the alien touch, the same march in a darker key.
+pub fn occupation_song() -> Song<'static> {
+    Song {
+        bpm: 132.0,
+        melody: &[
+            [74, H, H, 77, 76, H, 74, H],
+            [69, H, H, H, R, R, 72, 74],
+            [79, H, H, 77, 76, H, 74, H],
+            [76, H, H, H, R, R, R, R],
+            [74, H, H, 77, 81, H, 79, 77],
+            [76, H, 74, H, 72, H, 69, H],
+            [71, H, 72, H, 74, H, 76, H],
+            [74, H, H, H, R, R, R, R],
+            [81, H, H, 79, 77, H, 76, H],
+            [74, H, H, H, 69, H, R, R],
+            [83, H, H, 81, 79, H, 77, H],
+            [76, H, H, H, R, R, R, R],
+            [74, H, 77, H, 81, H, 86, H],
+            [84, H, H, 81, 79, H, 76, H],
+            [77, H, 76, H, 74, H, 72, H],
+            [74, H, H, H, R, R, R, R],
+        ],
+        chords: &[
+            [DM, DM],
+            [AM, AM],
+            [G, G],
+            [AM, AM],
+            [DM, DM],
+            [C, AM],
+            [G, AM],
+            [DM, DM],
+            [F, F],
+            [DM, DM],
+            [G, G],
+            [E, E],
+            [DM, DM],
+            [C, C],
+            [G, AM],
+            [DM, DM],
+        ],
+        lead: Voice::Saw,
+        lead_vol: 0.30,
+        harmony: Some((Voice::Theremin, -12)),
+        bass: [0, 0, 7, 0],
+        bass_voice: Voice::Growl,
+        groove: Groove::FourFloor,
+        action: true,
+        seed: 0xDEF0_3003,
+        ..Song::DEFAULT
+    }
+}
+
 /// The mothership: A minor, flat out, circling the leading note.
 pub fn mothership_song() -> Song<'static> {
     Song {
@@ -170,5 +222,9 @@ pub fn sounds() -> Vec<Asset> {
 
 /// The music: each tune as a WAV to play.
 pub fn music() -> Vec<(String, Vec<u8>)> {
-    blip::wav::tunes(&[("INVASION", &|| invasion_song().render()), ("MOTHERSHIP", &|| mothership_song().render())])
+    blip::wav::tunes(&[
+        ("INVASION", &|| invasion_song().render()),
+        ("MOTHERSHIP", &|| mothership_song().render()),
+        ("OCCUPATION", &|| occupation_song().render()),
+    ])
 }

@@ -105,7 +105,9 @@ const DIVE_MIN_ALIENS: i32 = 6;         // the last few stay in formation
 // Every third alien hit in a row without a shot going over the top is worth
 // one multiple more, up to this. A miss starts the count again.
 const STREAK_PER: i32 = 3;
-const STREAK_MAX: i32 = 5;
+// At 5 the bot scored five times what random fire did (skill 0.36 in the fun report): a steady eye kept x5 for most of
+// a wave while random fire seldom passed x2, so a higher cap pays the aim that earns it.
+const STREAK_MAX: i32 = 8;
 /// Invaders this close above the ground line turn it into a warning.
 const LANDING_WARN: i32 = 110;
 
@@ -194,6 +196,8 @@ struct Game {
     boss_fire: Timer,
     boss_flash: f32,
     fx: Fx,
+    /// Pieces of shot aliens, falling and fading (see break_alien).
+    chips: Vec<Chip>,
     /// Alien hits in a row without a miss: one more multiple every STREAK_PER, up to STREAK_MAX.
     streak: blip::Streak,
     /// A run that just broke, and seconds it stays shown (in red, under the ground).
@@ -271,6 +275,7 @@ impl Game {
             boss_fire: Timer::default(),
             boss_flash: 0.0,
             fx: Fx::new(),
+            chips: Vec::new(),
             streak: blip::Streak::new(STREAK_PER, STREAK_MAX),
             lost_run: (0, 0.0),
             dive_cd: 0.0,
@@ -409,6 +414,7 @@ impl Game {
         self.bullets.iter_mut().for_each(|b| b.active = false);
         self.explosions.iter_mut().for_each(|e| e.active = false);
         self.fx.clear();
+        self.chips.clear();
         self.streak.miss();
         self.dive_cd = rand_int(DIVE_EVERY.0, DIVE_EVERY.1) as f32;
         self.dive_pick = None;
@@ -1172,6 +1178,7 @@ fn shoot_aliens(g: &mut Game, bullet_starts: &[(f32, f32); N_BULLETS], sfx: &Sou
                 g.sess.add_score(pts);
                 let (cx, cy) = (ax + ALIEN_W as f32 / 2.0, ay + ALIEN_H as f32 / 2.0);
                 g.fx.burst(cx, cy, 10, 110.0, alien_color(kind));
+                break_alien(g, ax, ay, kind, g.bullets[bi].x);
                 if times > 1 {
                     g.fx.popup(cx, cy - 6.0, &format!("{pts} X{times}"), BLIP_YELLOW);
                 } else {
@@ -1180,6 +1187,56 @@ fn shoot_aliens(g: &mut Game, bullet_starts: &[(f32, f32); N_BULLETS], sfx: &Sou
                 break 'rows;
             }
         }
+    }
+}
+
+/// A square piece of a shot alien.
+struct Chip { x: f32, y: f32, vx: f32, vy: f32, turn: f32, spin: f32, ttl: f32, c: BlipColor }
+const CHIP_SECS: f32 = 0.8;
+
+/// A shot alien bursts into a grid of chips in its colour, thrown out from where the shot struck. Their scatter comes
+/// from a hash of where it happened, so the game's random numbers are untouched.
+fn break_alien(g: &mut Game, ax: f32, ay: f32, kind: usize, shot_x: f32) {
+    let c = alien_color(kind);
+    let (cols, rows) = (4, 3);
+    let (cw, ch) = (ALIEN_W as f32 / cols as f32, ALIEN_H as f32 / rows as f32);
+    let seed = (ax as u32).wrapping_mul(73_856_093) ^ (ay as u32).wrapping_mul(19_349_663) ^ shot_x.to_bits();
+    for r in 0..rows {
+        for k in 0..cols {
+            let h = hash(seed ^ (r * cols + k) as u32);
+            let (x, y) = (ax + (k as f32 + 0.5) * cw, ay + (r as f32 + 0.5) * ch);
+            let (dx, dy) = (x - shot_x, y - (ay + ALIEN_H as f32));
+            let len = dx.hypot(dy).max(1.0);
+            let v = 60.0 + (h % 90) as f32;
+            g.chips.push(Chip {
+                x, y, vx: dx / len * v, vy: dy / len * v - 30.0,
+                turn: 0.0, spin: ((h >> 8) % 13) as f32 - 6.0, ttl: CHIP_SECS, c,
+            });
+        }
+    }
+}
+
+fn update_chips(g: &mut Game, dt: f32) {
+    for c in g.chips.iter_mut() {
+        c.vy += 380.0 * dt;
+        c.x += c.vx * dt;
+        c.y += c.vy * dt;
+        c.turn += c.spin * dt;
+        c.ttl -= dt;
+    }
+    g.chips.retain(|c| c.ttl > 0.0);
+}
+
+fn draw_chips(g: &Game) {
+    use blip::macroquad::math::vec2;
+    for c in &g.chips {
+        let a = (c.ttl / CHIP_SECS).min(1.0);
+        let s = 2.0 + 2.0 * a;
+        let (sn, cs) = c.turn.sin_cos();
+        let p = |u: f32, v: f32| vec2(c.x + u * cs - v * sn, c.y + u * sn + v * cs);
+        let col = BlipColor { a, ..c.c };
+        blip::macroquad::shapes::draw_triangle(p(-s, -s), p(s, -s), p(s, s), col);
+        blip::macroquad::shapes::draw_triangle(p(-s, -s), p(s, s), p(-s, s), col);
     }
 }
 
@@ -1200,6 +1257,7 @@ fn shoot_diver(g: &mut Game, bullet_starts: &[(f32, f32); N_BULLETS], sfx: &Soun
                 g.sess.add_score(pts);
                 let (cx, cy) = (d.x + ALIEN_W as f32 / 2.0, d.y + ALIEN_H as f32 / 2.0);
                 g.fx.burst(cx, cy, 14, 130.0, alien_color(d.kind));
+                break_alien(g, d.x, d.y, d.kind, cx);
                 g.fx.popup(cx, cy - 6.0, &format!("DIVER {pts}"), BLIP_YELLOW);
                 break;
             }
@@ -1377,10 +1435,12 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 
     update_explosions(g, dt);
+    update_chips(g, dt);
 }
 
 fn update_dead(g: &mut Game, dt: f32) {
     g.fx.update(dt);
+    update_chips(g, dt);
     // Keep the death explosion's burst of fireballs animating through the
     // pause instead of freezing at full brightness until play resumes.
     update_explosions(g, dt);
@@ -1436,10 +1496,48 @@ fn draw_boss(blip: &Blip, g: &Game, saucer: &Texture2D) {
     blip.fill_rect(x, by, bw * frac, bh, bar);
 }
 
+/// A small integer hash: the same stars and buildings every frame, without touching the game's random numbers.
+fn hash(n: u32) -> u32 {
+    let mut x = n.wrapping_mul(0x9E37_79B9) ^ 0x85EB_CA6B;
+    x ^= x >> 15;
+    x = x.wrapping_mul(0x2C1B_3C6D);
+    x ^ (x >> 12)
+}
+
+/// The night the cannon defends: twinkling stars, a low moon and a dark town on the horizon, lit window by window.
+fn draw_backdrop(blip: &Blip, now: f32) {
+    for i in 0..70u32 {
+        let h = hash(i);
+        let (x, y) = ((h % WIN_W as u32) as f32, PLAY_Y as f32 + ((h >> 10) % (GROUND_Y as u32 - 90 - PLAY_Y as u32)) as f32);
+        let tw = 0.35 + 0.35 * (now * (0.8 + (h >> 20 & 7) as f32 * 0.3) + i as f32).sin();
+        let s = if h >> 24 & 3 == 0 { 2.0 } else { 1.0 };
+        blip.fill_rect(x, y, s, s, BlipColor { r: 0.8, g: 0.85, b: 1.0, a: tw * 0.6 });
+    }
+    blip.fill_circle(56.0, PLAY_Y as f32 + 52.0, 18.0, BlipColor { r: 0.22, g: 0.22, b: 0.28, a: 1.0 });
+    blip.fill_circle(62.0, PLAY_Y as f32 + 47.0, 16.0, BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 1.0 });
+    let mut x = 0.0;
+    let mut i = 0u32;
+    while x < WIN_W as f32 {
+        let h = hash(1000 + i);
+        let (w, tall) = (18.0 + (h % 20) as f32, 14.0 + ((h >> 8) % 34) as f32);
+        let top = GROUND_Y as f32 - 1.0 - tall;
+        blip.fill_rect(x, top, w - 2.0, tall, BlipColor { r: 0.05, g: 0.06, b: 0.12, a: 1.0 });
+        for wy in (0..(tall as i32 - 6)).step_by(7) {
+            for wx in (3..(w as i32 - 5)).step_by(6) {
+                let lit = hash(h ^ (wy as u32 * 31 + wx as u32)).is_multiple_of(5);
+                if lit { blip.fill_rect(x + wx as f32, top + 4.0 + wy as f32, 2.0, 3.0, BlipColor { r: 0.55, g: 0.45, b: 0.18, a: 0.7 }); }
+            }
+        }
+        x += w;
+        i += 1;
+    }
+}
+
 fn draw_play(blip: &Blip, g: &Game,
              player: &Texture2D, alien: &[[Texture2D; 2]; 3],
              explosion: &Texture2D, shield: &Texture2D, bullet: &Texture2D,
              saucer: &Texture2D) {
+    draw_backdrop(blip, blip::macroquad::time::get_time() as f32);
     // The ground line pulses red while the invaders are close to landing.
     let lowest = g.aliens.iter().filter(|a| a.alive).map(|a| a.y + ALIEN_H as f32).fold(0.0, f32::max);
     let ground = if g.state == State::Play && lowest > (GROUND_Y - LANDING_WARN) as f32
@@ -1496,6 +1594,17 @@ fn draw_play(blip: &Blip, g: &Game,
     };
 
     if ship_alpha > 0.0 {
+        // Exhaust puffs trail a moving cannon.
+        let speed = (g.player_vx / PLAYER_SPEED).clamp(-1.0, 1.0);
+        if speed.abs() > 0.2 {
+            let back = if speed > 0.0 { g.player_x + 2.0 } else { g.player_x + ALIEN_W as f32 - 2.0 };
+            for k in 1..=3 {
+                let px = back - speed * k as f32 * 5.0;
+                let flick = 0.6 + 0.4 * (now * 40.0 + k as f32).sin();
+                blip.fill_circle(px, GROUND_Y as f32 - 6.0, 3.0 - k as f32 * 0.6,
+                    BlipColor { r: 1.0, g: 0.6, b: 0.2, a: 0.5 * flick * speed.abs() * ship_alpha / k as f32 });
+            }
+        }
         blip.draw_texture_tinted(
             player, g.player_x, (GROUND_Y - 28) as f32, ALIEN_W as f32, 28.0,
             BlipColor { r: 1.0, g: 1.0, b: 1.0, a: ship_alpha },
@@ -1503,6 +1612,13 @@ fn draw_play(blip: &Blip, g: &Game,
     }
 
     for b in g.bullets.iter().filter(|b| b.active && b.player) {
+        // A fading tail under the shot, and a flash at the muzzle as it leaves.
+        for k in 1..=3 {
+            blip.fill_rect(b.x + 1.0, b.y + 12.0 + (k - 1) as f32 * 6.0, 2.0, 6.0, BlipColor { r: 0.6, g: 0.9, b: 1.0, a: 0.35 / k as f32 });
+        }
+        if b.y > (GROUND_Y - 60) as f32 {
+            blip.fill_glow_circle(b.x + 2.0, (GROUND_Y - 28) as f32, 8.0, BlipColor { r: 0.8, g: 0.95, b: 1.0, a: 0.6 });
+        }
         blip.draw_texture_tinted(bullet, b.x, b.y, 4.0, 12.0, BLIP_WHITE);
     }
 
@@ -1522,9 +1638,11 @@ fn draw_play(blip: &Blip, g: &Game,
     }
 
     draw_ufo(blip, g, saucer);
+    draw_chips(g);
     g.fx.draw(blip);
     // Bombs last, so a kill's burst and score never hide one falling from the formation.
     for b in g.bullets.iter().filter(|b| b.active && !b.player) {
+        blip.fill_glow_circle(b.x + 2.0, b.y + 8.0, 7.0, BlipColor { r: 1.0, g: 0.5, b: 0.1, a: 0.35 });
         blip.draw_texture_tinted(bullet, b.x, b.y, 4.0, 12.0, BLIP_ORANGE);
     }
     blip.draw_hud(g.sess.score, g.sess.lives);
@@ -1552,6 +1670,7 @@ fn streak_label(s: &blip::Streak) -> String {
 }
 
 fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: i32) {
+    draw_backdrop(blip, blip::macroquad::time::get_time() as f32);
     blip.draw_centered("DEFENDER", (WIN_H / 5 + 14) as f32, 6.0, BLIP_MAGENTA);
     // The title is 6 x 7 = 42px tall: the high score clears it by a real margin.
     blip.draw_hi(hi, (WIN_H / 5 + 93) as f32, BLIP_YELLOW);
@@ -1587,7 +1706,11 @@ fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: i32) {
     }
 }
 
-fn draw_clear(blip: &Blip, level: i32) {
+fn draw_clear(blip: &Blip, level: i32, t: f32) {
+    // Fireworks over the town the cannon kept safe.
+    draw_backdrop(blip, blip::macroquad::time::get_time() as f32);
+    blip::draw_fireworks(blip, t, (60.0, (PLAY_Y + 60) as f32, (WIN_W - 120) as f32, 220.0),
+        &[BLIP_MAGENTA, BLIP_CYAN, BLIP_GREEN, BLIP_YELLOW]);
     let buf = format!("LEVEL {}", level);
     blip.draw_centered("WAVE CLEAR", (WIN_H / 3) as f32, 4.0, BLIP_CYAN);
     blip.draw_centered(&buf,         (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
@@ -1616,7 +1739,7 @@ async fn main() {
 
     let sfx = Sounds::load().await;
     // The invasion tune, and the mothership's on boss levels.
-    let mut music = Jukebox::new("defender", &["INVASION", "MOTHERSHIP"]);
+    let mut music = Jukebox::new("defender", &["INVASION", "MOTHERSHIP", "OCCUPATION"]);
 
     if blip.screenshot_mode {
         g.start_game();
@@ -1625,7 +1748,8 @@ async fn main() {
     loop {
         let dt = blip.delta_time;
 
-        music.play(if g.state != State::Title && g.is_boss_level() { 1 } else { 0 });
+        // The mothership has its own tune; the other waves take the two marches in turn.
+        music.play(if g.state == State::Title { 0 } else if g.is_boss_level() { 1 } else if g.sess.level % 2 == 0 { 2 } else { 0 });
         g.touch_x = blip.touch(0).map(|p| p.x);
         if blip::bot::active() { bot::drive(&g); }
         let prev_state = g.state;
@@ -1649,8 +1773,11 @@ async fn main() {
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title => draw_title(&blip, &alien, web::high_score()),
-            State::Win   => draw_clear(&blip, g.sess.level),
-            State::Over  => blip.draw_game_over(g.sess.score, web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active()),
+            State::Win   => draw_clear(&blip, g.sess.level, 1.5 - g.dead_timer.remaining()),
+            State::Over  => {
+                draw_backdrop(&blip, blip::macroquad::time::get_time() as f32);
+                blip.draw_game_over(g.sess.score, web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active());
+            }
             State::Play | State::Dead => {
                 draw_play(&blip, &g, &player, &alien, &explosion, &shield, &bullet, &saucer);
             }

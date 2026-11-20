@@ -39,6 +39,7 @@ pub fn drive(w: &World) {
     blip::bot::set("score", w.score_of(0) as f64);
     let mut pad = Pad::new();
     for (i, s) in w.snakes.iter().enumerate().filter(|(_, s)| s.human && s.alive) {
+        if i == 0 { blip::bot::at(s.head.x, s.head.y); }
         let [left, right, _] = seat_keys(s.seat);
         pad.steer_with(0.0, cpu::steer_cpu(w, i).turn, 0.15, left, right);
     }

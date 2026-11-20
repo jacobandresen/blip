@@ -5,10 +5,10 @@ use blip::song::{Groove, Song, H, R};
 
 // ---- music: two tunes on the glockenspiel -------------------------------
 // Synthesised on the device (see `song`). Octave leaps for the ball's
-// bounce; the game alternates the two by level.
+// bounce; the game takes the three in turn, a level each.
 use blip::cosy::{self, Tone, Voice};
 use blip::Asset;
-use blip::song::chords::{C, D, F, G, AM, EM};
+use blip::song::chords::{C, D, DM, F, G, AM, EM};
 
 
 /// Odd levels: C major, bouncing up the octave and skipping back down.
@@ -108,6 +108,56 @@ pub fn rebound_song() -> Song<'static> {
     }
 }
 
+/// Every third level: F major, a backbeat under leaps that bounce up the octave and roll back down.
+pub fn ricochet_song() -> Song<'static> {
+    Song {
+        bpm: 132.0,
+        melody: &[
+            [77, H, 72, H, 77, 81, 84, H],
+            [84, H, 81, H, 79, H, 76, H],
+            [74, H, 77, H, 81, H, 77, H],
+            [79, H, H, H, R, R, 76, 79],
+            [77, H, 72, H, 77, 81, 84, H],
+            [86, H, 84, H, 81, H, 79, H],
+            [77, 79, 81, 79, 77, H, 76, H],
+            [77, H, H, H, R, R, R, R],
+            [81, H, 69, H, 81, H, 79, 77],
+            [76, H, 72, H, 76, H, 74, 72],
+            [74, H, 77, H, 81, H, 84, H],
+            [79, H, 76, H, 72, H, R, R],
+            [77, 89, 84, H, 81, H, 84, H],
+            [86, H, 84, H, 81, H, 77, H],
+            [79, H, 81, H, 79, H, 76, H],
+            [77, H, H, H, R, R, R, R],
+        ],
+        chords: &[
+            [F, F],
+            [C, C],
+            [DM, DM],
+            [C, C],
+            [F, F],
+            [DM, DM],
+            [C, G],
+            [F, F],
+            [AM, AM],
+            [C, C],
+            [DM, DM],
+            [C, C],
+            [F, F],
+            [DM, DM],
+            [C, C],
+            [F, F],
+        ],
+        lead: Voice::Glock,
+        lead_vol: 0.35,
+        harmony: Some((Voice::Pluck, -12)),
+        bass: [0, 7, 12, 7],
+        groove: Groove::Backbeat,
+        seed: 0xB0DE_9ABC,
+        ..Song::DEFAULT
+    }
+}
+
 // ---- effects --------------------------------------------------------------
 // Pitch variants (`v`) keep repeated hits from sounding identical.
 fn paddle_hit(v: usize) -> Vec<u8> {
@@ -186,5 +236,9 @@ pub fn sounds() -> Vec<Asset> {
 
 /// The music: each tune as a WAV to play.
 pub fn music() -> Vec<(String, Vec<u8>)> {
-    blip::wav::tunes(&[("BOUNCE", &|| bounce_song().render()), ("REBOUND", &|| rebound_song().render())])
+    blip::wav::tunes(&[
+        ("BOUNCE", &|| bounce_song().render()),
+        ("REBOUND", &|| rebound_song().render()),
+        ("RICOCHET", &|| ricochet_song().render()),
+    ])
 }

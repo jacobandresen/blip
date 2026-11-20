@@ -58,6 +58,20 @@ const HYPERSPACE_RISK: i32 = 20; // 1-in-N chance of self-destruct
 const MAX_ASTEROIDS: usize = 48;
 const MAX_DEBRIS:    usize = 96;
 
+// A broken big or medium rock leaves a crystal one time in three: points for flying through it before it fades. The
+// bot sat still in the middle and turned (variety 0.05 in the fun report); a prize out in the field is a reason to fly.
+const CRYSTAL_ODDS:   f32 = 0.33;
+const CRYSTAL_TTL:    f32 = 7.0;
+const CRYSTAL_WARN:   f32 = 1.5;
+const CRYSTAL_R:      f32 = 9.0;
+// At 150 a crystal paid less than the shooting the chase cost (the bot's score fell 13 %); 500 makes it a prize.
+const CRYSTAL_POINTS: i32 = 500;
+const MAX_CRYSTALS:   usize = 3;
+
+/// A crystal drifting where a rock broke.
+#[derive(Copy, Clone)]
+struct Crystal { x: f32, y: f32, vx: f32, vy: f32, ttl: f32 }
+
 // ---- saucer -----------------------------------------------------------
 const SAUCER_SPEED:    f32 = 90.0;
 const SAUCER_FIRE_CD:  f32 = 1.4;
@@ -197,6 +211,9 @@ struct Game {
     /// Seconds since the current wave arrived, for its banner.
     wave_t: f32,
     fx: Fx,
+    crystals: Vec<Crystal>,
+    /// Seconds of screen shake left (see SHIP_SHAKE).
+    shake: f32,
 }
 
 impl Game {
@@ -218,6 +235,8 @@ impl Game {
             streak: blip::Streak::new(STREAK_PER, STREAK_MAX),
             wave_t: 0.0,
             fx: Fx::new(),
+            crystals: Vec::new(),
+            shake: 0.0,
         }
     }
 
@@ -254,6 +273,7 @@ impl Game {
         self.bullets = [BULLET_OFF; MAX_BULLETS];
         self.debris = [DEBRIS_OFF; MAX_DEBRIS];
         self.fx.clear();
+        self.crystals.clear();
         self.saucer.active = false;
         let (lo, hi) = saucer_spawn_range(self.sess.level);
         self.saucer_cd = rand_range_f32(lo, hi);
@@ -263,7 +283,7 @@ impl Game {
     }
 }
 
-blip::sounds!(Sounds { fire, thrust, bang_large, bang_medium, bang_small, saucer_big, saucer_small, ship_boom = "ship_explosion", hyperspace, extra_life,
+blip::sounds!(Sounds { fire, thrust, crystal, bang_large, bang_medium, bang_small, saucer_big, saucer_small, ship_boom = "ship_explosion", hyperspace, extra_life,
     streak_up: [blip::BlipSound; 3] = [blip::sound!("streak2"), blip::sound!("streak3"), blip::sound!("streak4")] });
 
 fn field_centre() -> (f32, f32) {
@@ -432,7 +452,11 @@ fn hyperspace(g: &mut Game, sfx: &Sounds) {
     }
 }
 
+/// The ship's loss shakes the screen this long, up to 6 px.
+const SHIP_SHAKE: f32 = 0.4;
+
 fn kill_ship(g: &mut Game, sfx: &Sounds) {
+    g.shake = SHIP_SHAKE;
     if !g.ship_alive { return; }
     play_sfx(&sfx.ship_boom);
     g.ship_alive = false;
@@ -684,6 +708,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 
     fly_saucer(g, dt);
+    collect_crystals(g, dt, sfx);
 
     // ---- collisions: player bullets vs asteroids ----
     for bi in 0..MAX_BULLETS {
@@ -717,6 +742,9 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
                     ASize::Small  => play_sfx(&sfx.bang_small),
                 }
                 split_rock(g, a.x, a.y, size, pvx, pvy);
+                if size != ASize::Small && g.crystals.len() < MAX_CRYSTALS && rand_range_f32(0.0, 1.0) < CRYSTAL_ODDS {
+                    g.crystals.push(Crystal { x: a.x, y: a.y, vx: pvx * 0.3, vy: pvy * 0.3, ttl: CRYSTAL_TTL });
+                }
                 break;
             }
         }
@@ -764,6 +792,36 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     if pool_iter(&g.asteroids).count() == 0 {
         g.sess.next_level();
         g.start_wave();
+        // A wave cleared: a ring pulses out from the ship.
+        if g.ship_alive {
+            g.fx.ring(g.ship.x, g.ship.y, 160.0, 0.7, NEON_CYAN);
+            g.fx.ring(g.ship.x, g.ship.y, 90.0, 0.5, BLIP_WHITE);
+        }
+    }
+}
+
+/// Crystals drift and fade; the ship flying through one takes its points.
+fn collect_crystals(g: &mut Game, dt: f32, sfx: &Sounds) {
+    for c in g.crystals.iter_mut() {
+        c.x = wrap(c.x + c.vx * dt, 0.0, PLAY_W as f32);
+        c.y = wrap(c.y + c.vy * dt, PLAY_Y0, PLAY_Y0 + PLAY_H as f32);
+        c.ttl -= dt;
+    }
+    g.crystals.retain(|c| c.ttl > 0.0);
+    if !g.ship_alive { return; }
+    let (sx, sy) = (g.ship.x, g.ship.y);
+    let mut taken = Vec::new();
+    g.crystals.retain(|c| {
+        let near = wrapped_segment_circle_overlap((sx, sy), (sx, sy), (c.x, c.y), SHIP_RADIUS + CRYSTAL_R);
+        if near { taken.push((c.x, c.y)); }
+        !near
+    });
+    for (x, y) in taken {
+        play_sfx(&sfx.crystal);
+        blip::bot::add("crystals", 1.0);
+        g.fx.popup(x, y - 12.0, &format!("{CRYSTAL_POINTS}"), NEON_CYAN);
+        g.fx.ring(x, y, 28.0, 0.35, NEON_CYAN);
+        award(g, sfx, CRYSTAL_POINTS);
     }
 }
 
@@ -817,6 +875,10 @@ fn draw_ship(blip: &Blip, ship: &Ship, invuln_t: f32, level: i32, color: BlipCol
         for (p, q) in hull {
             smear_line(blip, (p, q), ((p.0 - dx, p.1 - dy), (q.0 - dx, q.1 - dy)), age, color);
         }
+    }
+    let dark = BlipColor { r: color.r * 0.18, g: color.g * 0.18, b: color.b * 0.18, a: 1.0 };
+    for (p, q, r) in [(nose, left, tail), (nose, tail, right)] {
+        blip::macroquad::shapes::draw_triangle(p.into(), q.into(), r.into(), dark);
     }
     for (p, q) in hull { blip.draw_glow_line(p.0, p.1, q.0, q.1, color); }
 
@@ -1009,6 +1071,15 @@ fn draw_rock(blip: &Blip, a: &Asteroid, level: i32, t: f32) {
             smear_line(blip, (at(p), at(q)), (was(p), was(q)), age, c);
         }
     }
+    if !flower {
+        // A dark body inside the outline, so a rock reads as a solid lump, not a wire ring.
+        let body = BlipColor { r: c.r * 0.14, g: c.g * 0.14, b: c.b * 0.14, a: 0.9 };
+        let centre = blip::macroquad::math::vec2(a.x, a.y);
+        for &(p, q) in &lines {
+            let (p, q) = (at(p), at(q));
+            blip::macroquad::shapes::draw_triangle(centre, p.into(), q.into(), body);
+        }
+    }
     for &(p, q) in &lines {
         let (p, q) = (at(p), at(q));
         blip.draw_glow_line(p.0, p.1, q.0, q.1, c);
@@ -1054,9 +1125,44 @@ fn draw_saucer(blip: &Blip, s: &Saucer, level: i32) {
 
 /// A receding synthwave horizon grid — used only on the title/game-over menu
 /// screens so the vector gameplay itself stays clean and readable.
+/// A crystal: a turning diamond with a bright heart, blinking as it fades.
+fn draw_crystal(blip: &Blip, c: &Crystal, t: f32) {
+    if c.ttl < CRYSTAL_WARN && (c.ttl * 8.0) as i32 % 2 == 0 { return; }
+    let k = (t * 2.0).cos();
+    let pts: Vec<(f32, f32)> = [(0.0, -1.3), (1.0, 0.0), (0.0, 1.3), (-1.0, 0.0)].iter()
+        .map(|&(x, y)| (c.x + (x * k * 0.6 + 0.4 * x) * CRYSTAL_R, c.y + y * CRYSTAL_R)).collect();
+    let centre = blip::macroquad::math::vec2(c.x, c.y);
+    for i in 0..4 {
+        let (p, q) = (pts[i], pts[(i + 1) % 4]);
+        blip::macroquad::shapes::draw_triangle(centre, p.into(), q.into(), BlipColor { r: 0.1, g: 0.35, b: 0.45, a: 0.8 });
+    }
+    for i in 0..4 {
+        let (p, q) = (pts[i], pts[(i + 1) % 4]);
+        blip.draw_glow_line(p.0, p.1, q.0, q.1, NEON_CYAN);
+    }
+    blip.fill_glow_circle(c.x, c.y, 2.5 + (t * 6.0).sin().abs() * 1.5, BLIP_WHITE);
+}
+
+/// Three layers of stars drifting at different speeds, the near ones brighter, each twinkling: depth and motion
+/// behind an otherwise black wave 1. Placed by a hash, so the game's random numbers are untouched.
+fn draw_stars(blip: &Blip, t: f32) {
+    for i in 0..110u32 {
+        let h = i.wrapping_mul(0x9E37_79B9).rotate_left(7).wrapping_mul(0x85EB_CA6B);
+        let layer = (h % 3) as f32;
+        let speed = 3.0 + layer * 5.0;
+        let x = wrap((h >> 4) as f32 % PLAY_W as f32 + t * speed, 0.0, PLAY_W as f32);
+        let y = wrap((h >> 14) as f32 % PLAY_H as f32 + t * speed * 0.4, 0.0, PLAY_H as f32) + PLAY_Y0;
+        let tw = 0.6 + 0.4 * (t * (1.0 + layer) + i as f32 * 1.7).sin();
+        let a = (0.28 + layer * 0.2) * tw;
+        let s = if layer == 2.0 { 2.0 } else { 1.0 };
+        blip.fill_rect(x, y, s, s, BlipColor { r: 0.75, g: 0.8, b: 1.0, a });
+    }
+}
+
 fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
     let t = blip::macroquad::time::get_time() as f32;
     blip.clear(BLIP_BLACK);
+    draw_stars(blip, t);
     draw_haze(blip, blot, &g.asteroids, g.sess.level, t);
     for a in pool_iter(&g.asteroids) { draw_rock(blip, a, g.sess.level, t); }
     for d in pool_iter(&g.debris) {
@@ -1075,6 +1181,7 @@ fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
         blip.draw_line(p.0, p.1, q.0, q.1, col);
     }
     if g.saucer.active { draw_saucer(blip, &g.saucer, g.sess.level); }
+    for c in &g.crystals { draw_crystal(blip, c, t); }
     g.fx.draw(blip);
     if g.wave_t < WAVE_BANNER_SECS && g.state == State::Play {
         let a = (1.0 - g.wave_t / WAVE_BANNER_SECS).min(0.5) * 2.0;
@@ -1115,6 +1222,7 @@ fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
 fn draw_title(blip: &Blip, hi: i32, art: &[Texture2D; 4]) {
     blip.clear(BLIP_BLACK);
     blip.draw_texture(&art[0], 0.0, 0.0, WIN_W as f32, WIN_H as f32);
+    draw_stars(blip, blip::macroquad::time::get_time() as f32);
     blip.draw_centered("METEORS", (WIN_H / 4) as f32, 6.0, NEON_CYAN);
     // METEORS is sz=6 (42px tall) — clear its bottom by a real margin.
     blip.draw_hi(hi, (WIN_H / 4) as f32 + 50.0, NEON_YELLOW);
@@ -1161,8 +1269,8 @@ async fn main() {
         texture
     });
 
-    // DRIFT, then STORM from wave STORM_WAVE.
-    let mut music = Jukebox::new("meteors", &["DRIFT", "STORM"]);
+    // DRIFT, BLOOM from wave BLOOM_WAVE (the flowers), then STORM from wave STORM_WAVE.
+    let mut music = Jukebox::new("meteors", &["DRIFT", "BLOOM", "STORM"]);
 
     let mut sfx = Sounds::load().await;
     let mut thrust_snd_t = 0.0f32;
@@ -1182,7 +1290,10 @@ async fn main() {
     loop {
         let dt = blip.delta_time;
 
-        music.play(if g.state != State::Title && g.sess.level >= STORM_WAVE { 1 } else { 0 });
+        music.play(if g.state == State::Title { 0 }
+            else if g.sess.level >= STORM_WAVE { 2 }
+            else if g.sess.level >= BLOOM_WAVE { 1 }
+            else { 0 });
 
         if blip::bot::active() { bot::drive(&g); }
         match g.state {
@@ -1195,8 +1306,14 @@ async fn main() {
         match g.state {
             State::Title => draw_title(&blip, web::high_score(), &title_art),
             State::Over  => draw_over(&blip, g.sess.score, web::high_score(), g.respawn_t.active(), &title_art[0]),
-            State::Play | State::Dead => draw_play(&blip, &g, &blot),
+            State::Play | State::Dead => {
+                let (dx, dy) = blip::shake(g.shake, SHIP_SHAKE, 6.0);
+                blip.set_offset(dx, dy);
+                draw_play(&blip, &g, &blot);
+                blip.set_offset(0.0, 0.0);
+            }
         }
+        g.shake = (g.shake - dt).max(0.0);
 
         blip.next_frame(60).await;
     }

@@ -177,7 +177,9 @@ const FLAK_SPEED: f32 = 240.0;
 /// Flying clean pays: every STREAK_PER things destroyed without taking a hit add one to the score multiple, up to
 /// STREAK_MAX; any hit starts the count again. Dodging well is worth more than spraying.
 const STREAK_PER: i32 = 5;
-const STREAK_MAX: i32 = 4;
+// At 4 the bot scored three and a half times what random play did (skill 0.27 in the fun report): a clean flier
+// holds the top multiple for long stretches, so a higher one pays the dodging that keeps it.
+const STREAK_MAX: i32 = 6;
 /// Guns hold fire at a plane closer than this: a shell's flight (0.46 s) must leave time to see it and turn away.
 const FLAK_MIN_RANGE: f32 = 110.0;
 const FLAK_BURST_R: f32 = 24.0;    // how far a burst reaches
@@ -2671,6 +2673,15 @@ fn point_in_any_cloud(g: &Game, x: f32, y: f32) -> bool {
 fn draw_islands(blip: &Blip, g: &Game, island_tex: &[Texture2D; 3]) {
     for isl in pool_iter(&g.islands) {
         let (w, h) = ISLAND_SIZES[isl.size as usize];
+        // Surf: two pale rings breathing round the shore, out of step, under the island.
+        let t = blip::macroquad::time::get_time() as f32 + isl.x * 0.01;
+        let (cx, cy) = (isl.x + w as f32 / 2.0, isl.y + h as f32 / 2.0);
+        for k in 0..2 {
+            let p = (t * 0.8 + k as f32 * 0.5).fract();
+            let grow = 1.0 + 0.12 * p;
+            blip::macroquad::shapes::draw_ellipse_lines(cx, cy, w as f32 * 0.5 * grow, h as f32 * 0.5 * grow, 0.0, 2.5,
+                BlipColor { r: 0.88, g: 0.96, b: 1.0, a: 0.55 * (1.0 - p) });
+        }
         blip.draw_texture(&island_tex[isl.size as usize], isl.x, isl.y, w as f32, h as f32);
         for k in 0..FLAK_GUNS[isl.size as usize].len() {
             draw_flak_gun(blip, isl, k);

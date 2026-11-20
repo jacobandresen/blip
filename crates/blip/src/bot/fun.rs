@@ -1,4 +1,4 @@
-//! What a bot run says about how much fun the game is, added to its RESULT line. Three measures, in order of
+//! What a bot run says about how much fun the game is, added to its RESULT line. The measures, in order of
 //! importance (FUN.md beside this file has the reasons and the sources):
 //!
 //! 1. Skill pays: the bot's score against random play's. Scored by `tools/fun_report.mjs` from two runs; nothing here.
@@ -6,6 +6,11 @@
 //!    miss when the boxes part (`fun_near_pm`, a minute) or as a hit when they touch or the game reports one (a rise
 //!    in `deaths` or a `hit_*` stat; `fun_hits_pm`). Only games whose bot reports hit boxes ([`super::near`]).
 //! 3. Busy: `fun_dead`, the share of the run in stretches of more than [`DEAD_SECS`] with the controls untouched.
+//! 4. Variety: `fun_variety`, how evenly the player's position spreads over an 8 x 8 grid of the canvas (entropy over
+//!    the most it could be on the axes the player moves along), from [`super::near`] or [`super::at`].
+//! 5. Calm: `fun_quick_deaths`, lives lost within [`QUICK_DEATH_SECS`] of the one before (clustered deaths).
+//! 6. Difficulty: deaths a minute at a person's reaction time; `fun_deaths_l<n>` counts them per level. Scored by
+//!    `tools/fun_report.mjs` from a `BLIP_BOT_REACT` run.
 //!
 //! With `BLIP_BOT_NEAR=<dir>`, each pass's closest frame is saved there with the boxes drawn, and each idle
 //! stretch is printed.
@@ -22,6 +27,11 @@ pub const NEAR: f32 = 16.0;
 const SHOTS: u32 = 8;
 /// A life lost this soon (seconds) after a hit is that hit, not another.
 const LIFE_AFTER_HIT: f32 = 3.0;
+/// A life lost this soon (seconds) after the one before is a quick death: respawn waits are 1 to 3 s, so this is a
+/// life that lasted under about 8 s of play.
+pub const QUICK_DEATH_SECS: f32 = 10.0;
+/// The variety grid's cells per side.
+const GRID: usize = 8;
 
 /// How a box is drawn on a saved frame.
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -54,6 +64,13 @@ pub(crate) struct Meter {
     export: Option<String>,
     dir: Option<String>,
     saved: [u32; 2],
+    /// The canvas size, the player's frames in each grid cell, and the cells' column and row ranges seen.
+    canvas: (f32, f32),
+    cells: [[u32; GRID]; GRID],
+    span: Option<[usize; 4]>,
+    /// The clock of each life lost, and the quick deaths among them.
+    last_death: Option<f32>,
+    quick_deaths: u32,
 }
 
 impl Meter {
@@ -77,9 +94,40 @@ impl Meter {
         self.still = 0;
     }
 
+    pub(crate) fn canvas(&mut self, w: f32, h: f32) { self.canvas = (w, h); }
+
+    /// Where the player is this frame, in canvas pixels.
+    pub(crate) fn at(&mut self, x: f32, y: f32) {
+        let (w, h) = self.canvas;
+        if w <= 0.0 || h <= 0.0 { return; }
+        let cell = |v: f32, size: f32| ((v / size * GRID as f32) as isize).clamp(0, GRID as isize - 1) as usize;
+        let (c, r) = (cell(x, w), cell(y, h));
+        self.cells[r][c] += 1;
+        let s = self.span.get_or_insert([c, c, r, r]);
+        *s = [s[0].min(c), s[1].max(c), s[2].min(r), s[3].max(r)];
+    }
+
+    /// A life lost at `clock`.
+    pub(crate) fn death(&mut self, clock: f32) {
+        if self.last_death.is_some_and(|t| clock - t < QUICK_DEATH_SECS) { self.quick_deaths += 1; }
+        self.last_death = Some(clock);
+    }
+
+    /// The entropy of the player's cells over the most it could be: ln(8) for each axis the player moved along.
+    fn variety(&self) -> Option<f64> {
+        let s = self.span?;
+        let axes = (s[1] > s[0]) as i32 + (s[3] > s[2]) as i32;
+        let total: u32 = self.cells.iter().flatten().sum();
+        if axes == 0 || total == 0 { return Some(0.0); }
+        let h: f64 = self.cells.iter().flatten().filter(|&&n| n > 0)
+            .map(|&n| { let p = n as f64 / total as f64; -p * p.ln() }).sum();
+        Some((h / (axes as f64 * (GRID as f64).ln())).min(1.0))
+    }
+
     /// This frame's hit boxes at `clock`.
     pub(crate) fn near(&mut self, me: &[Mover], hazards: &[Mover], clock: f32) {
         self.boxes_seen = true;
+        if let Some(m) = me.first() { self.at(m.x, m.y); }
         let gaps: Vec<f32> = hazards.iter().map(|h| if h.weight > 0.0 { me.iter().map(|m| gap(m, h)).fold(f32::INFINITY, f32::min) } else { f32::INFINITY }).collect();
         let nearest = gaps.iter().enumerate().min_by(|a, b| a.1.total_cmp(b.1)).map(|(i, g)| (*g, i));
         let closest = nearest.map_or(f32::INFINITY, |(g, _)| g);
@@ -159,6 +207,8 @@ impl Meter {
             out.push(("fun_near_pm", round(self.near_misses as f64 / mins)));
             out.push(("fun_hits_pm", round(self.hits as f64 / mins)));
         }
+        if let Some(v) = self.variety() { out.push(("fun_variety", round(v))); }
+        if self.last_death.is_some() { out.push(("fun_quick_deaths", self.quick_deaths as f64)); }
         out
     }
 }
@@ -212,5 +262,25 @@ mod tests {
         m.hit(9.0, true);
         let s: BTreeMap<_, _> = m.stats(60.0).into_iter().collect();
         assert_eq!(s["fun_hits_pm"], 3.0, "crash and its lost life one hit; a later hit and a lone death two more");
+    }
+
+    #[test]
+    fn a_player_who_roams_has_more_variety_than_one_who_stays_put() {
+        let mut roam = Meter::default();
+        let mut stay = Meter::default();
+        for m in [&mut roam, &mut stay] { m.canvas(80.0, 80.0); }
+        for i in 0..64 { roam.at((i % 8) as f32 * 10.0 + 5.0, (i / 8) as f32 * 10.0 + 5.0); }
+        for i in 0..64 { stay.at(5.0 + (i % 2) as f32 * 10.0, 5.0); }
+        let v = |m: &mut Meter| m.stats(1.0).into_iter().find(|(k, _)| *k == "fun_variety").unwrap().1;
+        assert_eq!(v(&mut roam), 1.0, "every cell alike");
+        assert_eq!(v(&mut stay), 0.33, "two cells along one axis: ln 2 / ln 8");
+    }
+
+    #[test]
+    fn a_death_soon_after_the_last_is_quick() {
+        let mut m = Meter::default();
+        for t in [5.0, 9.0, 40.0, 45.0, 80.0] { m.death(t); }
+        let s: BTreeMap<_, _> = m.stats(90.0).into_iter().collect();
+        assert_eq!(s["fun_quick_deaths"], 2.0);
     }
 }

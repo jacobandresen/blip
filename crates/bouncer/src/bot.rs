@@ -38,7 +38,10 @@ pub fn drive(g: &Game) {
     let mut pad = Pad::new();
     match g.state {
         State::Title | State::Launch => { pad.press_start(); }
-        State::Play => { pad.steer(g.pad_x + g.pad_w / 2.0, paddle_target(g), 5.0); }
+        State::Play => {
+            blip::bot::at(g.pad_x + g.pad_w / 2.0, PAD_Y as f32);
+            pad.steer(g.pad_x + g.pad_w / 2.0, paddle_target(g), 5.0);
+        }
         _ => {}
     }
     pad.send();

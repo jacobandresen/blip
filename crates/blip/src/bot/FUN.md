@@ -30,26 +30,20 @@ matter here, and which of their parts a bot can see:
 
 | Source | What enjoyment is made of | What a bot can measure |
 |---|---|---|
-| Malone 1980, *What makes things fun to learn* | challenge, fantasy, curiosity | challenge |
-| Csikszentmihalyi 1990, *Flow* | a challenge matched to skill, clear goals, feedback, concentration | challenge, concentration |
-| Sweetser & Wyeth 2005, *GameFlow* | concentration, challenge, player skills, control, clear goals, feedback, immersion, social | challenge, concentration, skill |
-| Ryan, Rigby & Przybylski 2006, SDT / PENS | competence, autonomy, relatedness (need satisfaction) | competence (effort turns into success) |
 | Yannakakis & Hallam 2007 | appropriate challenge, opponent behaviour diversity, spatial diversity (predator/prey games), validated against player rankings | challenge |
 | IJsselsteijn, de Kort & Poels (GEQ) | immersion, flow, competence, positive and negative affect, tension, challenge | competence, tension |
+| Johnson, Gardner & Perry 2018 (PENS, after self-determination theory) | competence, autonomy, relatedness, intuitive controls, presence | competence (effort turns into success) |
 | Browne & Maire 2010, *Ludi* | 57 measurable traits of board games; a subset (uncertainty, drama, lead change, ...) predicted human rankings | uncertainty, drama |
 | Nielsen, Barros, Togelius & Nelson 2015; Liu et al. 2017 | skill depth: better players (stronger AI agents) get better results; good games separate them more | the gap between a strong and a weak player |
-| Lantz, Isaksen, Jaffe, Nealen & Togelius 2017 | strategic depth: a ladder of ever better strategies | the gap between players |
-| Isaksen, Gopstein, Togelius & Nealen 2015, 2018 | difficulty as survival: the hazard rate of a player model with human motor skills | deaths over time |
-| Reid 1986; Clark et al. 2009 | near misses raise the urge to keep playing, *only when the player controls the outcome* | near misses |
-| Juul 2013, *The Art of Failure* | failure is enjoyable when the player can blame themselves and improve, not the game | fair versus unfair hits |
-| Hunicke 2005; Booth 2009 (Left 4 Dead's AI director) | keep challenge in a band; pace intensity in build-up, peak, relax | intensity over time |
+| Isaksen, Gopstein & Nealen 2015 | difficulty as survival: the hazard rate of a player model with human motor skills | deaths over time |
+| Clark et al. 2009 | near misses raise the urge to keep playing, *only when the player controls the outcome* | near misses |
+| Booth 2009 (Left 4 Dead's AI director) | keep challenge in a band; pace intensity in build-up, peak, relax | intensity over time |
 | Roohi et al. 2021 | AI players predict human pass rate (difficulty) and churn (engagement); an agent's *best* runs predict best | difficulty |
 
-Three things recur. **Competence and skill**: every framework has it, the SDT work names it a basic need, and the
-depth papers make it measurable by playing a strong and a weak agent and comparing results. **Challenge** that is
-neither trivial nor unfair: flow, GameFlow, Yannakakis and Hallam, Isaksen's hazard rates and the near-miss studies
-all measure it from different sides. **Concentration**: GameFlow's first element; boredom is what Roohi et al.'s
-player model leaves for. Other parts are real but either need people (immersion, autonomy, social) or suit only some
+Three things recur. **Competence and skill**: the GEQ and PENS both have it, and the depth papers make it measurable
+by playing a strong and a weak agent and comparing results. **Challenge** that is neither trivial nor unfair: the
+GEQ's flow and challenge, Yannakakis and Hallam, Isaksen's hazard rates and the near-miss study all measure it from
+different sides. **Concentration**: the GEQ's flow; boredom is what Roohi et al.'s player model leaves for. Other parts are real but either need people (immersion, autonomy, social) or suit only some
 games (drama needs an opponent, diversity a predator/prey game).
 
 The validation record is uneven, and says to keep the measures few and concrete: Law, Brühlmann & Mekler (2018)
@@ -57,7 +51,7 @@ found no support for the GEQ's seven factors; Johnson, Gardner & Perry (2018) fo
 controls to be one factor, not two. Constructs that are measured from play (score gaps, hazard rates, near misses)
 are on firmer ground than questionnaire scales, which is where a bot can contribute.
 
-## 2. The three measures, by importance
+## 2. The measures, by importance
 
 ### 1. Skill pays (weight 3)
 
@@ -80,8 +74,8 @@ bubbles too); Defender's random cannon still hits a marching formation. Brawler 
 ### 2. Close calls (weight 2)
 
 *Do dangers come close, and can they be dodged?* This is challenge seen from the player's hit box: Isaksen's hazard
-rates count the hits, the near-miss studies the misses, and Juul and blip's own rule ("every hazard has a tell and can
-be avoided") the fairness of the hits.
+rates count the hits, the near-miss study the misses (which motivate only when the player controls the outcome), and
+blip's own rule ("every hazard has a tell and can be avoided") the fairness of the hits.
 
 - **Approach A (chosen): hit boxes, edge to edge.** The game's bot passes, every frame, the player's hit boxes and the
   hazards' boxes *as the game's collision code tests them* (`blip::bot::near`). A hazard within 16 px starts a
@@ -112,7 +106,7 @@ hazards of that kind (or, in Brawler, hit boxes that are moves) and leave this m
 
 ### 3. Busy (weight 1)
 
-*How much of the time is there something to do?* GameFlow's concentration element; the cost of idle stretches is
+*How much of the time is there something to do?* Concentration, the GEQ's flow; the cost of idle stretches is
 plain in an arcade cabinet, where a bored player walks away.
 
 - **Approach A (chosen): from the controls.** `busy = 1 - fun_dead`, where `fun_dead` is the share of the run spent in
@@ -122,6 +116,27 @@ plain in an arcade cabinet, where a bored player walks away.
 
 References: the `IDLE` lines `BLIP_BOT_NEAR` prints put Raider's 7.6 s carrier take-off, Brawler's 5 s round
 intros, Adder's round changes and Serpent's long straight runs on the record.
+
+### 4. Variety, 5. Calm, 6. Difficulty (weight 1 each, added 2026-11-19)
+
+Three more measures, each from an open-access study that checked it against players. They weigh 1 each until a playtest with
+people sets the weights.
+
+- **Variety** (`fun_variety`): Yannakakis & Hallam's spatial diversity, which with challenge and behaviour diversity
+  predicted which game variants children preferred. Their measure was the opponents' spread over the map; here it is
+  the player's: the entropy of the player's position over an 8 x 8 grid of the canvas, over ln 8 for each axis the
+  player moved along (a bat on one axis can score 1). Positions come from the hit boxes (`blip::bot::near`) or
+  `blip::bot::at`. Unlike the dropped control-combination entropy, it measures where the game sends the player.
+- **Calm** (`fun_quick_deaths`): Pedersen, Togelius & Yannakakis fitted players' reported frustration to logged
+  play; deaths, and deaths close together, were among its strongest signs. `calm = (deaths - quick + 1) /
+  (deaths + 1)`, a quick death being a life lost within 10 s of the one before (respawn waits are 1 to 3 s).
+- **Difficulty**: Isaksen et al.'s survival analysis: the death rate of a player with human motor skills, which
+  matched the difficulty players reported. One more run per seed plays at 250 ms reaction time
+  (`BLIP_BOT_REACT`): 1 up to 3 deaths a minute, falling to 0 at ten times that. The deaths per level
+  (`fun_deaths_l<n>`), pooled over the seeds, list as **spikes** the levels with twice the game's rate and 3 or more
+  deaths; pooling is what the dropped per-run spike measure lacked.
+
+Calm and difficulty count only for games where a life can be lost.
 
 ### Measures tried and dropped
 
@@ -148,7 +163,7 @@ research says players feel), **cheap**, **stable** (repeats across seeds), **act
 
 ## 3. The score and the gate
 
-`fun = 100 x (3 skill + 2 close + 1 busy) / (sum of the weights present)`, per seed; a game's fun is the mean over
+`fun = 100 x (3 skill + 2 close + 1 busy + 1 variety + 1 calm + 1 difficulty) / (sum of the weights present)`, per seed; a game's fun is the mean over
 its seeds. A measure a game cannot take is left out, so a game is compared with itself over time, not with other
 games.
 
@@ -169,13 +184,15 @@ gains a hit-box hook is not marked down for a measure its base could not take:
 | skill's raw signal, the bot's score | it falls by more than 10 % |
 | close calls' raw signal, hits a minute | it rises by more than 1 |
 | busy's raw signal, dead time | it rises by more than 5 % of the run |
+| variety's raw signal | it falls by more than 0.05 |
+| difficulty's raw signal, deaths a minute at a person's reaction time | it rises by more than 0.5 |
 
 The raw signals are checked as well as the score because a weighted score dilutes them, as the Raider case below
 shows. `.github/workflows/fun.yml` runs it on every pull request that touches the games, the shared
 crate or the tool, for the games whose code changed (`fun_report.mjs --changed <base>`: a game's own crate, or every
 game when shared code changed; a pull request that changes no game measures nothing and passes): one job per game,
 side by side, each building the base (in a worktree) and the head, playing 6 seeds
-of 60 s on both, and uploading both reports and the near-miss frames. A last job, `fun`, passes only if every game
+of 60 s on both (and once more at a person's reaction time, for difficulty), and uploading both reports and the near-miss frames. A last job, `fun`, passes only if every game
 passed; it is the check to require in the branch protection rule. Measuring base and head on the same runner leaves no
 stored baseline to go stale or edit. A change meant to alter a game's feel that loses points says why in its
 description and is merged by an admin past the check.
@@ -260,28 +277,37 @@ them all. Measuring all eleven games (six seeds, the bot and random play) took 2
 
 ## 5. Every game now
 
-Six seeds of 60 s each, in the arcade's order, with every change above applied (close calls with the added near miss and hit, which lowers games that never get hit, such as Defender and Rounds). **This is not a ranking.** The score compares a game with itself over
+Six seeds of 60 s each, in the arcade's order, on all six measures (2026-11-19). **This is not a ranking.** The score compares a game with itself over
 time, which is all the CI gate does. Across games it mostly reflects which measures a game can take (only Raider,
 Defender and Bubbler report hit boxes) and what kind of game it is. A calm, simple game scores low on measures made
 for tension and still delights: Rally is the lowest here and one of the most loved, because it is simple and it
-recalls simpler days. Nostalgia, calm and familiarity are part of fun (Malone's *fantasy*; Juul on why people
-choose easy and casual games) that no bot can see.
+recalls simpler days. Nostalgia, calm and familiarity are part of fun that no bot can see.
 
-| Game | Fun | ± | Per seed | Skill | Close calls | Busy | Hits a minute |
-|---|---|---|---|---|---|---|---|
-| serpent | **92.8** | 1.6 | 91, 93, 91, 95, 94, 93 | 1 |  | 0.71 |  |
-| bouncer | **88.4** | 6.2 | 82, 97, 84, 92, 91, 84 | 0.85 |  | 0.99 |  |
-| defender | **64** | 2.8 | 63, 67, 66, 65, 61, 61 | 0.36 | 0.89 | 1 | 0.0 |
-| rally | **40.5** | 2.1 | 41, 42, 42, 40, 37, 41 | 0.23 |  | 0.94 |  |
-| meteors | **65.2** | 3.8 | 58, 65, 69, 67, 67, 67 | 0.56 | 0.33 | 1 | 0.2 |
-| brawler | **52.5** | 6.4 | 59, 56, 46, 44, 56, 54 | 0.45 |  | 0.74 |  |
-| bubbler | **49.2** | 4.4 | 54, 53, 46, 53, 44, 46 | 0.28 | 0.65 | 0.94 | 0.5 |
-| raider | **50.1** | 8.5 | 38, 54, 48, 44, 61, 56 | 0.27 | 0.65 | 0.9 | 1.7 |
-| adder | **89.9** | 1.5 | 90, 90, 89, 88, 91, 92 | 1 |  | 0.6 |  |
-| warlock | **83.5** | 7.5 | 87, 83, 82, 97, 77, 76 | 1 | 0.47 | 0.91 | 0.8 |
-| rounds | **74.2** | 1.3 | 74, 76, 74, 75, 72, 76 | 0.66 | 0.81 | 0.85 | 0.0 |
+| Game | Fun | ± | Per seed | Skill | Close calls | Busy | Variety | Calm | Difficulty | Hits a minute |
+|---|---|---|---|---|---|---|---|---|---|---|
+| serpent | **94.6** | 0.6 | 94, 95, 94, 96, 94, 95 | 1 |  | 0.72 | 0.91 | 1 | 1 |  |
+| bouncer | **90.8** | 4.2 | 88, 97, 85, 92, 93, 90 | 0.85 |  | 0.99 | 0.94 | 1 | 0.89 |  |
+| defender | **75.8** | 2.3 | 76, 77, 79, 76, 74, 73 | 0.39 | 0.89 | 1 | 0.96 | 1 | 0.91 | 0.0 |
+| rally | **47.4** | 2.4 | 47, 48, 49, 47, 43, 50 | 0.23 |  | 0.94 | 0.75 |  |  |  |
+| meteors | **75.1** | 4 | 76, 77, 74, 78, 68, 78 | 0.59 | 0.67 | 1 | 0.65 | 1 | 0.9 | 0.0 |
+| brawler | **65.9** | 4.8 | 64, 70, 73, 67, 60, 62 | 0.47 |  | 0.73 | 0.46 | 1 | 1 |  |
+| bubbler | **62.6** | 3.7 | 66, 60, 56, 65, 64, 65 | 0.28 | 0.65 | 0.94 | 0.72 | 1 | 0.98 | 0.5 |
+| raider | **64** | 5.9 | 56, 67, 63, 59, 71, 68 | 0.32 | 0.65 | 0.9 | 0.61 | 1 | 1 | 1.7 |
+| adder | **85.8** | 4.1 | 90, 82, 91, 81, 86, 86 | 1 |  | 0.55 | 0.78 | 0.82 | 0.85 |  |
+| warlock | **91.4** | 5.9 | 93, 80, 96, 93, 96, 90 | 1 | 0.5 | 0.94 | 0.79 | 1 | 0.91 | 0.2 |
+| rounds | **73.8** | 0.9 | 74, 75, 73, 74, 73, 73 | 0.66 | 0.81 | 0.85 | 0.33 | 1 | 0.86 | 0.0 |
 
 What the table points at:
+- **Meteors' variety was 0.05**: the best play was to sit in the middle and turn. Crystals left by broken rocks, worth
+  500 for flying through, raised variety to 0.65 and close calls from 0.33 to 0.67.
+- **Skill, where random play scored a fifth or a third of the bot's** (Defender 0.36, Raider 0.27): a higher top
+  multiple for the streaks that only steady play keeps (Defender x8, Raider x6) raised them to 0.39 and 0.32. Medals
+  for finished flights in Raider were tried and dropped: falling, random play caught them too; hovering, the bot flew
+  into fire for them.
+- **Warlock's first chamber was its deadliest** at a person's reaction time (5.3 lives a minute against 2.6): its imps
+  stood between the start and the rune. Moved away, the spike is gone and fun rose from 86 to 91.
+- **Adder's calm and difficulty were 0.63 and 0.58**: at a person's reaction time every lost round cost a life and three
+  were gone in about 22 s. Outlasting a CPU now keeps the life (0.82 and 0.85).
 - **Rally's skill is low because of how it scores**, not its play: 60 s of Rally is two or three points, and random
   play scores none, so the ratio is small. A longer run or a per-rally score would measure it better.
 - **Bubbler's random play scores almost as well as the bot** (skill 0.17): a dragon mashing keys blows bubbles that
@@ -289,8 +315,9 @@ What the table points at:
 - **Defender: no hits at all** in six minutes (close calls 0.89, the most seven near misses and no hit can give): the
   cannon dodges everything. Its fun comes from
   skill and the near misses, and a harder bomb pattern would show up here first.
-- **Adder and Serpent are the least busy** (0.6 and 0.71): Adder's round changes and long straight runs, Serpent's long
-  straight stretches between turns. The `IDLE` lines say where.
+- **Adder and Serpent are the least busy** (0.55 and 0.72): Adder's round changes and long straight runs, Serpent's long
+  straight stretches between turns (its golden mouse, which runs from the head, barely changed that). The `IDLE` lines
+  say where.
 - **Warlock's close calls were 0.08**: monsters reached the bot more often than they passed it, because it walked at
   them to bolt them. A bot that steps away from a monster beside it (as a player does) sees 7 near misses a minute
   and close calls of 0.51: Warlock is a game of near escapes.
@@ -314,23 +341,17 @@ What the table points at:
 
 ## References
 
-- Booth, M. (2009). *The AI Systems of Left 4 Dead.* Invited talk, AIIDE 2009, Stanford.
-- Browne, C., & Maire, F. (2010). Evolutionary game design. *IEEE Transactions on Computational Intelligence and AI in Games*, 2(1).
-- Clark, L., Lawrence, A. J., Astley-Jones, F., & Gray, N. (2009). Gambling near-misses enhance motivation to gamble and recruit win-related brain circuitry. *Neuron*, 61, 481–490.
-- Csikszentmihalyi, M. (1990). *Flow: The Psychology of Optimal Experience.* Harper & Row.
-- Hunicke, R. (2005). The case for dynamic difficulty adjustment in games. *ACE 2005*, 429–433.
-- IJsselsteijn, W. A., de Kort, Y. A. W., & Poels, K. *The Game Experience Questionnaire.* Technische Universiteit Eindhoven.
-- Isaksen, A., Gopstein, D., & Nealen, A. (2015). Exploring game space using survival analysis. *FDG 2015*.
-- Isaksen, A., Gopstein, D., Togelius, J., & Nealen, A. (2018). Exploring game space of minimal action games via parameter tuning and survival analysis. *IEEE TCIAIG*, 10(2), 182–194.
-- Johnson, D., Gardner, M. J., & Perry, R. (2018). Validation of two game experience scales: PENS and GEQ. *International Journal of Human-Computer Studies*, 118.
-- Juul, J. (2013). *The Art of Failure: An Essay on the Pain of Playing Video Games.* MIT Press.
-- Lantz, F., Isaksen, A., Jaffe, A., Nealen, A., & Togelius, J. (2017). Depth in strategic games. *AAAI Workshop on What's Next for AI in Games*.
-- Law, E. L.-C., Brühlmann, F., & Mekler, E. D. (2018). Systematic review and validation of the Game Experience Questionnaire (GEQ). *CHI PLAY 2018*, 257–270.
-- Liu, J., Togelius, J., Pérez-Liébana, D., & Lucas, S. M. (2017). Evolving game skill-depth using general video game AI agents. *IEEE CEC 2017*.
-- Malone, T. W. (1980). What makes things fun to learn? A study of intrinsically motivating computer games. Xerox PARC.
-- Nielsen, T. S., Barros, G. A. B., Togelius, J., & Nelson, M. J. (2015). General video game evaluation using relative algorithm performance profiles. *EvoApplications*, LNCS 9028, 369–380.
-- Reid, R. L. (1986). The psychology of the near miss. *Journal of Gambling Behavior*, 2, 32–39.
-- Roohi, S., Guckelsberger, C., Relas, A., Heiskanen, H., Takatalo, J., & Hämäläinen, P. (2021). Predicting game difficulty and engagement using AI players. *Proc. ACM HCI* 5 (CHI PLAY), 231.
-- Ryan, R. M., Rigby, C. S., & Przybylski, A. (2006). The motivational pull of video games: A self-determination theory approach. *Motivation and Emotion*, 30, 344–360.
-- Sweetser, P., & Wyeth, P. (2005). GameFlow: A model for evaluating player enjoyment in games. *Computers in Entertainment*, 3(3).
-- Yannakakis, G. N., & Hallam, J. (2007). Towards optimizing entertainment in computer games. *Applied Artificial Intelligence*, 21(10), 933–971.
+Only open-access work is cited: each reference links to a free copy, then to the published version.
+
+- Booth, M. (2009). *The AI Systems of Left 4 Dead.* Invited talk, AIIDE 2009, Stanford. Open access: <https://cdn.fastly.steamstatic.com/apps/valve/2009/ai_systems_of_l4d_mike_booth.pdf>
+- Browne, C., & Maire, F. (2010). Evolutionary game design. *IEEE Transactions on Computational Intelligence and AI in Games*, 2(1). Open access: <https://cris.maastrichtuniversity.nl/en/publications/c53c0467-e476-4be8-8373-4f7f0aa6ac75> (published: <https://doi.org/10.1109/TCIAIG.2010.2041928>)
+- Clark, L., Lawrence, A. J., Astley-Jones, F., & Gray, N. (2009). Gambling near-misses enhance motivation to gamble and recruit win-related brain circuitry. *Neuron*, 61, 481–490. Open access: <https://pmc.ncbi.nlm.nih.gov/articles/PMC2658737/> (published: <https://doi.org/10.1016/j.neuron.2008.12.031>)
+- IJsselsteijn, W. A., de Kort, Y. A. W., & Poels, K. *The Game Experience Questionnaire.* Technische Universiteit Eindhoven. Open access: <https://research.tue.nl/en/publications/the-game-experience-questionnaire>
+- Isaksen, A., Gopstein, D., & Nealen, A. (2015). Exploring game space using survival analysis. *FDG 2015*. Open access: <http://www.fdg2015.org/papers/fdg2015_paper_02.pdf>
+- Johnson, D., Gardner, M. J., & Perry, R. (2018). Validation of two game experience scales: PENS and GEQ. *International Journal of Human-Computer Studies*, 118. Open access: <https://eprints.qut.edu.au/118426/> (published: <https://doi.org/10.1016/j.ijhcs.2018.05.003>)
+- Law, E. L.-C., Brühlmann, F., & Mekler, E. D. (2018). Systematic review and validation of the Game Experience Questionnaire (GEQ). *CHI PLAY 2018*, 257–270. Open access: <https://doi.org/10.1145/3242671.3242683>
+- Liu, J., Togelius, J., Pérez-Liébana, D., & Lucas, S. M. (2017). Evolving game skill-depth using general video game AI agents. *IEEE CEC 2017*. Open access: <https://arxiv.org/abs/1703.06275> (published: <https://doi.org/10.1109/CEC.2017.7969583>)
+- Nielsen, T. S., Barros, G. A. B., Togelius, J., & Nelson, M. J. (2015). General video game evaluation using relative algorithm performance profiles. *EvoApplications*, LNCS 9028, 369–380. Open access: <https://researcher.itu.dk/ws/files/81828779/Nielsen2015General.pdf> (published: <https://doi.org/10.1007/978-3-319-16549-3_30>)
+- Pedersen, C., Togelius, J., & Yannakakis, G. N. (2010). Modeling player experience for content creation. *IEEE TCIAIG*, 2(1), 54–67. Open access: <https://www.um.edu.mt/library/oar/handle/123456789/22957> (published: <https://doi.org/10.1109/TCIAIG.2010.2043950>)
+- Roohi, S., Guckelsberger, C., Relas, A., Heiskanen, H., Takatalo, J., & Hämäläinen, P. (2021). Predicting game difficulty and engagement using AI players. *Proc. ACM HCI* 5 (CHI PLAY), 231. Open access: <https://arxiv.org/abs/2107.12061> (published: <https://doi.org/10.1145/3474658>)
+- Yannakakis, G. N., & Hallam, J. (2007). Towards optimizing entertainment in computer games. *Applied Artificial Intelligence*, 21(10), 933–971. Open access: <https://doi.org/10.1080/08839510701527580>

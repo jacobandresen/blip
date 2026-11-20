@@ -2382,6 +2382,39 @@ fn update_screen(g: &mut Game, dt: f32, inp: [Input; 2], p2_start: bool, sfx: &S
 }
 
 /// Draw the frame: the title, or the world with the words of its moment over it.
+/// A round cleared: pastel confetti, hearts and stars among the paper, tumbling down from the top for the
+/// clear's first seconds. Placed by the clock and each piece's number, so no random numbers are drawn.
+fn draw_confetti(t: f32) {
+    use blip::macroquad::{math::vec2, shapes::draw_triangle};
+    const COLOURS: [(u8, u8, u8); 6] = [(255, 160, 210), (150, 230, 255), (255, 230, 140), (170, 255, 190), (220, 180, 255), (255, 190, 160)];
+    for i in 0..70u32 {
+        let h = i.wrapping_mul(2_654_435_761).rotate_left(11);
+        let start = (h % 900) as f32 / 1000.0;
+        let age = t - start;
+        if age < 0.0 { continue; }
+        let fall = 60.0 + (h >> 10) as f32 % 70.0;
+        let y = HUD - 10.0 + age * fall;
+        if y > WIN_H as f32 + 10.0 { continue; }
+        let x = (h >> 4) as f32 % WIN_W as f32 + (age * 2.5 + i as f32).sin() * 14.0;
+        let c = COLOURS[(h >> 20) as usize % COLOURS.len()];
+        // Fades as the bubble wipe closes over it.
+        let a = (1.0 - ((t - 2.4) / 0.6).clamp(0.0, 1.0)) * 0.95;
+        let colour = col(c, a);
+        match i % 7 {
+            0 => draw_heart(&Heart { x, y, t: 1.0, sway: 0.0 }, 0.0, 0.0, 0.8, colour),
+            1 => sparkle(x, y, 5.0, colour),
+            _ => {
+                // A paper square flipping as it falls: its width follows the flip.
+                let (s, w) = (3.5, 3.5 * (age * 6.0 + i as f32).cos().abs().max(0.2));
+                let (sn, cs) = (age * 3.0 + i as f32).sin_cos();
+                let p = |u: f32, v: f32| vec2(x + u * cs - v * sn, y + u * sn + v * cs);
+                draw_triangle(p(-w, -s), p(w, -s), p(w, s), colour);
+                draw_triangle(p(-w, -s), p(w, s), p(-w, s), colour);
+            }
+        }
+    }
+}
+
 fn draw(blip: &Blip, art: &art::Art, g: &Game, hi: i32) {
     blip.clear(BlipColor::new(0.0, 0.0, 0.0, 1.0));
     match g.state {
@@ -2435,6 +2468,7 @@ fn draw(blip: &Blip, art: &art::Art, g: &Game, hi: i32) {
                 let text = format!("{} CHAIN!", g.chain.0);
                 cosy(blip, &text, 262.0 + DY, 2.6, CREAM, PINK, (1.2 - g.chain.1) * 5.0, g.chain.1.min(1.0));
             }
+            if g.state == State::Clear { draw_confetti(g.state_t); }
             // bubble wipe: out at the end of a round, back in at the start of the next
             let wipe = match g.state {
                 State::Clear => ((g.state_t - 2.6) / 0.8).clamp(0.0, 1.0),

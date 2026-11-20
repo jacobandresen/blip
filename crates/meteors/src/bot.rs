@@ -35,6 +35,7 @@ pub const PLAYTHROUGHS: &[Playthrough] = &[
 ];
 
 /// A rock or saucer as the ship sees it.
+#[derive(Clone, Copy)]
 struct Target {
     /// Seconds-ish until it matters: the lower, the sooner to deal with.
     urgency: f32,
@@ -72,6 +73,8 @@ fn hit_boxes(g: &Game) {
 
 fn fly(g: &Game, pad: &mut Pad) {
     let targets = rocks_and_saucer(g);
+    let calm = targets.iter().all(|t| t.urgency > 160.0);
+    if calm && chase_crystal(g, pad) { return; }
     if let Some(t) = best(&targets, |t| t.urgency) {
         pad.turn_to(g.ship.angle, t.aim, 0.06);
         let lined_up = blip::angle_diff(g.ship.angle, t.aim).abs() < 0.12;
@@ -87,6 +90,18 @@ fn fly(g: &Game, pad: &mut Pad) {
         // The nose points away from it: thrust.
         if blip::angle_diff(g.ship.angle, (-t.dx).atan2(t.dy)).abs() < 1.2 { pad.up(); }
     }
+}
+
+/// With nothing close, fly to the nearest crystal: turn to it and thrust while pointed at it and not already
+/// coasting there fast. False when there is none within reach.
+fn chase_crystal(g: &Game, pad: &mut Pad) -> bool {
+    let near = g.crystals.iter().map(|c| see(g, c.x, c.y, c.vx, c.vy, CRYSTAL_R)).filter(|t| t.distance < 320.0);
+    let Some(c) = best(near, |t| t.distance) else { return false };
+    let heading = c.dx.atan2(-c.dy);
+    pad.turn_to(g.ship.angle, heading, 0.08);
+    let toward = (g.ship.vx * c.dx + g.ship.vy * c.dy) / c.distance.max(1.0);
+    if blip::angle_diff(g.ship.angle, heading).abs() < 0.35 && toward < 140.0 { pad.up(); }
+    true
 }
 
 /// Every rock and the saucer.

@@ -91,6 +91,9 @@ struct Game {
     /// in seconds and is what makes it a decision rather than a pickup.
     bonus: Cell,
     bonus_ttl: f32,
+    /// The bonus is a golden mouse: seconds since its last hop, and the way it last ran.
+    mouse_t: f32,
+    mouse_dir: (i32, i32),
     /// The tail-cutting pickup (see SHEARS_FROM), timed like the bonus.
     shears: Cell,
     shears_ttl: f32,
@@ -110,6 +113,10 @@ struct Game {
     gulps: Vec<f32>,
     /// Score popups, the ring where food was eaten, the burst on a crash.
     fx: Fx,
+    /// Segments popped so far after a crash, head first.
+    popped: usize,
+    /// Seconds of screen shake left (see CRASH_SHAKE).
+    shake: f32,
     banner_t: f32,
 }
 
@@ -126,6 +133,8 @@ impl Game {
             sess: Session::new(LIVES_START),
             bonus: Cell { c: 0, r: 0 },
             bonus_ttl: 0.0,
+            mouse_t: 0.0,
+            mouse_dir: (1, 0),
             shears: Cell { c: 0, r: 0 },
             shears_ttl: 0.0,
             foods_eaten: 0,
@@ -138,6 +147,8 @@ impl Game {
             obstacle_count: 0,
             obs_fade: 1.0,
             gulps: Vec::new(),
+            popped: 0,
+            shake: 0.0,
             fx: Fx::new(),
             banner_t: 9.0,
         }
@@ -145,7 +156,10 @@ impl Game {
 
     /// The music for where the game is: the calm tune, then the fast one.
     fn track(&self) -> usize {
-        if self.state != State::Title && self.sess.level >= FRENZY_LEVEL { 1 } else { 0 }
+        if self.state == State::Title { 0 }
+        else if self.sess.level >= FRENZY_LEVEL { 2 }
+        else if self.sess.level >= PROWL_LEVEL { 1 }
+        else { 0 }
     }
 
     #[inline]
@@ -219,6 +233,7 @@ impl Game {
     /// board away, and settle for any free cell only if the board is nearly
     /// full.
     fn spawn_bonus(&mut self) {
+        self.mouse_t = 0.0;
         let head = self.snake_at(0);
         let far_enough = (COLS + ROWS) / 3;
         let mut free = Vec::new();
@@ -362,7 +377,7 @@ impl Game {
     }
 }
 
-blip::sounds!(Sounds { eat, game_over, bonus, bonus_eat, level });
+blip::sounds!(Sounds { eat, game_over, bonus, bonus_eat, level, squeak });
 
 fn update_title(g: &mut Game) {
     if coin_start() { g.start_game(); }
@@ -378,6 +393,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     if g.bonus_active() {
         g.bonus_ttl -= dt;
         if g.bonus_ttl < 0.0 { g.bonus_ttl = 0.0; }
+        if scurry(g, dt) { blip::audio::play_sfx_volume(&sfx.squeak, 0.35); }
     }
     g.shears_ttl = (g.shears_ttl - dt).max(0.0);
 
@@ -389,6 +405,33 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     if g.move_timer < g.move_interval() { return; }
     g.move_timer -= g.move_interval();
     step_snake(g, sfx);
+}
+
+// The golden mouse runs from a head within MOUSE_SEES cells, a cell every MOUSE_HOP seconds (the snake steps every
+// 70-180 ms, so it is always caught in the end): the last few cells become a chase with turns in it. Serpent's busy
+// measure was 0.71, long straight runs with the controls untouched.
+const MOUSE_SEES: i32 = 5;
+const MOUSE_HOP: f32 = 0.55;
+
+/// The mouse hops to the free neighbouring cell farthest from the head, when that is farther than where it is; true
+/// when it hopped.
+fn scurry(g: &mut Game, dt: f32) -> bool {
+    g.mouse_t += dt;
+    let head = g.snake_at(0);
+    let dist = |c: Cell| (c.c - head.c).abs() + (c.r - head.r).abs();
+    if g.mouse_t < MOUSE_HOP || dist(g.bonus) > MOUSE_SEES { return false; }
+    g.mouse_t = 0.0;
+    let mut best = (g.bonus, dist(g.bonus), (0, 0));
+    for (dc, dr) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+        let to = Cell { c: g.bonus.c + dc, r: g.bonus.r + dr };
+        let inside = (0..COLS).contains(&to.c) && (0..ROWS).contains(&to.r);
+        if !inside || !g.cell_is_free(to) || to == g.food || (g.shears_active() && to == g.shears) { continue; }
+        if dist(to) > best.1 { best = (to, dist(to), (dc, dr)); }
+    }
+    if best.0 == g.bonus { return false; }
+    g.bonus = best.0;
+    g.mouse_dir = best.2;
+    true
 }
 
 /// One step: the next turn, then the new head crashes, collects and eats.
@@ -440,7 +483,9 @@ fn lose_life(g: &mut Game, sfx: &Sounds, why: &str) {
     play_sfx(&sfx.game_over);
     // A lost life breaks the run of quick meals, as it breaks every streak in the arcade.
     g.streak.miss();
-    g.state = match g.sess.lose_life_after(&mut g.dead_timer, 1.5) {
+    g.popped = 0;
+    g.shake = CRASH_SHAKE;
+    g.state = match g.sess.lose_life_after(&mut g.dead_timer, DEAD_SECS) {
         LifeResult::StillAlive => State::Dead,
         LifeResult::GameOver => {
             // A new best gets the level-up chime after the crash.
@@ -524,27 +569,41 @@ fn spawn_after_meal(g: &mut Game, (shears, bonus): (bool, bool), sfx: &Sounds) {
     }
 }
 
+/// After a crash the snake pops apart from head to tail, a puff in its own colour per segment, done before the respawn.
 fn update_dead(g: &mut Game, dt: f32) {
     g.fx.update(dt);
+    let elapsed = DEAD_SECS - g.dead_timer.remaining();
+    let every = (1.1 / g.snake_len.max(1) as f32).min(0.05);
+    let due = (((elapsed - POP_AFTER) / every).max(0.0) as usize).min(g.snake_len);
+    while g.popped < due {
+        let k = g.popped as f32 / g.snake_len.max(2) as f32;
+        let (x, y) = cell_centre(g.snake_at(g.popped));
+        g.fx.burst(x, y, 4, 80.0, BlipColor { r: lerp(0.36, 0.16, k), g: lerp(0.86, 0.50, k), b: lerp(0.36, 0.20, k), a: 1.0 });
+        g.popped += 1;
+    }
     if g.dead_timer.tick(dt) {
         g.reset_snake();
         g.state = State::Play;
     }
 }
 
+/// The wait after a crash, and the red flash before the snake starts to pop.
+const DEAD_SECS: f32 = 1.5;
+/// A crash shakes the board this long, up to 5 px.
+const CRASH_SHAKE: f32 = 0.35;
+const POP_AFTER: f32 = 0.25;
+
 fn update_over(g: &mut Game, dt: f32) {
     if play_again(&mut g.dead_timer, dt) { g.start_game(); }
 }
 
+/// A dark lawn of two-tone squares, so the eye can count cells without grid lines.
 fn draw_board(blip: &Blip) {
-    let grid = BlipColor { r: 18.0/255.0, g: 18.0/255.0, b: 18.0/255.0, a: 1.0 };
-    for c in 0..=COLS {
-        blip.draw_line((c * CELL) as f32, HUD_H as f32,
-                       (c * CELL) as f32, WIN_H as f32, grid);
-    }
-    for r in 0..=ROWS {
-        blip.draw_line(0.0, (HUD_H + r * CELL) as f32,
-                       WIN_W as f32, (HUD_H + r * CELL) as f32, grid);
+    let tiles = [BlipColor { r: 0.035, g: 0.075, b: 0.045, a: 1.0 }, BlipColor { r: 0.05, g: 0.10, b: 0.06, a: 1.0 }];
+    for r in 0..ROWS {
+        for c in 0..COLS {
+            blip.fill_rect((c * CELL) as f32, (HUD_H + r * CELL) as f32, CELL as f32, CELL as f32, tiles[((c + r) & 1) as usize]);
+        }
     }
     // Visible wall border — shows the snake's movement boundary
     let wall = BlipColor { r: 0.20, g: 0.42, b: 0.20, a: 1.0 };
@@ -568,7 +627,9 @@ fn draw_snake(blip: &Blip, g: &Game) {
     } else {
         1.0
     };
-    let flash = g.state == State::Dead && (g.dead_timer.remaining() / 0.12) as i32 % 2 == 0;
+    let dead = g.state == State::Dead;
+    let flash = dead && DEAD_SECS - g.dead_timer.remaining() < POP_AFTER && (g.dead_timer.remaining() / 0.08) as i32 % 2 == 0;
+    let first = if dead { g.popped.min(g.snake_len) } else { 0 };
     let half = CELL as f32 / 2.0;
     let seg_px = |i: usize| -> (f32, f32) {
         let cur = g.snake_at(i);
@@ -589,35 +650,75 @@ fn draw_snake(blip: &Blip, g: &Game) {
         let k = i as f32 / n.max(2) as f32;
         BlipColor { r: lerp(0.36, 0.16, k), g: lerp(0.86, 0.50, k), b: lerp(0.36, 0.20, k), a: 1.0 }
     };
-    let thick = CELL as f32 - 6.0;
-    for i in (1..n).rev() {
-        let (x0, y0) = seg_px(i);
-        let (x1, y1) = seg_px(i - 1);
-        let c = shade(i);
-        blip.draw_line_ex(x0, y0, x1, y1, thick, c);
-        blip.fill_rect(x0 - thick / 2.0, y0 - thick / 2.0, thick, thick, c);
+    // Body radius tapers toward the tail; a swallowed food bulges it as it travels down.
+    let base_r = CELL as f32 / 2.0 - 3.0;
+    let radius = |i: usize| {
+        let taper = if i + 4 >= n { 0.55 + 0.45 * (n - 1 - i) as f32 / 4.0 } else { 1.0 };
+        let bulge = g.gulps.iter().map(|&k| (1.0 - (k - i as f32).abs()).max(0.0)).fold(0.0, f32::max);
+        base_r * taper.min(1.0) + bulge * 3.5
+    };
+    let ink = BlipColor { r: 0.02, g: 0.12, b: 0.04, a: 1.0 };
+    let pts: Vec<(f32, f32)> = (0..n).map(seg_px).collect();
+    // Outline first, then the body, then the belly stripe and a scale mark on every other segment.
+    for i in (first + 1..n).rev() {
+        let ((x0, y0), (x1, y1)) = (pts[i], pts[i - 1]);
+        blip.fill_capsule(x0, y0, x1, y1, radius(i) + 1.5, radius(i - 1) + 1.5, ink);
     }
-    // A swallowed food, travelling down toward the tail.
-    for &k in &g.gulps {
-        let i = (k as usize).min(n - 1);
-        let (x, y) = seg_px(i);
-        let r = thick / 2.0 + 3.0;
-        blip.fill_rect(x - r, y - r, r * 2.0, r * 2.0, shade(i));
+    for i in (first + 1..n).rev() {
+        let ((x0, y0), (x1, y1)) = (pts[i], pts[i - 1]);
+        blip.fill_capsule(x0, y0, x1, y1, radius(i), radius(i - 1), shade(i));
     }
-    let (hx, hy) = seg_px(0);
-    let hs = CELL as f32 - 4.0;
-    let head = if flash { BLIP_RED } else { BlipColor { r: 0.45, g: 0.95, b: 0.45, a: 1.0 } };
-    blip.fill_rect(hx - hs / 2.0, hy - hs / 2.0, hs, hs, head);
+    if !flash {
+        for i in (first + 1..n).rev() {
+            let ((x0, y0), (x1, y1)) = (pts[i], pts[i - 1]);
+            let c = shade(i);
+            let hi = BlipColor { r: (c.r + 0.25).min(1.0), g: (c.g + 0.12).min(1.0), b: (c.b + 0.2).min(1.0), a: 1.0 };
+            blip.fill_capsule(x0, y0, x1, y1, radius(i) * 0.32, radius(i - 1) * 0.32, hi);
+            if i % 2 == 0 && i + 2 < n {
+                blip.fill_circle(x0, y0, radius(i) * 0.5, BlipColor { r: c.r * 0.6, g: c.g * 0.6, b: c.b * 0.6, a: 1.0 });
+            }
+        }
+    }
+    // A new level: a sparkle runs down the body from head to tail.
+    if g.state == State::Play && g.banner_t < 0.9 && g.sess.level > 1 {
+        let at = g.banner_t / 0.9 * n as f32;
+        for k in 0..3 {
+            let i = (at as usize).saturating_sub(k * 2).min(n - 1);
+            let (sx, sy) = pts[i];
+            let a = 1.0 - k as f32 * 0.3;
+            blip.fill_glow_circle(sx, sy, 7.0 - k as f32 * 1.5, BlipColor { r: 1.0, g: 0.95, b: 0.6, a });
+        }
+    }
+    if first > 0 { return; }
+    let (hx, hy) = pts[0];
     let (fx, fy) = match g.cur_dir { Dir::Up => (0.0, -1.0), Dir::Down => (0.0, 1.0), Dir::Left => (-1.0, 0.0), Dir::Right => (1.0, 0.0) };
-    // A tongue flicks out now and then, in the direction of travel.
+    let hr = CELL as f32 / 2.0 - 1.0;
+    let head = if flash { BLIP_RED } else { BlipColor { r: 0.45, g: 0.95, b: 0.45, a: 1.0 } };
+    // A round head, longer than wide: a capsule from the neck to the snout.
+    let (nx, ny) = (hx - fx * 3.0, hy - fy * 3.0);
+    let (sx, sy) = (hx + fx * 3.0, hy + fy * 3.0);
+    blip.fill_capsule(nx, ny, sx, sy, hr + 1.5, hr * 0.8 + 1.5, ink);
+    blip.fill_capsule(nx, ny, sx, sy, hr, hr * 0.8, head);
+    // A forked tongue flicks out now and then, in the direction of travel.
     if g.state == State::Play && blip::macroquad::time::get_time().rem_euclid(1.6) < 0.18 {
-        let tip = hs / 2.0 + 6.0;
-        blip.draw_line_ex(hx + fx * hs / 2.0, hy + fy * hs / 2.0, hx + fx * tip, hy + fy * tip, 2.0, BLIP_RED);
+        let (bx, by) = (hx + fx * (hr + 2.0), hy + fy * (hr + 2.0));
+        let (tx, ty) = (hx + fx * (hr + 8.0), hy + fy * (hr + 8.0));
+        blip.draw_line_ex(bx, by, tx, ty, 2.0, BLIP_RED);
+        for side in [-1.0f32, 1.0] {
+            blip.draw_line_ex(tx, ty, tx + fx * 3.0 - fy * side * 3.0, ty + fy * 3.0 + fx * side * 3.0, 1.5, BLIP_RED);
+        }
+    }
+    // The mouth opens as food comes within a cell ahead.
+    let ahead = Cell { c: g.snake_at(0).c + fx as i32, r: g.snake_at(0).r + fy as i32 };
+    if g.state == State::Play && (ahead == g.food || (g.bonus_active() && ahead == g.bonus)) {
+        let open = 2.0 + 4.0 * f;
+        let (mx, my) = (hx + fx * (hr + 1.0), hy + fy * (hr + 1.0));
+        blip.fill_capsule(mx - fy * open, my + fx * open, mx + fy * open, my - fx * open, 2.5, 2.5, BlipColor { r: 0.35, g: 0.0, b: 0.05, a: 1.0 });
     }
     for side in [-1.0f32, 1.0] {
-        let (ex, ey) = (hx + fx * 4.0 - fy * side * 5.0, hy + fy * 4.0 + fx * side * 5.0);
-        blip.fill_circle(ex, ey, 3.2, BLIP_WHITE);
-        blip.fill_circle(ex + fx * 1.2, ey + fy * 1.2, 1.6, BLIP_BLACK);
+        let (ex, ey) = (hx + fx * 3.0 - fy * side * 5.5, hy + fy * 3.0 + fx * side * 5.5);
+        blip.fill_circle(ex, ey, 3.6, BLIP_WHITE);
+        blip.fill_circle(ex + fx * 1.4, ey + fy * 1.4, 1.8, BLIP_BLACK);
     }
 }
 
@@ -644,8 +745,21 @@ fn draw_obstacles(blip: &Blip, g: &Game) {
     for i in 0..g.obstacle_count {
         let obs = g.obstacles[i];
         let (x, y) = ((obs.c * CELL) as f32, (HUD_H + obs.r * CELL) as f32);
-        blip.fill_rect(x + 1.0, y + 1.0, CELL as f32 - 2.0, CELL as f32 - 2.0, BlipColor { a, ..BLIP_GRAY });
-        blip.fill_rect(x + 1.0, y + 1.0, CELL as f32 - 2.0, 3.0, BlipColor { r: 0.75, g: 0.75, b: 0.75, a });
+        // A bevelled stone: lit top-left, shadowed bottom-right, a crack for texture. A new one rises out of the lawn
+        // as it blinks in.
+        let full = CELL as f32 - 2.0;
+        let s = if solid { full } else { full * (0.4 + 0.6 * g.obs_fade) };
+        let (x, y) = (x + (full - s) / 2.0, y + (full - s) / 2.0);
+        blip.fill_rect(x + 1.0, y + 1.0, s, s, BlipColor { r: 0.30, g: 0.32, b: 0.36, a });
+        blip.fill_rect(x + 4.0, y + 4.0, s - 6.0, s - 6.0, BlipColor { r: 0.46, g: 0.48, b: 0.52, a });
+        blip.fill_rect(x + 1.0, y + 1.0, s, 3.0, BlipColor { r: 0.72, g: 0.74, b: 0.78, a });
+        blip.fill_rect(x + 1.0, y + 1.0, 3.0, s, BlipColor { r: 0.62, g: 0.64, b: 0.68, a });
+        let k = (obs.c * 7 + obs.r * 3) % 4;
+        if k < 2 && solid {
+            let cx = x + 8.0 + k as f32 * 6.0;
+            blip.draw_line_ex(cx, y + 6.0, cx + 3.0, y + 12.0, 1.5, BlipColor { r: 0.25, g: 0.26, b: 0.30, a });
+            blip.draw_line_ex(cx + 3.0, y + 12.0, cx + 1.0, y + 17.0, 1.5, BlipColor { r: 0.25, g: 0.26, b: 0.30, a });
+        }
     }
 }
 
@@ -673,8 +787,20 @@ fn draw_bonus(blip: &Blip, g: &Game) {
     let r = CELL as f32 * (0.26 + 0.20 * life);
     let gold = GOLD;
     let hot = BlipColor { r: 1.0, g: 0.98, b: 0.72, a: 1.0 };
-    blip.fill_circle(cx, cy, r, gold);
-    blip.fill_circle(cx, cy, r * 0.45, hot);
+    // A golden mouse facing the way it last ran: body, head, two round ears, a wiggling tail.
+    let (fx, fy) = (g.mouse_dir.0 as f32, g.mouse_dir.1 as f32);
+    let t = blip::macroquad::time::get_time() as f32;
+    let (tx, ty) = (cx - fx * r * 1.0, cy - fy * r * 1.0);
+    let wig = (t * 14.0).sin() * r * 0.5;
+    blip.draw_line_ex(tx, ty, tx - fx * r * 0.9 - fy * wig, ty - fy * r * 0.9 + fx * wig, 1.5, gold);
+    blip.fill_capsule(cx - fx * r * 0.5, cy - fy * r * 0.5, cx + fx * r * 0.3, cy + fy * r * 0.3, r * 0.75, r * 0.6, gold);
+    let (hx, hy) = (cx + fx * r * 0.75, cy + fy * r * 0.75);
+    for side in [-1.0f32, 1.0] {
+        blip.fill_circle(hx - fx * r * 0.2 - fy * side * r * 0.45, hy - fy * r * 0.2 + fx * side * r * 0.45, r * 0.3, hot);
+    }
+    blip.fill_circle(hx, hy, r * 0.45, gold);
+    blip.fill_circle(hx + fx * r * 0.45, hy + fy * r * 0.45, 1.2, BLIP_RED);
+    blip.fill_circle(hx + fx * r * 0.1 - fy * r * 0.2, hy + fy * r * 0.1 + fx * r * 0.2, 1.0, BLIP_BLACK);
 }
 
 /// The shears: a pale blue X of two blades, flashing as they run out.
@@ -692,7 +818,12 @@ fn draw_shears(blip: &Blip, g: &Game) {
 }
 
 fn draw_title(blip: &Blip, hi: i32) {
-    blip.draw_centered("SERPENT",            (WIN_H / 4) as f32,       6.0, BLIP_GREEN);
+    draw_board(blip);
+    // A dark band behind the words, so they read over the lawn.
+    blip.fill_rect(0.0, (WIN_H / 4 - 24) as f32, WIN_W as f32, 140.0, BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.55 });
+    blip.fill_rect(0.0, (WIN_H * 2 / 3 - 10) as f32, WIN_W as f32, 36.0, BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.55 });
+    blip.draw_centered_outlined("SERPENT", (WIN_W / 2) as f32, (WIN_H / 4) as f32, 6.0, BLIP_GREEN,
+        BlipColor { r: 0.02, g: 0.12, b: 0.04, a: 1.0 });
     // SERPENT is sz=6 (42px tall) — clear its bottom by a real margin.
     blip.draw_hi(hi, (WIN_H / 4 + 50) as f32, BLIP_YELLOW);
     let by = web::controls();
@@ -702,26 +833,63 @@ fn draw_title(blip: &Blip, hi: i32) {
     draw_title_snake(blip, blip::macroquad::time::get_time() as f32);
 }
 
-/// A snake winding across the title screen, head first, wrapping round.
+/// A snake winding across the title screen after a golden mouse, wrapping round: drawn as in play, an outlined body
+/// tapering to the tail with a belly stripe and scale marks.
 fn draw_title_snake(blip: &Blip, t: f32) {
-    const SEGS: usize = 16;
-    let span = WIN_W as f32 + 160.0;
+    const SEGS: usize = 22;
+    let span = WIN_W as f32 + 260.0;
     let at = |d: f32| {
-        let x = (t * 90.0 - d).rem_euclid(span) - 80.0;
-        (x, WIN_H as f32 * 0.83 + (x * 0.035).sin() * 18.0)
+        let x = (t * 90.0 - d).rem_euclid(span) - 160.0;
+        (x, WIN_H as f32 * 0.83 + ((t * 90.0 - d) * 0.035).sin() * 22.0)
     };
-    for i in (0..SEGS).rev() {
-        let (x, y) = at(i as f32 * 11.0);
+    let ink = BlipColor { r: 0.02, g: 0.12, b: 0.04, a: 1.0 };
+    let shade = |i: usize| {
         let k = i as f32 / SEGS as f32;
-        let c = BlipColor { r: lerp(0.36, 0.16, k), g: lerp(0.86, 0.50, k), b: lerp(0.36, 0.20, k), a: 1.0 };
-        blip.fill_circle(x, y, 9.0 - k * 3.0, c);
+        BlipColor { r: lerp(0.36, 0.16, k), g: lerp(0.86, 0.50, k), b: lerp(0.36, 0.20, k), a: 1.0 }
+    };
+    let r = |i: usize| 11.0 * if i + 5 >= SEGS { 0.5 + 0.5 * (SEGS - 1 - i) as f32 / 5.0 } else { 1.0 };
+    let pts: Vec<(f32, f32)> = (0..SEGS).map(|i| at(i as f32 * 10.0)).collect();
+    // Skip a joint that wraps across the screen edge.
+    let joined = |i: usize| (pts[i].0 - pts[i - 1].0).abs() < 40.0;
+    for i in (1..SEGS).rev().filter(|&i| joined(i)) {
+        blip.fill_capsule(pts[i].0, pts[i].1, pts[i - 1].0, pts[i - 1].1, r(i) + 1.5, r(i - 1) + 1.5, ink);
     }
-    let (hx, hy) = at(0.0);
-    blip.fill_circle(hx + 3.0, hy - 4.0, 2.6, BLIP_WHITE);
-    blip.fill_circle(hx + 4.0, hy - 4.0, 1.3, BLIP_BLACK);
+    for i in (1..SEGS).rev().filter(|&i| joined(i)) {
+        blip.fill_capsule(pts[i].0, pts[i].1, pts[i - 1].0, pts[i - 1].1, r(i), r(i - 1), shade(i));
+        let c = shade(i);
+        let hi = BlipColor { r: (c.r + 0.25).min(1.0), g: (c.g + 0.12).min(1.0), b: (c.b + 0.2).min(1.0), a: 1.0 };
+        blip.fill_capsule(pts[i].0, pts[i].1, pts[i - 1].0, pts[i - 1].1, r(i) * 0.32, r(i - 1) * 0.32, hi);
+        if i % 2 == 0 && i + 3 < SEGS { blip.fill_circle(pts[i].0, pts[i].1, r(i) * 0.5, BlipColor { r: c.r * 0.6, g: c.g * 0.6, b: c.b * 0.6, a: 1.0 }); }
+    }
+    let (hx, hy) = pts[0];
+    blip.fill_circle(hx + 2.0, hy, 13.5, ink);
+    blip.fill_circle(hx + 2.0, hy, 12.0, BlipColor { r: 0.45, g: 0.95, b: 0.45, a: 1.0 });
+    for side in [-1.0f32, 1.0] {
+        blip.fill_circle(hx + 5.0, hy + side * 5.5, 3.6, BLIP_WHITE);
+        blip.fill_circle(hx + 6.4, hy + side * 5.5, 1.8, BLIP_BLACK);
+    }
+    if t.rem_euclid(1.2) < 0.2 {
+        blip.draw_line_ex(hx + 14.0, hy, hx + 22.0, hy, 2.0, BLIP_RED);
+        for side in [-1.0f32, 1.0] { blip.draw_line_ex(hx + 22.0, hy, hx + 25.0, hy + side * 3.0, 1.5, BLIP_RED); }
+    }
+    // The golden mouse, always a little out of reach.
+    let mx = (t * 90.0 + 70.0).rem_euclid(span) - 160.0;
+    let my = WIN_H as f32 * 0.83 + ((t * 90.0 + 70.0) * 0.035).sin() * 22.0 + (t * 18.0).sin().abs() * -3.0;
+    let wig = (t * 14.0).sin() * 4.0;
+    blip.draw_line_ex(mx - 9.0, my, mx - 17.0, my + wig, 1.5, GOLD);
+    blip.fill_capsule(mx - 5.0, my, mx + 3.0, my, 8.0, 6.5, GOLD);
+    blip.fill_circle(mx + 2.0, my - 6.0, 3.5, BlipColor { r: 1.0, g: 0.98, b: 0.72, a: 1.0 });
+    blip.fill_circle(mx + 8.0, my, 5.0, GOLD);
+    blip.fill_circle(mx + 12.5, my, 1.3, BLIP_RED);
+    blip.fill_circle(mx + 9.0, my - 2.0, 1.1, BLIP_BLACK);
 }
 
 fn draw_over(blip: &Blip, g: &Game, hi: i32) {
+    // The field as it ended, dimmed under the score.
+    draw_board(blip);
+    draw_obstacles(blip, g);
+    draw_snake(blip, g);
+    blip.fill_rect(0.0, HUD_H as f32, WIN_W as f32, (WIN_H - HUD_H) as f32, BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.68 });
     let (title, colour) = if g.snake_len + g.obstacle_count == MAX_LEN { ("FIELD CLEARED", BLIP_GREEN) } else { ("GAME OVER", BLIP_RED) };
     blip.draw_end_screen(title, g.sess.score, hi, colour, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active());
     blip.draw_game_over_note(&format!("LEVEL {}   LENGTH {}", g.sess.level, g.snake_len), BLIP_GRAY);
@@ -740,7 +908,7 @@ async fn main() {
     let food = load_png(blip::png!("food"));
 
     let sfx = Sounds::load().await;
-    let mut music = Jukebox::new("serpent", &["SLITHER", "FRENZY"]);
+    let mut music = Jukebox::new("serpent", &["SLITHER", "PROWL", "FRENZY"]);
 
     if blip.screenshot_mode {
         g.start_game();
@@ -765,8 +933,14 @@ async fn main() {
         match g.state {
             State::Title => draw_title(&blip, web::high_score()),
             State::Over  => draw_over(&blip, &g, web::high_score()),
-            State::Play | State::Dead => draw_play(&blip, &g, &food),
+            State::Play | State::Dead => {
+                let (dx, dy) = blip::shake(g.shake, CRASH_SHAKE, 5.0);
+                blip.set_offset(dx, dy);
+                draw_play(&blip, &g, &food);
+                blip.set_offset(0.0, 0.0);
+            }
         }
+        g.shake = (g.shake - dt).max(0.0);
 
         blip.next_frame(60).await;
     }
@@ -775,6 +949,22 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_golden_mouse_runs_from_a_head_that_comes_near() {
+        let mut g = running();
+        let head = g.snake_at(0);
+        g.bonus = Cell { c: head.c + 3, r: head.r };
+        g.bonus_ttl = BONUS_TTL;
+        let dist = |g: &Game| (g.bonus.c - head.c).abs() + (g.bonus.r - head.r).abs();
+        assert!(!scurry(&mut g, MOUSE_HOP * 0.5), "not before its hop is due");
+        assert!(scurry(&mut g, MOUSE_HOP));
+        assert_eq!(dist(&g), 4, "one cell farther away");
+        g.bonus = Cell { c: head.c + MOUSE_SEES + 2, r: head.r };
+        let before = g.bonus;
+        assert!(!scurry(&mut g, MOUSE_HOP));
+        assert_eq!(g.bonus, before, "a far head is not seen");
+    }
 
     /// A snake set up mid-board, travelling right, with nothing queued.
     fn running() -> Game {
