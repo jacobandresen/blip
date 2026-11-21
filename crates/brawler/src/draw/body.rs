@@ -3,10 +3,32 @@
 
 use super::*;
 
+std::thread_local! {
+    /// Drawing the second of two of the same fighter: the alternate colours, as an arcade gives player two.
+    pub(crate) static SECOND: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// A fighter's colours as the second copy of them on screen: DRAKE in black with yellow stripes, everyone else
+/// with their main colour taken well down, so a mirror match is two fighters and not one twice.
+pub(crate) fn second_look(l: Look) -> Look {
+    // DRAKE's other colours are Way of the Dragon's: bare-chested in black kung fu trousers.
+    if l.build == Build::Track {
+        return Look { cloth: rgb((0.09, 0.09, 0.11)), trim: rgb((0.09, 0.09, 0.11)), torn: true, ..l };
+    }
+    // LANCER's are navy karate trousers: taken down, the white went a dull grey.
+    if l.build == Build::Duelist {
+        return Look { cloth: rgb((0.16, 0.20, 0.36)), ..l };
+    }
+    Look { cloth: shade(l.cloth, 0.55), ..l }
+}
+
 /// One of the two fighters, with the hit shake and (in versus) the player's
 /// mark under them.
 pub(crate) fn draw_fighter(blip: &Blip, g: &Game, i: usize) {
     let shake = g.shake_px();
+    // The alternate colours: picked with the kick, or the second of a mirror match.
+    let human = g.mode == Mode::Versus || i == 0;
+    SECOND.set((i == 1 && g.p[0].who == g.p[1].who) || (human && !g.demo && g.costume[i]));
 
     // In an exchange the two fighters overlap four frames in five, so in
     // versus a mark in each player's colour on the boards under them shows
@@ -20,6 +42,7 @@ pub(crate) fn draw_fighter(blip: &Blip, g: &Game, i: usize) {
             2.2, 2.2, c);
     }
     draw_body(blip, &g.p[i], g.now, shake, g.hitstop, i, true);
+    SECOND.set(false);
 }
 
 /// The face a fighter is wearing for what they are doing.
@@ -29,6 +52,8 @@ pub(crate) fn mood_of(f: &Fighter) -> Mood {
         Act::Hitstun | Act::Knockdown | Act::Defeat => Mood::Hurt,
         // The crunch is roared, every other win smiled.
         Act::Victory if STYLES[f.who].win == Win::Flex && f.t > 0.3 => Mood::Shout,
+        // DRAKE's stamp is cried out, the face screwed up.
+        Act::Victory if formless(f.who) && f.stumble_roll % 4 == 3 && !plucking(f) && f.t > 0.25 => Mood::Shout,
         Act::Victory => Mood::Happy,
         // Rocked, and it shows on the face too; and gritted teeth behind a guard taking a blow.
         _ if f.stagger > 0.0 => Mood::Hurt,
@@ -45,7 +70,8 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
     // Held in the hitstop, the one struck shudders on the spot.
     let shudder = if hitstop > 0.0 && f.act == Act::Hitstun { 2.0 * if ((now * 60.0) as i32) % 2 == 0 { 1.0 } else { -1.0 } } else { 0.0 };
     // Turning round, the face goes with the body: still the old way until halfway.
-    let face = if f.turn > 0.5 { -f.facing } else { f.facing };
+    // (And through a spinning back kick, looking back over the shoulder.)
+    let face = if f.turn > 0.5 || spin_turn(f) > 0.5 { -f.facing } else { f.facing };
     let rig = Rig::upright(f.x + shudder, f.y + shift, f.facing, face, a.size);
 
     let flash = if hitstop > 0.0 && f.act == Act::Hitstun { 0.5 }
@@ -64,7 +90,11 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
                 -(rise / 600.0).clamp(-1.0, 1.0) * 0.7);
     // A blink every three seconds or so, the two fighters out of step.
     let blink = (now * 0.31 + i as f32 * 0.37).fract() < 0.035;
-    let near = Look { wind, blink, prone, floor: FLOOR_Y + shift, ..look_of(&a, flash) };
+    let claw = ARTS[f.who] == Art::HungGar;
+    // DRAKE fights on with the suit top torn away once he has taken real punishment (under 45%).
+    let torn = formless(f.who) && (f.health as f32) < a.health as f32 * 0.45;
+    let near = Look { wind, blink, prone, floor: FLOOR_Y + shift, claw, torn, scars: torn, ..look_of(&a, flash) };
+    let near = if SECOND.get() { second_look(near) } else { near };
     let far = Look { far: true, tone: FAR, ..near };
 
     if shadow && a.build == Build::Uniform && f.act == Act::Attack && f.mv == MoveId::Special {
@@ -91,7 +121,8 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
 
     // Dust off the boards where a body lands. Knockdowns are the one
     // moment the floor is part of the fight.
-    if let Some(t) = down_time(f).filter(|t| *t < 0.26) {
+    // (On landing, at the end of the fall.)
+    if let Some(t) = down_time(f).map(|t| t - (FALL - 0.04)).filter(|t| (0.0..0.26).contains(t)) {
         let k = (1.0 - t / 0.26).max(0.0);
         for j in 0..5 {
             let dx = (j as f32 - 2.0) * 13.0 - f.facing * 14.0;
@@ -113,6 +144,45 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
         }
     }
 
+    // DRAKE's pluck: three hairs blown off the fingertips, drifting up and away and fading.
+    if plucking(f) && (0.75..2.6).contains(&f.t) {
+        let k = ((f.t - 0.8) / 1.8).max(0.0);
+        let z = f.size();
+        let tip = V(f.x + f.facing * 30.0 * z, f.y + shift - 96.0 * z);
+        // The breath: three short strokes out from the lips across the fingertips.
+        if f.t < 1.05 {
+            for j in 0..3 {
+                let y = tip.1 - 3.0 + 3.0 * j as f32;
+                stroke(blip, V(tip.0 - f.facing * 8.0, y), V(tip.0 + f.facing * 4.0, y), 0.6, 0.6,
+                    BlipColor { r: 1.0, g: 1.0, b: 1.0, a: 0.7 });
+            }
+        }
+        for j in 0..3 {
+            let drift = V(tip.0 + f.facing * (8.0 + 46.0 * k + 7.0 * j as f32),
+                tip.1 - 4.0 - 16.0 * k + 5.0 * (k * 9.0 + j as f32 * 2.0).sin());
+            let c = BlipColor { r: 0.30, g: 0.20, b: 0.10, a: (1.0 - k).min(1.0) };
+            let bend = 2.0 * (k * 7.0 + j as f32).cos();
+            stroke(blip, drift, V(drift.0 + 6.0 * f.facing, drift.1 + bend), 0.9, 0.6, c);
+        }
+    }
+    // DRAKE's stamp throws up dust round the foot.
+    if formless(f.who) && f.act == Act::Victory && f.stumble_roll % 4 == 3 && !plucking(f) && (0.3..0.6).contains(&f.t) {
+        let k = (f.t - 0.3) / 0.3;
+        for side in [-1.0f32, 1.0] {
+            blip.fill_circle(f.x + f.facing * 18.0 + side * (6.0 + 16.0 * k), FLOOR_Y + shift - 3.0 - 4.0 * k, 3.0 + 5.0 * k,
+                BlipColor { r: 0.66, g: 0.60, b: 0.52, a: 0.45 * (1.0 - k) });
+        }
+    }
+    // Sent sliding by the one-inch punch: dust kicked up along the boards behind the body.
+    if f.act == Act::Knockdown && f.vx.abs() > 80.0 {
+        let k = (f.vx.abs() / 560.0).min(1.0);
+        for j in 0..3 {
+            let back = f.x - f.vx.signum() * (10.0 + 14.0 * j as f32);
+            blip.fill_circle(back, FLOOR_Y + shift - 3.0 - 3.0 * j as f32, (3.0 + 2.5 * j as f32) * k,
+                BlipColor { r: 0.66, g: 0.60, b: 0.52, a: 0.40 * k });
+        }
+    }
+
     // Pushing off for a jump kicks up a puff where the feet left the boards (it stays there).
     if f.act == Act::Air && f.vy < 0.0 && f.t < 0.16 && !f.soaring() {
         let age = f.t / 0.16;
@@ -125,13 +195,13 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
     }
     // The heavy ones raise a little dust with every step: each foot as it comes down.
     if f.act == Act::Walk && a.bulk >= 1.12 {
-        let ph = f.x * f.facing * STRIDE / f.size();
+        let ph = walk_phase(f);
         for off in [0.0f32, std::f32::consts::PI] {
             let u = ((ph + off) / std::f32::consts::TAU).rem_euclid(1.0);
             // The first fifth of the planted half: the foot just down.
             if u < 0.10 {
                 let age = u / 0.10;
-                let (fwd, _) = foot_cycle(ph + off, 0.0);
+                let (fwd, _) = gait_foot(GAITS[f.who], ph + off, 0.0);
                 let x = f.x + f.facing * (WALK_MID + fwd) * f.size();
                 blip.fill_circle(x, FLOOR_Y + shift - 2.0, (2.0 + 4.0 * age) * f.size(),
                     BlipColor { r: 0.66, g: 0.60, b: 0.52, a: 0.30 * (1.0 - age) });
@@ -163,8 +233,10 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
     // Rage: a red heat behind the fighter, beating.
     if f.enraged() && !matches!(f.act, Act::Defeat | Act::Victory | Act::Bow) {
         let beat = 0.5 + 0.5 * (now * 9.0).sin();
-        blip.fill_glow_circle(f.x, f.y + shift - f.height() * 0.5, f.height() * (0.42 + 0.06 * beat),
-            BlipColor { r: 1.0, g: 0.18, b: 0.10, a: 0.20 + 0.12 * beat });
+        // DRAKE's is gold, not red: a dragon's heat, not a temper.
+        let heat = if formless(f.who) { BlipColor { r: 1.0, g: 0.72, b: 0.12, a: 0.18 + 0.12 * beat } }
+                   else { BlipColor { r: 1.0, g: 0.18, b: 0.10, a: 0.20 + 0.12 * beat } };
+        blip.fill_glow_circle(f.x, f.y + shift - f.height() * 0.5, f.height() * (0.42 + 0.06 * beat), heat);
     }
 
     // A turtle guarding low is drawn as what it is: a shell on the boards
@@ -203,10 +275,28 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
 
     let q = pose_of(now, f, i);
     let k = skeleton(rig, &q);
+    light_from(Some(rig.fwd));
     if matches!(a.build, Build::Caped | Build::Uniform) {
         draw_cape(blip, &far, k.hip, k.neck, rig.fwd, if prone { 1.0 } else { f.soar }, now, FLOOR_Y + shift);
     }
     draw_leg(blip, &far, k.hip_rear, k.knee_rear, k.ankle_rear, rig.fwd, rig.ground, q.rear_heel);
+    // DRAKE's nunchaku, tucked in the back of his waistband when they are not in his hand.
+    let in_hand = (f.act == Act::Attack && f.mv == MoveId::Special && f.special() == Special::Nunchaku)
+        || (f.act == Act::Victory && f.t < 1.6 && f.stumble_roll % 4 == 0 && !plucking(f)) || (f.act == Act::Bow && intro_now(f) != Intro::WarmUp && f.t > 0.15 && f.t < 0.6)
+        || (f.act == Act::Idle && f.taunt > 0.15 && f.taunt < 1.25 && f.stumble_roll % 2 == 1);
+    if formless(f.who) && !in_hand && !prone {
+        let z = a.size;
+        let (sx, sy) = unit(k.hip, k.neck);
+        let belt = along(k.hip, k.neck, 0.30);
+        // (Far enough back to show behind him: 8 px hid them behind the torso.)
+        let back = V(belt.0 - rig.fwd * 14.0 * z, belt.1);
+        let wood = near.c(BlipColor { r: 0.34, g: 0.20, b: 0.11, a: 1.0 });
+        for lean in [-0.25f32, 0.25] {
+            let top = V(back.0 + sx * 10.0 * z + lean * 4.0 * z, back.1 + sy * 10.0 * z);
+            let bottom = V(back.0 - sx * 6.0 * z - lean * 2.0 * z, back.1 - sy * 6.0 * z);
+            shape(blip, &[(top, bottom, 1.8 * z, 1.8 * z)], wood, INK);
+        }
+    }
     // The far arm is beyond the chest: what shows of it is what clears it.
     draw_arm(blip, &far, k.sh_rear, k.elbow_rear, k.hand_rear, q.open, rig.fwd);
     draw_torso(blip, &near, k.hip, k.neck, rig.fwd);
@@ -223,6 +313,13 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
     }
     draw_belt(blip, &near, k.hip, k.neck, rig.fwd);
     draw_arm(blip, &near, k.sh_lead, k.elbow_lead, k.hand_lead, q.open, rig.fwd);
+    light_from(None);
+    if (f.act == Act::Attack && f.mv == MoveId::Special && f.special() == Special::Nunchaku)
+        || (f.act == Act::Victory && formless(f.who) && f.t < 1.6 && f.stumble_roll % 4 == 0 && !plucking(f))
+        || (f.act == Act::Bow && formless(f.who) && !f.bows && intro_now(f) != Intro::WarmUp && f.t > 0.15 && f.t < 0.6)
+        || (f.act == Act::Idle && formless(f.who) && f.taunt > 0.15 && f.taunt < 1.25 && f.stumble_roll % 2 == 1) {
+        draw_sticks(blip, f, k.hand_lead, rig.fwd);
+    }
 
     // Stars going round the head of a dizzy fighter, in front and behind; and over one knocked out cold,
     // once they have stopped moving.
@@ -265,6 +362,64 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
             }
         }
     }
+}
+
+/// The nunchaku in the near hand: two sticks on a short chain. Through the startup they whirl round in a
+/// figure of eight, the free stick swinging wide behind the held one; then they crack out level, in line past
+/// the fist to the end of the special's reach (`NUNCHAKU`); in the recovery the free stick drops and swings.
+fn draw_sticks(blip: &Blip, f: &Fighter, hand: V, fwd: f32) {
+    let m = f.scaled(move_data(MoveId::Special));
+    let z = f.size();
+    let (stick, chain) = (13.0 * z, 4.0 * z);
+    let start = m.startup * F;
+    let end = start + m.active * F;
+    // The held stick's angle (screen radians), and the free one's, trailing it.
+    let tucked = f.act == Act::Victory && f.t >= 0.9;
+    let trick = if f.act == Act::Attack { stick_trick(f) } else { None };
+    let whirling = matches!(f.act, Act::Victory | Act::Bow | Act::Idle) || f.t < start;
+    let (held, free) = if tucked {
+        // Caught under the arm: the held stick laid back along the chest toward the armpit, the other hanging.
+        let back = if fwd > 0.0 { std::f32::consts::PI } else { 0.0 };
+        (back - fwd * 0.35, std::f32::consts::FRAC_PI_2)
+    } else if let Some((_, _, up)) = trick {
+        // The routine's trick: the held stick at its angle, the free one trailing it round in a whip.
+        let held = (-up.sin()).atan2(fwd * up.cos());
+        (held, held - fwd * 0.5)
+    } else if whirling {
+        let a = f.t * 26.0;
+        (a, a - 1.4 - 0.8 * (2.0 * a).sin())
+    } else if f.t <= end {
+        let level = if fwd > 0.0 { 0.0 } else { std::f32::consts::PI };
+        (level, level)
+    } else {
+        let k = ((f.t - end) / (m.recovery * F)).clamp(0.0, 1.0);
+        let down = std::f32::consts::FRAC_PI_2;
+        let level = if fwd > 0.0 { 0.0 } else { std::f32::consts::PI };
+        (level + (down - level) * k, down + 0.6 * (f.t * 14.0).sin() * (1.0 - k))
+    };
+    let tip = |from: V, a: f32, len: f32| V(from.0 + a.cos() * len, from.1 + a.sin() * len);
+    // Through the routine a pale swoosh follows the sticks' ends over the last few frames.
+    if trick.is_some() {
+        let screen = |up: f32| (-up.sin()).atan2(fwd * up.cos());
+        let mut last = tip(hand, held, 2.0 * stick + chain);
+        for j in 1..=6 {
+            let mut was = *f;
+            was.t -= j as f32 * F * 0.5;
+            let Some((_, _, up)) = stick_trick(&was) else { break };
+            let at = tip(hand, screen(up), 2.0 * stick + chain);
+            stroke(blip, last, at, 2.4 * z, 2.4 * z, BlipColor { r: 1.0, g: 0.96, b: 0.84, a: 0.55 * (1.0 - j as f32 / 7.0) });
+            last = at;
+        }
+    }
+    let a_end = tip(hand, held, stick);
+    let b_start = tip(a_end, (held + free) / 2.0, chain);
+    let b_end = tip(b_start, free, stick);
+    let wood = BlipColor { r: 0.34, g: 0.20, b: 0.11, a: 1.0 };
+    let steel = BlipColor { r: 0.70, g: 0.72, b: 0.76, a: 1.0 };
+    stroke(blip, a_end, b_start, 0.7 * z, 0.7 * z, steel);
+    shape(blip, &[(hand, a_end, 2.0 * z, 2.0 * z), (b_start, b_end, 2.0 * z, 2.0 * z)], wood, INK);
+    // A ring of brass at each chain end.
+    for at in [a_end, b_start] { blip.fill_circle(at.0, at.1, 1.2 * z, BlipColor { r: 0.90, g: 0.72, b: 0.30, a: 1.0 }); }
 }
 
 /// What each bolt-thrower throws: every one the same hitbox, each its own
@@ -407,6 +562,31 @@ pub(crate) fn draw_fruit(blip: &Blip, kind: usize, x: f32, ground: f32) {
 /// Everything on the stage during a round: dust, fruit, fighters, helpers,
 /// bolts, splashes and words.
 pub(crate) fn draw_fight(blip: &Blip, g: &Game) {
+    // DRAKE gathering a special: for its startup the stage dims around him and a warm glow comes up behind,
+    // the moment a whole arcade looks at one fighter.
+    for f in g.p.iter().filter(|f| formless(f.who) && f.act == Act::Attack && f.mv == MoveId::Special) {
+        let start = f.scaled(move_data(MoveId::Special)).startup * F;
+        if f.t >= start + 4.0 * F { continue; }
+        let k = (f.t / (start * 0.4)).min(1.0) * (1.0 - ((f.t - start) / (4.0 * F)).clamp(0.0, 1.0));
+        // Over the scenery the camera shows (a camera-sized margin either side).
+        blip.fill_rect(-200.0, -200.0, WIN_W as f32 + 400.0, FLOOR_Y + 200.0, BlipColor { r: 0.02, g: 0.01, b: 0.04, a: 0.62 * k });
+        let c = V(f.x, f.y - f.height() * 0.55);
+        blip.fill_glow_circle(c.0, c.1, f.height() * 0.55, BlipColor { r: 1.0, g: 0.62, b: 0.12, a: 0.42 * k });
+    }
+    // The one-inch punch landing: a white ring bursting from the fist, gone in a quarter of a second.
+    for f in g.p.iter().filter(|f| formless(f.who) && f.act == Act::Attack && f.mv == MoveId::Special
+        && f.special() == Special::OneInch && f.hit_clean) {
+        let m = f.scaled(move_data(MoveId::Special));
+        let age = (f.t - m.startup * F) / 0.25;
+        if !(0.0..1.0).contains(&age) { continue; }
+        let at = V(f.x + f.facing * (BODY_W / 2.0 + m.reach) * 0.9, f.y - m.height);
+        let r = 8.0 + 34.0 * age;
+        for k in 0..20 {
+            let a = k as f32 / 20.0 * std::f32::consts::TAU;
+            blip.fill_circle(at.0 + a.cos() * r, at.1 + a.sin() * r * 0.8, 2.6 * (1.0 - age) + 0.6,
+                BlipColor { r: 1.0, g: 1.0, b: 0.92, a: 0.9 * (1.0 - age) });
+        }
+    }
     // The floor after a rage jump: dust thrown up along the whole of it,
     // rolling out from where he landed.
     if g.quake_t > 0.0 {
@@ -469,13 +649,18 @@ pub(crate) fn draw_fight(blip: &Blip, g: &Game) {
     }
 
     for s in g.hitspark.iter().filter(|s| s.ttl > 0.0) { draw_splash(blip, s); }
+}
 
+/// The words over the fight, drawn on the canvas itself (pixel text at whole sizes) where the camera shows
+/// what they are about.
+pub(crate) fn draw_words(blip: &Blip, g: &Game) {
     // Words for what just happened, popping up over it and rising.
     // (Not over the banner that calls the round.)
     for w in g.pops.iter().filter(|w| w.ttl > 0.0 && g.state == State::Fight) {
         let age = POP_SECS - w.ttl;
         let sz = if age < 0.08 { 3.0 } else { 2.0 };
-        let (x, y) = (w.x - text_w(w.text, sz) / 2.0, w.y - age * 22.0);
+        let (wx, wy) = g.view.screen(w.x, w.y);
+        let (x, y) = (wx - text_w(w.text, sz) / 2.0, wy - age * 22.0);
         let x = x.clamp(4.0, WIN_W as f32 - text_w(w.text, sz) - 4.0);
         let a = (w.ttl * 4.0).min(1.0);
         for (dx, dy) in [(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0)] {
@@ -490,7 +675,8 @@ pub(crate) fn draw_fight(blip: &Blip, g: &Game) {
         let text = format!("{} HITS", g.combo_shown);
         let rise = (1.1 - g.combo_t) * 26.0;
         if g.combo_t > 0.25 || (g.now * 20.0) as i32 % 2 == 0 {
-            stamp_at(blip, &text, f.x, f.y - STAND_H * f.size() - 26.0 - rise, 2.0,
+            let (x, y) = g.view.screen(f.x, f.y - STAND_H * f.size());
+            stamp_at(blip, &text, x, y - 26.0 - rise, 2.0,
                 BlipColor { r: 1.0, g: 0.85, b: 0.25, a: 1.0 });
         }
     }

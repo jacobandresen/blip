@@ -115,6 +115,15 @@ pub(crate) struct Look {
     pub(crate) prone: bool,
     /// Blown toward white for the frames a hit is frozen on.
     pub(crate) flash: f32,
+    /// A `Civvy`'s haircut: cropped, shaved, long, a bun, curls.
+    pub(crate) hairdo: u8,
+    /// Open hands are tiger claws: the fingers curled hard at the tips (Hung Gar).
+    pub(crate) claw: bool,
+    /// The track suit's top off: DRAKE bare-chested, hurt or in his other colours (the black trousers of Way of
+    /// the Dragon).
+    pub(crate) torn: bool,
+    /// Three claw marks raked across the bare chest (DRAKE, hurt: Enter the Dragon).
+    pub(crate) scars: bool,
 }
 
 impl Look {
@@ -135,11 +144,79 @@ pub(crate) fn stroke(blip: &Blip, a: V, b: V, r1: f32, r2: f32, c: BlipColor) {
     blip.fill_capsule(a.0, a.1, b.0, b.1, r1, r2, c);
 }
 
+std::thread_local! {
+    /// Where the light comes from for the fighter being drawn (a screen direction toward it), or none while
+    /// scenery is drawn: `shape` shades by it.
+    static LIGHT: std::cell::Cell<Option<(f32, f32)>> = const { std::cell::Cell::new(None) };
+    /// The colour of the light and of the shade (see `tint_light`).
+    static TINT: std::cell::Cell<(BlipColor, BlipColor)> = const { std::cell::Cell::new((BLIP_WHITE, BLIP_BLACK)) };
+}
+
+/// The light on each stage, then the shade it leaves: a warm sunset and a violet dusk on the docks, moonlight at
+/// the temple. Highlights lean to the first and shadows to the second, so a fighter stands in the scene's own
+/// light rather than a studio's. `None` is white light, for the menus.
+pub(crate) fn tint_light(stage: Option<usize>) {
+    const LIGHTS: [((f32, f32, f32), (f32, f32, f32)); 11] = [
+        ((1.00, 0.78, 0.52), (0.36, 0.18, 0.42)), // docks at sunset
+        ((0.72, 0.82, 1.00), (0.10, 0.12, 0.32)), // temple by moonlight
+        ((1.00, 0.97, 0.90), (0.22, 0.30, 0.46)), // air base, noon
+        ((1.00, 0.86, 0.66), (0.36, 0.24, 0.18)), // bath house, lamplight
+        ((1.00, 0.95, 0.74), (0.18, 0.28, 0.18)), // river village under the trees
+        ((0.84, 0.95, 1.00), (0.18, 0.30, 0.46)), // ice
+        ((1.00, 0.74, 0.60), (0.24, 0.14, 0.34)), // rooftop at dusk
+        ((1.00, 0.70, 0.50), (0.26, 0.12, 0.26)), // the block at dusk
+        ((1.00, 0.80, 0.58), (0.18, 0.10, 0.30)), // the pagoda: lanterns under a dusk sky
+        ((1.00, 0.98, 0.88), (0.24, 0.30, 0.20)), // the island: a tropical noon
+        ((1.00, 0.90, 0.76), (0.30, 0.24, 0.24)), // the colosseum: Roman sun off old brick
+    ];
+    TINT.set(match stage {
+        Some(s) => { let (l, d) = LIGHTS[s % LIGHTS.len()]; (rgb(l), rgb(d)) }
+        None => (BLIP_WHITE, BLIP_BLACK),
+    });
+}
+
+/// Light the shapes drawn after this from above and in front of a fighter facing `fwd`, as SF2 lights every
+/// sprite; `None` turns the shading off again.
+pub(crate) fn light_from(fwd: Option<f32>) {
+    LIGHT.set(fwd.map(|f| (f * 0.5 / 1.118, -1.0 / 1.118)));
+}
+
 /// One shape out of several capsules: all the ink, then all the colour, so
-/// the outline runs round the whole and not round each piece.
+/// the outline runs round the whole and not round each piece. Under a light,
+/// each piece is cel-shaded: a shadow down its far side and a glint along
+/// its near one, the three tones a sprite of the period is painted in.
 pub(crate) fn shape(blip: &Blip, caps: &[Cap], fill: BlipColor, ink: BlipColor) {
     for &(a, b, r1, r2) in caps { stroke(blip, a, b, r1 + LINE, r2 + LINE, ink); }
     for &(a, b, r1, r2) in caps { stroke(blip, a, b, r1, r2, fill); }
+    cel(blip, caps, fill);
+}
+
+/// The shadow and glint of `shape` over pieces already filled with `fill`.
+pub(crate) fn cel(blip: &Blip, caps: &[Cap], fill: BlipColor) {
+    let Some((lx, ly)) = LIGHT.get() else { return };
+    // Away from the light, square to each piece.
+    let away = |a: V, b: V| {
+        let d = dist(a, b);
+        if d < 0.5 { return (-lx, -ly); }
+        let (nx, ny) = (-(b.1 - a.1) / d, (b.0 - a.0) / d);
+        if nx * lx + ny * ly > 0.0 { (-nx, -ny) } else { (nx, ny) }
+    };
+    // A capsule moved in by `k` of its radius and shrunk by as much stays inside the piece.
+    let inset = |a: V, b: V, r1: f32, r2: f32, (nx, ny): (f32, f32), k: f32, keep: f32| {
+        (V(a.0 + nx * r1 * k, a.1 + ny * r1 * k), V(b.0 + nx * r2 * k, b.1 + ny * r2 * k), r1 * keep, r2 * keep)
+    };
+    let (light, dusk) = TINT.get();
+    let dark = blend(shade(fill, 0.70), dusk, 0.16);
+    for &(a, b, r1, r2) in caps {
+        let (p, q, s1, s2) = inset(a, b, r1, r2, away(a, b), 0.45, 0.55);
+        stroke(blip, p, q, s1, s2, dark);
+    }
+    let lit = blend(fill, light, 0.30);
+    for &(a, b, r1, r2) in caps.iter().filter(|c| c.2.min(c.3) >= 3.0) {
+        let (nx, ny) = away(a, b);
+        let (p, q, s1, s2) = inset(a, b, r1, r2, (-nx, -ny), 0.58, 0.20);
+        stroke(blip, along(p, q, 0.15), along(p, q, 0.85), s1, s2, lit);
+    }
 }
 
 /// Minimum interior angle at full fold: about 30° at a knee and 35° at an elbow.
@@ -215,7 +292,7 @@ pub(crate) fn draw_leg(blip: &Blip, l: &Look, hip: V, knee: V, ankle: V, fwd: f3
     let b = l.bulk;
     let ink = l.ink();
     let (skin, cloth, trim) = (l.c(l.skin), l.c(l.cloth), l.c(l.trim));
-    let booted = !matches!(l.build, Build::Gi | Build::Turtle | Build::Giant);
+    let booted = !matches!(l.build, Build::Gi | Build::Duelist | Build::Turtle | Build::Giant);
 
     // The pose places the sole; a kick (well off the floor) places the ankle
     // itself, with the foot pointed along the shin.
@@ -243,21 +320,29 @@ pub(crate) fn draw_leg(blip: &Blip, l: &Look, hip: V, knee: V, ankle: V, fwd: f3
 
     // Thigh, a calf that swells below the knee, and a thin ankle.
     let (top, mid, calf, thin) = match l.build {
-        Build::Gi => (10.0, 8.0, 7.6, 3.8),
+        Build::Gi | Build::Duelist => (10.0, 8.0, 7.6, 3.8),
         Build::Suit | Build::Spider | Build::Caped | Build::Uniform | Build::Commando => (8.8, 6.4, 6.2, 4.2),
-        Build::Qipao => (10.2, 6.8, 6.8, 4.0),
+        Build::Tunic => (10.2, 6.8, 6.8, 4.0),
         Build::Bare | Build::Gladiator | Build::Ganger => (10.0, 7.6, 7.2, 5.0),
         Build::Turtle | Build::Giant => (10.0, 7.4, 7.2, 4.0),
+        Build::Civvy => (9.4, 7.0, 6.6, 4.2),
+        Build::Track => (9.0, 6.6, 6.4, 4.0),
     };
     let swell = along(knee, ankle, 0.30);
     let thigh = (hip, knee, top * b, mid * b);
     let shin = [(knee, swell, mid * b, calf * b), (swell, ankle, calf * b, thin * b)];
     match l.build {
-        Build::Qipao | Build::Gladiator => {
+        // Loose black trousers gathered at the ankle, and cloth shoes on white soles.
+        Build::Tunic => {
+            let pants = l.c(BlipColor { r: 0.12, g: 0.11, b: 0.13, a: 1.0 });
+            shape(blip, &[(hip, knee, (top + 0.8) * b, (mid + 1.0) * b), (knee, swell, (mid + 1.0) * b, (calf + 0.8) * b),
+                (swell, ankle, (calf + 0.8) * b, (thin + 1.2) * b)], pants, ink);
+            shape(blip, &[foot[0], foot[1]], l.c(BlipColor { r: 0.10, g: 0.09, b: 0.10, a: 1.0 }), ink);
+        }
+        Build::Gladiator => {
             shape(blip, &[thigh, shin[0], shin[1]], skin, ink);
             let cuff = along(knee, ankle, 0.18);
-            let boot = if l.build == Build::Qipao { l.c(PALE) } else { trim };
-            shape(blip, &[(cuff, ankle, 7.6 * b, 5.0 * b), foot[0], foot[1]], boot, ink);
+            shape(blip, &[(cuff, ankle, 7.6 * b, 5.0 * b), foot[0], foot[1]], trim, ink);
         }
         // Bare legs and feet, one skin: knee pads, or trousers torn at the knee.
         Build::Turtle | Build::Giant => {
@@ -265,21 +350,34 @@ pub(crate) fn draw_leg(blip: &Blip, l: &Look, hip: V, knee: V, ankle: V, fwd: f3
             if l.build == Build::Turtle { blip.fill_circle(knee.0, knee.1, mid * b, trim); }
             else { stroke(blip, hip, along(hip, knee, 0.85), top * b, (mid + 0.4) * b, cloth); }
         }
-        // Loose trousers to the shin, bare below.
-        Build::Gi => {
-            let hem = along(swell, ankle, 0.72);
+        // Loose trousers to the shin, bare below; the duelist's karate trousers come down to the ankle.
+        Build::Gi | Build::Duelist => {
+            let hem = along(swell, ankle, if l.build == Build::Duelist { 0.90 } else { 0.72 });
             shape(blip, &[(hem, ankle, 4.6 * b, thin * b), foot[0], foot[1]], skin, ink);
             shape(blip, &[thigh, shin[0], (swell, hem, calf * b, 6.6 * b)], cloth, ink);
         }
         // Boots, with a shaft up the shin: dark leather on the wrestler.
         _ => {
             shape(blip, &[thigh, shin[0], shin[1]], cloth, ink);
-            let boot = if l.build == Build::Bare { l.c(BOOT) } else { trim };
-            let cuff = along(swell, ankle, 0.45);
+            // (DRAKE's sneakers match the suit, as in Game of Death: yellow with the black stripe; black with the
+            // black trousers.)
+            let boot = match l.build {
+                Build::Bare | Build::Civvy => l.c(BOOT),
+                Build::Track => cloth,
+                _ => trim,
+            };
+            // A shoe comes up to the ankle; a boot halfway up the shin.
+            let cuff = along(swell, ankle, if matches!(l.build, Build::Civvy | Build::Track) { 0.80 } else { 0.45 });
             shape(blip, &[(cuff, ankle, (thin + 1.6) * b, (thin + 0.6) * b), foot[0], foot[1]], boot, ink);
         }
     }
 
+    // The track suit's stripe down the outside of the leg, and across the shoe.
+    if l.build == Build::Track {
+        stroke(blip, along(heel_at, ball, 0.2), along(ball, toe, 0.5), 1.0 * b, 0.8 * b, trim);
+        stroke(blip, along(hip, knee, 0.15), knee, 1.5 * b, 1.4 * b, trim);
+        stroke(blip, knee, along(knee, ankle, 0.75), 1.4 * b, 1.2 * b, trim);
+    }
     // The back of the near leg in shadow, like the back of the body.
     if !l.far {
         let behind = |a: V, c: V| {
@@ -288,7 +386,11 @@ pub(crate) fn draw_leg(blip: &Blip, l: &Look, hip: V, knee: V, ankle: V, fwd: f3
             // Under the leg when it is raised, behind it when it stands.
             if -0.4 * p.0 * fwd + p.1 >= -0.4 * q.0 * fwd + q.1 { p } else { q }
         };
-        let thigh_c = if matches!(l.build, Build::Turtle | Build::Qipao | Build::Gladiator) { skin } else { cloth };
+        let thigh_c = match l.build {
+            Build::Turtle | Build::Gladiator => skin,
+            Build::Tunic => l.c(BlipColor { r: 0.12, g: 0.11, b: 0.13, a: 1.0 }),
+            _ => cloth,
+        };
         let (px, py) = behind(hip, knee);
         let off = |v: V, d: f32| V(v.0 + px * d * b, v.1 + py * d * b);
         stroke(blip, off(along(hip, knee, 0.25), top * 0.85 - 3.0), off(knee, mid - 2.8), 2.8 * b, 2.6 * b,
@@ -300,7 +402,12 @@ pub(crate) fn draw_leg(blip: &Blip, l: &Look, hip: V, knee: V, ankle: V, fwd: f3
     if l.far { return; }
     let dark = shade(skin, 0.62);
     if booted {
-        let sole = shade(if l.build == Build::Bare { l.c(BOOT) } else { trim }, 0.55);
+        let sole = match l.build {
+            Build::Bare | Build::Civvy => shade(l.c(BOOT), 0.55),
+            Build::Track => l.c(BlipColor { r: 0.62, g: 0.58, b: 0.52, a: 1.0 }),
+            Build::Tunic => l.c(PALE),
+            _ => shade(trim, 0.55),
+        };
         let under = |p: V, r: f32| V(p.0 + nx * r, p.1 + ny * r);
         stroke(blip, under(heel_at, 4.3 * b), under(ball, 3.0 * b), 1.1 * b, 1.0 * b, sole);
         stroke(blip, under(ball, 3.0 * b), under(toe, (toe_r - 1.0) * b), 1.0 * b, 0.9 * b, sole);
@@ -324,7 +431,8 @@ pub(crate) fn draw_arm(blip: &Blip, l: &Look, shoulder: V, elbow: V, hand: V, op
     let b = l.bulk;
     let ink = l.ink();
     let (skin, trim) = (l.c(l.skin), l.c(l.trim));
-    let sleeved = matches!(l.build, Build::Suit | Build::Spider | Build::Caped | Build::Uniform | Build::Commando);
+    let sleeved = matches!(l.build, Build::Suit | Build::Spider | Build::Caped | Build::Uniform | Build::Commando)
+        || (l.build == Build::Track && !l.torn);
     let (dx, dy) = unit(elbow, hand);
     let (px, py) = (-dy * fwd, dx * fwd);
     let at = |f: f32, a: f32| V(hand.0 + (dx * f + px * a) * b, hand.1 + (dy * f + py * a) * b);
@@ -335,10 +443,10 @@ pub(crate) fn draw_arm(blip: &Blip, l: &Look, shoulder: V, elbow: V, hand: V, op
     let biceps = along(shoulder, elbow, 0.45);
     let swell = along(elbow, wrist, 0.30);
     shape(blip, &[
-        (shoulder, biceps, 6.8 * b, 6.2 * b),
-        (biceps, elbow, 6.2 * b, 4.6 * b),
-        (elbow, swell, 4.6 * b, 5.2 * b),
-        (swell, wrist, 5.2 * b, 3.6 * b),
+        (shoulder, biceps, 7.6 * b, 6.9 * b),
+        (biceps, elbow, 6.9 * b, 5.0 * b),
+        (elbow, swell, 5.0 * b, 5.9 * b),
+        (swell, wrist, 5.9 * b, 3.9 * b),
     ], if sleeved { l.c(l.cloth) } else { skin }, ink);
     if l.build == Build::Ganger && !l.far {
         let tattoo = shade(skin, 0.48);
@@ -346,16 +454,22 @@ pub(crate) fn draw_arm(blip: &Blip, l: &Look, shoulder: V, elbow: V, hand: V, op
         stroke(blip, along(shoulder, elbow, 0.40), along(shoulder, elbow, 0.64), 0.65 * b, 0.9 * b, tattoo);
         stroke(blip, along(shoulder, elbow, 0.49), along(shoulder, elbow, 0.71), 0.65 * b, 0.55 * b, tattoo);
     }
-    if matches!(l.build, Build::Qipao | Build::Uniform) {
-        let end = along(shoulder, elbow, if l.build == Build::Qipao { 0.32 } else { 0.24 });
-        shape(blip, &[(shoulder, end, 8.6 * b, 7.2 * b)],
-            if l.build == Build::Uniform { trim } else { l.c(l.cloth) }, ink);
+    if matches!(l.build, Build::Uniform | Build::Civvy) {
+        let end = along(shoulder, elbow, if l.build == Build::Civvy { 0.55 } else { 0.24 });
+        shape(blip, &[(shoulder, end, 8.6 * b, 7.2 * b)], trim, ink);
     }
     // What is worn on the forearm, inside the arm's own outline.
     let band = |from: f32, to: f32| stroke(blip, along(swell, wrist, from), along(swell, wrist, to),
-        (5.2 - 1.6 * from) * b, (5.2 - 1.6 * to) * b, trim);
+        (5.9 - 2.0 * from) * b, (5.9 - 2.0 * to) * b, trim);
     match l.build {
-        Build::Giant | Build::Caped => {}
+        Build::Giant | Build::Caped | Build::Civvy | Build::Duelist => {}
+        // The stripe down the sleeve, to the cuff.
+        // (In two pieces bending at the elbow: one line from shoulder to cuff left the arm whenever it bent.)
+        Build::Track if !l.torn => {
+            stroke(blip, along(shoulder, elbow, 0.15), elbow, 1.3 * b, 1.2 * b, trim);
+            stroke(blip, elbow, along(elbow, wrist, 0.8), 1.2 * b, 1.1 * b, trim);
+        }
+        Build::Track => {}
         Build::Spider => band(0.2, 1.0),
         Build::Turtle => {
             blip.fill_circle(elbow.0, elbow.1, 4.6 * b, trim);
@@ -374,9 +488,17 @@ pub(crate) fn draw_arm(blip: &Blip, l: &Look, shoulder: V, elbow: V, hand: V, op
         let r = if l.build == Build::Turtle { 1.5 } else { 1.15 };
         let mut caps = vec![(at(-3.0, 0.0), at(1.0, 0.0), 3.3 * b, 3.3 * b),
                             (at(-1.0, -2.6), at(2.4, -4.8), 1.4 * b, 1.1 * b)];
-        for a in fingers { caps.push((at(2.0, *a), at(6.2, a * 1.25 + 0.6), r * b, (r - 0.2) * b)); }
+        for a in fingers {
+            if l.claw {
+                // Out to the second knuckle, then hooked down hard.
+                caps.push((at(2.0, *a), at(4.8, a * 1.2 + 0.2), r * b, r * b));
+                caps.push((at(4.8, a * 1.2 + 0.2), at(5.4, a * 1.2 + 2.6), r * b, (r - 0.3) * b));
+            } else {
+                caps.push((at(2.0, *a), at(6.2, a * 1.25 + 0.6), r * b, (r - 0.2) * b));
+            }
+        }
         shape(blip, &caps, skin, ink);
-        if lines {
+        if lines && !l.claw {
             for w in fingers.windows(2) {
                 let a = (w[0] + w[1]) / 2.0;
                 crease(at(2.8, a), at(6.0, a * 1.25 + 0.6));
@@ -400,8 +522,8 @@ pub(crate) fn draw_arm(blip: &Blip, l: &Look, shoulder: V, elbow: V, hand: V, op
 }
 
 /// A wedge: narrow hips, wide chest.
-pub(crate) const WAIST_R: f32 = 8.6;
-pub(crate) const CHEST_R: f32 = 12.8;
+pub(crate) const WAIST_R: f32 = 9.2;
+pub(crate) const CHEST_R: f32 = 14.2;
 pub(crate) const CHEST_AT: f32 = 0.60;
 pub(crate) const BELT_AT: f32 = 0.30;
 /// The body's radius at the belt.
@@ -419,11 +541,13 @@ pub(crate) fn draw_torso(blip: &Blip, l: &Look, hip: V, neck: V, fwd: f32) {
     let chest = along(hip, neck, CHEST_AT);
     let front = |k: f32, out: f32| { let v = along(hip, neck, k); V(v.0 + fwd * out * b, v.1) };
     let body = match l.build {
-        Build::Gi | Build::Suit | Build::Caped | Build::Qipao | Build::Uniform | Build::Commando | Build::Gladiator => l.c(l.cloth),
+        Build::Gi | Build::Suit | Build::Caped | Build::Tunic | Build::Uniform | Build::Commando | Build::Gladiator => l.c(l.cloth),
         Build::Ganger => l.c(l.skin),
-        Build::Bare | Build::Giant => l.c(l.skin),
+        Build::Bare | Build::Giant | Build::Duelist => l.c(l.skin),
         Build::Turtle => l.c(PLASTRON),
-        Build::Spider => l.c(l.trim),
+        Build::Spider | Build::Civvy => l.c(l.trim),
+        Build::Track if l.torn => l.c(l.skin),
+        Build::Track => l.c(l.cloth),
     };
     // The shell, behind the body.
     if l.build == Build::Turtle {
@@ -443,26 +567,48 @@ pub(crate) fn draw_torso(blip: &Blip, l: &Look, hip: V, neck: V, fwd: f32) {
     let seat_c = if l.build == Build::Turtle { l.c(l.skin) } else { l.c(l.cloth) };
     for &(a, c, r1, r2) in trunk.iter().chain([&seat]) { stroke(blip, a, c, r1 + LINE, r2 + LINE, ink); }
     stroke(blip, seat.0, seat.1, seat.2, seat.3, seat_c);
+    cel(blip, &[seat], seat_c);
     for &(a, c, r1, r2) in &trunk { stroke(blip, a, c, r1, r2, body); }
+    cel(blip, &trunk, body);
     let crease = |a: V, b: V| stroke(blip, a, b, 1.0, 1.0, shade(body, 0.62));
+    // Trousers up to the waist over the trunk.
+    let trousers = || {
+        stroke(blip, hip, along(hip, neck, BELT_AT), WAIST_R * b, BELT_R * b, l.c(l.cloth));
+        // That stroke ends in a dome above the belt; the trunk is put back over it in slices across the
+        // body, so the trousers stop at the waist.
+        let (sx, sy) = unit(hip, neck);
+        let len = dist(hip, neck);
+        let mut t = BELT_AT;
+        while t < BELT_AT + (BELT_R * b + 2.0) / len {
+            let at = along(hip, neck, t);
+            let w = (WAIST_R + (CHEST_R - WAIST_R) * (t / CHEST_AT).min(1.0)) * b - 1.2;
+            stroke(blip, V(at.0 + sy * w, at.1 - sx * w), V(at.0 - sy * w, at.1 + sx * w), 1.2, 1.2, body);
+            t += 1.0 / len;
+        }
+    };
     match l.build {
         // The open collar of a gi: skin in a V down to the belt.
         Build::Gi => stroke(blip, front(0.92, 1.0), front(0.42, 2.0), 4.6 * b, 1.2 * b, l.c(l.skin)),
+        // Trousers to the waist, the lines of the chest, and the hair on it (Way of the Dragon's famous hairy chest).
+        Build::Duelist => {
+            trousers();
+            crease(front(0.66, -8.0), front(0.61, -1.0));
+            crease(front(0.61, 1.5), front(0.66, 9.0));
+            crease(front(0.50, 0.5), front(0.40, 0.5));
+            // Short strokes, not a patch: a patch read as a shadow. Across the chest and down the middle to the belly.
+            let hair = BlipColor { a: 0.75, ..shade(l.c(l.hair), 0.55) };
+            for k in 0..7 {
+                let (u, across) = (0.78 - 0.035 * (k % 2) as f32, -5.0 + 1.7 * k as f32);
+                stroke(blip, front(u, across), front(u - 0.05, across + 0.8), 0.45 * b, 0.35 * b, hair);
+            }
+            for k in 0..4 {
+                let u = 0.66 - 0.06 * k as f32;
+                stroke(blip, front(u, 0.6 + 0.6 * (k % 2) as f32), front(u - 0.04, 1.4), 0.45 * b, 0.35 * b, hair);
+            }
+        }
         // Trousers to the waist, and the line under the chest.
         Build::Bare | Build::Giant => {
-            stroke(blip, hip, along(hip, neck, BELT_AT), WAIST_R * b, BELT_R * b, l.c(l.cloth));
-            // That stroke ends in a dome above the belt; the skin is put
-            // back over it in slices across the body, so the trousers stop
-            // at the waist.
-            let (sx, sy) = unit(hip, neck);
-            let len = dist(hip, neck);
-            let mut t = BELT_AT;
-            while t < BELT_AT + (BELT_R * b + 2.0) / len {
-                let at = along(hip, neck, t);
-                let w = (WAIST_R + (CHEST_R - WAIST_R) * (t / CHEST_AT).min(1.0)) * b - 1.2;
-                stroke(blip, V(at.0 + sy * w, at.1 - sx * w), V(at.0 - sy * w, at.1 + sx * w), 1.2, 1.2, body);
-                t += 1.0 / len;
-            }
+            trousers();
             // The chest faces the viewer: a line under each side of it, the
             // breastbone between, and the top of the stomach.
             crease(front(0.66, -8.0), front(0.61, -1.0));
@@ -470,16 +616,41 @@ pub(crate) fn draw_torso(blip: &Blip, l: &Look, hip: V, neck: V, fwd: f32) {
             crease(front(0.84, 0.5), front(0.63, 0.5));
             crease(front(0.50, 0.5), front(0.40, 0.5));
         }
+        // An open collar and a button placket.
+        Build::Civvy => {
+            trousers();
+            stroke(blip, front(0.93, 1.0), front(0.80, 2.0), 3.6 * b, 1.0 * b, l.c(l.skin));
+            stroke(blip, front(0.78, 2.5), front(0.34, 3.0), 0.6 * b, 0.6 * b, shade(body, 0.70));
+        }
+        // A stripe down each side, a zip up the front to a small collar.
+        // Torn away: trousers to the waist, a lean chest, and three claw marks raked across it.
+        Build::Track if l.torn => {
+            trousers();
+            crease(front(0.66, -8.0), front(0.61, -1.0));
+            crease(front(0.61, 1.5), front(0.66, 9.0));
+            crease(front(0.50, 0.5), front(0.40, 0.5));
+            let blood = l.c(BlipColor { r: 0.72, g: 0.10, b: 0.10, a: 1.0 });
+            for k in 0..if l.scars { 3 } else { 0 } {
+                let o = k as f32 * 3.2 - 3.2;
+                stroke(blip, front(0.84 + o * 0.012, -8.0 + o), front(0.52 + o * 0.012, 8.0 + o), 1.0 * b, 0.6 * b, blood);
+            }
+        }
+        Build::Track => {
+            stroke(blip, front(0.10, -8.5), front(0.86, -7.0), 1.6 * b, 1.4 * b, l.c(l.trim));
+            stroke(blip, front(0.30, 2.0), front(0.92, 2.0), 0.5 * b, 0.5 * b, shade(body, 0.66));
+        }
         // A stripe down the front of the suit.
         Build::Suit => stroke(blip, front(0.36, 1.0), front(0.82, 1.0), 2.0 * b, 2.0 * b, l.c(l.trim)),
-        Build::Qipao => {
-            stroke(blip, front(0.90, -2.0), front(0.70, 5.0), 1.5 * b, 1.5 * b, l.c(l.trim));
-            for side in [-1.0f32, 1.0] {
-                let top = front(0.18, side * 6.0);
-                let hem = V(hip.0 + fwd * side * 13.0 * b, hip.1 + 14.0 * b);
-                shape(blip, &[(top, hem, 5.0 * b, 3.0 * b)], body, ink);
-                stroke(blip, top, hem, 1.2 * b, 1.2 * b, l.c(l.trim));
+        // A standing collar edged in red, frog buttons down the front, the tunic's skirt over the trousers.
+        Build::Tunic => {
+            stroke(blip, front(0.95, -3.0), front(0.95, 4.0), 1.6 * b, 1.6 * b, l.c(l.trim));
+            for k in [0.80f32, 0.66, 0.52] {
+                let at = front(k, 3.0);
+                stroke(blip, V(at.0 - 2.5 * b, at.1), V(at.0 + 2.5 * b, at.1), 0.9 * b, 0.9 * b, l.c(l.trim));
             }
+            stroke(blip, front(0.90, 3.0), front(0.40, 3.0), 0.6 * b, 0.6 * b, shade(body, 0.66));
+            let hem = V(hip.0 + fwd * 4.0 * b, hip.1 + 10.0 * b);
+            shape(blip, &[(front(0.15, 2.0), hem, 7.0 * b, 6.0 * b)], body, ink);
         }
         Build::Uniform => {
             stroke(blip, front(0.90, 2.0), front(0.26, 2.0), 1.0 * b, 1.0 * b, ink);
@@ -533,7 +704,7 @@ pub(crate) fn draw_torso(blip: &Blip, l: &Look, hip: V, neck: V, fwd: f32) {
 
     // One shadow tone down the back and under the seat: the light is in
     // front and above, and a body with no dark side is a paper cut-out.
-    if l.build == Build::Turtle { return; }
+    if l.build == Build::Turtle || LIGHT.get().is_some() { return; }
     let radius = |t: f32| if t <= CHEST_AT { WAIST_R + (CHEST_R - WAIST_R) * t / CHEST_AT }
         else { CHEST_R + (6.5 - CHEST_R) * (t - CHEST_AT) / (0.90 - CHEST_AT) };
     let back = |t: f32, r: f32| {
@@ -542,7 +713,7 @@ pub(crate) fn draw_torso(blip: &Blip, l: &Look, hip: V, neck: V, fwd: f32) {
         V(v.0 + sy * fwd * out, v.1 - sx * fwd * out)
     };
     let dim = |c: BlipColor| shade(c, 0.84);
-    let lower = if matches!(l.build, Build::Bare | Build::Giant) { l.c(l.cloth) } else { body };
+    let lower = if matches!(l.build, Build::Bare | Build::Giant | Build::Civvy | Build::Duelist) { l.c(l.cloth) } else { body };
     stroke(blip, back(0.38, 3.4), back(0.62, 3.6), 3.4 * b, 3.6 * b, dim(body));
     stroke(blip, back(0.62, 3.6), back(0.84, 2.6), 3.6 * b, 2.6 * b, dim(body));
     stroke(blip, back(0.04, 3.0), back(0.24, 3.2), 3.0 * b, 3.2 * b, dim(lower));
@@ -580,11 +751,12 @@ pub(crate) fn draw_cape(blip: &Blip, l: &Look, hip: V, neck: V, fwd: f32, level:
 pub(crate) fn draw_belt(blip: &Blip, l: &Look, hip: V, neck: V, fwd: f32) {
     let b = l.bulk;
     let c = match l.build {
-        Build::Gi => l.c(BlipColor { r: 0.13, g: 0.12, b: 0.15, a: 1.0 }),
+        Build::Gi | Build::Duelist => l.c(BlipColor { r: 0.13, g: 0.12, b: 0.15, a: 1.0 }),
         Build::Turtle => l.c(BlipColor { r: 0.38, g: 0.24, b: 0.13, a: 1.0 }),
-        Build::Bare | Build::Suit | Build::Qipao | Build::Uniform | Build::Commando | Build::Gladiator | Build::Ganger => l.c(l.trim),
+        Build::Bare | Build::Suit | Build::Tunic | Build::Uniform | Build::Commando | Build::Gladiator | Build::Ganger => l.c(l.trim),
         Build::Caped => l.c(GOLD),
-        Build::Spider | Build::Giant => return,
+        Build::Civvy => l.c(BOOT),
+        Build::Spider | Build::Giant | Build::Track => return,
     };
     let at = along(hip, neck, BELT_AT);
     let (sx, sy) = unit(hip, neck);
@@ -595,7 +767,7 @@ pub(crate) fn draw_belt(blip: &Blip, l: &Look, hip: V, neck: V, fwd: f32) {
     let knot = V(at.0 + fwd * 1.0 * b, at.1);
     match l.build {
         // The knot and one end hanging off it.
-        Build::Gi => stroke(blip, knot, V(knot.0 + fwd * 1.5, knot.1 + 10.0 * b), 2.2 * b, 1.2 * b, c),
+        Build::Gi | Build::Duelist => stroke(blip, knot, V(knot.0 + fwd * 1.5, knot.1 + 10.0 * b), 2.2 * b, 1.2 * b, c),
         // A buckle in the mask's colour.
         Build::Turtle => blip.fill_circle(knot.0, knot.1, 3.4 * b, l.c(l.trim)),
         _ => {}
@@ -637,7 +809,10 @@ pub(crate) fn draw_head(blip: &Blip, l: &Look, fw: f32, head: V, neck: V, mood: 
         // Neat, with one curl on the forehead.
         Build::Caped => &[dot(-0.22, -0.44, 0.80), dot(-0.66, 0.00, 0.50),
                           dot(0.52, -0.66, 0.20)],
-        Build::Qipao => &[dot(-0.25, -0.45, 0.80), dot(-0.85, -0.75, 0.50), dot(0.15, -0.95, 0.40)],
+        // Drawn back smooth into one long braid down the back.
+        Build::Tunic => &[dot(-0.26, -0.44, 0.80), dot(-0.70, -0.10, 0.50),
+            (at(-0.90, 0.20), at(-1.20 + l.wind.0, 1.20 + l.wind.1), 0.24 * r, 0.20 * r),
+            (at(-1.20 + l.wind.0, 1.20 + l.wind.1), at(-1.35 + l.wind.0 * 1.4, 2.10 + l.wind.1 * 1.4), 0.20 * r, 0.14 * r)],
         Build::Uniform => &[dot(-0.35, -0.35, 0.75)],
         Build::Commando => &[dot(-0.26, -0.40, 0.78),
             (at(-0.85, 0.10), at(-1.35 + l.wind.0, 1.90 + l.wind.1), 0.22 * r, 0.12 * r),
@@ -645,22 +820,69 @@ pub(crate) fn draw_head(blip: &Blip, l: &Look, fw: f32, head: V, neck: V, mood: 
         Build::Gladiator => &[dot(-0.60, -0.35, 0.75), dot(-0.35, -0.85, 0.60), dot(0.25, -0.90, 0.48)],
         Build::Bare | Build::Turtle | Build::Spider => &[],
         Build::Ganger => &[dot(-0.22, -0.42, 0.80), dot(-0.66, 0.02, 0.52)],
+        // Shaggy: full on top, down over the ears and the nape, a thick fringe across the forehead.
+        Build::Duelist => &[dot(-0.32, -0.56, 0.78), dot(-0.66, 0.06, 0.56), dot(-0.32, 0.08, 0.38),
+                            (at(0.0, -0.86), at(0.46, -0.66), 0.34 * r, 0.20 * r),
+                            // Ragged ends: locks hanging at the nape and over the ear.
+                            (at(-0.70, 0.30), at(-0.78 + 0.3 * l.wind.0, 0.66 + 0.3 * l.wind.1), 0.22 * r, 0.10 * r),
+                            (at(-0.42, 0.34), at(-0.44 + 0.3 * l.wind.0, 0.62 + 0.3 * l.wind.1), 0.18 * r, 0.08 * r),
+                            (at(-0.92, 0.10), at(-1.04 + 0.3 * l.wind.0, 0.40 + 0.3 * l.wind.1), 0.18 * r, 0.08 * r),
+                            (at(0.30, -0.80), at(0.72 + 0.4 * l.wind.0, -0.48 + 0.4 * l.wind.1), 0.20 * r, 0.10 * r)],
+        // Short and thick, a fringe swept down over the brow.
+        // (The fringe stops short of the brow: his frown is half the character.)
+        // Thick across the top and down to just above the brow, a fringe swept to the side, full at the back.
+        Build::Track => &[dot(-0.32, -0.62, 0.76), dot(-0.70, -0.06, 0.50),
+                          (at(-0.10, -0.90), at(0.42, -0.74), 0.38 * r, 0.26 * r),
+                          // (The fringe's tip moves with the loose ends: it flicks when he is struck.)
+                          (at(0.20, -0.92), at(0.66 + 0.4 * l.wind.0, -0.55 + 0.4 * l.wind.1), 0.24 * r, 0.10 * r)],
+        Build::Civvy => match l.hairdo {
+            1 => &[],
+            2 => &[dot(-0.25, -0.45, 0.82), (at(-0.70, -0.30), at(-0.86 + l.wind.0, 0.95), 0.52 * r, 0.40 * r)],
+            3 => &[dot(-0.25, -0.45, 0.80), dot(-1.00, -0.55, 0.36)],
+            4 => &[dot(-0.18, -0.50, 0.96), dot(-0.66, -0.12, 0.66)],
+            _ => &[dot(-0.30, -0.42, 0.78), dot(-0.64, -0.06, 0.46)],
+        },
     };
     for &(a, b, r1, r2) in locks { stroke(blip, a, b, r1 + LINE, r2 + LINE, ink); }
 
     // Neck, skull and jaw as one silhouette. The jaw hung off the front of
     // the skull is what makes it a profile; a turtle has a muzzle instead.
-    let neck = (neck, at(-0.12, 0.55), 5.2 * l.bulk, 4.8 * l.bulk);
+    // (DRAKE's neck is thicker, as Bruce Lee's was.)
+    let thick = if l.build == Build::Track { 1.25 } else { 1.0 };
+    let neck = (neck, at(-0.12, 0.55), 5.2 * l.bulk * thick, 4.8 * l.bulk * thick);
     match l.build {
         Build::Turtle => shape(blip, &[neck, dot(0.0, 0.0, 1.0),
             (at(0.16, 0.36), at(0.56, 0.42), 0.62 * r, 0.56 * r)], skin, ink),
         Build::Spider => shape(blip, &[neck, dot(0.0, 0.0, 1.0),
             (at(0.08, 0.30), at(0.40, 0.62), 0.60 * r, 0.42 * r)], skin, ink),
-        _ => shape(blip, &[neck, dot(0.0, 0.0, 1.0),
-            (at(0.08, 0.30), at(0.44, 0.64), 0.60 * r, 0.42 * r),
-            dot(0.98, 0.14, 0.15)], skin, ink),
+        _ => {
+            // A face is lit by its features, not as a ball: the general shading would darken the back half of
+            // the skull. The neck in the jaw's shadow, the hollow under the cheekbone, the back of the skull.
+            let light = LIGHT.get();
+            light_from(None);
+            // DRAKE's jaw is square: a fuller chin, and the angle of the jaw standing out under the ear.
+            let track = matches!(l.build, Build::Track | Build::Duelist);
+            let jaw = if track { (at(0.06, 0.34), at(0.48, 0.66), 0.64 * r, 0.48 * r) }
+                      else { (at(0.08, 0.30), at(0.44, 0.64), 0.60 * r, 0.42 * r) };
+            let angle = if track { dot(-0.30, 0.46, 0.46) } else { dot(0.0, 0.0, 1.0) };
+            shape(blip, &[neck, dot(0.0, 0.0, 1.0), jaw, dot(0.98, 0.14, 0.15), angle], skin, ink);
+            LIGHT.set(light);
+            if light.is_some() && !l.prone {
+                let low = shade(skin, 0.74);
+                stroke(blip, neck.0, along(neck.0, neck.1, 0.30), 4.0 * l.bulk, 3.6 * l.bulk, low);
+                stroke(blip, at(-0.50, 0.20), at(-0.30, 0.58), 0.26 * r, 0.20 * r, shade(skin, 0.84));
+                // The hollow under the cheekbone; deeper on DRAKE's lean face.
+                let (hw, hs) = if track { (0.11, 0.79) } else { (0.09, 0.82) };
+                stroke(blip, at(0.10, 0.22), at(0.36, 0.50), hw * r, hw * 0.66 * r, shade(skin, hs));
+                stroke(blip, at(0.36, 0.78), at(0.62, 0.70), 0.08 * r, 0.06 * r, low);
+            }
+        }
     }
     for &(a, b, r1, r2) in locks { stroke(blip, a, b, r1, r2, hair); }
+    // A sheen across the top of the hair.
+    if LIGHT.get().is_some() && !locks.is_empty() && !l.prone {
+        stroke(blip, at(-0.42, -0.86), at(0.10, -0.96), 0.10 * r, 0.07 * r, blend(hair, BLIP_WHITE, 0.30));
+    }
 
     // A band round the head with two ends trailing behind: a headband at the
     // hairline, or a turtle's mask across the eyes.
@@ -674,17 +896,14 @@ pub(crate) fn draw_head(blip: &Blip, l: &Look, fw: f32, head: V, neck: V, mood: 
     };
     match l.build {
         Build::Ganger => band(-0.40, 0.22),
+        // Sideburns down to the ear.
+        Build::Track => stroke(blip, at(-0.20, -0.20), at(-0.10, 0.22), 0.12 * r, 0.08 * r, hair),
         Build::Gi => band(-0.40, 0.19),
         Build::Turtle => band(-0.14, 0.30),
         // A beard along the jaw.
         Build::Bare => stroke(blip, at(-0.10, 0.52), at(0.50, 0.70), 0.44 * r, 0.40 * r, hair),
-        Build::Qipao => {
-            for (f, d) in [(-0.90f32, -0.70f32), (0.20, -0.90)] {
-                shape(blip, &[dot(f, d, 0.35)], l.c(PALE), ink);
-                stroke(blip, at(f, d), at(f - 0.35 + l.wind.0, d + 1.0 + l.wind.1),
-                    0.10 * r, 0.06 * r, l.c(PALE));
-            }
-        }
+        // A red tie where the braid starts.
+        Build::Tunic => blip.fill_circle(at(-0.92, 0.22).0, at(-0.92, 0.22).1, 0.16 * r, l.c(l.trim)),
         Build::Uniform => {
             shape(blip, &[(at(-0.65, -0.65), at(0.45, -0.65), 0.43 * r, 0.43 * r)], l.c(l.cloth), ink);
             stroke(blip, at(-0.65, -0.38), at(1.12, -0.38), 0.14 * r, 0.10 * r, l.c(l.trim));
@@ -714,7 +933,12 @@ pub(crate) fn draw_head(blip: &Blip, l: &Look, fw: f32, head: V, neck: V, mood: 
     }
 
     // The face: brow, eye, mouth, and each one changes with the mood.
-    let brow = if l.build == Build::Giant { 0.14 } else { 0.09 };
+    // (DRAKE's brows are heavy and straight, his famous scowl.)
+    let brow = match l.build { Build::Giant => 0.14, Build::Track => 0.13, _ => 0.10 };
+    // The brow throws a shadow over the eye.
+    if LIGHT.get().is_some() && !l.prone {
+        stroke(blip, at(0.26, -0.30), at(0.82, -0.14), 0.09 * r, 0.07 * r, shade(skin, 0.80));
+    }
     if mood == Mood::Hurt {
         // Screwed shut.
         line(at(0.34, -0.24), at(0.66, -0.08), 0.07);
@@ -726,15 +950,31 @@ pub(crate) fn draw_head(blip: &Blip, l: &Look, fw: f32, head: V, neck: V, mood: 
         } else {
             blip.fill_circle(eye.0, eye.1, 0.22 * r, BLIP_WHITE);
             blip.fill_circle(eye.0 + fw * 0.08 * r, eye.1, 0.12 * r, dark);
+            // DRAKE's eyes are narrowed, intent: the lid comes down over the top of the eye (not when he smiles).
+            if l.build == Build::Track && mood != Mood::Happy {
+                stroke(blip, at(0.26, -0.24), at(0.74, -0.20), 0.13 * r, 0.11 * r, skin);
+            }
         }
         if mood == Mood::Happy { line(at(0.24, -0.44), at(0.80, -0.44), brow); }
         else { line(at(0.20, -0.40), at(0.84, -0.24), brow); }
     }
     match mood {
-        Mood::Calm => line(at(0.50, 0.50), at(0.80, 0.48), 0.06),
+        // (Thinner on DRAKE: at portrait size the heavy line read as a moustache.)
+        // LANCER's calm is a confident half-smile, the corner turned up.
+        Mood::Calm if l.build == Build::Duelist => {
+            line(at(0.48, 0.50), at(0.72, 0.52), 0.05);
+            line(at(0.72, 0.52), at(0.84, 0.44), 0.05);
+        }
+        Mood::Calm => line(at(0.50, 0.50), at(0.80, 0.48), if l.build == Build::Track { 0.04 } else { 0.06 }),
         Mood::Happy => {
             line(at(0.42, 0.44), at(0.62, 0.56), 0.06);
             line(at(0.62, 0.56), at(0.84, 0.42), 0.06);
+        }
+        // DRAKE's cry is the whole face: the mouth wide, teeth bared, the nose wrinkled under the scowl.
+        Mood::Shout if l.build == Build::Track => {
+            stroke(blip, at(0.50, 0.50), at(0.76, 0.54), 0.16 * r, 0.14 * r, BlipColor { r: 0.36, g: 0.08, b: 0.10, a: 1.0 });
+            stroke(blip, at(0.50, 0.42), at(0.76, 0.46), 0.05 * r, 0.05 * r, BLIP_WHITE);
+            line(at(0.74, -0.06), at(0.86, 0.10), 0.05);
         }
         Mood::Shout | Mood::Hurt => {
             let m = at(0.62, 0.50);
@@ -760,5 +1000,9 @@ pub(crate) fn look_of(a: &Archetype, flash: f32) -> Look {
         floor: f32::INFINITY,
         prone: false,
         flash,
+        hairdo: 0,
+        claw: false,
+        torn: false,
+        scars: false,
     }
 }

@@ -97,6 +97,8 @@ pub fn menus(g: &mut Game) {
         let foe = blip::bot::num("FOE").map(|f| f as usize);
         if let Some(foe) = foe.filter(|&f| f < FIGHTERS.len() && f != g.p[1].who) {
             g.p[1] = Fighter { rounds: g.p[1].rounds, ..Fighter::new(foe, 440.0, -1.0) };
+            // At the foe's own home, as the ladder would have it (it stayed wherever the rung was).
+            g.stage = home_of(foe);
         }
     }
     let again = g.state == State::Continue && blip::bot::may_continue();

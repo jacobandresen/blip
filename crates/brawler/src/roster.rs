@@ -3,7 +3,14 @@
 
 /// What punch and kick together does.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub(crate) enum Special { ChiBolt, BullRush, TalonKick, LaserVision, DriveBy }
+pub(crate) enum Special {
+    ChiBolt, BullRush, TalonKick, LaserVision, DriveBy,
+    /// DRAKE's nunchaku: the sticks whirled round the shoulder, then cracked out in line at the head.
+    Nunchaku,
+    /// DRAKE's other: Bruce Lee's signature one-inch punch. From touching distance, the fist travelling only
+    /// the last inch behind legs, hips and shoulder firing in one chain; it throws the opponent across the stage.
+    OneInch,
+}
 
 /// What a fighter wears and how they are built, kept beside the numbers so
 /// looks and moves stay one roster.
@@ -11,6 +18,9 @@ pub(crate) enum Special { ChiBolt, BullRush, TalonKick, LaserVision, DriveBy }
 pub(crate) enum Build {
     /// Karate gi: jacket to the elbows, trousers to mid-shin, bare feet.
     Gi,
+    /// Stripped to the waist and barefoot for a duel: white karate trousers to the ankle, a black belt, a hairy
+    /// chest and shaggy hair over the ears (LANCER, after Way of the Dragon's last fight).
+    Duelist,
     /// Stripped to the waist, heavy boots.
     Bare,
     /// A one-piece flight suit, wrapped forearms and shins.
@@ -23,8 +33,9 @@ pub(crate) enum Build {
     Giant,
     /// A `cloth` suit with a cape and boots in `trim`.
     Caped,
-    /// Split blue tunic, bare thighs, tall boots and ribboned hair buns.
-    Qipao,
+    /// A sleeveless kung fu tunic in `cloth` with a mandarin collar, frog buttons and a sash in `trim`, loose
+    /// black trousers, cloth shoes, the hair in one long braid. (JADE's own look: no qipao, no buns.)
+    Tunic,
     /// Peaked cap, armoured shoulders and a military tunic.
     Uniform,
     /// A fitted commando suit, beret, gauntlets and twin braids.
@@ -33,6 +44,11 @@ pub(crate) enum Build {
     Gladiator,
     /// Streetwear, bandana and gold chain; built from the same anatomy rig.
     Ganger,
+    /// Everyday clothes, for the people watching and never a fighter: a `trim` shirt with short sleeves,
+    /// `cloth` trousers, leather shoes and belt.
+    Civvy,
+    /// A one-piece track suit in `cloth` with a `trim` stripe down each side, flat black shoes, short hair.
+    Track,
 }
 
 /// A fighter's identity, in the only terms that change how they play.
@@ -65,7 +81,16 @@ pub(crate) struct Archetype {
     pub(crate) boss: bool,
 }
 
-pub(crate) const FIGHTERS: [Archetype; 15] = [
+impl Archetype {
+    /// The colour a fighter's name, frame and bars are drawn in on screen: the trim, unless it is too dark to read
+    /// on the menus' dark ground (DRAKE's black stripe), when it is the main colour.
+    pub(crate) fn accent(&self) -> (f32, f32, f32) {
+        let (r, g, b) = self.trim;
+        if r + g + b < 0.6 { self.color } else { self.trim }
+    }
+}
+
+pub(crate) const FIGHTERS: [Archetype; 17] = [
     Archetype {
         name: "RYUKA", health: 100, walk: 132.0, back_walk: 108.0, jump_scale: 1.0,
         power: 1.0, reach: 1.0, special: Special::ChiBolt, special_name: "CHI BOLT", power_desc: "RANGED CHI SHOT",
@@ -145,8 +170,8 @@ pub(crate) const FIGHTERS: [Archetype; 15] = [
         name: "JADE", health: 96, walk: 174.0, back_walk: 146.0, jump_scale: 1.18,
         power: 0.94, reach: 1.14, special: Special::TalonKick, special_name: "LOTUS KICK",
         power_desc: "RISING LOTUS STRIKE",
-        color: (0.10, 0.38, 0.88), trim: (0.98, 0.86, 0.42),
-        skin: (0.88, 0.68, 0.52), hair: (0.08, 0.07, 0.10), build: Build::Qipao,
+        color: (0.14, 0.56, 0.42), trim: (0.82, 0.16, 0.14),
+        skin: (0.88, 0.68, 0.52), hair: (0.08, 0.07, 0.10), build: Build::Tunic,
         bulk: 0.94, size: 1.0, boss: false,
     },
     Archetype {
@@ -181,13 +206,37 @@ pub(crate) const FIGHTERS: [Archetype; 15] = [
         skin: (0.42, 0.27, 0.20), hair: (0.10, 0.08, 0.08), build: Build::Ganger,
         bulk: 1.04, size: 1.0, boss: false,
     },
+    // DRAKE: a tribute to Bruce Lee, asked for by the user (2026-11-20), fighting in jeet kune do. His own name; the
+    // yellow suit with the black stripe of Game of Death, as the user asked him to look like Bruce Lee.
+    Archetype {
+        // (Health 94 and power 1.04 had him winning 32% of CPU rounds against the field, not a master. With the
+        // intercepting fist and his flowing chains, 110 and 1.08 put him at 58%; the giant is still too much.)
+        name: "DRAKE", health: 110, walk: 196.0, back_walk: 164.0, jump_scale: 1.14,
+        power: 1.08, reach: 1.06, special: Special::Nunchaku, special_name: "THREE SPECIALS",
+        power_desc: "STICKS, INCH PUNCH, FLY KICK",
+        color: (0.98, 0.80, 0.12), trim: (0.10, 0.09, 0.10),
+        skin: (0.88, 0.72, 0.56), hair: (0.07, 0.06, 0.06), build: Build::Track,
+        bulk: 0.92, size: 1.0, boss: false,
+    },
+    // A tribute to the American karate champion who met Bruce Lee in the Colosseum in Way of the Dragon (his own
+    // name, as every tribute here has): shirtless in white karate trousers, the hairy chest, the high spinning kick.
+    Archetype {
+        name: "LANCER", health: 112, walk: 150.0, back_walk: 124.0, jump_scale: 1.08,
+        // (Reach 1.06: at 1.10 his throw's hitbox reached 14 px past the arms drawn. Power 1.10: kicking first, as he
+        // does, at 1.04 and health 104 he took 43% of his CPU rounds; at 1.10 and 112, 56%.)
+        power: 1.10, reach: 1.06, special: Special::TalonKick, special_name: "WHIRLWIND",
+        power_desc: "SPINNING HEEL KICK",
+        color: (0.94, 0.93, 0.88), trim: (0.12, 0.11, 0.12),
+        skin: (0.90, 0.68, 0.50), hair: (0.56, 0.38, 0.18), build: Build::Duelist,
+        bulk: 1.02, size: 1.02, boss: false,
+    },
 ];
 
 /// The stages. Scenery only: the same floor line, height and walls in all.
-pub(crate) const STAGES: usize = 8;
+pub(crate) const STAGES: usize = 11;
 pub(crate) const STAGE_NAMES: [&str; STAGES] =
     ["THE DOCKS", "MOONLIT TEMPLE", "THE AIR BASE", "THE BATH HOUSE", "RIVER VILLAGE",
-     "CRYSTAL FORTRESS", "QUEENS ROOFTOP", "THE HOOD"];
+     "CRYSTAL FORTRESS", "QUEENS ROOFTOP", "THE HOOD", "THE PAGODA", "THE ISLAND", "THE COLOSSEUM"];
 
 /// Where a fighter is at home. As in Street Fighter II, a fight is held at
 /// the opponent's; a ladder never meets two of a kind in a row, so it never
@@ -195,15 +244,26 @@ pub(crate) const STAGE_NAMES: [&str; STAGES] =
 pub(crate) fn home_of(who: usize) -> usize {
     match FIGHTERS[who].build {
         Build::Bare | Build::Gladiator => 0,
-        Build::Gi | Build::Qipao => 1,
+        Build::Tunic => 1,
+        // RYUKA fights at THE ISLAND: a karate tournament's grounds, after Enter the Dragon's.
+        Build::Gi => 9,
+        // LANCER at THE COLOSSEUM, where Way of the Dragon's last fight was.
+        Build::Duelist => 10,
+        // DRAKE's own: a five-storey pagoda at dusk, a nod to the tower in Game of Death.
+        Build::Track => 8,
         Build::Suit | Build::Uniform | Build::Commando => 2,
         Build::Turtle => 3,
         Build::Giant => 4,
         Build::Caped => 5,
         Build::Spider => 6,
-        Build::Ganger => 7,
+        Build::Ganger | Build::Civvy => 7,
     }
 }
+
+/// Jeet kune do, "no way as way": a fighter whose next move has no pattern to read (DRAKE). The CPU plays them
+/// with a broken rhythm and an even spread of choices (see `cpu_think`), and their special is any of three
+/// (`Fighter::special`), picked at random each time (the user's rule, 2026-11-20).
+pub(crate) fn formless(who: usize) -> bool { FIGHTERS[who].build == Build::Track }
 
 pub(crate) const TURTLE_SKIN: (f32, f32, f32) = (0.44, 0.68, 0.30);
 pub(crate) const TURTLE_SHELL: (f32, f32, f32) = (0.44, 0.31, 0.17);

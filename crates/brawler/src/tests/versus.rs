@@ -168,8 +168,8 @@ pub(crate) fn a_special_pressed_a_few_frames_apart_still_comes_out() {
 // `apply_input` / `advance` / `resolve_hit`. Only keyboard and speaker are
 // replaced.
 
-pub(crate) fn press(back: bool, fwd: bool, fire: bool) -> MenuIn { MenuIn { back, fwd, fire } }
-pub(crate) const NOTHING: MenuIn = MenuIn { back: false, fwd: false, fire: false };
+pub(crate) fn press(back: bool, fwd: bool, fire: bool) -> MenuIn { MenuIn { back, fwd, fire, alt: false } }
+pub(crate) const NOTHING: MenuIn = MenuIn { back: false, fwd: false, fire: false, alt: false };
 
 /// Walk the title menu into two-player mode and return the game sitting
 /// on the select screen.
@@ -536,4 +536,17 @@ pub(crate) fn nobody_is_thrown_twice_running() {
     // It wears off.
     for _ in 0..(THROW_REST / F) as usize + 2 { advance(def, F); }
     assert_eq!(def.throw_rest, 0.0);
+}
+
+#[test]
+pub(crate) fn confirming_with_the_kick_picks_the_other_colours() {
+    let mut g = Game::new();
+    update_menus(&mut g, [press(false, false, true), NOTHING]);  // 1 PLAYER
+    let kick = MenuIn { alt: true, ..press(false, false, true) };
+    update_menus(&mut g, [kick, NOTHING]);
+    assert!(g.costume[0], "a kick to confirm kept the fighter's own colours");
+    let mut g = Game::new();
+    update_menus(&mut g, [press(false, false, true), NOTHING]);
+    update_menus(&mut g, [press(false, false, true), NOTHING]);
+    assert!(!g.costume[0], "a punch to confirm changed the colours");
 }

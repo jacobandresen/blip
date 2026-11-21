@@ -21,6 +21,20 @@
 //! | 20 | a dizzy fighter |
 //! | 21 | the second bonus round |
 //! | 22 | a turtle's shell ram |
+//! | 23 | DRAKE at home, the pagoda |
+//! | 24 | DRAKE gathering a special |
+//! | 25 | DRAKE against DRAKE: the second in the alternate colours |
+//! | 26 | the round opening at the pagoda, the students bowing |
+//! | 27 | the billing before DRAKE's fourth fight |
+//! | 28 | the billing before DRAKE's last fight, against the boss |
+//! | 29 | DRAKE's bonus round: boards to break |
+//! | 30 | THE ISLAND: RYUKA at home against DRAKE |
+//! | 31 | THE COLOSSEUM: DRAKE against LANCER, the kitten watching |
+//! | 32 | the select screen, on LANCER |
+//! | 33 | the billing before LANCER's fourth fight |
+//! | 34 | DRAKE over LANCER at the Colosseum: the pluck |
+//! | 35 | the round opening at the Colosseum, both warming up |
+//! | 36 | LANCER against LANCER: the second in navy |
 
 use super::*;
 
@@ -32,10 +46,10 @@ pub(crate) fn pose(g: &mut Game, shot_frame: &mut u32) {
         // The title is where the game already is.
     } else if scene == 15 {
         g.poster = true;
-    } else if scene == 19 || scene == 21 {
-        // The bonus round, a barrel already gone and one cracked.
+    } else if matches!(scene, 19 | 21 | 29) {
+        // The bonus round, a barrel already gone and one cracked (29: DRAKE's, boards).
         if g.state != State::Bonus {
-            g.pick = 0;
+            g.pick = if scene == 29 { 15 } else { 0 };
             g.start_bonus();
             g.p[0].x = 250.0;
             g.opponent_index = if scene == 21 { BONUS_AFTER[1] } else { BONUS_AFTER[0] };
@@ -46,14 +60,18 @@ pub(crate) fn pose(g: &mut Game, shot_frame: &mut u32) {
             g.barrels[1].hp = 1;
             g.clock = 13.2;
         }
+    } else if scene == 32 {
+        g.state = State::Select;
+        g.pick = FIGHTERS.len() - 1;
     } else if scene == 16 {
         g.pick = 0;
         g.sess.score = 48200;
         g.state = State::Won;
-    } else if scene == 7 {
+    } else if matches!(scene, 7 | 27 | 28 | 33) {
         if g.state != State::Vs {
-            g.pick = 0;
-            g.start_match(3);
+            g.pick = match scene { 7 => 0, 33 => 16, _ => 15 };
+            // Scene 28: the last fight on DRAKE's ladder, the boss.
+            g.start_match(if scene == 28 { FIGHTERS.len() - 2 } else { 3 });
             g.announce();
         }
     } else if scene > 0 && !matches!(scene, 8 | 13 | 14) {
@@ -70,6 +88,12 @@ pub(crate) fn pose(g: &mut Game, shot_frame: &mut u32) {
             18 => (6, 0, 3),
             22 => (4, 0, 3),
             12 => (0, 7, 6),
+            23 | 24 => (15, 0, 8),
+            25 => (15, 15, 8),
+            36 => (16, 16, 10),
+            26 => (15, 0, 8),
+            30 => (0, 15, 9),
+            31 | 34 | 35 => (15, 16, 10),
             10 => (7, 0, 2),
             _ => (0, 8, 4),
         };
@@ -82,6 +106,11 @@ pub(crate) fn pose(g: &mut Game, shot_frame: &mut u32) {
             g.ghost = [g.p[0].health as f32, g.p[1].health as f32];
             g.clock = ROUND_SECS * 0.6;
             g.fruit_due = false;
+            if matches!(scene, 26 | 35) {
+                g.state = State::RoundIntro;
+                g.phase.start(ROUND_INTRO);
+                g.bowed = false;
+            }
             if scene == 1 {
                 g.p[0].y = FLOOR_Y - 70.0;
                 g.p[0].act = Act::Air;
@@ -89,13 +118,25 @@ pub(crate) fn pose(g: &mut Game, shot_frame: &mut u32) {
         }
         g.cpu_plan = CpuPlan::Wait;
         g.cpu_delay = 99.0;
+        if scene == 34 {
+            g.p[0].act = Act::Victory;
+            g.p[0].shown = Act::Victory;
+            g.p[0].t = 1.1;
+            g.p[1].act = Act::Knockdown;
+            g.p[1].shown = Act::Knockdown;
+            g.p[1].t = 2.0;
+        }
         if scene == 20 {
             g.p[1].act = Act::Hitstun;
             g.p[1].stun = 1.0;
             g.p[1].dizzy = 1.0;
             g.p[1].x = 330.0;
         }
-        if *shot_frame == 4 && matches!(scene, 1 | 9 | 10 | 17 | 18 | 22) {
+        if *shot_frame == 4 && scene == 24 {
+            g.p[0].stumble_roll = std::env::var("BLIP_ROLL").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
+            g.p[1].x = 290.0;
+        }
+        if *shot_frame == 4 && matches!(scene, 1 | 9 | 10 | 17 | 18 | 22 | 24) {
             g.p[0].called = matches!(scene, 18 | 22);
             g.p[0].start_attack(MoveId::Special);
         }

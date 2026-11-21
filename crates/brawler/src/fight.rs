@@ -7,7 +7,7 @@ use super::*;
 pub(crate) fn is_kick(f: &Fighter) -> bool {
     matches!(f.mv, MoveId::LowKick | MoveId::HighKick | MoveId::Sweep
         | MoveId::JumpKick | MoveId::FlyingKick)
-        || (f.mv == MoveId::Special && f.arch().special == Special::TalonKick)
+        || (f.mv == MoveId::Special && f.special() == Special::TalonKick)
 }
 
 /// How far into an attack's startup the leg stops chambering and starts
@@ -99,7 +99,7 @@ pub(crate) fn land_quake(g: &mut Game, i: usize) -> bool {
     if !stomp || !matches!(g.p[i].act, Act::Idle | Act::Attack) { return false; }
     g.quake_x = g.p[i].x;
     g.quake_t = QUAKE_SECS;
-    g.shake = 0.3;
+    g.rouse(0.3);
     let from = g.p[i].size();
     let d = &mut g.p[1 - i];
     if !d.airborne() && d.act != Act::Knockdown && !invulnerable(d) {
@@ -224,6 +224,7 @@ pub(crate) fn step_fight(g: &mut Game, dt: f32, p_in: Input, c_in: Input) {
     if g.shake > 0.0 { g.shake -= dt; }
     if g.quake_t > 0.0 { g.quake_t -= dt; }
     if g.combo_t > 0.0 { g.combo_t -= dt; }
+    g.view.follow(&g.p, dt);
 
     call_round(g);
 }
@@ -235,6 +236,32 @@ fn swing_sounds(g: &mut Game, dt: f32) {
     // the same split the drawing uses between chamber and extension.
     for i in 0..2 {
         let f = g.p[i];
+        // Footfalls: a foot comes down twice a stride (`draw::walk_phase`), louder under a heavier body.
+        if f.act == Act::Walk && f.vx != 0.0 {
+            let was = Fighter { x: f.x - f.vx * dt, ..f };
+            let half = |f: &Fighter| (draw::walk_phase(f) / std::f32::consts::PI).floor();
+            if half(&f) != half(&was) { g.snd_at(Sfx::Step, 0.30 * f.size().max(0.6) * f.arch().bulk); }
+        }
+        // Kept at a distance, DRAKE dares them in now and then: the thumb across the nose and the beckon (about
+        // once in four seconds of standing out of range).
+        if formless(f.who) && f.act == Act::Idle && f.taunt <= 0.0 && (g.p[1 - i].x - f.x).abs() > 280.0
+            && (g.now * 0.25 + i as f32 * 0.5).fract() < dt * 0.25 {
+            g.p[i].taunt = 1.4;
+        }
+        // The nunchaku hum round as they whirl: a whoosh every four frames of the startup, fading.
+        if f.act == Act::Attack && f.mv == MoveId::Special && f.special() == Special::Nunchaku {
+            let start = f.scaled(move_data(MoveId::Special)).startup * F;
+            let turn = |t: f32| (t / (4.0 * F)).floor();
+            if f.t < start && f.t > dt && turn(f.t) != turn(f.t - dt) { g.snd_at(Sfx::Swing, 0.55 - 0.2 * f.t / start); }
+            // And a whoosh into every strike of the routine.
+            let strike = |t: f32| ((t / F - STICK_WHIRL) / STICK_EVERY).floor();
+            if f.t >= start && !f.hit_done && strike(f.t) != strike(f.t - dt) { g.snd_at(Sfx::Swing, 0.7); }
+        }
+        // And the twirl he taunts with, softer.
+        if formless(f.who) && f.act == Act::Idle && f.taunt > 0.15 && f.taunt < 1.25 && f.stumble_roll % 2 == 1 {
+            let turn = |t: f32| (t / (5.0 * F)).floor();
+            if turn(f.taunt) != turn(f.taunt + dt) { g.snd_at(Sfx::Swing, 0.3); }
+        }
         if f.act == Act::Attack && is_kick(&f) {
             let at = f.scaled(move_data(f.mv)).startup * F * KICK_SNAP;
             if f.t >= at && f.t - dt < at { g.snd(Sfx::Gi); }
@@ -250,6 +277,19 @@ fn swing_sounds(g: &mut Game, dt: f32) {
             if f.stomp { g.snd(Sfx::Bellow); }
             else if f.epic_punch() || matches!(f.mv, MoveId::Sweep | MoveId::HighKick | MoveId::Uppercut) {
                 g.snd_at(Sfx::Swing, 0.7);
+            }
+            // And shouted: every special, and two big blows in three, as a fighter of the period does.
+            let big = matches!(f.mv, MoveId::Sweep | MoveId::HighKick | MoveId::HighPunch | MoveId::Uppercut
+                | MoveId::FlyingKick | MoveId::JumpKick);
+            let often = (g.now * 60.0) as u32 % 3 != 1;
+            // DRAKE cries out on every big blow and one quick one in three, his signature.
+            let cries = formless(f.who) && (big || (g.now * 60.0) as u32 % 3 == 0);
+            // One cry at a time: his run 0.3 to 1 s, and a cry on every jab (four a second) piled up into a
+            // henhouse. A new one waits until the last has had 0.7 s.
+            let free = g.now - g.yelled[i] > 0.7;
+            if free && !f.stomp && (f.mv == MoveId::Special || (big && often) || cries) {
+                g.yelled[i] = g.now;
+                g.snd_at(Sfx::Kiai(throat_of(f.who)), if cries && !big { 0.6 } else { 0.85 });
             }
         }
     }
@@ -290,8 +330,15 @@ fn fire_specials(g: &mut Game, dt: f32) {
                 }
             } else if f.t >= at && f.t - dt < at {
                 // Called by name, as the cabinets shouted them.
-                g.pop(f.arch().special_name, f.x, f.y - f.height() - 18.0);
-                match f.arch().special {
+                // DRAKE's pop names whichever of his three this one is.
+                let name = match (formless(f.who), f.special()) {
+                    (true, Special::Nunchaku) => "NUNCHAKU",
+                    (true, Special::OneInch) => "ONE-INCH PUNCH",
+                    (true, _) => "FLYING SIDE KICK",
+                    _ => f.arch().special_name,
+                };
+                g.pop(name, f.x, f.y - f.height() - 18.0);
+                match f.special() {
                     Special::ChiBolt | Special::LaserVision => {
                         g.p[i].hit_done = true; // the bolt carries the hit, not the hand
                         g.spawn_bolt(i, m.damage);
@@ -313,6 +360,8 @@ fn fire_specials(g: &mut Game, dt: f32) {
                         g.snd(Sfx::Whoosh);
                     }
                     Special::DriveBy => unreachable!("drive-by has its own timeline"),
+                    Special::Nunchaku => g.snd(Sfx::Swing),
+                    Special::OneInch => {}
                 }
             }
         }
@@ -381,7 +430,9 @@ fn trade_blows(g: &mut Game, holds: [Input; 2]) {
                 if a == 0 && g.mode == Mode::Solo { g.sess.add_score(FIRST_HIT); }
             }
             if dmg > 0 && g.p[a].countered {
-                g.pop("COUNTER!", x, over);
+                g.pop(if formless(g.p[a].who) { "INTERCEPT!" } else { "COUNTER!" }, x, over);
+                // An intercept holds the frame a moment longer (a tenth of a second at least): the counter is the point.
+                if formless(g.p[a].who) { g.hitstop = g.hitstop.max(0.10); }
                 g.snd(Sfx::Counter);
             }
             if g.p[a].turned {
@@ -397,15 +448,29 @@ fn trade_blows(g: &mut Game, holds: [Input; 2]) {
                 // The combo counter on the receiving end picks the
                 // light hit, so a chain climbs. A knockdown gets the
                 // crunch and the crowd with it.
+                let (kick, voice) = (is_kick(&g.p[a]), throat_of(g.p[d].who));
                 if knock {
                     g.snd(Sfx::Crunch);
+                    g.snd(Sfx::Hurt(voice, true));
                     g.snd_at(Sfx::Cheer, 0.5);
                 } else if dmg >= 12 {
-                    g.snd(Sfx::HitHeavy);
+                    g.snd(if kick { Sfx::HitKick(true) } else { Sfx::HitHeavy });
+                    g.snd(Sfx::Hurt(voice, true));
                 } else {
                     let step = (g.p[d].combo.max(1) as usize - 1).min(2);
-                    g.snd(Sfx::HitLight(step));
+                    g.snd(if kick { Sfx::HitKick(false) } else { Sfx::HitLight(step) });
+                    // A grunt on most light blows, not all: a voice on every jab is a drone.
+                    if !((g.now * 60.0) as u32).is_multiple_of(3) { g.snd_at(Sfx::Hurt(voice, false), 0.8); }
                 }
+                // A special of DRAKE's that lands punches the camera in a tenth closer; `View::follow` eases it back
+                // out over a fifth of a second.
+                if g.p[a].mv == MoveId::Special && formless(g.p[a].who) { g.view.zoom += 0.10; }
+                // And harder still for the blow that finishes it.
+                if formless(g.p[a].who) && g.p[d].health <= 0 { g.view.zoom += 0.12; }
+                // The nunchaku land with a crack of hardwood under the hit.
+                if g.p[a].mv == MoveId::Special && g.p[a].special() == Special::Nunchaku { g.snd(Sfx::Tick); }
+                // The one-inch punch lands deep: the floor's own thud under the blow.
+                if g.p[a].mv == MoveId::Special && g.p[a].special() == Special::OneInch { g.snd_at(Sfx::Quake, 0.45); }
                 // A knockdown throws them clear, so the attacker is not
                 // standing over an invulnerable wakeup. A throw pushes
                 // little: it already leaves the thrower on top.
@@ -415,7 +480,7 @@ fn trade_blows(g: &mut Game, holds: [Input; 2]) {
                     _ => 9.0,
                 };
                 push_apart(&mut g.p, push);
-                g.shake = if knock { 0.16 } else { 0.08 };
+                g.rouse(if knock { 0.16 } else { 0.08 });
                 if g.p[d].combo > 1 {
                     g.combo_shown = g.p[d].combo;
                     g.combo_t = 1.1;
@@ -485,7 +550,9 @@ fn fly_bolts(g: &mut Game, dt: f32, holds: [Input; 2]) {
             // A web costs little in itself: what it costs is the next five
             // seconds.
             let web = g.p[1 - d].arch().build == Build::Spider;
-            let dmg = if laser { g.p[d].health.max(1) }
+            // (DRAKE rolls with it: on him the laser is an ordinary bolt, and the boss's at that, see `master_edge`.)
+            let dmg = if laser && formless(g.p[d].who) { ((g.bolts[i].damage as f32) / DRAKE_EDGE).max(1.0) as i32 }
+                else if laser { g.p[d].health.max(1) }
                 else if web { (g.bolts[i].damage / 3).max(1) }
                 else { g.bolts[i].damage };
             g.p[d].hurt(dmg, g.p[1 - d].size());
@@ -500,7 +567,8 @@ fn fly_bolts(g: &mut Game, dt: f32, holds: [Input; 2]) {
                 g.snd(Sfx::Thwip);
             }
             g.snd(Sfx::HitLight(0));
-            g.shake = 0.08;
+            g.snd_at(Sfx::Hurt(throat_of(g.p[d].who), false), 0.8);
+            g.rouse(0.08);
             if d == 1 { g.sess.add_score(dmg * 10); }
         }
         g.spark(g.bolts[i].x, g.bolts[i].y, false, guarding);
@@ -524,8 +592,16 @@ fn call_round(g: &mut Game) {
             // either fighter reaches two, and a draw takes both there.
             RoundResult::Draw => { g.p[0].rounds += 1; g.p[1].rounds += 1; }
         }
+        // A round of DRAKE's is rung out with a gong, as the old kung fu pictures opened.
+        if let RoundResult::P1 | RoundResult::P2 = g.result {
+            let w = if g.result == RoundResult::P1 { 0 } else { 1 };
+            if formless(g.p[w].who) { g.snd_at(Sfx::Gong, 0.8); }
+        }
         if ko {
             g.snd(Sfx::Ko);
+            for who in [0, 1].map(|i| g.p[i]).iter().filter(|f| f.health <= 0).map(|f| f.who) { g.snd(Sfx::Cry(throat_of(who))); }
+            // At the Colosseum the only witness has something to say, as in Way of the Dragon.
+            if g.stage == 10 { g.snd_at(Sfx::Meow, 0.6); }
             g.snd_at(Sfx::Roar, 0.75);
             g.slow = SLOW_MO_SECS;
         }
@@ -642,6 +718,23 @@ pub(crate) fn update_round_end(g: &mut Game, dt: f32) {
     for i in 0..2 {
         advance(&mut g.p[i], dt);
         g.p[i].x = clamp(g.p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
+        let f0 = g.p[i];
+        // The nunchaku stop when the opponent is down: straight into the recovery.
+        if f0.act == Act::Attack && f0.nunchaku() && !f0.hit_done && matches!(g.p[1 - i].act, Act::Knockdown | Act::Defeat) {
+            g.p[i].hit_done = true;
+            g.p[i].t = g.p[i].t.max((STICK_WHIRL + STICK_EVERY * STICK_STRIKES as f32) * F);
+        }
+        // DRAKE's stamp lands with a thud and his cry.
+        if formless(f0.who) && f0.act == Act::Victory && f0.stumble_roll % 4 == 3 && !draw::plucking(&f0) && f0.t >= 0.3 && f0.t - dt < 0.3 {
+            g.snd_at(Sfx::Land, 1.0);
+            g.snd_at(Sfx::Kiai(throat_of(f0.who)), 0.9);
+        }
+        // DRAKE's winning whirl of the nunchaku hums as it turns (the first of his wins).
+        let f = g.p[i];
+        if formless(f.who) && f.act == Act::Victory && f.t < 0.9 && f.stumble_roll % 4 == 0 && !draw::plucking(&f) {
+            let turn = |t: f32| (t / (4.0 * F)).floor();
+            if f.t > dt && turn(f.t) != turn(f.t - dt) { g.snd_at(Sfx::Swing, 0.35); }
+        }
     }
     // A bolt in flight at the bell sails on off screen, harmless, rather than hang there.
     for b in g.bolts.iter_mut().filter(|b| b.active) {
@@ -654,6 +747,7 @@ pub(crate) fn update_round_end(g: &mut Game, dt: f32) {
     drain_ghosts(g, dt);
     if g.shake > 0.0 { g.shake -= dt; }
     if g.quake_t > 0.0 { g.quake_t -= dt; }
+    g.view.follow(&g.p, dt);
     if !g.phase.tick(dt) { return; }
     let (a, b) = (g.p[0].rounds, g.p[1].rounds);
     if a >= ROUNDS_TO_WIN || b >= ROUNDS_TO_WIN {

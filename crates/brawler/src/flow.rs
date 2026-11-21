@@ -8,7 +8,11 @@ use super::*;
 /// than the keyboard, so the whole front of the game (mode, cursors, lock-in,
 /// no shared fighter) can be driven by a test.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-pub(crate) struct MenuIn { pub(crate) back: bool, pub(crate) fwd: bool, pub(crate) fire: bool }
+pub(crate) struct MenuIn {
+    pub(crate) back: bool, pub(crate) fwd: bool, pub(crate) fire: bool,
+    /// The confirm was the kick: the fighter in their alternate colours, as a cabinet's second button gives.
+    pub(crate) alt: bool,
+}
 
 /// What a menu transition asked to be heard. Returned rather than
 /// played, for the same reason.
@@ -23,6 +27,7 @@ pub(crate) fn read_menu(g: &mut Game) -> [MenuIn; 2] {
             back: menu_step(g, who, true),
             fwd: menu_step(g, who, false),
             fire: menu_fire(g, who),
+            alt: menu_kick(g, who),
         };
     }
     out
@@ -87,6 +92,7 @@ pub(crate) fn update_menus(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
                 }
                 if m[who].fire && !g.taken_by_other(who, g.picked(who)) {
                     g.locked[who] = true;
+                    g.costume[who] = m[who].alt;
                     // Move the other player's cursor off a fighter now taken,
                     // so it is never parked on something it cannot confirm.
                     let other = 1 - who;
@@ -181,7 +187,7 @@ pub(crate) fn update_bonus(g: &mut Game, dt: f32, inp: Input) -> Option<bool> {
             g.p[0].hit_done = true;
             g.spark(x - g.p[0].facing * BARREL_W / 2.0, y - 34.0, broke, false);
             g.hitstop = hitstop_for(if heavy { 12 } else { 6 }, broke, false);
-            if broke { g.shake = 0.10; }
+            if broke { g.rouse(0.10); }
             g.sess.add_score(if broke { 1000 } else { 100 });
             event = Some(broke);
         }

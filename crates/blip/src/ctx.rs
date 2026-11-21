@@ -386,6 +386,15 @@ impl Blip {
         set_camera(&cam);
     }
 
+    /// Draw the canvas region (`x`, `y`, `w`, `h`) over the whole canvas: a camera that pans and zooms.
+    /// `set_offset(0.0, 0.0)` restores the normal view.
+    pub fn set_view_rect(&self, x: f32, y: f32, w: f32, h: f32) {
+        let mut cam = Camera2D::from_display_rect(Rect::new(x, y, w, h));
+        cam.render_target = Some(self.rt.clone());
+        if crate::bot::unseen() { cam.viewport = Some((0, 0, 1, 1)); }
+        set_camera(&cam);
+    }
+
     /// Turn everything drawn after this by `degrees` (clockwise) about the middle of the canvas, shifted by
     /// (`dx`, `dy`): a camera swinging round a corner. `set_offset(0.0, 0.0)` restores the normal view.
     pub fn set_view(&self, dx: f32, dy: f32, degrees: f32) {

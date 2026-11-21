@@ -17,7 +17,7 @@ Ten arcade games in the browser, written in Rust on the small `blip` engine and 
 | [Defender](https://jacobandresen.github.io/blip/defender/) | Alien formations and motherships |
 | [Meteors](https://jacobandresen.github.io/blip/meteors/) | Thrust and shoot through asteroids |
 | [Raider](https://jacobandresen.github.io/blip/raider/) | A vertical shooter with bosses |
-| [Brawler](https://jacobandresen.github.io/blip/brawler/) | Fifteen fighters, a fourteen-match ladder |
+| [Brawler](https://jacobandresen.github.io/blip/brawler/) | Seventeen fighters, a sixteen-match ladder |
 | [Bubbler](https://jacobandresen.github.io/blip/bubbler/) | Trap monsters in bubbles, one or two players |
 | [Warlock](https://jacobandresen.github.io/blip/warlock/) | A maze shooter in candlelit cellars |
 | [Rounds](https://jacobandresen.github.io/blip/rounds/) | A paper round on a cargo bike, a week of weather |

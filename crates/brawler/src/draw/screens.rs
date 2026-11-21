@@ -64,7 +64,7 @@ pub(crate) fn title_fighter(who: usize, x: f32, facing: f32, u: f32, first: bool
 pub(crate) fn draw_title(blip: &Blip, g: &Game) {
     let now = g.now;
     // A night stage, knocked back so the sign is the brightest thing on it.
-    draw_temple(blip, 0.0, now, 0.0);
+    draw_temple(blip, 0.0, now, Roar::QUIET);
     draw_floor(blip, 1, 0.0);
     blip.fill_rect(0.0, 0.0, WIN_W as f32, FLOOR_Y, BlipColor { r: 0.02, g: 0.01, b: 0.08, a: 0.70 });
 
@@ -95,8 +95,11 @@ pub(crate) fn draw_title(blip: &Blip, g: &Game) {
         blip.fill_glow_circle(cx, cy + 6.0, r, BlipColor { a: a * glow, ..sign });
     }
     neon(blip, "BRAWLER", 22.0, 9.0, sign, glow);
-    neon(blip, "FIFTEEN FIGHTERS   ONE CHAMPION", 100.0, 2.0,
-        BlipColor { r: 0.35, g: 0.95, b: 1.0, a: 1.0 }, tube(now, 2.1));
+    // Counted off the roster, so the sign is never a fighter behind (it said FIFTEEN after DRAKE joined).
+    const WORDS: [&str; 21] = ["NO", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN",
+        "ELEVEN", "TWELVE", "THIRTEEN", "FOURTEEN", "FIFTEEN", "SIXTEEN", "SEVENTEEN", "EIGHTEEN", "NINETEEN", "TWENTY"];
+    let tag = format!("{} FIGHTERS   ONE CHAMPION", WORDS[FIGHTERS.len().min(20)]);
+    neon(blip, &tag, 100.0, 2.0, BlipColor { r: 0.35, g: 0.95, b: 1.0, a: 1.0 }, tube(now, 2.1));
 
     // The roster, one face each, with the pair on stage lit.
     let gap = 38.0;
@@ -175,7 +178,7 @@ pub(crate) fn draw_select(blip: &Blip, g: &Game) {
     // of player two: where that match will be), raised to the preview's floor.
     let ground = 236.0;
     let home = home_of(if versus { g.pick2 } else { g.pick });
-    draw_backdrop(blip, home, ground - FLOOR_Y, g.now, 0.0);
+    draw_backdrop(blip, home, ground - FLOOR_Y, g.now, Roar::QUIET, WIN_W as f32 / 2.0);
     draw_floor(blip, home, ground - FLOOR_Y);
     blip.fill_rect(0.0, 0.0, WIN_W as f32, WIN_H as f32, BlipColor { r: 0.02, g: 0.02, b: 0.05, a: 0.48 });
     blip.fill_rect(0.0, 250.0, WIN_W as f32, WIN_H as f32 - 250.0, BlipColor { r: 0.03, g: 0.03, b: 0.06, a: 1.0 });
@@ -199,7 +202,9 @@ pub(crate) fn draw_select(blip: &Blip, g: &Game) {
         let mut f = Fighter::new(who, x, facing);
         // Locked in, they celebrate; until then they stand in their guard.
         if g.locked[side] { f.act = Act::Victory; f.t = 1.0; }
+        SECOND.set((side == 1 && g.picked(0) == g.picked(1)) || (g.locked[side] && g.costume[side]));
         draw_body(blip, &f, g.now, ground - FLOOR_Y, 0.0, side, true);
+        SECOND.set(false);
 
         if versus {
             let lit = if g.locked[side] { 1.0 } else { 0.45 + 0.55 * (g.now * 5.0).sin().max(0.0) };
@@ -209,10 +214,10 @@ pub(crate) fn draw_select(blip: &Blip, g: &Game) {
         // A plate under the words: the stage behind them is not black.
         let plate_w = if versus { 184.0 } else { 268.0 };
         blip.fill_rect(tx - 8.0, 100.0, plate_w, 136.0, BlipColor { r: 0.02, g: 0.02, b: 0.05, a: 0.72 });
-        blip.draw_text(a.name, tx, 112.0, 3.0, rgb(a.trim));
+        blip.draw_text(a.name, tx, 112.0, 3.0, rgb(a.accent()));
         let info_w = plate_w - 16.0;
         blip.draw_text(a.special_name, tx, 146.0, select_info_size(a.special_name, info_w), grey);
-        blip.draw_text(a.power_desc, tx, 162.0, select_info_size(a.power_desc, info_w), rgb(a.trim));
+        blip.draw_text(a.power_desc, tx, 162.0, select_info_size(a.power_desc, info_w), rgb(a.accent()));
         let stage = STAGE_NAMES[home_of(who)];
         blip.draw_text(stage, tx, 178.0, select_info_size(stage, info_w), BlipColor { r: 0.55, g: 0.58, b: 0.66, a: 1.0 });
         // Show move speed, reach and damage; Full leads the fair fighters, while the boss fighter exceeds all three.
@@ -221,7 +226,7 @@ pub(crate) fn draw_select(blip: &Blip, g: &Game) {
         for (r, (label, v)) in stats.iter().enumerate() {
             let sy = 194.0 + r as f32 * 14.0;
             blip.draw_text(label, tx, sy, 2.0, grey);
-            blip.fill_rect(tx + 46.0, sy, 60.0 * v.clamp(0.0, 1.25), 8.0, rgb(a.trim));
+            blip.fill_rect(tx + 46.0, sy, 60.0 * v.clamp(0.0, 1.25), 8.0, rgb(a.accent()));
             blip.draw_rect(tx + 46.0, sy, 60.0, 8.0, BlipColor { r: 0.3, g: 0.3, b: 0.36, a: 1.0 });
             let value = match r {
                 0 => format!("{:.1}X", a.power),
@@ -232,8 +237,10 @@ pub(crate) fn draw_select(blip: &Blip, g: &Game) {
         }
     }
 
-    let columns = 8;
-    let (cw, ch, gap) = (74.0, 44.0, 4.0);
+    // Two rows, however many there are: 17 at 74 px wide ran into a third row over the help text.
+    let columns = FIGHTERS.len().div_ceil(2);
+    let cw = ((WIN_W as f32 - 8.0) / columns as f32 - 4.0).min(74.0).floor();
+    let (ch, gap) = (44.0, 4.0);
     let x0 = (WIN_W as f32 - columns as f32 * (cw + gap) + gap) / 2.0;
     for (i, a) in FIGHTERS.iter().enumerate() {
         let x = x0 + (i % columns) as f32 * (cw + gap);
@@ -251,7 +258,7 @@ pub(crate) fn draw_select(blip: &Blip, g: &Game) {
         blip.draw_text(a.name, cx - text_w(a.name, name_size) / 2.0, y0 + ch - 15.0, name_size,
             if on1 || on2 { BLIP_WHITE } else { BlipColor { r: 0.6, g: 0.6, b: 0.66, a: 1.0 } });
         let frame = if on1 && on2 { BLIP_WHITE }
-            else if on1 { if versus { p1c } else { rgb(a.trim) } }
+            else if on1 { if versus { p1c } else { rgb(a.accent()) } }
             else if on2 { p2c }
             else { BlipColor { r: 0.3, g: 0.3, b: 0.35, a: 1.0 } };
         blip.draw_rect(x, y0, cw, ch, frame);
@@ -265,8 +272,9 @@ pub(crate) fn draw_select(blip: &Blip, g: &Game) {
     // nothing else to do but read them.
     blip.draw_centered("BACK GUARDS   BOTH BUTTONS: SPECIAL", 348.0, 2.0, grey);
     let keys = web::controls() == web::Controls::Keys;
-    let prompt = if !versus { if keys { "ARROWS CHOOSE  F OR SPACE START" } else { "PRESS PUNCH TO START" } }
-        else if !g.locked[0] || !g.locked[1] { "PRESS TO LOCK IN" }
+    // (A kick to confirm is the fighter in the other colours.)
+    let prompt = if !versus { if keys { "ARROWS CHOOSE  F START  G OTHER COLOURS" } else { "PUNCH START   KICK: OTHER COLOURS" } }
+        else if !g.locked[0] || !g.locked[1] { "PUNCH LOCKS IN   KICK: OTHER COLOURS" }
         else { "FIGHT" };
     blip.draw_centered(prompt, 374.0, 2.0, BLIP_WHITE);
 }
@@ -305,18 +313,19 @@ pub(crate) fn draw_bust(blip: &Blip, a: &Archetype, cx: f32, py: f32, pw: f32, s
     blip.fill_rect(cx - pw / 2.0, py, pw, pw, back);
     // No wind in the frame: a headband's tails would fly out of it.
     let look = Look { bulk: a.bulk * 3.0 * z, size: 3.0 * z, wind: (0.0, 1.0), ..look_of(a, 0.0) };
-    let head = V(cx - side * 8.0 * z, py + 50.0 * z);
+    // (DRAKE's head sits lower in the frame: his neck is short and thick.)
+    let head = V(cx - side * 8.0 * z, py + if a.build == Build::Track { 58.0 } else { 50.0 } * z);
     let neck = V(head.0 + side * 8.0 * z, py + pw - 22.0 * z);
     // Shoulders across the foot of the frame, under the head.
     let (l, r) = (V(cx - 34.0 * z, py + pw + 4.0 * z), V(cx + 34.0 * z, py + pw + 4.0 * z));
-    let bare = matches!(a.build, Build::Bare | Build::Giant | Build::Turtle);
+    let bare = matches!(a.build, Build::Bare | Build::Giant | Build::Turtle | Build::Duelist);
     stroke(blip, l, r, 30.0 * z + LINE, 30.0 * z + LINE, INK);
     stroke(blip, l, r, 30.0 * z, 30.0 * z, look.c(if bare { look.skin } else { look.cloth }));
     draw_head(blip, &look, -side, head, neck, mood);
     // The shoulders run out of the frame; the sill squares them off.
     blip.fill_rect(cx - pw / 2.0 - 4.0, py + pw, pw + 8.0, 36.0 * z, INK);
-    blip.draw_rect(cx - pw / 2.0, py, pw, pw, rgb(a.trim));
-    blip.draw_rect(cx - pw / 2.0 - 1.0, py - 1.0, pw + 2.0, pw + 2.0, rgb(a.trim));
+    blip.draw_rect(cx - pw / 2.0, py, pw, pw, rgb(a.accent()));
+    blip.draw_rect(cx - pw / 2.0 - 1.0, py - 1.0, pw + 2.0, pw + 2.0, rgb(a.accent()));
 }
 
 /// What each fighter has to say over a beaten opponent, in two lines.
@@ -336,7 +345,22 @@ pub(crate) const QUOTES: [[&str; 2]; FIGHTERS.len()] = [
     ["MISSION COMPLETE.", "YOU NEVER SAW ME COMING."],
     ["STAND TALL.", "EVEN WHEN THE EARTH DISAGREES."],
     ["THE BLOCK RAISED ME.", "THE BELL SETTLES IT."],
+    ["NO STYLE IS THE STYLE.", "YOU FOUGHT A SHAPE. I WAS WATER."],
+    ["KICK FIRST.", "THE QUESTIONS CAN WAIT."],
 ];
+
+/// DRAKE's word over a beaten opponent: one of five, by who it was, and his own for the boss.
+fn drake_quote(loser: usize) -> [&'static str; 2] {
+    const SAYS: [[&str; 2]; 5] = [
+        ["NO STYLE IS THE STYLE.", "YOU FOUGHT A SHAPE. I WAS WATER."],
+        ["TEN THOUSAND KICKS, ONCE?", "I DRILLED ONE KICK FOR YEARS."],
+        ["STOP THINKING.", "FEEL IT COMING. THEN MOVE."],
+        ["I POINTED AT THE MOON.", "YOU WATCHED MY FINGER."],
+        ["EMPTY YOUR CUP", "BEFORE YOU ASK FOR MORE."],
+    ];
+    if FIGHTERS[loser].boss { return ["A CAPE IS FOR SHOW.", "SKILL IS FOR WINNING."]; }
+    SAYS[loser % SAYS.len()]
+}
 
 /// The winner's word on the match, along the foot of the screen.
 pub(crate) fn draw_quote(blip: &Blip, g: &Game) {
@@ -348,10 +372,13 @@ pub(crate) fn draw_quote(blip: &Blip, g: &Game) {
     let (top, pw) = (FLOOR_Y + 12.0, 50.0);
     blip.fill_rect(0.0, top - 8.0, WIN_W as f32, WIN_H as f32 - top + 8.0,
         BlipColor { r: 0.02, g: 0.02, b: 0.05, a: 0.90 });
-    blip.fill_rect(0.0, top - 8.0, WIN_W as f32, 2.0, rgb(arch.trim));
-    draw_bust(blip, arch, 52.0, top, pw, -1.0, shade(rgb(arch.trim), 0.4), Mood::Happy);
-    blip.draw_text(arch.name, 96.0, top - 1.0, 1.0, rgb(arch.trim));
-    for (k, line) in QUOTES[who].iter().enumerate() {
+    blip.fill_rect(0.0, top - 8.0, WIN_W as f32, 2.0, rgb(arch.accent()));
+    draw_bust(blip, arch, 52.0, top, pw, -1.0, shade(rgb(arch.accent()), 0.4), Mood::Happy);
+    blip.draw_text(arch.name, 96.0, top - 1.0, 1.0, rgb(arch.accent()));
+    // DRAKE has a word for each opponent, not one line for all of them.
+    let loser = g.p[if a > b { 1 } else { 0 }].who;
+    let lines = if formless(who) { drake_quote(loser) } else { QUOTES[who] };
+    for (k, line) in lines.iter().enumerate() {
         blip.draw_text(line, 96.0, top + 12.0 + k as f32 * 20.0, 2.0, BLIP_WHITE);
     }
 }
@@ -375,12 +402,23 @@ pub(crate) fn draw_bonus(blip: &Blip, g: &Game) {
                 if y > floor { continue; }
                 let tall = j % 2 == 0;
                 blip.fill_rect(x - 3.0, y - 9.0, if tall { 6.0 } else { 16.0 }, if tall { 18.0 } else { 5.0 }, INK);
+                // (Boards break into wood alone; a barrel has its hoops.)
+                let metal = j % 3 == 0 && !formless(g.p[0].who);
                 blip.fill_rect(x - 2.0, y - 8.0, if tall { 4.0 } else { 14.0 }, if tall { 16.0 } else { 3.0 },
-                    if j % 3 == 0 { hoop } else { wood });
+                    if metal { hoop } else { wood });
             }
             continue;
         }
         if b.wait > 0.0 { continue; }
+        // For DRAKE a thick plank tumbling end over end.
+        if b.rolls && formless(g.p[0].who) {
+            let c = V(b.x, b.y - 20.0 + shake);
+            let ang = b.x * 0.06;
+            let (dx, dy) = (ang.cos() * 18.0, ang.sin() * 18.0);
+            shape(blip, &[(V(c.0 - dx, c.1 - dy), V(c.0 + dx, c.1 + dy), 5.0, 5.0)], wood, INK);
+            stroke(blip, V(c.0 - dx * 0.8, c.1 - dy * 0.8), V(c.0 + dx * 0.8, c.1 + dy * 0.8), 0.8, 0.8, dark);
+            continue;
+        }
         // One that fell is seen end on: a hooped round, turning as it rolls.
         if b.rolls {
             let c = V(b.x, b.y - 20.0 + shake);
@@ -398,6 +436,32 @@ pub(crate) fn draw_bonus(blip: &Blip, g: &Game) {
         }
         // It rocks when it is struck.
         let rock = if b.hit_t < 0.22 { (b.hit_t * 60.0).sin() * 3.0 * (1.0 - b.hit_t / 0.22) } else { 0.0 };
+        // For DRAKE they are boards to break, a stack of them across two blocks, as a demonstration has it; each
+        // blow splits another board.
+        if formless(g.p[0].who) {
+            let x = b.x + rock;
+            let block = c(0.56, 0.54, 0.52);
+            for side in [-1.0f32, 1.0] {
+                let bx = x + side * (BARREL_W / 2.0 - 4.0);
+                blip.fill_rect(bx - 7.0, floor - 30.0, 14.0, 30.0, INK);
+                blip.fill_rect(bx - 6.0, floor - 29.0, 12.0, 29.0, block);
+                blip.fill_rect(bx - 6.0, floor - 29.0, 12.0, 3.0, blend(block, BLIP_WHITE, 0.3));
+            }
+            let split = (BARREL_HP - b.hp) as usize;
+            for k in 0..6usize {
+                let y = floor - 34.0 - k as f32 * 6.0;
+                let w = BARREL_W + 18.0;
+                blip.fill_rect(x - w / 2.0 - 1.0, y - 1.0, w + 2.0, 6.0, INK);
+                let plank = if k % 2 == 0 { wood } else { shade(wood, 0.9) };
+                blip.fill_rect(x - w / 2.0, y, w, 4.0, plank);
+                blip.fill_rect(x - w / 2.0, y, w, 1.0, blend(plank, BLIP_WHITE, 0.3));
+                // The boards a blow has split, from the top down: a crack through the middle.
+                if k >= 6 - split.min(6) {
+                    blip.fill_rect(x - 1.0, y - 1.0, 2.0, 6.0, INK);
+                }
+            }
+            continue;
+        }
         let (x, w, h) = (b.x + rock, BARREL_W, 62.0);
         blip.fill_rect(x - w / 2.0 - 2.0, floor - h - 2.0, w + 4.0, h + 2.0, INK);
         blip.fill_rect(x - w / 2.0 + 2.0, floor - h, w - 4.0, h, wood);
@@ -417,7 +481,9 @@ pub(crate) fn draw_bonus(blip: &Blip, g: &Game) {
     draw_fighter(blip, g, 0);
     for s in g.hitspark.iter().filter(|s| s.ttl > 0.0) { draw_splash(blip, s); }
 
-    stamp(blip, "BONUS ROUND", 14.0, 3.0, BLIP_YELLOW);
+    stamp(blip, if formless(g.p[0].who) { "BREAK THE BOARDS" } else { "BONUS ROUND" }, 14.0, 3.0, BLIP_YELLOW);
+    // (Enter the Dragon's line, under DRAKE's.)
+    if formless(g.p[0].who) { blip.draw_centered("BOARDS DON'T HIT BACK", 44.0, 1.0, PALE); }
     let grey = PALE;
     blip.draw_text(&format!("SCORE {}", g.sess.score), 16.0, 16.0, 1.0, grey);
     let down = g.barrels.iter().filter(|b| b.broke_t >= 0.0).count();
@@ -465,6 +531,8 @@ const ENDINGS: [&str; FIGHTERS.len()] = [
     "THE BERET IS ON THE HOOK BEFORE ANYBODY NOTICES.",
     "THE BRONZE BELT IS HEAVY. SHE CARRIES IT LIGHTLY.",
     "THE LOWRIDER ROLLS HOME UNDER THE DUSK LIGHT.",
+    "HE OPENS A SCHOOL WITH NO NAME ON THE DOOR. THE LINE GOES ROUND THE BLOCK.",
+    "HE OPENS A KARATE SCHOOL. THE BOW AT THE DOOR IS NOT OPTIONAL.",
 ];
 
 /// The ladder cleared: the champion at home with a fist in the air, everyone
@@ -472,7 +540,9 @@ const ENDINGS: [&str; FIGHTERS.len()] = [
 pub(crate) fn draw_ending(blip: &Blip, g: &Game) {
     let (w, n) = (WIN_W as f32, FIGHTERS.len());
     let home = home_of(g.pick);
-    draw_backdrop(blip, home, 0.0, g.now, 1.0);
+    // The crowd going up again and again, a new roar every 2.6 s.
+    let roar = Roar { at: g.now - g.now.rem_euclid(2.6), loud: 0.3, n: (g.now / 2.6) as u32 };
+    draw_backdrop(blip, home, 0.0, g.now, roar, WIN_W as f32 / 2.0);
     draw_floor(blip, home, 0.0);
 
     // The others in two lines either side of the champion, facing in, spaced to fit however many there
@@ -491,7 +561,23 @@ pub(crate) fn draw_ending(blip: &Blip, g: &Game) {
     champ.act = Act::Victory;
     champ.shown = Act::Victory;
     champ.t = 1.0 + g.now;
+    // DRAKE's ending is Fist of Fury's: frozen at the top of a flying kick, the picture gone to sepia.
+    let freeze = formless(g.pick);
+    if freeze {
+        let m = champ.scaled(move_data(MoveId::FlyingKick));
+        champ.act = Act::Attack;
+        champ.shown = Act::Attack;
+        champ.mv = MoveId::FlyingKick;
+        // (Low enough to clear the lines of text above.)
+        champ.y = FLOOR_Y - 58.0;
+        champ.vy = 0.0;
+        champ.vx = FLY_SPEED;
+        champ.t = (m.startup + m.active * 0.5) * F;
+    }
     draw_body(blip, &champ, g.now, 0.0, 0.0, 0, true);
+    if freeze {
+        blip.fill_rect(0.0, 0.0, w, WIN_H as f32, BlipColor { r: 0.44, g: 0.30, b: 0.14, a: 0.32 });
+    }
 
     // Paper, in everybody's colours.
     for i in 0..70 {
@@ -504,7 +590,7 @@ pub(crate) fn draw_ending(blip: &Blip, g: &Game) {
     }
 
     stamp(blip, "CHAMPION", 34.0, 6.0, BLIP_YELLOW);
-    stamp(blip, FIGHTERS[g.pick].name, 92.0, 3.0, rgb(FIGHTERS[g.pick].trim));
+    stamp(blip, FIGHTERS[g.pick].name, 92.0, 3.0, rgb(FIGHTERS[g.pick].accent()));
     // The score counts from the last continue, so say how the run went.
     let run = match g.continues {
         0 => "THE WHOLE LADDER WITHOUT A CONTINUE".to_string(),
@@ -535,10 +621,10 @@ pub(crate) fn draw_vs(blip: &Blip, g: &Game) {
     // cold, so two of a kind still stand on different ground.
     let warm = BlipColor { r: 0.75, g: 0.16, b: 0.12, a: 1.0 };
     let cold = BlipColor { r: 0.12, g: 0.26, b: 0.70, a: 1.0 };
-    let tint = [blend(rgb(who[0].trim), warm, 0.6), blend(rgb(who[1].trim), cold, 0.6)];
+    let tint = [blend(rgb(who[0].accent()), warm, 0.6), blend(rgb(who[1].accent()), cold, 0.6)];
     // Under the colours, where they are about to meet: the stage itself,
     // its floor under the two of them.
-    draw_backdrop(blip, g.stage, 302.0 - FLOOR_Y, g.now, 0.0);
+    draw_backdrop(blip, g.stage, 302.0 - FLOOR_Y, g.now, Roar::QUIET, WIN_W as f32 / 2.0);
     draw_floor(blip, g.stage, 302.0 - FLOOR_Y);
     let slant = 0.24;
     let edge = |y: f32| w / 2.0 + (h / 2.0 - y) * slant;
@@ -567,6 +653,11 @@ pub(crate) fn draw_vs(blip: &Blip, g: &Game) {
             blip.draw_text(label, cx - text_w(label, 1.0) / 2.0, py - 16.0, 1.0, grey);
         }
         blip.draw_text(a.name, cx - text_w(a.name, 3.0) / 2.0, py + pw + 6.0, 3.0, BLIP_WHITE);
+        // DRAKE's billing carries his creed under the name.
+        if formless(g.p[i].who) {
+            let creed = "NO WAY AS WAY";
+            blip.draw_text(creed, cx - text_w(creed, 1.0) / 2.0, py + pw + 38.0, 1.0, BLIP_YELLOW);
+        }
 
         let f = Fighter::new(g.p[i].who, w / 2.0 + side * (64.0 + off), -side);
         draw_body(blip, &f, g.now, ground - FLOOR_Y, 0.0, i, true);
@@ -576,6 +667,16 @@ pub(crate) fn draw_vs(blip: &Blip, g: &Game) {
     if age > 0.35 {
         let sz = if age < 0.45 { 11.0 } else { 8.0 };
         stamp_at(blip, "VS", w / 2.0, 62.0 - (sz - 8.0) * 4.0, sz, BLIP_YELLOW);
+        // DRAKE meeting the boss is billed as what it is.
+        let (a, b) = (g.p[0].who, g.p[1].who);
+        if (formless(a) && FIGHTERS[b].boss) || (formless(b) && FIGHTERS[a].boss) {
+            stamp_at(blip, "SKILL VS POWER", w / 2.0, 140.0, 2.0, BLIP_WHITE);
+        }
+        // And meeting LANCER: a kicker against a fighter of no style.
+        let duelist = |w: usize| FIGHTERS[w].build == Build::Duelist;
+        if (formless(a) && duelist(b)) || (formless(b) && duelist(a)) {
+            stamp_at(blip, "STYLE VS STYLE", w / 2.0, 140.0, 2.0, BLIP_WHITE);
+        }
     }
     stamp(blip, STAGE_NAMES[g.stage % STAGES], 14.0, 2.0, grey);
     if g.mode != Mode::Solo { return; }
