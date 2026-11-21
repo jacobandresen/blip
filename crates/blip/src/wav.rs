@@ -20,6 +20,14 @@ impl Rng {
     }
 }
 
+/// Fold what rings out past a loop's `body` samples back over its start, so the loop repeats without a seam; the
+/// buffer ends at `body`.
+pub fn fold_tail(mut buf: Vec<f32>, body: usize) -> Vec<f32> {
+    let tail = buf.split_off(body);
+    for (v, t) in buf.iter_mut().zip(tail) { *v += t; }
+    buf
+}
+
 /// The master warmth for a music track: two gentle low-pass poles round
 /// 3 kHz take the fizz off hats, saws and noise without dulling the tune.
 pub fn warm(buf: &mut [f32]) { low_pass(buf, 3000.0); }
@@ -152,6 +160,12 @@ pub fn mix_into_f32(buf: &mut [f32], off: usize, sample: f32) {
         return;
     }
     buf[off] += sample;
+}
+
+/// A mix scaled by `gain`, through the limiter at [`MIX_KNEE`].
+pub fn limit_pcm16(buf: &[f32], gain: f32) -> Vec<i16> {
+    let scaled: Vec<f32> = buf.iter().map(|v| v * gain).collect();
+    soft_limit_to_pcm16(&scaled, MIX_KNEE)
 }
 
 /// Convert an f32 mix to 16-bit PCM through a tanh limiter.

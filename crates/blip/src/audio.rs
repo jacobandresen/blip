@@ -1,6 +1,5 @@
 //! Load sounds at startup and play them synchronously during the game loop.
 
-use std::f32::consts::PI;
 use std::sync::{Mutex, OnceLock};
 
 use macroquad::experimental::coroutines::{start_coroutine, Coroutine};
@@ -82,35 +81,6 @@ pub fn play_alert(s: &BlipSound) {
 }
 
 pub fn stop_alert() { stop_loop(&CURRENT_ALERT); }
-
-/// Synthesize a beep at `freq` Hz for `duration_ms`; load it at startup.
-pub async fn beep(freq: f32, duration_ms: f32) -> BlipSound {
-    load_sound(&synth_beep_wav(freq, duration_ms)).await
-}
-
-fn synth_beep_wav(freq: f32, duration_ms: f32) -> Vec<u8> {
-    const SR: u32 = 44_100;
-    let n = (SR as f32 * duration_ms / 1000.0) as usize;
-    let attack = ((SR as usize) / 500).max(1).min(n / 4 + 1);
-    let mut samples: Vec<i16> = Vec::with_capacity(n);
-    for i in 0..n {
-        let t = i as f32 / SR as f32;
-        let env = if i < attack {
-            i as f32 / attack as f32
-        } else {
-            let d = (i - attack) as f32 / (n - attack).max(1) as f32;
-            (1.0 - d).powf(1.6)
-        };
-        let drift = 1.0 - 0.05 * (i as f32 / n as f32); // slight downward pitch character
-        let f = freq * drift;
-        let fund = (2.0 * PI * f * t).sin();
-        let third = (2.0 * PI * f * 3.0 * t).sin() / 3.0;
-        let shaped = (fund * 0.8 + third * 0.35).tanh();
-        let s = (env * 11_500.0 * shaped) as i16;
-        samples.push(s);
-    }
-    crate::wav::encode_at(&samples, SR)
-}
 
 /// Plays a game's tunes from its music folder. Each loads in the background the
 /// first time it is wanted, and starts once it has: a WAV is megabytes, and the

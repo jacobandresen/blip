@@ -2,10 +2,7 @@
 
 use std::f32::consts::PI;
 
-use blip::input::{
-    coin_start, play_again, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
-    BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
-};
+use blip::input::{coin_start, key_active, key_pressed, play_again, Stick, BLIP_KEY_BUTTON2, BLIP_KEY_SPACE};
 use blip::macroquad::texture::Texture2D;
 use blip::{
     hsv,
@@ -467,7 +464,7 @@ fn kill_ship(g: &mut Game, sfx: &Sounds) {
         LifeResult::StillAlive => State::Dead,
         LifeResult::GameOver => {
             // A new best gets the extra-life jingle after the blast.
-            if web::beats_best(g.sess.score) { play_sfx(&sfx.extra_life); }
+            if g.sess.beats_best() { play_sfx(&sfx.extra_life); }
             State::Over
         }
     };
@@ -493,10 +490,10 @@ fn update_title(g: &mut Game) {
 /// how far the ship moved, across the seam if it wrapped.
 fn fly_ship(g: &mut Game, dt: f32, sfx: &Sounds, thrust_snd_t: &mut f32) -> (f32, f32) {
     let before = (g.ship.x, g.ship.y);
-    if key_active(BLIP_KEY_LEFT)  || key_active(BLIP_KEY_A) { g.ship.angle -= SHIP_TURN_RATE * dt; }
-    if key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D) { g.ship.angle += SHIP_TURN_RATE * dt; }
+    if Stick::Left.active() { g.ship.angle -= SHIP_TURN_RATE * dt; }
+    if Stick::Right.active() { g.ship.angle += SHIP_TURN_RATE * dt; }
 
-    g.ship.thrusting = key_active(BLIP_KEY_UP) || key_active(BLIP_KEY_W);
+    g.ship.thrusting = Stick::Up.active();
     if g.ship.thrusting {
         g.ship.vx += g.ship.angle.sin() * SHIP_ACCEL * dt;
         g.ship.vy -= g.ship.angle.cos() * SHIP_ACCEL * dt;
@@ -599,7 +596,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
             ) {
                 let a = g.asteroids[ai];
                 g.asteroids[ai].active = false;
-                let c = rock_color(&a, g.sess.level, blip::macroquad::time::get_time() as f32);
+                let c = rock_color(&a, g.sess.level, blip::now());
                 burst(g, a.x, a.y, a.vx, a.vy, 6, a.size.radius() * 0.5, 70.0, c);
                 split_rock(g, a.x, a.y, a.size, a.vx, a.vy);
                 blip::bot::add("death_rock", 1.0);
@@ -729,7 +726,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
                 // A share of the bullet's momentum goes into the fragments.
                 let (pvx, pvy) = (a.vx + g.bullets[bi].vx * 0.04, a.vy + g.bullets[bi].vy * 0.04);
                 g.asteroids[ai].active = false;
-                let c = rock_color(&a, g.sess.level, blip::macroquad::time::get_time() as f32);
+                let c = rock_color(&a, g.sess.level, blip::now());
                 burst(g, a.x, a.y, a.vx, a.vy, 5, size.radius() * 0.5, 60.0, c);
                 let times = g.streak.hit();
                 let pts = size.points() * times;
@@ -878,7 +875,7 @@ fn draw_ship(blip: &Blip, ship: &Ship, invuln_t: f32, level: i32, color: BlipCol
     }
     let dark = BlipColor { r: color.r * 0.18, g: color.g * 0.18, b: color.b * 0.18, a: 1.0 };
     for (p, q, r) in [(nose, left, tail), (nose, tail, right)] {
-        blip::macroquad::shapes::draw_triangle(p.into(), q.into(), r.into(), dark);
+        blip.fill_triangle(p, q, r, dark);
     }
     for (p, q) in hull { blip.draw_glow_line(p.0, p.1, q.0, q.1, color); }
 
@@ -1074,11 +1071,7 @@ fn draw_rock(blip: &Blip, a: &Asteroid, level: i32, t: f32) {
     if !flower {
         // A dark body inside the outline, so a rock reads as a solid lump, not a wire ring.
         let body = BlipColor { r: c.r * 0.14, g: c.g * 0.14, b: c.b * 0.14, a: 0.9 };
-        let centre = blip::macroquad::math::vec2(a.x, a.y);
-        for &(p, q) in &lines {
-            let (p, q) = (at(p), at(q));
-            blip::macroquad::shapes::draw_triangle(centre, p.into(), q.into(), body);
-        }
+        for &(p, q) in &lines { blip.fill_triangle((a.x, a.y), at(p), at(q), body); }
     }
     for &(p, q) in &lines {
         let (p, q) = (at(p), at(q));
@@ -1131,11 +1124,7 @@ fn draw_crystal(blip: &Blip, c: &Crystal, t: f32) {
     let k = (t * 2.0).cos();
     let pts: Vec<(f32, f32)> = [(0.0, -1.3), (1.0, 0.0), (0.0, 1.3), (-1.0, 0.0)].iter()
         .map(|&(x, y)| (c.x + (x * k * 0.6 + 0.4 * x) * CRYSTAL_R, c.y + y * CRYSTAL_R)).collect();
-    let centre = blip::macroquad::math::vec2(c.x, c.y);
-    for i in 0..4 {
-        let (p, q) = (pts[i], pts[(i + 1) % 4]);
-        blip::macroquad::shapes::draw_triangle(centre, p.into(), q.into(), BlipColor { r: 0.1, g: 0.35, b: 0.45, a: 0.8 });
-    }
+    blip.fill_fan((c.x, c.y), &pts, BlipColor { r: 0.1, g: 0.35, b: 0.45, a: 0.8 });
     for i in 0..4 {
         let (p, q) = (pts[i], pts[(i + 1) % 4]);
         blip.draw_glow_line(p.0, p.1, q.0, q.1, NEON_CYAN);
@@ -1160,7 +1149,7 @@ fn draw_stars(blip: &Blip, t: f32) {
 }
 
 fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
-    let t = blip::macroquad::time::get_time() as f32;
+    let t = blip::now();
     blip.clear(BLIP_BLACK);
     draw_stars(blip, t);
     draw_haze(blip, blot, &g.asteroids, g.sess.level, t);
@@ -1222,7 +1211,7 @@ fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
 fn draw_title(blip: &Blip, hi: i32, art: &[Texture2D; 4]) {
     blip.clear(BLIP_BLACK);
     blip.draw_texture(&art[0], 0.0, 0.0, WIN_W as f32, WIN_H as f32);
-    draw_stars(blip, blip::macroquad::time::get_time() as f32);
+    draw_stars(blip, blip::now());
     blip.draw_centered("METEORS", (WIN_H / 4) as f32, 6.0, NEON_CYAN);
     // METEORS is sz=6 (42px tall) — clear its bottom by a real margin.
     blip.draw_hi(hi, (WIN_H / 4) as f32 + 50.0, NEON_YELLOW);
@@ -1233,7 +1222,7 @@ fn draw_title(blip: &Blip, hi: i32, art: &[Texture2D; 4]) {
         else { ("PAD TURNS   UP THRUSTS", "BUTTONS FIRE AND HYPERSPACE") };
     blip.draw_centered(l1, (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
     blip.draw_centered(l2, (WIN_H * 2 / 3) as f32 + 24.0, 2.0, BLIP_GRAY);
-    let t = blip::macroquad::time::get_time() as f32;
+    let t = blip::now();
     blip.draw_texture_cell(&art[1], 0, 1, 0, 1, 72.0, 558.0, 96.0, 96.0, t * 0.16);
     blip.draw_texture_cell(&art[2], 0, 1, 0, 1, 528.0, 572.0, 64.0, 64.0, -t * 0.22);
     blip.draw_texture_cell(&art[3], 0, 1, 0, 1,
@@ -1255,19 +1244,14 @@ async fn main() {
     blip::bot::playthroughs(bot::PLAYTHROUGHS);
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
-    let blot = Texture2D::from_file_with_format(blip::png!("soft_glow"), Some(blip::macroquad::prelude::ImageFormat::Png));
-    blot.set_filter(blip::macroquad::texture::FilterMode::Linear);
+    let blot = blip::load_png_smooth(blip::png!("soft_glow"));
 
     let title_art = [
         blip::png!("title_grid"),
         blip::png!("title_rock_large"),
         blip::png!("title_rock_medium"),
         blip::png!("title_ship"),
-    ].map(|bytes| {
-        let texture = Texture2D::from_file_with_format(bytes, Some(blip::macroquad::prelude::ImageFormat::Png));
-        texture.set_filter(blip::macroquad::texture::FilterMode::Nearest);
-        texture
-    });
+    ].map(blip::load_png);
 
     // DRIFT, BLOOM from wave BLOOM_WAVE (the flowers), then STORM from wave STORM_WAVE.
     let mut music = Jukebox::new("meteors", &["DRIFT", "BLOOM", "STORM"]);
@@ -1306,16 +1290,11 @@ async fn main() {
         match g.state {
             State::Title => draw_title(&blip, web::high_score(), &title_art),
             State::Over  => draw_over(&blip, g.sess.score, web::high_score(), g.respawn_t.active(), &title_art[0]),
-            State::Play | State::Dead => {
-                let (dx, dy) = blip::shake(g.shake, SHIP_SHAKE, 6.0);
-                blip.set_offset(dx, dy);
-                draw_play(&blip, &g, &blot);
-                blip.set_offset(0.0, 0.0);
-            }
+            State::Play | State::Dead => blip.shaken(g.shake, SHIP_SHAKE, 6.0, || draw_play(&blip, &g, &blot)),
         }
         g.shake = (g.shake - dt).max(0.0);
 
-        blip.next_frame(60).await;
+        blip.next_frame().await;
     }
 }
 
@@ -1412,10 +1391,8 @@ mod tests {
 
     #[test]
     fn saucers_come_and_shoot_more_often_each_level_down_to_a_floor() {
-        for level in 1..8 {
-            assert!(saucer_fire_cooldown(level + 1) <= saucer_fire_cooldown(level));
-            assert!(saucer_spawn_range(level + 1).0 <= saucer_spawn_range(level).0);
-        }
+        blip::testing::never_rises("saucer cooldown", 1..=8, saucer_fire_cooldown);
+        blip::testing::never_rises("saucer spawn", 1..=8, |l| saucer_spawn_range(l).0);
         assert!(saucer_fire_cooldown(50) >= 0.7);
         assert!(saucer_spawn_range(50).0 >= 4.0);
     }

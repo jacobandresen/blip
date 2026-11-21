@@ -297,27 +297,11 @@ fn render_maze(img: &mut [V3]) {
 
 /// Paint `col` (a closure of position) wherever the polygon covers.
 fn paint_poly(img: &mut [V3], pts: &[(f32, f32)], f: &dyn Fn(f32, f32) -> Option<V3>) {
-    let (mut x0, mut y0, mut x1, mut y1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
-    for &(x, y) in pts {
-        x0 = x0.min(x);
-        y0 = y0.min(y);
-        x1 = x1.max(x);
-        y1 = y1.max(y);
-    }
+    let (x0, y0, x1, y1) = blip::math::bounds(pts);
     for y in (y0.floor() as i32).max(0)..=(y1.ceil() as i32).min(H - 1) {
         for x in (x0.floor() as i32).max(0)..=(x1.ceil() as i32).min(W - 1) {
             let (px, py) = (x as f32 + 0.5, y as f32 + 0.5);
-            let mut inside = false;
-            let mut j = pts.len() - 1;
-            for i in 0..pts.len() {
-                let (xi, yi) = pts[i];
-                let (xj, yj) = pts[j];
-                if (yi > py) != (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi {
-                    inside = !inside;
-                }
-                j = i;
-            }
-            if inside {
+            if blip::math::in_polygon(pts, px, py) {
                 if let Some(c) = f(px, py) {
                     img[(y * W + x) as usize] = c;
                 }

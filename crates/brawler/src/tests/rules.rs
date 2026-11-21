@@ -38,8 +38,7 @@ pub(crate) fn blocking_requires_holding_away_from_the_opponent() {
     // Holding toward them is walking into it. This is what makes a
     // player commit: you cannot advance and be safe at the same time.
     assert!(holding_back(back_input(1.0, false), 1.0));
-    let mut forward = Input::default();
-    forward.right = true;
+    let forward = Input { right: true, ..Default::default() };
     assert!(!holding_back(forward, 1.0), "holding forward is not a block");
 }
 
@@ -158,8 +157,7 @@ pub(crate) fn you_cannot_act_while_you_are_busy() {
     let mut f = at(0, 200.0, 1.0);
     f.start_attack(MoveId::Sweep);
     let before = f.mv;
-    let mut jab = Input::default();
-    jab.punch_low = true;
+    let jab = Input { punch_low: true, ..Default::default() };
     apply_input(&mut f, jab, false, F);
     assert_eq!(f.mv, before, "an attack was cancelled into another attack");
     assert_eq!(f.act, Act::Attack);
@@ -255,8 +253,7 @@ pub(crate) fn a_landed_jab_can_be_cancelled_into_something_heavier() {
     assert!(dmg > 0);
     assert!(atk.can_cancel(), "a landed jab opened no follow-up window");
 
-    let mut kick = Input::default();
-    kick.kick_high = true;
+    let kick = Input { kick_high: true, ..Default::default() };
     apply_input(&mut atk, kick, false, F);
     assert_eq!(atk.mv, MoveId::HighKick, "the follow-up never came out");
     assert!(atk.chained, "the follow-up was not marked as a chain");
@@ -269,9 +266,8 @@ pub(crate) fn a_blocked_poke_buys_nothing() {
     let mut atk = at(0, 280.0, 1.0);
     let mut def = at(1, 320.0, -1.0);
     wind_to_active(&mut atk, MoveId::LowPunch);
-    let mut back = Input::default();
-    back.right = true; // away from the attacker on the left
-    back.down = true;  // and low, because the low punch is low
+    // Away from the attacker on the left, and low, because the low punch is low.
+    let back = Input { right: true, down: true, ..Default::default() };
     let (_, blocked, _) = resolve_hit(&mut atk, &mut def, back);
     assert!(blocked);
     assert!(!atk.can_cancel(), "a blocked poke opened a follow-up window");
@@ -285,8 +281,7 @@ pub(crate) fn a_chain_cannot_chain_again() {
     let mut def = at(1, 320.0, -1.0);
     wind_to_active(&mut atk, MoveId::LowPunch);
     resolve_hit(&mut atk, &mut def, Input::default());
-    let mut jab = Input::default();
-    jab.punch_low = true;
+    let jab = Input { punch_low: true, ..Default::default() };
     apply_input(&mut atk, jab, false, F);          // the one cancel
     assert!(atk.chained);
 
@@ -359,8 +354,7 @@ pub(crate) fn a_throw_only_comes_out_from_throw_range() {
     // Punch is punch at arm's length and a throw up close; at range the
     // player must still get the move they expect.
     let f = at(0, 300.0, 1.0);
-    let mut punch = Input::default();
-    punch.punch_low = true;
+    let mut punch = Input { punch_low: true, ..Default::default() };
     assert_eq!(pressed_move(&f, punch, true), Some(MoveId::Throw));
     assert_eq!(pressed_move(&f, punch, false), Some(MoveId::LowPunch));
     // And crouching punch is never a throw — you cannot throw from
@@ -368,9 +362,7 @@ pub(crate) fn a_throw_only_comes_out_from_throw_range() {
     // found it, the same way it asks for the sweep.
     punch.down = true;
     assert_eq!(pressed_move(&f, punch, true), Some(MoveId::Uppercut));
-    let mut high = Input::default();
-    high.punch_high = true;
-    high.down = true;
+    let high = Input { punch_high: true, down: true, ..Default::default() };
     assert_eq!(pressed_move(&f, high, false), Some(MoveId::Uppercut));
 }
 
@@ -437,9 +429,7 @@ pub(crate) fn a_flurry_leaves_a_fighter_dizzy_once_a_round_and_a_jab_now_and_the
 
 #[test]
 pub(crate) fn down_and_punch_is_the_uppercut_and_it_is_for_whoever_jumps_in() {
-    let mut down_punch = Input::default();
-    down_punch.down = true;
-    down_punch.punch_low = true;
+    let down_punch = Input { down: true, punch_low: true, ..Default::default() };
     assert_eq!(grounded_move(down_punch, false), Some(MoveId::Uppercut));
 
     let upper = |set: fn(&mut Fighter)| {

@@ -775,12 +775,7 @@ pub(crate) fn the_cpu_throws_the_flying_kick_too() {
             g.p[1].x = 520.0;
             for _ in 0..3000 {
                 if g.p[0].health <= 0 || g.p[1].health <= 0 { break; }
-                g.cpu_delay -= F;
-                if g.cpu_delay <= 0.0 {
-                    g.cpu_plan = cpu_think(&mut g);
-                    g.cpu_delay = 0.38 - 0.18 * g.difficulty;
-                }
-                let c_in = cpu_input(&g);
+                let c_in = timed_cpu(&mut g);
                 // The player holds their ground and does nothing, so
                 // the CPU keeps having to solve the same problem.
                 let ins = [Input::default(), c_in];

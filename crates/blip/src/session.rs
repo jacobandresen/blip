@@ -113,12 +113,14 @@ pub struct Session {
     pub score: i32,
     pub lives: i32,
     pub level: i32,
+    /// The best score before the run's continues: each continue starts the score afresh.
+    best: i32,
 }
 
 impl Session {
     /// Create a new session with zero score, `lives` lives, and level 1.
     pub fn new(lives: i32) -> Self {
-        Self { score: 0, lives, level: 1 }
+        Self { score: 0, lives, level: 1, best: 0 }
     }
 
     /// Add `pts` to the score.
@@ -147,6 +149,23 @@ impl Session {
         result
     }
 
+    /// A continue taken: the score afresh with `lives`, its best kept for [`Session::run_best`].
+    pub fn play_on(&mut self, lives: i32) {
+        crate::bot::add("continues", 1.0);
+        self.best = self.run_best();
+        self.score = 0;
+        self.lives = lives;
+    }
+
+    /// The run's best score over its continues: what the game reports at the end.
+    pub fn run_best(&self) -> i32 { self.score.max(self.best) }
+
+    /// The run is over: report its best (see `web::report_score`).
+    pub fn report(&self) { crate::web::report_score(self.run_best()); }
+
+    /// The run beats this browser's best: a fanfare instead of the game-over tune.
+    pub fn beats_best(&self) -> bool { crate::web::beats_best(self.run_best()) }
+
     /// Advance to the next level (increments the level counter only).
     pub fn next_level(&mut self) {
         self.level += 1;
@@ -157,6 +176,7 @@ impl Session {
     /// A bot run with `BLIP_BOT_LEVEL=n` starts at level n.
     pub fn reset(&mut self, lives: i32) {
         self.score = 0;
+        self.best = 0;
         self.level = 1 + crate::bot::level(i32::MAX as usize) as i32;
         self.lives = lives;
         crate::bot::reached_level(self.level);
@@ -170,6 +190,20 @@ pub const GAME_OVER_MIN_WAIT: f32 = 2.0;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn playing_on_starts_the_score_afresh_and_keeps_the_runs_best() {
+        let mut s = Session::new(3);
+        s.add_score(700);
+        s.play_on(2);
+        assert_eq!((s.score, s.lives, s.run_best()), (0, 2, 700));
+        s.add_score(300);
+        assert_eq!(s.run_best(), 700);
+        s.add_score(500);
+        assert_eq!(s.run_best(), 800);
+        s.reset(3);
+        assert_eq!(s.run_best(), 0);
+    }
 
     #[test]
     fn a_continue_ignores_a_held_button_then_plays_on_or_runs_out() {

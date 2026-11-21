@@ -282,7 +282,7 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
     draw_leg(blip, &far, k.hip_rear, k.knee_rear, k.ankle_rear, rig.fwd, rig.ground, q.rear_heel);
     // DRAKE's nunchaku, tucked in the back of his waistband when they are not in his hand.
     let in_hand = (f.act == Act::Attack && f.mv == MoveId::Special && f.special() == Special::Nunchaku)
-        || (f.act == Act::Victory && f.t < 1.6 && f.stumble_roll % 4 == 0 && !plucking(f)) || (f.act == Act::Bow && intro_now(f) != Intro::WarmUp && f.t > 0.15 && f.t < 0.6)
+        || (f.act == Act::Victory && f.t < 1.6 && f.stumble_roll.is_multiple_of(4) && !plucking(f)) || (f.act == Act::Bow && intro_now(f) != Intro::WarmUp && f.t > 0.15 && f.t < 0.6)
         || (f.act == Act::Idle && f.taunt > 0.15 && f.taunt < 1.25 && f.stumble_roll % 2 == 1);
     if formless(f.who) && !in_hand && !prone {
         let z = a.size;
@@ -315,7 +315,7 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
     draw_arm(blip, &near, k.sh_lead, k.elbow_lead, k.hand_lead, q.open, rig.fwd);
     light_from(None);
     if (f.act == Act::Attack && f.mv == MoveId::Special && f.special() == Special::Nunchaku)
-        || (f.act == Act::Victory && formless(f.who) && f.t < 1.6 && f.stumble_roll % 4 == 0 && !plucking(f))
+        || (f.act == Act::Victory && formless(f.who) && f.t < 1.6 && f.stumble_roll.is_multiple_of(4) && !plucking(f))
         || (f.act == Act::Bow && formless(f.who) && !f.bows && intro_now(f) != Intro::WarmUp && f.t > 0.15 && f.t < 0.6)
         || (f.act == Act::Idle && formless(f.who) && f.taunt > 0.15 && f.taunt < 1.25 && f.stumble_roll % 2 == 1) {
         draw_sticks(blip, f, k.hand_lead, rig.fwd);

@@ -1,12 +1,8 @@
 //! Raider — a 1942-style vertical dogfighting shoot-'em-up.
 
-use blip::input::{
-    coin_start, play_again, key_active, key_held, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
-    BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
-};
+use blip::input::{coin_start, key_active, play_again, Stick, BLIP_KEY_SPACE};
 use blip::macroquad::audio::{play_sound, set_sound_volume, stop_sound, PlaySoundParams};
 use blip::macroquad::math::vec2;
-use blip::macroquad::shapes::draw_triangle;
 use blip::macroquad::rand::rand;
 use blip::macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use blip::{
@@ -528,7 +524,6 @@ struct Game {
     /// The continue offered at game over, and the best score of the run before one was taken (a continue starts
     /// the score afresh; the run's best is what is reported).
     cont: blip::Continue,
-    run_best: i32,
 }
 
 fn wave_target_for(level: i32) -> i32 {
@@ -685,7 +680,6 @@ impl Game {
             fx: Fx::new(),
             streak: blip::Streak::new(STREAK_PER, STREAK_MAX),
             cont: blip::Continue::default(),
-            run_best: 0,
         }
     }
 
@@ -795,7 +789,6 @@ impl Game {
     fn start_game(&mut self) {
         self.sess.reset(LIVES_START);
         self.streak.miss();
-        self.run_best = 0;
         self.sess.level = self.sess.level.min(MAX_LEVEL);
         blip::bot::levels(MAX_LEVEL as usize);
         blip::bot::reached_level(self.sess.level);
@@ -1615,8 +1608,8 @@ fn update_launch(g: &mut Game, dt: f32, sfx: &Sounds) {
     if t < LAUNCH_ROLL_END + 0.4 {
         g.player_x = ((WIN_W - PLAYER_W) / 2) as f32;
     } else {
-        let left  = key_held(BLIP_KEY_LEFT)  || key_held(BLIP_KEY_A);
-        let right = key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D);
+        let left  = Stick::Left.held();
+        let right = Stick::Right.held();
         if left  { g.player_x -= PLAYER_SPEED * dt; }
         if right { g.player_x += PLAYER_SPEED * dt; }
         g.player_x = clamp(g.player_x, 0.0, (WIN_W - PLAYER_W) as f32);
@@ -2017,10 +2010,10 @@ fn fly_plane(g: &mut Game, dt: f32, sfx: &Sounds) {
     if g.stall_fall > 0.0 {
         update_stall(g, dt, sfx);
     } else {
-        let left  = key_active(BLIP_KEY_LEFT)  || key_active(BLIP_KEY_A);
-        let right = key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D);
-        let up    = key_active(BLIP_KEY_UP)    || key_active(BLIP_KEY_W);
-        let down  = key_active(BLIP_KEY_DOWN)  || key_active(BLIP_KEY_S);
+        let left  = Stick::Left.active();
+        let right = Stick::Right.active();
+        let up    = Stick::Up.active();
+        let down  = Stick::Down.active();
         let throttle = up as i32 as f32 - down as i32 as f32;
         if g.engine_out() {
             // No thrust: the plane sheds speed whatever the throttle, but
@@ -2513,14 +2506,11 @@ fn update_won(g: &mut Game, dt: f32) {
 fn update_over(g: &mut Game, dt: f32) {
     match g.cont.update(dt, blip::input::btn1_pressed()) {
         Some(true) => {
-            blip::bot::add("continues", 1.0);
-            g.run_best = g.run_best.max(g.sess.score);
-            g.sess.lives = LIVES_START;
-            g.sess.score = 0;
+            g.sess.play_on(LIVES_START);
             g.start_round();
         }
         Some(false) => {
-            web::report_score(g.sess.score.max(g.run_best));
+            g.sess.report();
             g.state = State::Title;
         }
         None => {}
@@ -2531,17 +2521,11 @@ fn update_over(g: &mut Game, dt: f32) {
 /// octaves of wave lines (swell and chop) scrolling with `sea_scroll`, sun
 /// glitter in a diagonal band, and each cloud's shadow drifting on the water.
 fn draw_sea(blip: &Blip, g: &Game) {
-    let bands = 14;
-    let band_h = WIN_H as f32 / bands as f32;
     let far  = (0.10, 0.24, 0.46); // hazy, sun-bleached blue at the horizon (top)
     let near = (0.03, 0.11, 0.30); // deep, saturated blue close up (bottom)
-    for i in 0..bands {
-        let t = i as f32 / (bands - 1) as f32;
-        let r = far.0 + (near.0 - far.0) * t;
-        let gcol = far.1 + (near.1 - far.1) * t;
-        let b = far.2 + (near.2 - far.2) * t;
-        blip.fill_rect(0.0, i as f32 * band_h, WIN_W as f32, band_h + 1.0, BlipColor::new(r, gcol, b, 1.0));
-    }
+    blip.fill_bands(0.0, 0.0, WIN_W as f32, WIN_H as f32, 14, |t| {
+        BlipColor::new(far.0 + (near.0 - far.0) * t, far.1 + (near.1 - far.1) * t, far.2 + (near.2 - far.2) * t, 1.0)
+    });
 
     let spacing = 30.0;
     let rows = (WIN_H as f32 / spacing) as i32 + 2;
@@ -2674,7 +2658,7 @@ fn draw_islands(blip: &Blip, g: &Game, island_tex: &[Texture2D; 3]) {
     for isl in pool_iter(&g.islands) {
         let (w, h) = ISLAND_SIZES[isl.size as usize];
         // Surf: two pale rings breathing round the shore, out of step, under the island.
-        let t = blip::macroquad::time::get_time() as f32 + isl.x * 0.01;
+        let t = blip::now() + isl.x * 0.01;
         let (cx, cy) = (isl.x + w as f32 / 2.0, isl.y + h as f32 / 2.0);
         for k in 0..2 {
             let p = (t * 0.8 + k as f32 * 0.5).fract();
@@ -2765,9 +2749,8 @@ fn draw_plane(tex: &Texture2D, x: f32, y: f32, w: f32, h: f32, heading: f32, ban
 fn draw_launch(
     blip: &Blip, g: &Game,
     player_tex: &Texture2D, enemy_tex: &[Texture2D; 3], carrier_tex: &Texture2D, boat_tex: &Texture2D,
-    cloud_tex: &[Texture2D; 3], island_tex: &[Texture2D; 3],
+    cloud_tex: &[Texture2D; 3],
 ) {
-    let _ = island_tex;
     draw_sea(blip, g);
     land::draw_land(blip, g);
     draw_boats(blip, g, boat_tex);
@@ -3031,8 +3014,7 @@ fn draw_play(
         let (tx, ty) = (nx - dx * len, ny - dy * len);
         let (sx, sy) = (nx - dx * len * 0.35, ny - dy * len * 0.35); // where the ogive starts
         blip.draw_line_ex(tx, ty, sx, sy, wid, brass);
-        draw_triangle(vec2(sx + px * wid / 2.0, sy + py * wid / 2.0),
-            vec2(sx - px * wid / 2.0, sy - py * wid / 2.0), vec2(nx, ny), copper);
+        blip.fill_triangle((sx + px * wid / 2.0, sy + py * wid / 2.0), (sx - px * wid / 2.0, sy - py * wid / 2.0), (nx, ny), copper);
         blip.draw_line_ex(tx + px * wid * 0.22, ty + py * wid * 0.22,
             sx + px * wid * 0.22, sy + py * wid * 0.22, (wid * 0.28).max(0.6), glint);
     }
@@ -3072,13 +3054,13 @@ fn draw_play(
     } else if g.state == State::Play {
         // Blink the plane while the post-respawn grace period is active.
         let blink = g.respawn_grace.active() && ((g.respawn_grace.remaining() * 12.0) as i32 % 2 == 0);
-        if g.airspeed < STALL_WARN && (blip::macroquad::time::get_time() * 5.0) as i64 % 2 == 0 {
+        if g.airspeed < STALL_WARN && blip::blink(5.0) {
             blip.draw_text("STALL", g.player_x + PLAYER_W as f32 / 2.0 - 15.0, g.player_y - 14.0, 2.0, BLIP_RED);
         }
         if !blink {
             // near a stall the airframe buffets
             let shake = if g.airspeed < STALL_WARN { 2.5 * (1.0 - g.airspeed / STALL_WARN) } else { 0.0 };
-            let tt = blip::macroquad::time::get_time() as f32;
+            let tt = blip::now();
             let (bx, by) = ((tt * 57.0).sin() * shake, (tt * 43.0).cos() * shake);
             // at full throttle, vapour streams off the wingtips
             if g.airspeed > 1.15 {
@@ -3434,10 +3416,10 @@ async fn main() {
         if prev_state != State::Win  && g.state == State::Win  { play_sfx(&sfx.stage_clear); }
         if prev_state != State::Over && g.state == State::Over {
             // A new best (over the whole run's continues) ends on the stage-clear fanfare.
-            play_sfx(if web::beats_best(g.sess.score.max(g.run_best)) { &sfx.stage_clear } else { &sfx.game_over });
+            play_sfx(if g.sess.beats_best() { &sfx.stage_clear } else { &sfx.game_over });
         }
         if prev_state != State::Won && g.state == State::Won {
-            web::report_score(g.sess.score.max(g.run_best));
+            g.sess.report();
         }
         // In flight the engine is the crossfaded bank; it starts when play
         // does and stops when it ends (death, stage clear, game over).
@@ -3458,21 +3440,19 @@ async fn main() {
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title  => draw_title(&blip, &title_backdrop, &player_tex, web::high_score()),
-            State::Launch => draw_launch(&blip, &g, &player_tex, &enemy_tex, &carrier_tex, &boat_tex, &cloud_tex, &island_tex),
+            State::Launch => draw_launch(&blip, &g, &player_tex, &enemy_tex, &carrier_tex, &boat_tex, &cloud_tex),
             State::Win    => draw_win(&blip, g.sess.level),
             State::Won    => draw_won(&blip, g.sess.score, web::high_score(), g.over_timer.active()),
             State::Over   => {
                 blip.draw_game_over(g.sess.score, web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, false);
-                if g.cont.showing() {
-                    blip.draw_game_over_prompt(&format!("CONTINUE? {}", g.cont.seconds()), BLIP_YELLOW);
-                }
+                blip.draw_continue(&g.cont, BLIP_YELLOW);
             }
             State::Play | State::Dead => {
                 draw_play(&blip, &g, &player_tex, &enemy_tex, &boss_tex, &powerup_tex, &health_tex, &boss_name_ja_tex, &boat_tex, &cloud_tex, &island_tex);
             }
         }
 
-        blip.next_frame(60).await;
+        blip.next_frame().await;
     }
 }
 
@@ -3524,19 +3504,15 @@ mod tests {
 
     #[test]
     fn each_gun_tier_is_at_least_the_last_one() {
-        for level in 1..MAX_WEAPON_LEVEL {
-            let (n0, fan0, r0) = weapon_guns(level);
-            let (n1, fan1, r1) = weapon_guns(level + 1);
-            assert!(n1 >= n0 && fan1 >= fan0 && r1 >= r0, "tier {} is weaker than {level}", level + 1);
-            assert!(weapon_cooldown(level + 1) <= weapon_cooldown(level));
-        }
+        blip::testing::never_falls("guns", 1..=MAX_WEAPON_LEVEL, |l| weapon_guns(l).0);
+        blip::testing::never_falls("fan", 1..=MAX_WEAPON_LEVEL, |l| weapon_guns(l).1);
+        blip::testing::never_falls("range", 1..=MAX_WEAPON_LEVEL, |l| weapon_guns(l).2);
+        blip::testing::never_rises("cooldown", 1..=MAX_WEAPON_LEVEL, weapon_cooldown);
     }
 
     #[test]
     fn waves_grow_and_the_last_is_the_long_flight_in() {
-        for level in 1..MAX_LEVEL - 1 {
-            assert!(wave_target_for(level + 1) >= wave_target_for(level));
-        }
+        blip::testing::never_falls("wave size", 1..MAX_LEVEL, wave_target_for);
         assert!(wave_target_for(MAX_LEVEL) > wave_target_for(MAX_LEVEL - 1));
         assert!(wave_target_for(40) <= 160, "the cap holds before the last level");
     }
@@ -3546,8 +3522,8 @@ mod tests {
         for level in 1..10 {
             let (lo, hi) = spawn_interval_range(level);
             assert!(lo > 0.0 && lo < hi, "level {level}");
-            assert!(spawn_interval_range(level + 1).1 <= hi);
         }
+        blip::testing::never_rises("longest gap", 1..=10, |l| spawn_interval_range(l).1);
     }
 
     #[test]

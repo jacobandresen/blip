@@ -1,8 +1,8 @@
 //! Bubble Bobble-inspired platform game with one- or two-player co-op.
 
 use blip::input::{
-    key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D, BLIP_KEY_F, BLIP_KEY_G, BLIP_KEY_J, BLIP_KEY_K,
-    BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
+    any_pressed, key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D, BLIP_KEY_F, BLIP_KEY_G, BLIP_KEY_J,
+    BLIP_KEY_K, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::input::KeyCode;
 use blip::macroquad::math::vec2;
@@ -101,9 +101,7 @@ fn col(c: (u8, u8, u8), a: f32) -> BlipColor {
 fn rgba(r: f32, g: f32, b: f32, a: f32) -> BlipColor {
     BlipColor::new(r, g, b, a)
 }
-fn now() -> f32 {
-    blip::macroquad::time::get_time() as f32
-}
+use blip::now;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State {
@@ -154,7 +152,6 @@ const P2_KEYS: KeySet =
     KeySet { left: &[BLIP_KEY_LEFT], right: &[BLIP_KEY_RIGHT], jump: &[BLIP_KEY_UP, BLIP_KEY_K], blow: &[BLIP_KEY_J] };
 fn read(k: &KeySet) -> Input {
     let any_held = |ks: &[KeyCode]| ks.iter().any(|c| key_held(*c) || key_pressed(*c));
-    let any_pressed = |ks: &[KeyCode]| ks.iter().any(|c| key_pressed(*c));
     Input {
         left: any_held(k.left),
         right: any_held(k.right),
@@ -1515,17 +1512,10 @@ fn tint(c: (u8, u8, u8), k: f32) -> (u8, u8, u8) {
 
 fn draw_background(blip: &Blip, g: &Game) {
     let pal = &PALETTES[g.round];
-    let bands = 18;
-    for i in 0..bands {
-        let t = i as f32 / (bands - 1) as f32;
-        let c = (
-            (pal.sky0.0 as f32 + (pal.sky1.0 as f32 - pal.sky0.0 as f32) * t) as u8,
-            (pal.sky0.1 as f32 + (pal.sky1.1 as f32 - pal.sky0.1 as f32) * t) as u8,
-            (pal.sky0.2 as f32 + (pal.sky1.2 as f32 - pal.sky0.2 as f32) * t) as u8,
-        );
-        let h = WIN_H as f32 / bands as f32;
-        blip.fill_rect(0.0, i as f32 * h, WIN_W as f32, h + 1.0, col(c, 1.0));
-    }
+    let ch = |a: u8, b: u8, t: f32| (a as f32 + (b as f32 - a as f32) * t) as u8;
+    blip.fill_bands(0.0, 0.0, WIN_W as f32, WIN_H as f32, 18, |t| {
+        col((ch(pal.sky0.0, pal.sky1.0, t), ch(pal.sky0.1, pal.sky1.1, t), ch(pal.sky0.2, pal.sky1.2, t)), 1.0)
+    });
     draw_bokeh(blip, pal);
 }
 
@@ -2078,7 +2068,7 @@ fn draw_scores(blip: &Blip, g: &Game) {
     soft(blip, &round, (WIN_W as f32 - text_w(&round, sz)) / 2.0, y, sz, PEACH, 1.0);
 }
 
-fn draw_title(blip: &Blip, art: &art::Art, g: &Game, hi: i32) {
+fn draw_title(blip: &Blip, art: &art::Art, hi: i32) {
     let t = now();
     art.title_background(blip);
     draw_bokeh(blip, &PALETTES[0]);
@@ -2111,7 +2101,6 @@ fn draw_title(blip: &Blip, art: &art::Art, g: &Game, hi: i32) {
         let h = format!("HI {hi}");
         soft(blip, &h, (WIN_W as f32 - text_w(&h, 2.0)) / 2.0, 428.0 + DY, 2.0, PEACH, 1.0);
     }
-    let _ = g;
 }
 
 /// The cabinet card: two dragons mid-round, bubbles up, a chain ready.
@@ -2278,7 +2267,7 @@ async fn main() {
         }
 
         draw(&blip, &art, &g, hi);
-        blip.next_frame(60).await;
+        blip.next_frame().await;
     }
 }
 
@@ -2418,7 +2407,7 @@ fn draw_confetti(t: f32) {
 fn draw(blip: &Blip, art: &art::Art, g: &Game, hi: i32) {
     blip.clear(BlipColor::new(0.0, 0.0, 0.0, 1.0));
     match g.state {
-        State::Title => draw_title(blip, art, g, hi),
+        State::Title => draw_title(blip, art, hi),
         _ => {
             draw_world(blip, art, g);
             draw_scores(blip, g);
@@ -2571,11 +2560,7 @@ mod tests {
     #[test]
     fn every_round_is_a_full_grid_with_both_players_and_something_to_trap() {
         for (round, rows) in LEVELS.iter().enumerate() {
-            assert!(
-                rows.iter().all(|row| row.chars().count() == COLS),
-                "round {}: a row is not {COLS} wide",
-                round + 1
-            );
+            blip::testing::assert_grid(&format!("round {}", round + 1), rows, COLS, ROWS);
             let text = rows.concat();
             assert_eq!(text.matches('A').count(), 1, "round {}: player one's start", round + 1);
             assert_eq!(text.matches('B').count(), 1, "round {}: player two's start", round + 1);
@@ -2612,10 +2597,8 @@ mod tests {
 
     #[test]
     fn the_pressure_rises_then_holds_from_the_ramps_top() {
-        for round in 0..RAMP_TOP {
-            assert!(monster_pace(round + 1) >= monster_pace(round));
-            assert!(trap_life(round + 1) <= trap_life(round));
-        }
+        blip::testing::never_falls("monster pace", 0..=RAMP_TOP, monster_pace);
+        blip::testing::never_rises("trap life", 0..=RAMP_TOP, trap_life);
         for round in RAMP_TOP..ROUNDS {
             assert_eq!(monster_pace(round), monster_pace(RAMP_TOP));
             assert_eq!(trap_life(round), trap_life(RAMP_TOP));

@@ -4,6 +4,7 @@
 use std::f32::consts::PI;
 
 use blip::image::Image;
+use blip::math::lerp;
 use blip::Asset;
 
 // Must match crates/raider/src/main.rs's PLAYER_W / PLAYER_H.
@@ -140,9 +141,6 @@ impl Canvas {
 
 fn rgb(c: (u8, u8, u8)) -> [f32; 4] {
     [c.0 as f32 / 255.0, c.1 as f32 / 255.0, c.2 as f32 / 255.0, 1.0]
-}
-fn lerp(a: f32, b: f32, t: f32) -> f32 {
-    a + (b - a) * t
 }
 
 /// A lifting surface either side of the centreline `cx`: leading / trailing
@@ -392,16 +390,7 @@ fn star(x: f32, y: f32, r: f32) -> bool {
             (a.cos() * rr, a.sin() * rr)
         })
         .collect();
-    let mut inside = false;
-    let mut j = pts.len() - 1;
-    for i in 0..pts.len() {
-        let ((xi, yi), (xj, yj)) = (pts[i], pts[j]);
-        if (yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi {
-            inside = !inside;
-        }
-        j = i;
-    }
-    inside
+    blip::math::in_polygon(&pts, x, y)
 }
 
 /// A hinomaru with a thin white surround, on each wing.
@@ -417,9 +406,8 @@ fn hinomaru(c: &mut Canvas, cx: f32, dx: f32, y0: f32, r: f32) {
 /// bubble canopy, red spinner and yellow nose band, star on the port wing.
 fn player_plane() -> Vec<u8> {
     // designed at 36x32, rendered at 1.5x
-    let (w, h) = (36, 32);
+    let w = 36;
     let mut c = Canvas::scaled(PLAYER_W, PLAYER_H, PLAYER_W as f32 / 36.0);
-    let _ = h;
     let cx = w as f32 / 2.0;
     let metal = (196, 202, 212);
     let f = Fighter {
@@ -1141,7 +1129,7 @@ fn carrier_ship() -> Vec<u8> {
         c.solid(|x, y| ((x - px) / 1.6).powi(2) + ((y - py + 3.0) / 3.0).powi(2) <= 1.0, [0.5, 0.65, 0.8, 0.9]);
         c.solid(|x, y| ((x - px) / 3.2).powi(2) + ((y - py + 12.5) / 1.4).powi(2) <= 1.0, [0.12, 0.12, 0.12, 1.0]);
     };
-    for (k, (dx, dy)) in [
+    for (dx, dy) in [
         (-44.0f32, -104.0f32),
         (-22.0, -104.0),
         (0.0, -100.0),
@@ -1152,10 +1140,7 @@ fn carrier_ship() -> Vec<u8> {
         (11.0, -72.0),
         (33.0, -74.0),
     ]
-    .iter()
-    .enumerate()
     {
-        let _ = k;
         hellcat(&mut c, cx + dx, stern + dy + 30.0);
     }
     c.unclip();

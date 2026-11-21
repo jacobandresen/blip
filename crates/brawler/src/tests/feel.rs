@@ -14,8 +14,7 @@ pub(crate) fn an_attack_pressed_during_recovery_comes_out_when_recovery_ends() {
     let sweep = f.scaled(move_data(MoveId::Sweep));
     let total = (sweep.startup + sweep.active + sweep.recovery) * F;
 
-    let mut punch = Input::default();
-    punch.punch_low = true;
+    let punch = Input { punch_low: true, ..Default::default() };
     // Press with a few frames of recovery still to run.
     f.t = total - 4.0 * F;
     apply_input(&mut f, punch, false, F);
@@ -36,8 +35,7 @@ pub(crate) fn a_buffered_attack_is_forgotten_if_it_waits_too_long() {
     let mut f = at(0, 200.0, 1.0);
     f.act = Act::Hitstun;
     f.stun = 1.0;
-    let mut punch = Input::default();
-    punch.punch_low = true;
+    let punch = Input { punch_low: true, ..Default::default() };
     apply_input(&mut f, punch, false, F);
     assert!(f.buffered.is_some());
 
@@ -51,9 +49,7 @@ pub(crate) fn a_buffered_move_remembers_the_stance_it_was_asked_for_in() {
     // the stick does meanwhile.
     let mut f = at(0, 200.0, 1.0);
     f.start_attack(MoveId::HighKick);
-    let mut low = Input::default();
-    low.down = true;
-    low.kick_low = true;
+    let low = Input { down: true, kick_low: true, ..Default::default() };
     apply_input(&mut f, low, false, F);
     assert_eq!(f.buffered, Some(MoveId::Sweep));
 }

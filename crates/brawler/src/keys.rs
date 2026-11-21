@@ -2,6 +2,7 @@
 //! the `Input` the rules read.
 
 use super::*;
+pub(crate) use blip::input::{any_held, any_pressed};
 
 /// The keys one player answers to: a stick and two buttons. Two at one
 /// keyboard get sets that never overlap (W A S D with F G; the arrows with
@@ -56,20 +57,13 @@ pub(crate) fn pad(mode: Mode, who: usize) -> &'static Pad {
     }
 }
 
-/// Is any of these keys down?
-pub(crate) fn any_held(keys: &[KeyCode]) -> bool { keys.iter().any(|k| key_held(*k)) }
-/// Was any of these keys pressed this frame?
-pub(crate) fn any_pressed(keys: &[KeyCode]) -> bool { keys.iter().any(|k| key_pressed(*k)) }
-
 /// Player `who`'s keys as an `Input`, with the late second button of a
 /// special allowed for.
 pub(crate) fn human_input(g: &mut Game, who: usize) -> Input {
     let k = pad(g.mode, who);
-    let mut inp = Input::default();
-    inp.left = any_held(k.left);
-    inp.right = any_held(k.right);
-    inp.up = any_held(k.up);
-    inp.down = any_held(k.down);
+    let mut inp = Input {
+        left: any_held(k.left), right: any_held(k.right), up: any_held(k.up), down: any_held(k.down), ..Default::default()
+    };
     // Two buttons; the stick picks the height. Held toward the opponent a
     // punch or kick is the overhead one, otherwise the low poke (down and
     // up turn them into the sweep and the flying kick in grounded_move()).

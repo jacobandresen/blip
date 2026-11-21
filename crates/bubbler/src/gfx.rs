@@ -1,7 +1,8 @@
 // Compiled by build.rs, and by the game only for its tests: much goes unused in each.
 #![allow(dead_code)]
 
-use blip::{image::Image, Asset};
+use blip::image::{coverage, Image};
+use blip::Asset;
 
 // One texture per letter preserves the title's individual bobbing motion.
 fn title_letter(ch: char, index: usize) -> Vec<u8> {
@@ -20,14 +21,7 @@ fn title_letter(ch: char, index: usize) -> Vec<u8> {
     let mut shape = |rgb: [u8; 3], alpha: f32, inside: &dyn Fn(f32, f32) -> bool| {
         for y in 0..74 {
             for x in 0..68 {
-                let mut covered = 0;
-                for sy in 0..3 {
-                    for sx in 0..3 {
-                        if inside(x as f32 + (sx as f32 + 0.5) / 3.0, y as f32 + (sy as f32 + 0.5) / 3.0) {
-                            covered += 1;
-                        }
-                    }
-                }
+                let covered = coverage(x, y, inside);
                 if covered > 0 {
                     image.blend(x, y, [rgb[0], rgb[1], rgb[2], (alpha * covered as f32 / 9.0 * 255.0).round() as u8]);
                 }
@@ -108,16 +102,6 @@ fn title_sky() -> Vec<u8> {
     image.encode_png()
 }
 
-fn disc(img: &mut Image, cx: i32, cy: i32, rx: i32, ry: i32, color: (u8, u8, u8)) {
-    for y in -ry..=ry {
-        for x in -rx..=rx {
-            if x * x * ry * ry + y * y * rx * rx <= rx * rx * ry * ry {
-                img.set(cx + x, cy + y, color.0, color.1, color.2);
-            }
-        }
-    }
-}
-
 fn line(img: &mut Image, x0: i32, y0: i32, x1: i32, y1: i32, color: (u8, u8, u8)) {
     let steps = (x1 - x0).abs().max((y1 - y0).abs()).max(1);
     for i in 0..=steps {
@@ -138,14 +122,7 @@ type Rgb = (u8, u8, u8);
 fn fill(img: &mut Image, c: [u8; 4], inside: impl Fn(f32, f32) -> bool) {
     for y in 0..img.h as i32 {
         for x in 0..img.w as i32 {
-            let mut n = 0;
-            for sy in 0..3 {
-                for sx in 0..3 {
-                    if inside(x as f32 + (sx as f32 + 0.5) / 3.0, y as f32 + (sy as f32 + 0.5) / 3.0) {
-                        n += 1;
-                    }
-                }
-            }
+            let n = coverage(x, y, &inside);
             if n > 0 {
                 img.blend(x, y, [c[0], c[1], c[2], (c[3] as f32 * n as f32 / 9.0) as u8]);
             }

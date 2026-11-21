@@ -444,7 +444,7 @@ impl Art {
 
     pub fn draw_frame(&mut self, blip: &Blip, g: &Game, t: f32) {
         match g.state {
-            State::Title => self.draw_title(blip, g, t),
+            State::Title => self.draw_title(blip, t),
             State::Over => {
                 self.draw_cellar(blip, g, t);
                 draw_rectangle(0.0, 0.0, WIN_W as f32, WIN_H as f32, c(0.02, 0.02, 0.04, 0.72));
@@ -1298,7 +1298,7 @@ impl Art {
 
     // ---- title -----------------------------------------------------------------------
 
-    fn draw_title(&self, blip: &Blip, _g: &Game, t: f32) {
+    fn draw_title(&self, blip: &Blip, t: f32) {
         let white = blip::macroquad::color::WHITE;
         draw_texture_ex(&self.title, 0.0, 0.0, white, DrawTextureParams { dest_size: Some(vec2(WIN_W as f32, WIN_H as f32)), ..Default::default() });
 

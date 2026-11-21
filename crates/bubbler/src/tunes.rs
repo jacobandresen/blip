@@ -5,7 +5,7 @@ use std::f32::consts::PI;
 
 use blip::cosy::{midi_hz, note, pulse, Voice, SR};
 use blip::song::{hat, kick};
-use blip::wav::{encode_pcm16_half, encode_pcm16_mono, encode_pcm16_music, soft_limit_to_pcm16, warm, Rng, MIX_KNEE};
+use blip::wav::{encode_pcm16_half, encode_pcm16_mono, encode_pcm16_music, limit_pcm16, warm, Rng};
 use blip::Asset;
 
 const H: i32 = -2;
@@ -147,8 +147,7 @@ fn theme(bpm: f32) -> Vec<u8> {
         buf[i] += v;
     }
     warm(&mut buf);
-    let scaled: Vec<f32> = buf.iter().map(|v| v * 21_000.0).collect();
-    encode_pcm16_music(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
+    encode_pcm16_music(&limit_pcm16(&buf, 21_000.0))
 }
 
 /// A handclap: three quick bursts of filtered noise, then a short tail.
@@ -329,8 +328,7 @@ pub fn sfx_wav(which: usize) -> Vec<u8> {
             }
         };
     }
-    let scaled: Vec<f32> = buf.iter().map(|v| v * 20_000.0).collect();
-    let pcm = soft_limit_to_pcm16(&scaled, MIX_KNEE);
+    let pcm = limit_pcm16(&buf, 20_000.0);
     // Fruit, bounce and sparkle are 39 dB or more quieter above 10 kHz.
     if matches!(which, 4 | 7 | 8) {
         encode_pcm16_half(&pcm)

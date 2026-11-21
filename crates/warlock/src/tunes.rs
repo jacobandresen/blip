@@ -6,7 +6,7 @@
 //! over all of it. Dark fantasy in D minor; the melodies are our own.
 
 use blip::cosy::{midi_hz, SR};
-use blip::wav::{encode_pcm16_half, encode_pcm16_music, low_pass, mix_into_f32, soft_limit_to_pcm16, Rng, MIX_KNEE};
+use blip::wav::{encode_pcm16_half, encode_pcm16_music, fold_tail, limit_pcm16, low_pass, mix_into_f32, Rng};
 use blip::Asset;
 use std::f32::consts::TAU;
 
@@ -200,27 +200,14 @@ fn cellar(buf: &mut Vec<f32>, size: f32, wet: f32, tail: f32) {
     }
 }
 
-/// Fold the tail of a loop back over its head so it repeats without a seam.
-fn wrap(mut buf: Vec<f32>, body: usize) -> Vec<f32> {
-    let tail: Vec<f32> = buf.drain(body..).collect();
-    for (i, v) in tail.into_iter().enumerate() {
-        if i < buf.len() {
-            buf[i] += v;
-        }
-    }
-    buf
-}
-
 fn finish_music(mut buf: Vec<f32>, gain: f32) -> Vec<u8> {
     low_pass(&mut buf, 6000.0);
-    let scaled: Vec<f32> = buf.iter().map(|s| s * gain).collect();
-    encode_pcm16_music(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
+    encode_pcm16_music(&limit_pcm16(&buf, gain))
 }
 
 fn finish_sfx(mut buf: Vec<f32>, gain: f32) -> Vec<u8> {
     low_pass(&mut buf, 9000.0);
-    let scaled: Vec<f32> = buf.iter().map(|s| s * gain).collect();
-    encode_pcm16_half(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
+    encode_pcm16_half(&limit_pcm16(&buf, gain))
 }
 
 // ---- the score ----------------------------------------------------------------------
@@ -294,7 +281,7 @@ pub fn dungeon() -> Vec<u8> {
     }
     let _ = D2;
     cellar(&mut buf, 1.3, 0.9, 0.0);
-    finish_music(wrap(buf, body), 2.2)
+    finish_music(fold_tail(buf, body), 2.2)
 }
 
 /// The Warlock's sanctum: driving 4/4, spiccato cellos in sixteenths, war
@@ -358,7 +345,7 @@ pub fn tower() -> Vec<u8> {
         t += beats * beat;
     }
     cellar(&mut buf, 1.0, 0.7, 0.0);
-    finish_music(wrap(buf, body), 2.2)
+    finish_music(fold_tail(buf, body), 2.2)
 }
 
 /// A horn: two saws whose filter opens with the breath, then settles warm.
@@ -526,7 +513,7 @@ pub fn theme() -> Vec<u8> {
         drum(&mut buf, secs(b0 + bar * 7.0 + q * bar), 52.0, 2000.0 + 7000.0 * q, 0.22, &mut rng);
     }
     cellar(&mut buf, 1.4, 0.95, 0.0);
-    finish_music(wrap(buf, body), 1.6)
+    finish_music(fold_tail(buf, body), 1.6)
 }
 
 /// The deeper wings, from the seventh chamber: Phrygian and restless. A
@@ -578,7 +565,7 @@ pub fn depths() -> Vec<u8> {
         t += beats * beat;
     }
     cellar(&mut buf, 1.3, 0.9, 0.0);
-    finish_music(wrap(buf, body), 1.8)
+    finish_music(fold_tail(buf, body), 1.8)
 }
 
 // ---- effects ---------------------------------------------------------------------------

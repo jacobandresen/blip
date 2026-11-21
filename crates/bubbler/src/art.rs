@@ -15,14 +15,7 @@ pub(super) struct Art {
 
 impl Art {
     pub(super) fn load() -> Self {
-        let load = |bytes: &[u8]| {
-            let texture = Texture2D::from_file_with_format(
-                bytes,
-                Some(blip::macroquad::prelude::ImageFormat::Png),
-            );
-            texture.set_filter(blip::macroquad::texture::FilterMode::Nearest);
-            texture
-        };
+        let load = blip::load_png;
         // the toys are drawn at twice their size and shown smoothed, soft like felt
         let soft = |texture: Texture2D| {
             texture.set_filter(blip::macroquad::texture::FilterMode::Linear);

@@ -100,10 +100,9 @@ pub(crate) fn land_quake(g: &mut Game, i: usize) -> bool {
     g.quake_x = g.p[i].x;
     g.quake_t = QUAKE_SECS;
     g.rouse(0.3);
-    let from = g.p[i].size();
     let d = &mut g.p[1 - i];
     if !d.airborne() && d.act != Act::Knockdown && !invulnerable(d) {
-        d.hurt(QUAKE_DAMAGE, from);
+        d.hurt(QUAKE_DAMAGE);
         d.act = Act::Knockdown;
         d.t = 0.0;
         d.vx = 0.0;
@@ -283,7 +282,7 @@ fn swing_sounds(g: &mut Game, dt: f32) {
                 | MoveId::FlyingKick | MoveId::JumpKick);
             let often = (g.now * 60.0) as u32 % 3 != 1;
             // DRAKE cries out on every big blow and one quick one in three, his signature.
-            let cries = formless(f.who) && (big || (g.now * 60.0) as u32 % 3 == 0);
+            let cries = formless(f.who) && (big || ((g.now * 60.0) as u32).is_multiple_of(3));
             // One cry at a time: his run 0.3 to 1 s, and a cry on every jab (four a second) piled up into a
             // henhouse. A new one waits until the last has had 0.7 s.
             let free = g.now - g.yelled[i] > 0.7;
@@ -542,7 +541,7 @@ fn fly_bolts(g: &mut Game, dt: f32, holds: [Input; 2]) {
             // dodged, or it is paid for.
             let laser = g.p[1 - d].arch().special == Special::LaserVision;
             let chip = if laser { LASER_CHIP } else { (g.bolts[i].damage / CHIP_DIVISOR).max(1) };
-            if laser || !g.p[d].shelled() { g.p[d].hurt(chip, g.p[1 - d].size()); }
+            if laser || !g.p[d].shelled() { g.p[d].hurt(chip); }
             g.snd(Sfx::Block);
         } else {
             // The laser is the end of the round for whoever it touches.
@@ -555,7 +554,7 @@ fn fly_bolts(g: &mut Game, dt: f32, holds: [Input; 2]) {
                 else if laser { g.p[d].health.max(1) }
                 else if web { (g.bolts[i].damage / 3).max(1) }
                 else { g.bolts[i].damage };
-            g.p[d].hurt(dmg, g.p[1 - d].size());
+            g.p[d].hurt(dmg);
             g.p[d].act = Act::Hitstun;
             let up = g.p[d].y - g.bolts[i].y;
             g.p[d].struck(up, dmg.min(g.bolts[i].damage));
@@ -581,7 +580,7 @@ fn call_round(g: &mut Game) {
     let ko = g.p[0].health <= 0 || g.p[1].health <= 0;
     let time = g.clock <= 0.0;
     if ko || time {
-        g.result = round_result(g, ko);
+        g.result = round_result(g);
         match g.result {
             RoundResult::P1 => { g.p[0].rounds += 1; g.p[1].act = Act::Defeat; g.p[0].act = Act::Victory;
                 g.p[0].t = 0.0; g.p[1].t = 0.0; }
@@ -689,7 +688,7 @@ pub(crate) fn update_helpers(g: &mut Game, dt: f32, holds: [Input; 2]) -> Vec<(i
 }
 
 /// Who took the round: whoever has more health left, by knockout or at the bell.
-pub(crate) fn round_result(g: &Game, _ko: bool) -> RoundResult {
+pub(crate) fn round_result(g: &Game) -> RoundResult {
     if g.p[0].health == g.p[1].health { RoundResult::Draw }
     else if g.p[0].health > g.p[1].health { RoundResult::P1 }
     else { RoundResult::P2 }
@@ -731,7 +730,7 @@ pub(crate) fn update_round_end(g: &mut Game, dt: f32) {
         }
         // DRAKE's winning whirl of the nunchaku hums as it turns (the first of his wins).
         let f = g.p[i];
-        if formless(f.who) && f.act == Act::Victory && f.t < 0.9 && f.stumble_roll % 4 == 0 && !draw::plucking(&f) {
+        if formless(f.who) && f.act == Act::Victory && f.t < 0.9 && f.stumble_roll.is_multiple_of(4) && !draw::plucking(&f) {
             let turn = |t: f32| (t / (4.0 * F)).floor();
             if f.t > dt && turn(f.t) != turn(f.t - dt) { g.snd_at(Sfx::Swing, 0.35); }
         }

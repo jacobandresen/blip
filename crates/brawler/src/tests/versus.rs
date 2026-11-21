@@ -223,17 +223,7 @@ pub(crate) fn step_versus(g: &mut Game, frames: usize, style: fn(usize, usize, &
             if g.hitstop > 0.0 { g.hitstop -= F; return true; }
             g.clock -= F;
             let ins = [style(0, frames, &g.p), style(1, frames, &g.p)];
-            for i in 0..2 {
-                let other = g.p[1 - i].x;
-                if g.p[i].free() && !g.p[i].airborne() {
-                    g.p[i].facing = if other >= g.p[i].x { 1.0 } else { -1.0 };
-                }
-                let close = face_off(&mut g.p)[i];
-                apply_input(&mut g.p[i], ins[i], close, F);
-                advance(&mut g.p[i], F);
-                g.p[i].x = clamp(g.p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
-            }
-            separate(&mut g.p);
+            move_both(g, ins);
             for i in 0..2 {
                 let (a, d) = if i == 0 { (0, 1) } else { (1, 0) };
                 let mut atk = g.p[a];
@@ -352,8 +342,7 @@ pub(crate) fn playtest_4_each_player_drives_only_their_own_fighter() {
     let (x0, x1) = (g.p[0].x, g.p[1].x);
     // Only player one presses anything, for a while.
     for _ in 0..40 {
-        let mut a = Input::default();
-        a.right = true;
+        let a = Input { right: true, ..Default::default() };
         for i in 0..2 {
             let inp = if i == 0 { a } else { Input::default() };
             apply_input(&mut g.p[i], inp, false, F);

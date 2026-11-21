@@ -3,7 +3,7 @@
 
 use blip::cosy::{self, Voice, H};
 use blip::techno::{
-    bass_note, clap, hat, kick, lead_stab, lift_fill, open_hat, phrase_note, riser, sidechain_duck, supersaw,
+    bass_note, clap, hat, kick, lead_stab, lift_fill, open_hat, phrase_note, riser, sidechain_duck, sixteenth, supersaw,
 };
 use blip::wav::{encode_pcm16_mono, low_pass, soft_limit_to_pcm16, Rng, MIX_KNEE, SAMPLE_RATE};
 use blip::Asset;
@@ -25,8 +25,7 @@ struct Loop {
 impl Loop {
     /// Sixteenth-note steps at `bpm`, with a quarter second of tail.
     fn new(bpm: f32, steps: usize, rng: Rng) -> Self {
-        let step_ms = 60_000.0 / bpm / 4.0;
-        let step_samples = (SAMPLE_RATE as f32 * step_ms / 1000.0) as usize;
+        let (step_ms, step_samples) = sixteenth(bpm);
         let buf = vec![0f32; step_samples * steps + SAMPLE_RATE as usize / 4];
         Loop { buf, rng, step_ms, step_samples, kick_offsets: Vec::new() }
     }

@@ -208,7 +208,7 @@ fn ledge_toward(g: &Game, px: f32, foot: f32, tx: f32) -> Option<f32> {
             if g.platform(c, r) && !g.platform(c, r - 1) { spots.push(c as f32 * TILE + TILE / 2.0); }
         }
     }
-    best(spots.into_iter(), |x| (x - px).abs() + (x - tx).abs())
+    best(spots, |x| (x - px).abs() + (x - tx).abs())
 }
 
 /// A rock or spark that will hit the dragon within 0.4 s, both moving as they are.

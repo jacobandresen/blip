@@ -8,8 +8,8 @@
 use std::f32::consts::PI;
 
 use crate::cosy::{note, Voice, SR};
-use crate::wav::{bright, warm, Rng, MIX_KNEE};
-use crate::wav::{encode_pcm16_music, soft_limit_to_pcm16};
+use crate::wav::{bright, limit_pcm16, warm, Rng};
+use crate::wav::encode_pcm16_music;
 
 /// Hold the previous note for another eighth.
 pub const H: i32 = -2;
@@ -152,8 +152,7 @@ impl Song<'_> {
         let tail = buf.split_off(total);
         for (i, v) in tail.iter().enumerate() { buf[i % total] += v; }
         if self.action { bright(&mut buf); } else { warm(&mut buf); }
-        let scaled: Vec<f32> = buf.iter().map(|v| v * 21_000.0).collect();
-        encode_pcm16_music(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
+        encode_pcm16_music(&limit_pcm16(&buf, 21_000.0))
     }
 
     fn play_line(&self, buf: &mut [f32], b0: usize, eighth: usize, line: &[i32; 8], second_half: bool) {

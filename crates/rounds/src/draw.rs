@@ -81,12 +81,12 @@ fn stand(x: f32, y: f32, what: Stand) {
 }
 
 /// Everything put aside, upright: farthest up the screen first.
-fn draw_standing(blip: &Blip, t: f32) {
+fn draw_standing(blip: &Blip) {
     let mut list = STANDING.with(|l| std::mem::take(&mut *l.borrow_mut()));
     list.sort_by(|a, b| a.1.total_cmp(&b.1));
     for (x, y, what) in list {
         match what {
-            Stand::Statue => frederik(blip, x, y, t),
+            Stand::Statue => frederik(blip, x, y),
             Stand::Guard => guard(blip, x, y, 0.0),
             Stand::Post(big, light) => light_post(blip, x, y, big, light),
             Stand::Wagon => polsevogn(blip, x, y),
@@ -102,7 +102,7 @@ pub fn plain_view(blip: &Blip, g: &Game) {
 }
 
 /// The street's screen y for a distance along it.
-pub fn sy(_g: &Game, d: f32) -> f32 { BIKE_Y - (d - VIEW.with(|v| v.get().0)) }
+pub fn sy(d: f32) -> f32 { BIKE_Y - (d - VIEW.with(|v| v.get().0)) }
 
 /// `x` given for the left side, mirrored onto `side`: the street is symmetric about its middle.
 fn mx(side: usize, x: f32) -> f32 { if side == 0 { x } else { WIN_W as f32 - x } }
@@ -158,7 +158,7 @@ pub fn draw_world(blip: &Blip, g: &Game, t: f32) {
         blip.set_view_pivot((ax, BIKE_Y), (240.0, BIKE_Y), ang);
         draw_street(blip, g, t, seg);
         if seg == g.seg() {
-            for p in g.papers.iter().filter(|p| p.landed.is_none()) { draw_paper(blip, g, p); }
+            for p in g.papers.iter().filter(|p| p.landed.is_none()) { draw_paper(blip, p); }
             draw_bits(blip, g);
             // where the bike is on the screen, through this camera
             let q = (g.bike_x - ax, BIKE_Y - (g.bike_d - ad) - BIKE_Y);
@@ -167,7 +167,7 @@ pub fn draw_world(blip: &Blip, g: &Game, t: f32) {
         }
     }
     blip.set_offset(0.0, 0.0);
-    draw_standing(blip, t);
+    draw_standing(blip);
     draw_bike(blip, g, t, bike_at.0, bike_at.1);
     // back to the bike's own street for what is drawn over the picture
     set_view(g.bike_d, 240.0);
@@ -187,23 +187,23 @@ pub fn draw_street(blip: &Blip, g: &Game, t: f32, seg: u8) {
     for &r in &visible { for s in 0..2 { draw_lot(blip, g, s, r, t); } }
     for &r in &visible {
         if !matches!(g.houses[0][r].lot, Lot::Bridge | Lot::Cross | Lot::Palace)
-            && !(r > 0 && g.houses[0][r - 1].lot == Lot::Palace) { draw_furniture(blip, g, r, sy(g, (r + 1) as f32 * LOT)); }
+            && !(r > 0 && g.houses[0][r - 1].lot == Lot::Palace) { draw_furniture(blip, g, r, sy((r + 1) as f32 * LOT)); }
     }
-    if seg == 0 && (visible.contains(&TURN_ROW) || visible.contains(&(TURN_ROW + 1))) { mouth(blip, g); }
+    if seg == 0 && (visible.contains(&TURN_ROW) || visible.contains(&(TURN_ROW + 1))) { mouth(blip); }
     let flat = |h: &&Hazard| matches!(h.kind, Hz::Puddle(_) | Hz::Sprinkler);
     let shown = |h: &&Hazard| h.seg == seg && (seg == 0 || g.turned);
     for h in g.hazards.iter().filter(flat).filter(shown) { draw_hazard(blip, g, h, t); }
-    if seg == g.seg() { for p in g.papers.iter().filter(|p| p.landed.is_some()) { draw_paper(blip, g, p); } }
+    if seg == g.seg() { for p in g.papers.iter().filter(|p| p.landed.is_some()) { draw_paper(blip, p); } }
     for h in g.hazards.iter().filter(|h| !flat(h)).filter(shown) { draw_hazard(blip, g, h, t); }
     for &r in &ghost {
         for s in 0..2 {
-            if s == 1 || r >= first_new + 2 { ghost_building(blip, g, s, r); }
+            if s == 1 || r >= first_new + 2 { ghost_building(blip, s, r); }
         }
     }
-    if seg == 0 { roadworks(blip, g); }
+    if seg == 0 { roadworks(blip); }
     let mut order: Vec<usize> = visible.clone();
     order.sort_by(|a, b| {
-        let far = |r: usize| (sy(g, door_d(r)) - vanish().1).abs();
+        let far = |r: usize| (sy(door_d(r)) - vanish().1).abs();
         far(*b).total_cmp(&far(*a))
     });
     for &r in &order {
@@ -214,8 +214,8 @@ pub fn draw_street(blip: &Blip, g: &Game, t: f32, seg: u8) {
                 Lot::Bakery => draw_shop(blip, g, s, r),
                 // drawn in the houses' own perspective, so they stand up off the street as the houses do
                 Lot::Tower => rundetaarn_up(blip, g, s, r),
-                Lot::Church => marmorkirken_up(blip, g, s, r),
-                Lot::Palace => palace(blip, g, s, r),
+                Lot::Church => marmorkirken_up(blip, s, r),
+                Lot::Palace => palace(blip, s, r),
                 _ => {}
             }
         }
@@ -224,11 +224,11 @@ pub fn draw_street(blip: &Blip, g: &Game, t: f32, seg: u8) {
         if visible.contains(&r) { bus_stop(blip, g, r, side, t); }
     }
     for &r in JUNCTIONS.iter() {
-        if visible.contains(&r) { traffic_lights(blip, g, r); }
+        if visible.contains(&r) { traffic_lights(g, r); }
     }
-    if visible.contains(&STATUE_ROW) || visible.contains(&(STATUE_ROW - 1)) { stand(240.0, sy(g, statue_d()) + STATUE_HALF, Stand::Statue); }
+    if visible.contains(&STATUE_ROW) || visible.contains(&(STATUE_ROW - 1)) { stand(240.0, sy(statue_d()) + STATUE_HALF, Stand::Statue); }
     for &r in &visible { pedestrians(blip, g, r, t); }
-    if seg == 0 && (visible.contains(&(TURN_ROW - 1)) || visible.contains(&TURN_ROW)) { route_sign(blip, g); }
+    if seg == 0 && (visible.contains(&(TURN_ROW - 1)) || visible.contains(&TURN_ROW)) { route_sign(); }
     draw_overhead(blip, g, &visible);
     if g.weather() == Weather::Market { for &r in &visible { draw_bunting(blip, g, r, t); } }
 }
@@ -244,7 +244,7 @@ fn pedestrians(blip: &Blip, g: &Game, r: usize, t: f32) {
         let speed = [70.0, 26.0, 30.0, 34.0][kind] * if scatter(k, 63) > 0.5 { 1.0 } else { -1.0 };
         let d = r as f32 * LOT + (scatter(k, 64) * LOT + t * speed).rem_euclid(LOT);
         let x = mx(s, 137.0 + (scatter(k, 65) - 0.5) * 10.0);
-        let y = sy(g, d);
+        let y = sy(d);
         let coat = if g.rain() { [[250, 210, 40], [40, 60, 110], [60, 140, 90]][k % 3] } else { [[200, 70, 70], [60, 90, 150], [230, 220, 200], [70, 120, 90], [40, 40, 50]][k % 5] };
         let swing = (t * if kind == 0 { 12.0 } else { 6.0 } + k as f32).sin() * 2.0;
         person(blip, x, y, coat, [[80, 60, 40], [230, 200, 120], [30, 24, 20]][k % 3], swing);
@@ -329,7 +329,7 @@ fn bus(blip: &Blip, x: f32, y: f32, up: bool, long: bool, line: &str, doors: boo
 fn bus_stop(blip: &Blip, g: &Game, row: usize, side: Side, t: f32) {
     let s = side.index();
     let d = door_d(row) + 30.0;
-    let y = sy(g, d);
+    let y = sy(d);
     if !(-80.0..WIN_H as f32 + 60.0).contains(&y) { return; }
     let x = mx(s, 136.0);
     let (ox, oy) = sun(3.5);
@@ -363,10 +363,10 @@ fn polsevogn(blip: &Blip, cx: f32, base: f32) {
 }
 
 /// The lights at a junction, on posts at the corners: for the bike's street and its own small cycle lights.
-fn traffic_lights(_blip: &Blip, g: &Game, r: usize) {
+fn traffic_lights(g: &Game, r: usize) {
     let (light, _) = g.light(r);
-    let near = sy(g, r as f32 * LOT + 8.0);
-    let far = sy(g, (r + 1) as f32 * LOT - 8.0);
+    let near = sy(r as f32 * LOT + 8.0);
+    let far = sy((r + 1) as f32 * LOT - 8.0);
     for (x, y, big) in [(CURB[1] + 8.0, near, true), (CURB[0] - 8.0, near, false), (CURB[0] - 8.0, far, true), (CURB[1] + 8.0, far, false)] {
         stand(x, y, Stand::Post(big, light));
     }
@@ -388,10 +388,10 @@ fn light_post(blip: &Blip, x: f32, y: f32, big: bool, light: Light) {
 
 /// Frederiksgade's mouth on the left of Store Kongensgade: its road and pavements running off to the left, the
 /// blue cycle crossing over the old street's track, the corners.
-fn mouth(blip: &Blip, g: &Game) {
-    let (top, bot) = (sy(g, JD + MOUTH_HALF + 20.0), sy(g, JD - MOUTH_HALF - 20.0));
+fn mouth(blip: &Blip) {
+    let (top, bot) = (sy(JD + MOUTH_HALF + 20.0), sy(JD - MOUTH_HALF - 20.0));
     blip.fill_rect(-400.0, top, CURB[0] + 400.0, bot - top, rgb(PAVE));
-    let (rt, rb) = (sy(g, JD + MOUTH_HALF), sy(g, JD - MOUTH_HALF));
+    let (rt, rb) = (sy(JD + MOUTH_HALF), sy(JD - MOUTH_HALF));
     blip.fill_rect(-400.0, rt, CURB[0] + 400.0, rb - rt, rgb([84, 84, 92]));
     // its cycle tracks, its centre line, the kerbs
     for (a, b) in [(rt, rt + 26.0), (rb - 26.0, rb)] { blip.fill_rect(-400.0, a, CURB[0] + 400.0, b - a, rgb(TRACK)); }
@@ -403,11 +403,11 @@ fn mouth(blip: &Blip, g: &Game) {
 }
 
 /// A house of the old street past the turn: only scenery, Store Kongensgade carrying on.
-fn ghost_building(blip: &Blip, g: &Game, s: usize, r: usize) {
-    let y = sy(g, (r + 1) as f32 * LOT);
+fn ghost_building(blip: &Blip, s: usize, r: usize) {
+    let y = sy((r + 1) as f32 * LOT);
     side_rect(blip, s, WALL[0], y, FENCE[0] - WALL[0], LOT, rgb([178, 174, 168]));
     side_rect(blip, s, FENCE[0] - 2.0, y, 2.0, LOT, rgb([36, 36, 42]));
-    let (y0, y1) = (y, sy(g, r as f32 * LOT));
+    let (y0, y1) = (y, sy(r as f32 * LOT));
     let (w, back, ridge) = (mx(s, WALL[0]), mx(s, -30.0), mx(s, 30.0));
     let (wall, roof) = house_colours(s, 27, r * 2 + s);
     let hh = 46.0;
@@ -429,10 +429,10 @@ fn ghost_building(blip: &Blip, g: &Game, s: usize, r: usize) {
 
 /// Store Kongensgade closed past the turn: red and white barriers on their feet, amber lamps, the sign, the dug road
 /// and a digger.
-fn roadworks(blip: &Blip, g: &Game) {
-    let y = sy(g, WORKS_D);
+fn roadworks(blip: &Blip) {
+    let y = sy(WORKS_D);
     if !(-60.0..WIN_H as f32 + 60.0).contains(&y) { return; }
-    let t = blip::macroquad::time::get_time() as f32;
+    let t = blip::now();
     blip.fill_rect(CURB[0] + 4.0, y - 90.0, CURB[1] - CURB[0] - 8.0, 80.0, rgb([120, 96, 70]));
     for k in 0..6 { blip.fill_circle(CURB[0] + 20.0 + k as f32 * 28.0, y - 40.0 - (k % 2) as f32 * 20.0, 8.0, rgb([100, 80, 58])); }
     block(270.0, y - 50.0, 14.0, 20.0, 0.0, 18.0, rgb([230, 180, 30]), rgb([246, 200, 50]));
@@ -459,8 +459,8 @@ fn roadworks(blip: &Blip, g: &Game) {
 }
 
 /// Ahead of the left turn: Copenhagen's blue direction sign on its posts at the corner, the arrow to the left.
-fn route_sign(_blip: &Blip, g: &Game) {
-    stand(WIN_W as f32 - 14.0 - 98.0, sy(g, JD - MOUTH_HALF - 40.0), Stand::Sign);
+fn route_sign() {
+    stand(WIN_W as f32 - 14.0 - 98.0, sy(JD - MOUTH_HALF - 40.0), Stand::Sign);
 }
 
 /// The sign itself, its posts standing at (`cx`, `base`).
@@ -496,11 +496,11 @@ fn forecourt(blip: &Blip, s: usize, y: f32, r: usize) {
 }
 
 /// Amalienborg's square: setts, laid in an octagon of pale granite strips.
-fn plaza(blip: &Blip, g: &Game, r: usize, y: f32) {
+fn plaza(blip: &Blip, r: usize, y: f32) {
     let w = WIN_W as f32;
     blip.fill_rect(0.0, y, w, LOT, rgb([138, 136, 136]));
     for row in 0..14 {
-        let off = if (r * 14 + row) % 2 == 0 { 0.0 } else { 5.0 };
+        let off = if (r * 14 + row).is_multiple_of(2) { 0.0 } else { 5.0 };
         let mut x = off;
         let mut k = 0;
         while x < w {
@@ -510,7 +510,7 @@ fn plaza(blip: &Blip, g: &Game, r: usize, y: f32) {
         }
     }
     // pale granite strips: an octagon round the statue
-    let cy = sy(g, statue_d());
+    let cy = sy(statue_d());
     let pale = rgba([214, 208, 196], 0.9);
     for i in 0..8 {
         let a0 = (i as f32 + 0.5) / 8.0 * TAU;
@@ -560,7 +560,7 @@ fn round_top(c: (f32, f32), rad: f32, h: f32, col: BlipColor) {
 /// ramp on the side facing you, the sandstone cornice, the iron railing round the platform and the observatory with
 /// its dark dome in the middle.
 fn rundetaarn_up(blip: &Blip, g: &Game, s: usize, r: usize) {
-    let c = (mx(s, 62.0), sy(g, door_d(r)));
+    let c = (mx(s, 62.0), sy(door_d(r)));
     // 46 high in the houses' units (the palace is 54): taller leans so far toward the edge it reads as lying down
     let (rad, hh) = (32.0, 46.0);
     let (ox, oy) = sun(hh * 0.18);
@@ -599,8 +599,8 @@ fn rundetaarn_up(blip: &Blip, g: &Game, s: usize, r: usize) {
 
 /// Marmorkirken seen from above like the houses: the round marble church, its portico toward the street, the green
 /// copper dome on top, ribbed, with the ring of round dormers, the lantern and the gilded cross.
-fn marmorkirken_up(blip: &Blip, g: &Game, s: usize, r: usize) {
-    let c = (mx(s, 56.0), sy(g, door_d(r)));
+fn marmorkirken_up(blip: &Blip, s: usize, r: usize) {
+    let c = (mx(s, 56.0), sy(door_d(r)));
     // kept low in the houses' units (body 22, dome 20) for the same reason as Rundetaarn
     let (rad, hh) = (42.0, 22.0);
     let toward = if s == 0 { 1.0 } else { -1.0 };
@@ -672,8 +672,8 @@ fn marmorkirken_up(blip: &Blip, g: &Game, s: usize, r: usize) {
 }
 
 /// One of Amalienborg's four palaces: sandstone, three floors of tall windows, a copper roof.
-fn palace(blip: &Blip, g: &Game, s: usize, r: usize) {
-    let (y0, y1) = (sy(g, (r + 1) as f32 * LOT), sy(g, r as f32 * LOT));
+fn palace(blip: &Blip, s: usize, r: usize) {
+    let (y0, y1) = (sy((r + 1) as f32 * LOT), sy(r as f32 * LOT));
     let wall_x = mx(s, 96.0);
     let (back, ridge) = (mx(s, -20.0), mx(s, 40.0));
     let hh = 54.0;
@@ -717,7 +717,7 @@ fn palace(blip: &Blip, g: &Game, s: usize, r: usize) {
     blip.draw_line(c0.0, c0.1, c1.0, c1.1, rgb(shade_u(stone, 0.8)));
     // a Royal Life Guard on watch by the palace: bearskin, dark blue tunic, white belts, light blue trousers
     if r == STATUE_ROW {
-        stand(mx(s, 128.0), sy(g, door_d(r)), Stand::Guard);
+        stand(mx(s, 128.0), sy(door_d(r)), Stand::Guard);
     }
 }
 
@@ -736,7 +736,7 @@ pub fn guard(blip: &Blip, x: f32, y: f32, step: f32) {
 }
 
 /// Frederik V on his horse, high on the pedestal in the middle of Amalienborg's square.
-fn frederik(blip: &Blip, cx: f32, base: f32, t: f32) {
+fn frederik(blip: &Blip, cx: f32, base: f32) {
     // Saly's statue as it stands: dark green-grey bronze, a tall veined marble plinth with bronze medallions on its
     // faces, and the black iron railing round it
     let bronze = [62, 104, 92];
@@ -776,12 +776,11 @@ fn frederik(blip: &Blip, cx: f32, base: f32, t: f32) {
     }
     blip.fill_rect(cx - 24.0, base - 9.0, 50.0, 1.5, iron);
     blip.fill_rect(cx - 24.0, base - 4.0, 50.0, 1.0, iron);
-    let _ = t;
 }
 
 /// The bakery standing up: a cream shop front with its big window and BAGERI over it, under a slate roof.
 fn draw_shop(blip: &Blip, g: &Game, s: usize, r: usize) {
-    let (y0, y1) = (sy(g, (r + 1) as f32 * LOT), sy(g, r as f32 * LOT));
+    let (y0, y1) = (sy((r + 1) as f32 * LOT), sy(r as f32 * LOT));
     let (w, back, ridge) = (mx(s, WALL[0]), mx(s, -30.0), mx(s, 30.0));
     let hh = terrace_height(g, s, r);
     let face = |uy: f32, v: f32| lift(w, uy, v);
@@ -805,7 +804,7 @@ fn draw_shop(blip: &Blip, g: &Game, s: usize, r: usize) {
 
 /// Pavements, bike lanes and the road for one row; a side street or a bridge where the route has one.
 fn draw_ground(blip: &Blip, g: &Game, r: usize) {
-    let y = sy(g, (r + 1) as f32 * LOT);
+    let y = sy((r + 1) as f32 * LOT);
     let lot = g.houses[0][r].lot;
     let w = WIN_W as f32;
     if lot == Lot::Bridge {
@@ -817,7 +816,7 @@ fn draw_ground(blip: &Blip, g: &Game, r: usize) {
             blip.fill_rect(wx, wy, 18.0, 2.0, rgba([200, 230, 240], 0.35));
         }
         // the Lakes' swans, gliding
-        let t = blip::macroquad::time::get_time() as f32;
+        let t = blip::now();
         for k in 0..3 {
             let sx = if k == 1 { 30.0 + scatter(r, 61) * 90.0 } else { 350.0 + scatter(r * 3 + k, 62) * 100.0 };
             let syy = y + 20.0 + scatter(r * 3 + k, 63) * 70.0 + (t * 0.5 + k as f32).sin() * 4.0;
@@ -871,7 +870,7 @@ fn draw_ground(blip: &Blip, g: &Game, r: usize) {
     let setts = district(Side::Left, r) != District::Norrebro;
     for row in 0..(if setts { 14 } else { 0 }) {
         let cy = y + row as f32 * 8.0;
-        let off = if (r * 14 + row) % 2 == 0 { 0.0 } else { 5.0 };
+        let off = if (r * 14 + row).is_multiple_of(2) { 0.0 } else { 5.0 };
         let mut cx = CURB[0] + 26.0 + off;
         let mut k = 0;
         while cx < CURB[1] - 28.0 {
@@ -889,7 +888,7 @@ fn draw_ground(blip: &Blip, g: &Game, r: usize) {
         side_rect(blip, s, CURB[0] - 2.0, y, 2.0, LOT, rgb(KERB));
     }
     if lot == Lot::Palace {
-        plaza(blip, g, r, y);
+        plaza(blip, r, y);
         return;
     }
     if lot == Lot::Cross {
@@ -965,8 +964,8 @@ fn lit(g: &Game, s: usize, r: usize) -> bool {
 
 fn draw_lot(blip: &Blip, g: &Game, s: usize, r: usize, t: f32) {
     let h = g.houses[s][r];
-    let y = sy(g, (r + 1) as f32 * LOT);
-    let dy = sy(g, door_d(r));
+    let y = sy((r + 1) as f32 * LOT);
+    let dy = sy(door_d(r));
     match h.lot {
         Lot::Bridge | Lot::Cross => {}
         // the cemetery's wall runs on along the street for two lots
@@ -978,7 +977,6 @@ fn draw_lot(blip: &Blip, g: &Game, s: usize, r: usize, t: f32) {
         Lot::Palace | Lot::Mouth | Lot::Corner => {}
         Lot::House { drive } => draw_house(blip, g, s, r, y, dy, drive, t),
     }
-    let _ = dy;
 }
 
 fn draw_park(blip: &Blip, s: usize, r: usize, y: f32) {
@@ -1148,7 +1146,7 @@ fn draw_house(blip: &Blip, g: &Game, s: usize, r: usize, y: f32, dy: f32, drive:
     }
     if !h.sub {
         // the sample box by the gate: blue, with a star, until one is in it
-        let (bx, by) = (mx(s, BOX_X[0]), sy(g, door_d(r) + BOX_D));
+        let (bx, by) = (mx(s, BOX_X[0]), sy(door_d(r) + BOX_D));
         blip.fill_rect(bx - 6.0, by - 6.0, 12.0, 12.0, rgb(if h.sampled { [120, 200, 140] } else { [70, 140, 220] }));
         blip.draw_rect(bx - 6.0, by - 6.0, 12.0, 12.0, rgb([30, 50, 90]));
         if h.sampled {
@@ -1245,8 +1243,8 @@ fn draw_building(blip: &Blip, g: &Game, s: usize, r: usize, t: f32) {
     let nyboder = district(side_of(s), r) == District::Nyboder;
     // Nyboder's doors are all bottle green
     let door = if nyboder { [44, 96, 64] } else { DOORS[(scatter(k, 3) * DOORS.len() as f32) as usize % DOORS.len()] };
-    let (y0, y1) = (sy(g, (r + 1) as f32 * LOT), sy(g, r as f32 * LOT));
-    let dy = sy(g, door_d(r));
+    let (y0, y1) = (sy((r + 1) as f32 * LOT), sy(r as f32 * LOT));
+    let dy = sy(door_d(r));
     let (w, back, ridge) = (mx(s, WALL[0]), mx(s, -30.0), mx(s, 30.0));
     let hh = terrace_height(g, s, r);
     let rise = 20.0;
@@ -1372,7 +1370,7 @@ pub fn draw_overhead(blip: &Blip, g: &Game, rows: &[usize]) {
     let glow = (0.75 - daylight(g)).max(0.0);
     for &r in rows {
         if r % 3 != 0 || matches!(g.houses[0][r].lot, Lot::Bridge | Lot::Cross | Lot::Palace) { continue; }
-        let y = sy(g, r as f32 * LOT + 4.0);
+        let y = sy(r as f32 * LOT + 4.0);
         if !(HUD_H - 10.0..WIN_H as f32).contains(&y) { continue; }
         // the wires from the walls either side, sagging to the lamp, and the lamp's white globe under its cap
         let (lx, ly) = lift(240.0, y, 40.0);
@@ -1391,15 +1389,15 @@ pub fn draw_overhead(blip: &Blip, g: &Game, rows: &[usize]) {
 
 /// Market day: bunting strung across the street.
 fn draw_bunting(blip: &Blip, g: &Game, r: usize, t: f32) {
-    if r % 3 != 0 || g.houses[0][r].lot == Lot::Bridge { return; }
-    let y = sy(g, r as f32 * LOT + 10.0);
+    if !r.is_multiple_of(3) || g.houses[0][r].lot == Lot::Bridge { return; }
+    let y = sy(r as f32 * LOT + 10.0);
     blip.draw_line(WALL[0], y, WALL[1], y, rgb([90, 80, 70]));
     let mut x = WALL[0] + 6.0;
     let mut i = 0;
     while x < WALL[1] - 6.0 {
         let c = [[230, 70, 70], [250, 210, 80], [90, 160, 220], [120, 200, 120]][i % 4];
         let sway = (t * 2.0 + i as f32).sin();
-        for k in 0..6 { blip.fill_rect(x - 5.0 + k as f32, y + 1.0, 10.0 - k as f32 * 2.0 + 1.0, 1.5, rgb(c)); let _ = sway; }
+        for k in 0..6 { blip.fill_rect(x - 5.0 + k as f32, y + 1.0, 10.0 - k as f32 * 2.0 + 1.0, 1.5, rgb(c)); }
         blip.fill_rect(x - 4.0, y + 1.0, 8.0, 6.0 + sway, rgb(c));
         x += 18.0;
         i += 1;
@@ -1510,33 +1508,13 @@ fn car(blip: &Blip, x: f32, y: f32, across: bool, body: [u8; 3]) {
     block(x, y, hw, hh, 0.0, 10.0, rgb(shade_u(body, 0.85)), rgb(body));
     let (cw, ch) = if across { (hw * 0.5, hh - 1.5) } else { (hw - 1.5, hh * 0.5) };
     block(x, y, cw, ch, 10.0, 17.0, rgb([110, 140, 170]), rgb(shade_u(body, 0.92)));
-    let _ = car_flat;
-}
-
-#[allow(dead_code)]
-fn car_flat(blip: &Blip, x: f32, y: f32, across: bool, body: [u8; 3]) {
-    let (w, h) = if across { (40.0, 22.0) } else { (22.0, 40.0) };
-    blip.fill_rect(x - w / 2.0 + 3.0, y - h / 2.0 + 3.0, w, h, rgba([20, 20, 30], 0.3));
-    blip.fill_rect(x - w / 2.0, y - h / 2.0, w, h, rgb(body));
-    blip.fill_rect(x - w / 2.0 + 1.0, y - h / 2.0 + 1.0, w - 2.0, 2.0, rgb(shade_u(body, 1.15).map(|v| v.max(40))));
-    let roof = rgb(shade_u(body, 0.8));
-    let glass = rgb([140, 180, 210]);
-    if across {
-        blip.fill_rect(x - 10.0, y - 9.0, 20.0, 18.0, roof);
-        blip.fill_rect(x - 14.0, y - 8.0, 4.0, 16.0, glass);
-        blip.fill_rect(x + 10.0, y - 8.0, 4.0, 16.0, glass);
-    } else {
-        blip.fill_rect(x - 9.0, y - 10.0, 18.0, 20.0, roof);
-        blip.fill_rect(x - 8.0, y - 14.0, 16.0, 4.0, glass);
-        blip.fill_rect(x - 8.0, y + 10.0, 16.0, 4.0, glass);
-    }
 }
 
 fn draw_hazard(blip: &Blip, g: &Game, h: &Hazard, t: f32) {
     if h.gone { return; }
-    let y = sy(g, h.d);
+    let y = sy(h.d);
     if y < -80.0 || y > WIN_H as f32 + 80.0 { return; }
-    let (x, s) = (h.x, h.side.index());
+    let x = h.x;
     let blink = (t * 6.0).fract() < 0.5;
     match h.kind {
         Hz::Car if h.bus => {
@@ -1546,7 +1524,7 @@ fn draw_hazard(blip: &Blip, g: &Game, h: &Hazard, t: f32) {
                 blip.fill_rect(x - 10.0 - k * 2.0, y + 42.0 + k * 10.0, 20.0 + k * 4.0, 10.0, rgba([255, 240, 170], 0.16 - k * 0.02));
             }
             let line = if district(Side::Left, row_at(h.d).unwrap_or(0)) == District::Norrebro { "5C" } else { "1A" };
-            bus(blip, x, y, false, h.d as usize % 3 == 0, line, false, false, t);
+            bus(blip, x, y, false, (h.d as usize).is_multiple_of(3), line, false, false, t);
         }
         Hz::Bus => {
             let up = h.side == Side::Right;
@@ -1640,8 +1618,6 @@ fn draw_hazard(blip: &Blip, g: &Game, h: &Hazard, t: f32) {
             }
         }
         Hz::Sprinkler => {
-            let sx = mx(s, if s == 0 { h.x } else { WIN_W as f32 - h.x });
-            let _ = sx;
             blip.fill_circle(x, y, 3.0, rgb([90, 90, 100]));
             if h.phase == TELL {
                 for k in 0..4 {
@@ -1783,9 +1759,9 @@ fn draw_hazard(blip: &Blip, g: &Game, h: &Hazard, t: f32) {
 
 // ---- papers and the bike -----------------------------------------------------
 
-pub fn draw_paper(blip: &Blip, g: &Game, p: &Paper) {
+pub fn draw_paper(blip: &Blip, p: &Paper) {
     let (x, d, hgt) = p.at();
-    let y = sy(g, d);
+    let y = sy(d);
     let fade = p.landed.map_or(1.0, |(t, _)| (2.5 - t).clamp(0.0, 1.0));
     if fade <= 0.0 || p.landed.is_some_and(|(t, _)| t >= 9.0) { return; }
     blip.fill_rect(x - 5.0, y - 2.0, 10.0, 4.0, rgba([20, 20, 30], 0.3 * fade));
@@ -1862,7 +1838,7 @@ pub fn draw_bike(blip: &Blip, g: &Game, t: f32, x: f32, y: f32) {
 pub fn draw_bits(blip: &Blip, g: &Game) {
     for b in &g.bits {
         let a = 1.0 - b.t / b.life;
-        blip.fill_rect(b.x - b.size / 2.0, sy(g, b.d) - b.size / 2.0, b.size, b.size, rgba(b.color, a));
+        blip.fill_rect(b.x - b.size / 2.0, sy(b.d) - b.size / 2.0, b.size, b.size, rgba(b.color, a));
     }
 }
 
@@ -1870,7 +1846,7 @@ pub fn draw_bits(blip: &Blip, g: &Game) {
 pub fn draw_pops(blip: &Blip, g: &Game) {
     for p in &g.pops {
         let a = (1.0 - p.t).clamp(0.0, 1.0);
-        label(blip, &p.text, p.x.clamp(60.0, WIN_W as f32 - 60.0), sy(g, p.d), 2.0, rgba(p.color, a));
+        label(blip, &p.text, p.x.clamp(60.0, WIN_W as f32 - 60.0), sy(p.d), 2.0, rgba(p.color, a));
     }
 }
 
@@ -1900,7 +1876,7 @@ pub fn draw_weather(blip: &Blip, g: &Game, t: f32) {
             for s in 0..2 {
                 for r in 0..ROWS {
                     let h = &g.houses[s][r];
-                    let dy = sy(g, door_d(r));
+                    let dy = sy(door_d(r));
                     if !h.sub || dy < top - 20.0 || dy > BIKE_Y { continue; }
                     blip.fill_glow_circle(mx(s, WALL[0] + 3.0), dy - 16.0, 6.0, rgba(LAMP, 0.9));
                 }
@@ -1945,8 +1921,8 @@ pub fn draw_canal(blip: &Blip, g: &Game, t: f32) {
     let w = WIN_W as f32;
     let water = [52, 104, 120];
     blip.clear(rgb(water));
-    let start = sy(g, 0.0);
-    let harbour = sy(g, HARBOUR_D);
+    let start = sy(0.0);
+    let harbour = sy(HARBOUR_D);
     // ripples on the canal and the harbour
     for k in 0..48 {
         let y = (scatter(k, 71) * 700.0 - g.bike_d * 0.0 + g.bike_d).rem_euclid(700.0);
@@ -1977,7 +1953,7 @@ pub fn draw_canal(blip: &Blip, g: &Game, t: f32) {
         let mut d = (g.bike_d - 200.0).div_euclid(70.0) * 70.0;
         while d < g.bike_d + 500.0 {
             if d > 0.0 && d < HARBOUR_D {
-                let y = sy(g, d);
+                let y = sy(d);
                 blip.fill_circle(QUAY[1] + 2.0, y, 3.5, rgb([30, 30, 34]));
             }
             d += 70.0;
@@ -1988,7 +1964,7 @@ pub fn draw_canal(blip: &Blip, g: &Game, t: f32) {
     let mut d = (g.bike_d - 300.0).div_euclid(64.0) * 64.0;
     while d < g.bike_d + 500.0 {
         if d > 60.0 && d < HARBOUR_D - 40.0 {
-            let y = sy(g, d);
+            let y = sy(d);
             let k = (d / 64.0) as usize;
             let c = [[200, 40, 44], [240, 232, 214], [44, 110, 80], [230, 160, 40]][k % 4];
             blip.fill_circle(118.0 + 3.0, y + 3.0, 15.0, rgba([20, 20, 30], 0.25));
@@ -1998,7 +1974,7 @@ pub fn draw_canal(blip: &Blip, g: &Game, t: f32) {
         d += 64.0;
     }
     // the targets on the terrace and the water
-    for tg in &g.targets { draw_mark(blip, g, tg, t); }
+    for tg in &g.targets { draw_mark(blip, tg, t); }
     // Nyhavn's houses, both quays: narrow, tall and every colour, gables to the canal
     nyhavn_row(g, 0);
     nyhavn_row(g, 1);
@@ -2006,7 +1982,7 @@ pub fn draw_canal(blip: &Blip, g: &Game, t: f32) {
     if start > HUD_H && start < WIN_H as f32 + 80.0 { anchor(blip, 330.0, start - 10.0); }
     // across the harbour: Christianshavn and the spire of Vor Frelsers Kirke
     if harbour > HUD_H - 300.0 {
-        let far = sy(g, HARBOUR_D + 420.0);
+        let far = sy(HARBOUR_D + 420.0);
         blip.fill_rect(0.0, far - 60.0, w, 60.0, rgb([120, 116, 112]));
         for i in 0..10 {
             let c = [[200, 120, 70], [230, 200, 140], [170, 80, 60], [210, 190, 160]][i % 4];
@@ -2015,7 +1991,7 @@ pub fn draw_canal(blip: &Blip, g: &Game, t: f32) {
         }
         vor_frelsers(blip, 330.0, far - 30.0, t);
     }
-    for p in &g.papers { draw_paper(blip, g, p); }
+    for p in &g.papers { draw_paper(blip, p); }
     // gulls wheeling over the canal
     for k in 0..5 {
         let a = t * (0.4 + scatter(k, 91) * 0.3) + k as f32 * 1.7;
@@ -2041,7 +2017,7 @@ fn nyhavn_row(g: &Game, s: usize) {
     let last = ((g.bike_d + 560.0).min(HARBOUR_D) / len).ceil() as i32;
     for i in first..last {
         let (d0, d1) = (i as f32 * len, (i + 1) as f32 * len);
-        let (y0, y1) = (sy(g, d1), sy(g, d0));
+        let (y0, y1) = (sy(d1), sy(d0));
         let k = i as usize * 2 + s;
         let col = NYHAVN[(scatter(k, 41) * NYHAVN.len() as f32) as usize % NYHAVN.len()];
         let hh = 54.0 + (scatter(k, 42) * 3.0).floor() * 10.0;
@@ -2067,8 +2043,8 @@ fn nyhavn_row(g: &Game, s: usize) {
 
 /// A Nyhavn target: a café table with someone waiting for the paper, an old wooden ship with a basket on deck, or
 /// a canal tour boat.
-fn draw_mark(blip: &Blip, g: &Game, tg: &Target, t: f32) {
-    let y = sy(g, tg.d);
+fn draw_mark(blip: &Blip, tg: &Target, t: f32) {
+    let y = sy(tg.d);
     if !(-120.0..WIN_H as f32 + 120.0).contains(&y) { return; }
     let bob = (t * 2.0 + tg.d * 0.05).sin() * 1.5;
     match tg.mark {
@@ -2314,7 +2290,7 @@ pub fn draw_tally(blip: &Blip, g: &Game) {
 
 fn bundles_mult(g: &Game) -> i32 { if g.weather() == Weather::Bundles { 2 } else { 1 } }
 
-pub fn draw_week(blip: &Blip, g: &Game, t: f32) {
+pub fn draw_week(blip: &Blip, g: &Game) {
     let (x, y, w, h) = (60.0, 140.0, 360.0, 220.0);
     panel(blip, x, y, w, h);
     let ink = rgb([60, 40, 50]);
@@ -2323,7 +2299,6 @@ pub fn draw_week(blip: &Blip, g: &Game, t: f32) {
     blip.draw_centered(&format!("+{}", g.tally.won * KEPT_PTS), y + 108.0, 3.0, rgb([200, 80, 90]));
     blip.draw_centered("A SPARE LIFE", y + 150.0, 2.0, ink);
     blip.draw_centered("THE STREETS GET BUSIER", y + 180.0, 2.0, rgb([60, 110, 150]));
-    let _ = t;
 }
 
 pub fn draw_canal_hud(blip: &Blip, g: &Game) {
@@ -2433,9 +2408,7 @@ pub fn draw_over(blip: &Blip, g: &Game, hi: i32) {
     let offering = g.offering();
     blip.draw_end_screen(title, g.sess.score + g.score2, if g.two_player { 0 } else { hi }, rgb([255, 150, 130]),
         rgb([255, 214, 90]), BLIP_WHITE, !offering && !g.wait.active());
-    if offering && g.cont.showing() {
-        blip.draw_game_over_prompt(&format!("CONTINUE? {}", g.cont.seconds()), rgb([255, 214, 90]));
-    }
+    if offering { blip.draw_continue(&g.cont, rgb([255, 214, 90])); }
     let note = if g.two_player { format!("1P {}   2P {}", g.sess.score, g.score2) } else {
         format!("WEEK {} {}   {} HOMES", g.week, WEEKDAYS[g.day], g.subscribers())
     };

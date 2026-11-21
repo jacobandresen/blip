@@ -317,7 +317,7 @@ impl Hazard {
 
     fn traffic(row: usize) -> Self {
         // every other one is a yellow city bus
-        Self { oncoming: true, bus: row % 2 == 0, x: CAR_LANE[0], d: door_d(row), home: CAR_LANE[0], ..Self::new(Hz::Car, Side::Left, row) }
+        Self { oncoming: true, bus: row.is_multiple_of(2), x: CAR_LANE[0], d: door_d(row), home: CAR_LANE[0], ..Self::new(Hz::Car, Side::Left, row) }
     }
 
     /// Half its size across and along the street, as the bike would hit it; zero for what cannot be hit.
@@ -381,10 +381,9 @@ impl Hazard {
             (Hz::Cyclist, GO) => (0.0, if self.side == Side::Right { 58.0 } else { -85.0 }),
             (Hz::CrossCar, _) => (if self.side == Side::Left { CROSS_SPEED } else { -CROSS_SPEED }, 0.0),
             (Hz::Tourist, GO) => {
-                let (_, staring, out) = tourist_phase(self.t);
+                let (_, staring, _) = tourist_phase(self.t);
                 let pace = if staring { 0.3 } else { 1.0 };
                 let vd = if self.side == Side::Right { 80.0 } else { -95.0 } * pace;
-                let _ = out;
                 if self.guide { return (0.0, vd); }
                 (tourist_x(self.home, self.side, self.t + self.beat + 0.05) - tourist_x(self.home, self.side, self.t + self.beat), vd).into_rate(0.05)
             }
@@ -469,7 +468,6 @@ pub struct Game {
     /// The continue offered at game over while homes remain, and the best score of the run before one was taken (a
     /// continue starts the score afresh; the run's best is what is posted).
     pub cont: blip::Continue,
-    pub run_best: i32,
     pub sess: Session,
     /// Player two's score; the session's is player one's.
     pub score2: i32,
@@ -524,7 +522,7 @@ pub struct Game {
 impl Game {
     pub fn new() -> Self {
         let mut g = Self {
-            state: State::Title, sess: Session::new(LIVES), cont: blip::Continue::default(), run_best: 0, score2: 0, two_player: false, week: 1, day: 0,
+            state: State::Title, sess: Session::new(LIVES), cont: blip::Continue::default(), score2: 0, two_player: false, week: 1, day: 0,
             houses: [Vec::new(), Vec::new()], hazards: Vec::new(), papers: Vec::new(), stock: 0,
             bike_x: 240.0, bike_d: LOT * 1.2, steer_v: 0.0, speed: CRUISE, safe: 0.0, throw_cd: [0.0; 2],
             timer: Timer::default(), wait: Timer::default(), tally: Tally::default(), pops: Vec::new(), bits: Vec::new(),
@@ -565,7 +563,6 @@ impl Game {
     /// A new game: the week from Monday (a bot run may start on another day).
     pub fn start(&mut self, two: bool) {
         self.sess.reset(LIVES);
-        self.run_best = 0;
         self.score2 = 0;
         self.two_player = two;
         self.week = 1 + (self.sess.level - 1) / 7;
@@ -998,8 +995,6 @@ impl Game {
     fn cross_traffic(&mut self) {
         for (j, &row) in JUNCTIONS.iter().enumerate() {
             let near = (door_d(row) - self.bike_d).abs() < 700.0;
-            let (_, t) = self.light(row);
-            let _ = t;
             for lane in 0..2 {
                 if near && self.ride_t >= self.cross_next[j][lane] {
                     let side = if lane == 0 { Side::Left } else { Side::Right };
@@ -1365,7 +1360,7 @@ impl Game {
         self.pop(x, d + 36.0, &format!("OOF! {what}"), [255, 150, 120]);
         blip::bot::add("crashes", 1.0);
         blip::bot::add("hit_crash", 1.0);
-        blip::bot::add(&format!("crash_{}", what.split(' ').last().unwrap_or("x").to_lowercase()), 1.0);
+        blip::bot::add(&format!("crash_{}", what.split(' ').next_back().unwrap_or("x").to_lowercase()), 1.0);
         self.timer.start(CRASH_SECS);
     }
 
@@ -1408,16 +1403,13 @@ impl Game {
 
     /// The run is over: post its best (two riders share the tandem, and their game posts no best).
     pub fn post_score(&mut self) {
-        if self.two_player { blip::bot::finish("over"); } else { blip::web::report_score(self.sess.score.max(self.run_best)); }
+        if self.two_player { blip::bot::finish("over"); } else { self.sess.report(); }
     }
 
     /// A continue taken: the same day again from its card, with fresh lives and the score afresh.
     pub fn continue_day(&mut self) {
-        blip::bot::add("continues", 1.0);
-        self.run_best = self.run_best.max(self.sess.score);
-        self.sess.score = 0;
+        self.sess.play_on(LIVES);
         self.score2 = 0;
-        self.sess.lives = LIVES;
         self.begin_day();
     }
 
@@ -1594,12 +1586,13 @@ impl Game {
 mod tests {
     use super::*;
 
-    fn playing() -> Game {
-        blip::rand_seed(1);
+    /// A game in play, its random numbers seeded and held for the test (`blip::testing::seeded`).
+    fn playing() -> (std::sync::MutexGuard<'static, ()>, Game) {
+        let rng = blip::testing::seeded(1);
         let mut g = Game::new();
         g.start(false);
         g.state = State::Play;
-        g
+        (rng, g)
     }
 
     /// The first subscriber's house on `side`.
@@ -1609,7 +1602,7 @@ mod tests {
 
     #[test]
     fn a_continue_rides_the_same_day_again_with_fresh_lives_and_keeps_the_runs_best() {
-        let mut g = playing();
+        let (_rng, mut g) = playing();
         g.day = 3;
         g.begin_day();
         g.sess.score = 500;
@@ -1618,7 +1611,7 @@ mod tests {
         assert!(g.offering(), "homes remain, so a continue is offered");
         g.continue_day();
         assert!(g.state == State::Card, "the day starts again from its card");
-        assert_eq!((g.day, g.sess.lives, g.sess.score, g.run_best), (3, LIVES, 0, 500));
+        assert_eq!((g.day, g.sess.lives, g.sess.score, g.sess.run_best()), (3, LIVES, 0, 500));
     }
 
     #[test]
@@ -1671,7 +1664,7 @@ mod tests {
 
     #[test]
     fn delivering_scores_once_and_a_letterbox_mends_a_heart() {
-        let mut g = playing();
+        let (_rng, mut g) = playing();
         let r = first_sub(&g, Side::Left);
         g.houses[0][r].hearts = 1;
         let f = Flight { x: WALL[0], d: door_d(r), wall: true, slid: false, t: 0.3 };
@@ -1686,7 +1679,7 @@ mod tests {
 
     #[test]
     fn two_missed_mornings_lose_a_subscriber() {
-        let mut g = playing();
+        let (_rng, mut g) = playing();
         let r = first_sub(&g, Side::Right);
         let before = g.subscribers();
         for _ in 0..2 {
@@ -1701,7 +1694,7 @@ mod tests {
 
     #[test]
     fn a_sample_can_win_a_new_subscriber_by_the_next_day() {
-        let mut g = playing();
+        let (_rng, mut g) = playing();
         let r = (0..ROWS).find(|&r| g.houses[0][r].lot.is_house() && !g.houses[0][r].sub).unwrap();
         let mut won = 0;
         for seed in 0..20 {
@@ -1725,7 +1718,7 @@ mod tests {
 
     #[test]
     fn every_nyhavn_target_can_be_reached_from_the_quay() {
-        let mut g = playing();
+        let (_rng, mut g) = playing();
         g.start_canal();
         let lim = g.ride_limits();
         for t in &g.targets {
@@ -1736,7 +1729,7 @@ mod tests {
 
     #[test]
     fn steering_left_in_the_junction_turns_the_bike_into_the_new_street() {
-        let mut g = playing();
+        let (_rng, mut g) = playing();
         g.bike_d = JD - MOUTH_HALF - 60.0;
         g.bike_x = 200.0;
         for _ in 0..(60 * 20) {
@@ -1753,7 +1746,7 @@ mod tests {
 
     #[test]
     fn a_crash_at_the_statue_does_not_put_the_bike_back_on_it() {
-        let mut g = playing();
+        let (_rng, mut g) = playing();
         g.bike_d = statue_d() - STATUE_HALF;
         g.bike_x = 240.0;
         g.update_play(1.0 / 60.0);
@@ -1769,7 +1762,7 @@ mod tests {
     #[test]
     fn a_rider_who_never_steers_still_gets_round_the_corner() {
         for pedal in [0.0, 1.0] {
-            let mut g = playing();
+            let (_rng, mut g) = playing();
             g.bike_d = JD - MOUTH_HALF - 60.0;
             g.bike_x = 200.0;
             for _ in 0..(60 * 30) {
@@ -1786,7 +1779,7 @@ mod tests {
     #[test]
     fn buses_and_cars_never_drive_into_each_other() {
         for day in 0..7 {
-            let mut g = playing();
+            let (_rng, mut g) = playing();
             g.day = day;
             g.begin_day();
             g.state = State::Play;
@@ -1815,7 +1808,7 @@ mod tests {
     fn riders_never_ride_through_cars_dogs_or_buses() {
         let mut found = Vec::new();
         for day in 0..7 {
-            let mut g = playing();
+            let (_rng, mut g) = playing();
             g.day = day;
             g.begin_day();
             g.state = State::Play;
@@ -1846,7 +1839,7 @@ mod tests {
     #[test]
     fn at_the_crossing_nothing_drives_into_anything() {
         // the bike waits short of the junction while the lights go round several times
-        let mut g = playing();
+        let (_rng, mut g) = playing();
         g.bike_d = Game::stop_d(JUNCTIONS[0]) - 60.0;
         for frame in 0..(60 * 60) {
             g.state = State::Play;
@@ -1867,7 +1860,7 @@ mod tests {
 
     #[test]
     fn going_straight_on_stops_at_the_roadworks() {
-        let mut g = playing();
+        let (_rng, mut g) = playing();
         g.bike_d = JD - MOUTH_HALF - 60.0;
         g.bike_x = 280.0;
         for _ in 0..(60 * 10) {
@@ -1888,7 +1881,7 @@ mod tests {
 
     #[test]
     fn a_week_of_days_comes_round_to_monday() {
-        let mut g = playing();
+        let (_rng, mut g) = playing();
         for day in 0..7 {
             assert_eq!(g.day, day);
             g.end_day();

@@ -266,7 +266,7 @@ impl Fighter {
         let run = 1.0 + 0.08 * (self.combo - 1).clamp(0, 4) as f32;
         self.struck_force = ((0.35 + damage as f32 / 16.0) * run).clamp(0.6, 1.5);
     }
-    pub(crate) fn hurt(&mut self, damage: i32, _from: f32) {
+    pub(crate) fn hurt(&mut self, damage: i32) {
         // A web takes two blows and no more, whatever they cost.
         if self.webbed > 0.0 && damage > 0 {
             self.web_hits += 1;

@@ -2,7 +2,7 @@
 
 
 use blip::input::{
-    any_key_pressed, btn1_pressed, key_active, key_pressed, BLIP_KEY_DOWN, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
+    any_key_pressed, btn1_pressed, key_active, key_pressed, Stick, BLIP_KEY_DOWN, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::input::KeyCode;
 use blip::macroquad::math::Vec2;
@@ -125,8 +125,8 @@ fn touch_drag(g: &Game, slot: usize) -> f32 {
 
 /// Keys and fingers on the bats, for the serve and the rally.
 fn move_paddles(g: &mut Game, dt: f32) {
-    if key_active(BLIP_KEY_UP)   || key_active(BLIP_KEY_W) { g.lpad_y -= PAD_SPEED * dt; }
-    if key_active(BLIP_KEY_DOWN) || key_active(BLIP_KEY_S) { g.lpad_y += PAD_SPEED * dt; }
+    if Stick::Up.active() { g.lpad_y -= PAD_SPEED * dt; }
+    if Stick::Down.active() { g.lpad_y += PAD_SPEED * dt; }
     g.lpad_y += touch_drag(g, 0);
     if g.mode == Mode::TwoPlayer {
         if key_active(KeyCode::I) { g.rpad_y -= PAD_SPEED * dt; }
@@ -273,7 +273,7 @@ fn draw_title(blip: &Blip) {
     blip.fill_rect(LPAD_X, py, PAD_W, PAD_H, C_PAD);
     blip.fill_rect(RPAD_X, py, PAD_W, PAD_H, C_PAD);
     let cy = PLAY_T + PLAY_H * 0.5;
-    let t = blip::macroquad::time::get_time() as f32;
+    let t = blip::now();
     let travel = (t * 150.0).rem_euclid(WIN_W as f32 * 2.0);
     let ball_x = if travel <= WIN_W as f32 { travel } else { WIN_W as f32 * 2.0 - travel };
     let ball_y = cy + 126.0 + (t * 2.1).sin() * 10.0;
@@ -378,6 +378,6 @@ async fn main() {
             State::Point => draw_point(&blip, &g),
             State::Over  => draw_over(&blip, &g),
         }
-        blip.next_frame(60).await;
+        blip.next_frame().await;
     }
 }

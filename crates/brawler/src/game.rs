@@ -265,7 +265,6 @@ pub(crate) struct Game {
     pub(crate) phase: Timer,
     /// The continue offered after a lost fight, and the best score of the run before any continue.
     pub(crate) cont: blip::Continue,
-    pub(crate) run_best: i32,
     pub(crate) banner: &'static str,
     /// How many times this run has been continued, for the ending.
     pub(crate) continues: u32,
@@ -391,7 +390,6 @@ impl Game {
             clock: ROUND_SECS,
             phase: Timer::default(),
             cont: blip::Continue::default(),
-            run_best: 0,
             banner: "",
             bonus: [0, 0],
             untouched: true,

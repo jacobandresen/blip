@@ -233,12 +233,12 @@ pub(crate) fn the_last_fight_is_a_boss_and_the_bell_uses_health() {
     assert_eq!(g.p[1].who, boss);
     g.p[0].health = 7;
     assert!(FIGHTERS[boss].boss);
-    assert_eq!(round_result(&g, false), RoundResult::P2, "the boss still leads on health");
+    assert_eq!(round_result(&g), RoundResult::P2, "the boss still leads on health");
     // A player who lands more damage wins at the bell.
     g.p[1].health = 1;
-    assert_eq!(round_result(&g, false), RoundResult::P1);
+    assert_eq!(round_result(&g), RoundResult::P1);
     g.p[0].health = 0;
-    assert_eq!(round_result(&g, true), RoundResult::P2);
+    assert_eq!(round_result(&g), RoundResult::P2);
     // Two players settle it on health, whoever they picked.
     g.mode = Mode::Versus;
     g.p[1] = at(boss, 440.0, -1.0);
@@ -246,14 +246,9 @@ pub(crate) fn the_last_fight_is_a_boss_and_the_bell_uses_health() {
 
 #[test]
 pub(crate) fn the_ladder_gets_harder_all_the_way_up() {
-    let mut g = Game { pick: 0, ..Game::new() };
-    let mut last = f32::MIN;
-    for rung in 0..RUNGS {
-        g.start_match(rung);
-        assert!(g.difficulty > last, "fight {} is no harder than the one before", rung + 1);
-        last = g.difficulty;
-    }
-    assert!((last - LAST_RUNG).abs() < 1e-4);
+    let difficulty = |rung| { let mut g = Game { pick: 0, ..Game::new() }; g.start_match(rung); g.difficulty };
+    blip::testing::climbs("fight difficulty", 0..RUNGS, difficulty);
+    assert!((difficulty(RUNGS - 1) - LAST_RUNG).abs() < 1e-4);
 }
 
 #[test]
