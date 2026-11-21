@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="title">
+  <title id="title">BLIP</title>
+  <!-- The BLIP name plate (blip-logo.svg) as an app tile: C64 blue lit by a copper bar, chrome letters, rainbow stripes. -->
+  <defs>
+    <linearGradient id="copper" x2="0" y2="1"><stop offset="0" stop-color="#271d66"/><stop offset=".2" stop-color="#40318d"/><stop offset=".36" stop-color="#6f60cc"/><stop offset=".4" stop-color="#8e80e0"/><stop offset=".44" stop-color="#6f60cc"/><stop offset=".58" stop-color="#40318d"/><stop offset=".85" stop-color="#3a2c85"/><stop offset="1" stop-color="#271d66"/></linearGradient>
+    <linearGradient id="chrome" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset=".52" stop-color="#eef1ff"/><stop offset=".53" stop-color="#b9c4ff"/><stop offset="1" stop-color="#f3f5ff"/></linearGradient>
+    <pattern id="scanlines" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="2.2" fill="#000" fill-opacity=".07"/></pattern>
+    <g id="letters" fill-rule="evenodd">
+      <path d="M7 6h10a5 5 0 0 1 0 10H7zM12 9.6v2.8h5a1.4 1.4 0 0 0 0-2.8z"/>
+      <path d="M7 15.2h11a5.4 5.4 0 0 1 0 10.8H7zM12 18.8v3.6h5.6a1.8 1.8 0 0 0 0-3.6z"/>
+      <path d="M26.6 6h5v16.4h8.4V26H26.6z"/>
+      <path d="M41.8 6h5v20h-5z"/>
+      <path d="M50 6h10a5.6 5.6 0 0 1 0 11.2h-5V26h-5zM55 9.6v4h4.8a2 2 0 0 0 0-4z"/>
+    </g>
+  </defs>
+  <rect width="512" height="512" fill="url(#copper)"/>
+  <rect x="14" y="14" width="484" height="484" rx="96" fill="none" stroke="#7869c4" stroke-width="10" stroke-opacity=".75"/>
+  <g transform="translate(46 118) scale(6.6)">
+    <g transform="translate(3.4 0) skewX(-12)">
+      <g fill="none" stroke="#0b0726" stroke-width="1.4" stroke-linejoin="round"><use href="#letters" transform="translate(2.2 2.2)"/><use href="#letters"/></g>
+      <use href="#letters" transform="translate(2.2 2.2)" fill="#120c3a"/><use href="#letters" transform="translate(1.1 1.1)" fill="#1d1554"/><use href="#letters" fill="url(#chrome)"/>
+    </g>
+  </g>
+  <g transform="skewX(-24)"><path d="M336 334h34v70h-34z" fill="#d2493d"/><path d="M380 334h34v70h-34z" fill="#e48d3a"/><path d="M424 334h34v70h-34z" fill="#ecc54c"/><path d="M468 334h34v70h-34z" fill="#4f9be0"/></g>
+  <rect width="512" height="512" fill="url(#scanlines)"/>
+</svg>
