@@ -84,6 +84,10 @@ pub(crate) struct Fighter {
     pub(crate) downed_by: MoveId,
     /// Bows whatever their own way of opening a round (the beaten, at the ending). Drawing state only.
     pub(crate) bows: bool,
+    /// Seconds left of a taunt: DRAKE, having put somebody down, flicks a thumb across his nose and beckons.
+    pub(crate) taunt: f32,
+    /// How many of the nunchaku's strikes have had their turn (see `stick_strike`).
+    pub(crate) strikes: u8,
     /// The facing last drawn, and how much of a turn to face the other way is left to show (1 to 0).
     /// Drawing state only.
     pub(crate) shown_facing: f32,
@@ -143,6 +147,8 @@ pub(crate) struct Fighter {
     /// The opponent's size, kept up to date by `face_off`: blows are aimed
     /// at the body in front of them.
     pub(crate) foe_size: f32,
+    /// Who the opponent is (kept with `foe_size`): DRAKE wins against LANCER as in Way of the Dragon.
+    pub(crate) foe: usize,
 }
 
 /// How long a pose takes to hand over to the next one. Four frames:
@@ -161,6 +167,15 @@ pub(crate) const LAND_ABSORB: f32 = 12.0 * F;
 pub(crate) const RISE_BLEND: f32 = 9.0 * F;
 /// The opening bow (rei), seconds: attention, bow, hold, rise, attention.
 pub(crate) const BOW_TIME: f32 = 1.6;
+
+/// DRAKE's nunchaku (the user asked for a long sequence that steps in, trick after trick, until it is blocked or
+/// the opponent is down): a whirl, then up to six strikes a fifth of a second apart, a step forward with each; a
+/// blocked one ends it, the sixth knocks down. In frames.
+pub(crate) const STICK_WHIRL: f32 = 12.0;
+pub(crate) const STICK_EVERY: f32 = 12.0;
+pub(crate) const STICK_HIT: f32 = 4.0;
+pub(crate) const STICK_STRIKES: u8 = 6;
+pub(crate) const STICK_RECOVER: f32 = 14.0;
 /// Rising out of the bow into the guard: unhurried.
 pub(crate) const BOW_TO_GUARD: f32 = 0.35;
 /// The round intro: the bow, then the guard coming up as FIGHT shows.
@@ -187,13 +202,14 @@ impl Fighter {
             shown: Act::Idle, shown_t: 0.0, shown_mv: MoveId::LowPunch,
             shown_air: false, shown_vy: 0.0, prev_air: false, prev_vy: 0.0,
             prev_act: Act::Idle, prev_mv: MoveId::LowPunch, prev_t: 0.0, blend: 0.0,
-            blend_len: POSE_BLEND, land: 0.0, land_force: 0.0, struck_legs: false, struck_body: false, struck_force: 1.0, downed_by: MoveId::LowPunch, bows: false, shown_facing: facing, turn: 0.0,
+            blend_len: POSE_BLEND, land: 0.0, land_force: 0.0, struck_legs: false, struck_body: false, struck_force: 1.0, downed_by: MoveId::LowPunch, bows: false, taunt: 0.0, strikes: 0, shown_facing: facing, turn: 0.0,
             soar: 0.0, stomp: false, parry_t: 0.0, throw_rest: 0.0,
             webbed: 0.0, web_hits: 0, web_rest: 0.0, called: false, calling: false, aim: None,
             alt_punch: false, alt_kick: false, stumble_roll: 0, stumble: 0.0, stagger: 0.0,
             since_punch: 9.0, far_leads: false, punch_run: 0, since_kick: 9.0, down_tap: 9.0, was_down: false,
             daze: 0.0, dizzy: 0.0, dazed: false, was_toward: false, countered: false, turned: false,
             foe_size: FIGHTERS[who].size,
+            foe: who,
         }
     }
 
@@ -302,7 +318,43 @@ impl Fighter {
 
     /// A move as this fighter throws it: their power and reach, aimed no
     /// higher than the opponent stands.
+    /// The special this fighter is throwing: their own, or for DRAKE any of nunchaku, the one-inch punch and the
+    /// flying side kick, picked by the per-attack roll every attack advances (so a run still repeats).
+    pub(crate) fn special(&self) -> Special {
+        if formless(self.who) {
+            [Special::Nunchaku, Special::OneInch, Special::TalonKick][(self.stumble_roll % 3) as usize]
+        } else { self.arch().special }
+    }
+
+    /// Throwing DRAKE's nunchaku now.
+    pub(crate) fn nunchaku(&self) -> bool { self.mv == MoveId::Special && self.special() == Special::Nunchaku }
+
+    /// Which of the nunchaku's strikes the sticks are on (from 0), and whether its window to land is open: a whirl
+    /// of `STICK_WHIRL` frames, then a strike every `STICK_EVERY`, each landing for `STICK_HIT`.
+    pub(crate) fn stick_strike(&self) -> Option<(u8, bool)> {
+        let at = self.t / F - STICK_WHIRL;
+        if !self.nunchaku() || at < 0.0 { return None; }
+        let k = (at / STICK_EVERY) as u8;
+        if k >= STICK_STRIKES { return None; }
+        Some((k, at - k as f32 * STICK_EVERY < STICK_HIT))
+    }
+
     pub(crate) fn scaled(&self, m: MoveData) -> MoveData {
+        let sticks = m == move_data(MoveId::Special) && self.special() == Special::Nunchaku;
+        // The nunchaku's sequence: the whirl, the strikes, a short recovery. Every strike but the last is light and
+        // holds the opponent for the next (hitstun past the gap between strikes); the last knocks them down.
+        let m = if sticks {
+            let last = self.stick_strike().is_some_and(|(k, _)| k + 1 >= STICK_STRIKES);
+            let mut s = MoveData { startup: STICK_WHIRL, active: STICK_EVERY * STICK_STRIKES as f32, recovery: STICK_RECOVER, ..m };
+            if !last {
+                // (4 a strike: 61% of DRAKE's CPU rounds; at 5, 68%, against 58% before the routine.)
+                s.damage = 4;
+                s.knockdown = false;
+                s.hitstun = STICK_EVERY + 6.0;
+                s.blockstun = 10.0;
+            }
+            s
+        } else { m };
         let a = self.arch();
         // Reach is the fighter's own; height is where the blow is aimed, and
         // nobody strikes over the head of a smaller opponent.
@@ -314,10 +366,17 @@ impl Fighter {
         // The laser's stare is its tell, and the laser ends the round: it lasts long enough to see and get
         // out of a blow already thrown. At 11 frames the bot, caught mid-kick, lost both rounds to it in 4 of 4 fights; at 24, one.
         let startup = if a.special == Special::LaserVision && m == move_data(MoveId::Special) { LASER_STARE } else { m.startup };
+        // The one-inch punch: jab's reach, quicker out than the shared special (7 frames against 11). Its
+        // danger is its range: only from touching distance.
+        let one_inch = m == move_data(MoveId::Special) && self.special() == Special::OneInch;
+        let (startup, reach) = if one_inch { (7.0, move_data(MoveId::LowPunch).reach) } else { (startup, m.reach) };
+        // Economy of motion: DRAKE's blows come out 15% sooner (a frame or two), no wind-up to read.
+        // (Not the nunchaku's whirl, which `stick_strike` times.)
+        let startup = if formless(self.who) && !sticks { startup * 0.85 } else { startup };
         MoveData {
             startup,
             damage: ((m.damage as f32) * a.power * rage * even).round() as i32,
-            reach: m.reach * a.reach * a.size,
+            reach: reach * a.reach * a.size,
             height: m.height * aim,
             thickness: m.thickness * aim,
             ..m
@@ -326,10 +385,19 @@ impl Fighter {
 
     /// Where the current attack can hit, during its active window only.
     pub(crate) fn hit_box(&self) -> Option<(f32, f32, f32, f32)> {
+        // DRAKE's nunchaku land strike after strike: each window open once, in turn.
+        if self.nunchaku() {
+            if self.act != Act::Attack || self.hit_done { return None; }
+            let (k, open) = self.stick_strike()?;
+            if !open || k < self.strikes { return None; }
+            let m = self.scaled(move_data(self.mv));
+            let half = self.width() / 2.0;
+            let x = if self.facing > 0.0 { self.x + half } else { self.x - half - m.reach };
+            return Some((x, self.y - m.height - m.thickness / 2.0, m.reach, m.thickness));
+        }
         if self.act != Act::Attack || self.hit_done || self.calling { return None; }
         let m = self.scaled(move_data(self.mv));
-        let start = m.startup * F;
-        let end = start + m.active * F;
+        let (start, end) = (m.startup * F, (m.startup + m.active) * F);
         if self.t < start || self.t > end { return None; }
         let len = m.reach;
         let half = self.width() / 2.0;
@@ -397,6 +465,7 @@ impl Fighter {
         self.hit_done = id == MoveId::Special && self.arch().special == Special::DriveBy;
         self.hit_clean = false;
         self.countered = false;
+        self.strikes = 0;
         self.stomp = id == MoveId::JumpKick && self.arch().build == Build::Giant;
         self.cancel_t = 0.0;
         if !self.airborne() && matches!(id, MoveId::LowPunch | MoveId::HighPunch

@@ -447,6 +447,23 @@ pub(crate) fn nobody_on_the_roster_is_hopeless_or_unbeatable() {
 }
 
 #[test]
+pub(crate) fn drake_has_no_trouble_with_zenith() {
+    // The user's rule: DRAKE is so plainly skilled that the boss is no problem for him.
+    let _sim = simulating(0xD2A4);
+    let who = |n: &str| FIGHTERS.iter().position(|a| a.name == n).unwrap();
+    let (drake, zenith) = (who("DRAKE"), who("ZENITH"));
+    const N: usize = 20;
+    let mut won = 0.0;
+    for k in 0..N {
+        let h = if k % 2 == 0 { cpu_round(drake, zenith, 0.4).0 } else { let h = cpu_round(zenith, drake, 0.4).0; [h[1], h[0]] };
+        won += if h[0] > h[1] { 1.0 } else if h[0] == h[1] { 0.5 } else { 0.0 };
+    }
+    let share = won / N as f32;
+    eprintln!("DRAKE against ZENITH: {:.0}% of rounds", share * 100.0);
+    assert!(share >= 0.75, "DRAKE wins only {:.0}% of his rounds against ZENITH", share * 100.0);
+}
+
+#[test]
 pub(crate) fn the_second_bonus_round_drops_ten_barrels_that_roll_away_if_nobody_stops_them() {
     let mut g = after_winning(BONUS_AFTER[1]);
     assert_eq!(g.bonus_total, BARRELS);

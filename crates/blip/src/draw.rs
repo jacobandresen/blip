@@ -5,7 +5,7 @@
 use macroquad::color::Color;
 use macroquad::shapes::{
     draw_circle as mq_fill_circle, draw_circle_lines as mq_draw_circle,
-    draw_line as mq_draw_line, draw_rectangle, draw_rectangle_lines,
+    draw_line as mq_draw_line, draw_rectangle, draw_rectangle_lines, draw_triangle,
 };
 use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use macroquad::math::{vec2, Rect};
@@ -86,19 +86,29 @@ pub fn fill_circle(cx: f32, cy: f32, r: f32, c: Color) {
 }
 
 /// Draw a capsule from (`x1`, `y1`) to (`x2`, `y2`), tapering from `r1` to `r2`.
-/// Use opaque colours; overlapping circles show through as beads.
+/// Use opaque colours: a translucent one doubles where the round ends overlap the middle.
 pub fn fill_capsule(x1: f32, y1: f32, x2: f32, y2: f32, r1: f32, r2: f32, c: Color) {
-    let len = ((x2 - x1).powi(2) + (y2 - y1).powi(2)).sqrt();
-    // Circles a third of a radius apart leave an edge smooth to a hundredth
-    // of the radius; a thin line still needs one every pixel or two.
-    let mut d = 0.0;
-    loop {
-        let t = if len > 0.0 { (d / len).min(1.0) } else { 1.0 };
-        let r = r1 + (r2 - r1) * t;
-        mq_fill_circle(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, r, c);
-        if t >= 1.0 { break; }
-        d += (r * 0.3).max(1.7);
+    let (dx, dy) = (x2 - x1, y2 - y1);
+    let len = (dx * dx + dy * dy).sqrt();
+    // One end inside the other: only the bigger circle shows.
+    if len <= (r1 - r2).abs() + 0.01 {
+        if r1 >= r2 { mq_fill_circle(x1, y1, r1, c) } else { mq_fill_circle(x2, y2, r2, c) }
+        return;
     }
+    // The two ends joined along their outer tangents: a tangent touches each circle where its normal n has
+    // n·u = (r1 - r2) / len. Three primitives, where a row of circles a third of a radius apart took fifteen
+    // for a limb (Brawler's crowd halved the frame rate on a slow CPU drawn that way).
+    let (ux, uy) = (dx / len, dy / len);
+    let s = (r1 - r2) / len;
+    let co = (1.0 - s * s).max(0.0).sqrt();
+    let (ax, ay) = (-uy * co + ux * s, ux * co + uy * s);
+    let (bx, by) = (uy * co + ux * s, -ux * co + uy * s);
+    let (p1a, p2a) = (vec2(x1 + ax * r1, y1 + ay * r1), vec2(x2 + ax * r2, y2 + ay * r2));
+    let (p1b, p2b) = (vec2(x1 + bx * r1, y1 + by * r1), vec2(x2 + bx * r2, y2 + by * r2));
+    draw_triangle(p1a, p2a, p2b, c);
+    draw_triangle(p1a, p2b, p1b, c);
+    mq_fill_circle(x1, y1, r1, c);
+    mq_fill_circle(x2, y2, r2, c);
 }
 
 /// Draw `rays` alternating wedges from (`cx`, `cy`) to `reach`, starting at `turn`.

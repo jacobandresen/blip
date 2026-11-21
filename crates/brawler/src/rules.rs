@@ -29,6 +29,8 @@ pub(crate) fn face_off(p: &mut [Fighter; 2]) -> [bool; 2] {
     let dist = (p[1].x - p[0].x).abs();
     p[0].foe_size = p[1].size();
     p[1].foe_size = p[0].size();
+    p[0].foe = p[1].who;
+    p[1].foe = p[0].who;
     [0, 1].map(|i| dist <= throw_range(&p[i]))
 }
 
@@ -152,6 +154,8 @@ pub(crate) const SPECIAL_WINDOW: f32 = 5.0 * F;
 /// quarter more damage and six frames more stun.
 pub(crate) const COUNTER: f32 = 1.25;
 pub(crate) const COUNTER_STUN: f32 = 6.0 * F;
+/// DRAKE's counter, the intercepting fist: half again, against a quarter for everyone else.
+pub(crate) const INTERCEPT: f32 = 1.5;
 
 /// Rage, as in Tekken: with a quarter of the bar left a fighter hits a fifth
 /// harder, so a round is not over until it is over.
@@ -330,7 +334,12 @@ pub(crate) fn advance(f: &mut Fighter, dt: f32) {
     f.soar += (level - f.soar) * (10.0 * dt).min(1.0);
 
     let from = f.t;
+    let was = f.stick_strike();
     f.t += dt;
+    // A step forward into each new strike of the nunchaku (170 px/s, bled off by the slide: about 25 px).
+    if let Some((k, _)) = f.stick_strike() {
+        if was.map(|w| w.0) != Some(k) && !f.hit_done { f.vx = f.facing * 170.0; }
+    }
     if f.act == Act::Bow && f.t >= BOW_TIME { f.act = Act::Idle; f.t = 0.0; }
     // A long frame on a slow device can step clean over a two-frame active
     // window; stop in it for this step so the hit is still tested.
@@ -340,6 +349,7 @@ pub(crate) fn advance(f: &mut Fighter, dt: f32) {
         if from < start && f.t > end { f.t = (start + end) / 2.0; }
     }
     if f.cancel_t > 0.0 { f.cancel_t -= dt; }
+    if f.taunt > 0.0 { f.taunt -= dt; }
 
     if f.airborne() || f.vy < 0.0 {
         // A flier hangs where the stick left him; everyone else falls.
@@ -378,7 +388,7 @@ pub(crate) fn advance(f: &mut Fighter, dt: f32) {
 
     // An attack that carries the body along the floor (the rush, a small
     // fighter's lunge) slides, and the slide bleeds off so it ends.
-    if !f.airborne() && f.act == Act::Attack {
+    if !f.airborne() && matches!(f.act, Act::Attack | Act::Knockdown) {
         f.x += f.vx * dt;
         f.vx *= 1.0 - (6.0 * dt).min(1.0);
     }
@@ -456,6 +466,18 @@ pub(crate) fn note_handover(f: &mut Fighter, dt: f32) {
     }
 }
 
+/// DRAKE is so plainly skilled that the boss is no problem for him (the user's rule, 2026-11-20): his blows
+/// count `DRAKE_EDGE` times over against the boss, and the boss's land on him at the inverse; the laser does
+/// not end his round. (CPU against CPU he won 1 round in 20 against ZENITH; with the edge alone 9; with the laser
+/// too, 19. `drake_has_no_trouble_with_zenith` holds it at three in four or better.)
+pub(crate) const DRAKE_EDGE: f32 = 2.5;
+
+pub(crate) fn master_edge(attacker: &Fighter, defender: &Fighter) -> f32 {
+    if formless(attacker.who) && defender.arch().boss { DRAKE_EDGE }
+    else if attacker.arch().boss && formless(defender.who) { 1.0 / DRAKE_EDGE }
+    else { 1.0 }
+}
+
 /// Is this fighter untouchable right now? Only on the way up from a
 /// knockdown, and only briefly.
 pub(crate) fn invulnerable(f: &Fighter) -> bool {
@@ -477,7 +499,13 @@ pub(crate) fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: 
     if attacker.mv == MoveId::Throw && (defender.airborne() || defender.throw_rest > 0.0) {
         return (0, false, false);
     }
-    attacker.hit_done = true;
+    // The nunchaku's strikes each take their turn; the sequence ends at the last (or a block, below).
+    if let Some((k, _)) = attacker.stick_strike() {
+        attacker.strikes = k + 1;
+        if k + 1 >= STICK_STRIKES { attacker.hit_done = true; }
+    } else {
+        attacker.hit_done = true;
+    }
     if attacker.mv == MoveId::Throw { defender.throw_rest = THROW_REST; }
 
     // The guard impact: the blow is turned and the attacker left open.
@@ -498,6 +526,11 @@ pub(crate) fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: 
         && holding_back(hold, defender.facing)
         && matches!(defender.act, Act::Idle | Act::Walk | Act::Crouch | Act::Block);
     if guarding && !unblockable(attacker.mv) && blocks(m.level, defender.crouch_block || hold.down) {
+        // Blocked, the nunchaku's run is over: straight into the recovery.
+        if attacker.nunchaku() {
+            attacker.hit_done = true;
+            attacker.t = attacker.t.max((STICK_WHIRL + STICK_EVERY * STICK_STRIKES as f32) * F);
+        }
         defender.act = Act::Block;
         defender.crouch_block = hold.down;
         defender.stun = m.blockstun * F;
@@ -511,11 +544,14 @@ pub(crate) fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: 
     let theirs = defender.scaled(move_data(defender.mv));
     let counter = defender.act == Act::Attack && defender.t <= (theirs.startup + theirs.active) * F;
     attacker.countered = counter;
-    let bonus = if counter { COUNTER } else { 1.0 };
-    let damage = ((m.damage as f32) * combo_scale(defender.combo) * bonus).round().max(1.0) as i32;
+    // Jeet kune do is "the way of the intercepting fist": DRAKE catching a blow on its way out hits harder still.
+    let bonus = if counter && formless(attacker.who) { INTERCEPT } else if counter { COUNTER } else { 1.0 };
+    let damage = ((m.damage as f32) * combo_scale(defender.combo) * bonus * master_edge(attacker, defender)).round().max(1.0) as i32;
     defender.combo += 1;
     // A light attack that lands buys the right to follow it up.
-    if matches!(attacker.mv, MoveId::LowPunch) && !attacker.chained {
+    // DRAKE flows: any blow of his that lands (not a special) opens the window, one technique into the next.
+    if (matches!(attacker.mv, MoveId::LowPunch) || (formless(attacker.who) && attacker.mv != MoveId::Special))
+        && !attacker.chained {
         attacker.cancel_t = CANCEL_WINDOW;
     }
     defender.hurt(damage, attacker.size());
@@ -530,10 +566,17 @@ pub(crate) fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: 
     let floored = m.knockdown || attacker.epic_punch();
     if floored || defender.airborne() {
         defender.act = Act::Knockdown;
+        // Somebody DRAKE put down gets the thumb across the nose while they lie there (1.4 s, about their time down).
+        if formless(attacker.who) { attacker.taunt = 1.4; }
+        let one_inch = attacker.mv == MoveId::Special && attacker.special() == Special::OneInch;
         defender.downed_by = if defender.airborne() { MoveId::LowPunch } else { attacker.mv };
         defender.t = 0.0;
         defender.vy = 0.0;
-        defender.vx = 0.0;
+        // The one-inch punch throws them back across the stage: 560 px/s bleeding off at 6 a second is about
+        // 90 px of slide, on top of the push every knockdown gets.
+        defender.vx = if one_inch {
+            attacker.facing * 560.0
+        } else { 0.0 };
         defender.y = FLOOR_Y;
     } else {
         defender.act = Act::Hitstun;

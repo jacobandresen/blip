@@ -4,6 +4,38 @@
 
 use super::*;
 
+/// The crowd going up: see `Game::rouse` and `Roar::of`.
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub(crate) struct Roar {
+    pub(crate) at: f32,
+    pub(crate) loud: f32,
+    pub(crate) n: u32,
+}
+
+impl Roar {
+    /// Nothing has happened yet.
+    pub(crate) const QUIET: Roar = Roar { at: f32::NEG_INFINITY, loud: 0.0, n: 0 };
+
+    /// How far one of the crowd (`i`, `salt`) is into answering this roar at `now`: 0 at rest, up to 1.
+    /// Each has their own delay, keeps it up for their own time, and may not bother at all for a small blow,
+    /// so a crowd goes up in a ripple and comes down one by one rather than as one body.
+    pub(crate) fn of(self, i: usize, salt: u32, now: f32) -> f32 {
+        let roll = |k: u32| blip::scatter(i, salt ^ k ^ self.n.wrapping_mul(0x9E37_79B9));
+        // About half answer a light blow, nearly all a knockdown (a shake of 0.08 to 0.3 s).
+        if roll(0x11) > 0.30 + 2.2 * self.loud { return 0.0; }
+        let delay = 0.03 + 0.55 * roll(0x22);
+        let hold = 0.5 + 1.7 * roll(0x33);
+        let e = now - self.at - delay;
+        if !(0.0..hold + 0.4).contains(&e) { return 0.0; }
+        (e / 0.14).min(1.0) * (1.0 - ((e - hold) / 0.4).clamp(0.0, 1.0))
+    }
+
+    /// Which of the ways to cheer this one picks this time.
+    pub(crate) fn kind(self, i: usize, salt: u32, kinds: usize) -> usize {
+        (blip::scatter(i, salt ^ 0x44 ^ self.n.wrapping_mul(0x85EB_CA6B)) * kinds as f32) as usize % kinds
+    }
+}
+
 /// A flash where something connected. `blocked` picks the colour, which
 /// is how a player tells "that cost me nothing" from "that cost me".
 #[derive(Copy, Clone)]
@@ -68,6 +100,61 @@ pub(crate) struct Pop {
     pub(crate) ttl: f32,
 }
 pub(crate) const POP_SECS: f32 = 0.9;
+
+/// The fight camera. Close in, a fighter stands 156 px of the 400 (SF2's sprites fill about 45% of its screen;
+/// at the whole stage ours fill 30%); it pulls back to the whole stage as the two part or leap. Scenery only:
+/// walls, reach and boxes are the same at any zoom.
+#[derive(Copy, Clone)]
+pub(crate) struct View { pub(crate) x: f32, pub(crate) zoom: f32 }
+/// The tightest the camera closes in.
+pub(crate) const ZOOM_MAX: f32 = 1.3;
+
+impl View {
+    pub(crate) const WIDE: View = View { x: WIN_W as f32 / 2.0, zoom: 1.0 };
+
+    /// Where the camera wants to be: both fighters in, with room ahead of each for a kick, and the top of a leap
+    /// clear of the health bars.
+    pub(crate) fn aim(p: &[Fighter; 2]) -> View {
+        let (w, h) = (WIN_W as f32, WIN_H as f32);
+        let room = 90.0 * (p[0].size() + p[1].size());
+        let span = (p[0].x - p[1].x).abs() + room;
+        let top = p.iter().map(|f| f.y - STAND_H * f.size()).fold(FLOOR_Y, f32::min);
+        // The bars end 80 px down; the view's bottom edge stays on the canvas's.
+        let tall = (h - 80.0) / (h - top).max(1.0);
+        let zoom = (w / span).min(tall).clamp(1.0, ZOOM_MAX);
+        // BLIP_BOT_NEAR draws hit boxes in canvas pixels, so its frames keep the whole stage.
+        let zoom = if blip::bot::var("BLIP_BOT_NEAR").is_some() { 1.0 } else { zoom };
+        let half = w / 2.0 / zoom;
+        View { x: ((p[0].x + p[1].x) / 2.0).clamp(half, w - half), zoom }
+    }
+
+    /// Ease toward the aim: about a fifth of a second to settle, so a jump swells the view instead of jolting it.
+    pub(crate) fn follow(&mut self, p: &[Fighter; 2], dt: f32) {
+        let aim = View::aim(p);
+        let k = 1.0 - (-dt * 7.0).exp();
+        self.zoom += (aim.zoom - self.zoom) * k;
+        let half = WIN_W as f32 / 2.0 / self.zoom;
+        self.x = (self.x + (aim.x - self.x) * k).clamp(half, WIN_W as f32 - half);
+    }
+
+    /// The canvas rect shown for a layer `depth` back (1 the floor and fighters, less for scenery further off):
+    /// further layers zoom and pan less, and every layer keeps the floor line at the same height on screen.
+    pub(crate) fn rect(self, depth: f32) -> (f32, f32, f32, f32) {
+        let (w, h) = (WIN_W as f32, WIN_H as f32);
+        let floor = (FLOOR_Y - (h - h / self.zoom)) * self.zoom;
+        let z = 1.0 + (self.zoom - 1.0) * depth;
+        let cx = w / 2.0 + (self.x - w / 2.0) * depth;
+        let x = (cx - w / 2.0 / z).clamp(0.0, w - w / z);
+        (x, FLOOR_Y - floor / z, w / z, h / z)
+    }
+
+    /// A point on the floor plane as a point on screen.
+    pub(crate) fn screen(self, x: f32, y: f32) -> (f32, f32) {
+        let (vx, vy, vw, _) = self.rect(1.0);
+        let z = WIN_W as f32 / vw;
+        ((x - vx) * z, (y - vy) * z)
+    }
+}
 
 /// The bonus fruit on the boards: where, how long it has left, and which of
 /// the eight it is.
@@ -164,6 +251,10 @@ pub(crate) struct Game {
     /// their choice. Nobody fights until both have.
     pub(crate) pick2: usize,
     pub(crate) locked: [bool; 2],
+    /// Each player's colours: false the fighter's own, true the alternate (picked with the kick).
+    pub(crate) costume: [bool; 2],
+    /// When each fighter last shouted (`now`): one cry at a time.
+    pub(crate) yelled: [f32; 2],
     /// Which line of the title menu is highlighted.
     pub(crate) menu: usize,
     /// Which of the other two fighters this match is against, 0 then 1.
@@ -190,6 +281,11 @@ pub(crate) struct Game {
     pub(crate) result: RoundResult,
     pub(crate) hitspark: [Spark; 4],
     pub(crate) shake: f32,
+    /// The crowd's last roar: when (`now`), how loud (the shake that set it off), and a count so each one
+    /// is answered differently.
+    pub(crate) roar: Roar,
+    /// The fight camera: the middle of what it shows and how far it is zoomed in.
+    pub(crate) view: View,
     /// Frames where everything stops on contact: it gives a hit weight, and
     /// it is when both players need to see who got hit with what.
     pub(crate) hitstop: f32,
@@ -286,6 +382,8 @@ impl Game {
             pick: 0,
             pick2: 1,
             locked: [false; 2],
+            costume: [false; 2],
+            yelled: [-9.0; 2],
             menu: 0,
             opponent_index: 0,
             stage: 0,
@@ -303,6 +401,8 @@ impl Game {
             result: RoundResult::Draw,
             hitspark: [Spark { x: 0.0, y: 0.0, ttl: 0.0, life: 1.0, blocked: false }; 4],
             shake: 0.0,
+            roar: Roar::QUIET,
+            view: View::WIDE,
             hitstop: 0.0,
             bowed: false,
             combo_shown: 0,
@@ -495,6 +595,7 @@ impl Game {
         self.call = "";
         self.hitstop = 0.0;
         self.clock = ROUND_SECS;
+        self.view = View::aim(&self.p);
         self.banner = "ROUND";
         self.state = State::RoundIntro;
         self.phase.start(ROUND_INTRO);
@@ -579,6 +680,12 @@ impl Game {
 
     /// How far the picture is thrown down this frame by the last heavy blow:
     /// a few pixels, dying away as it rings.
+    /// Shake the picture for `secs`, and set the crowd off.
+    pub(crate) fn rouse(&mut self, secs: f32) {
+        self.shake = secs;
+        self.roar = Roar { at: self.now, loud: secs, n: self.roar.n.wrapping_add(1) };
+    }
+
     pub(crate) fn shake_px(&self) -> f32 {
         if self.shake > 0.0 {
             (self.shake * 60.0).sin() * self.shake * 30.0

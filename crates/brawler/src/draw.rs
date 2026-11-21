@@ -62,8 +62,13 @@ pub(crate) fn draw_screen(blip: &Blip, g: &Game) {
         State::Won => draw_ending(blip, g),
         State::Bonus => draw_bonus(blip, g),
         _ => {
+            // The stage's own light on everyone in it (see `tint_light`).
+            tint_light(Some(g.stage));
             draw_stage(blip, g);
             draw_fight(blip, g);
+            tint_light(None);
+            blip.set_offset(0.0, 0.0);
+            draw_words(blip, g);
             draw_hud(blip, g);
             draw_banner(blip, g);
         }

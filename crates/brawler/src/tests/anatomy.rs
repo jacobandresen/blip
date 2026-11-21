@@ -38,6 +38,38 @@ pub(crate) fn every_pose() -> Vec<(String, Fighter)> {
                 };
                 if act == Act::Walk { f.x = 300.0 + step as f32 * 7.0; }
                 out.push((format!("{} {:?} t={:.2}", FIGHTERS[who].name, act, f.t), f));
+                // DRAKE's two guards, whichever his roll picks.
+                if act == Act::Block && formless(who) {
+                    let mut v = f;
+                    v.stumble_roll = 1;
+                    out.push((format!("{} Block roll 1 t={:.2}", FIGHTERS[who].name, v.t), v));
+                }
+                // DRAKE's two openers, whichever his roll picks.
+                if act == Act::Bow && formless(who) {
+                    let mut v = f;
+                    v.stumble_roll = 1;
+                    out.push((format!("{} Bow roll 1 t={:.2}", FIGHTERS[who].name, v.t), v));
+                }
+                // DRAKE's three wins, whichever his roll picks.
+                if act == Act::Victory && formless(who) {
+                    for roll in 0..4u8 {
+                        let mut v = f;
+                        v.stumble_roll = roll;
+                        out.push((format!("{} Victory roll {roll} t={:.2}", FIGHTERS[who].name, v.t), v));
+                    }
+                }
+                // DRAKE's taunt over a fallen opponent, the whole of it.
+                if act == Act::Idle && formless(who) {
+                    let mut t = f;
+                    t.taunt = 1.4 * (1.0 - step as f32 / 11.0);
+                    out.push((format!("{} taunt left={:.2}", FIGHTERS[who].name, t.taunt), t));
+                    let mut twirl = t;
+                    twirl.stumble_roll = 1;
+                    out.push((format!("{} twirl left={:.2}", FIGHTERS[who].name, twirl.taunt), twirl));
+                    let mut torn = t;
+                    torn.health = 3;
+                    out.push((format!("{} torn taunt left={:.2}", FIGHTERS[who].name, torn.taunt), torn));
+                }
                 // Nearly out of health: the enraged guard.
                 if matches!(act, Act::Idle | Act::Walk | Act::Block) {
                     let mut w = f;
@@ -100,6 +132,16 @@ pub(crate) fn every_pose() -> Vec<(String, Fighter)> {
                 let total = (m.startup + m.active + m.recovery) * F;
                 f.t = step as f32 / 15.0 * total;
                 out.push((format!("{} {:?} t={:.3}", FIGHTERS[who].name, mv, f.t), f));
+                // DRAKE's technique (and special) comes off his per-attack roll: every one of them.
+                if formless(who) {
+                    for roll in 0..6u8 {
+                        let mut v = f;
+                        v.stumble_roll = roll;
+                        let m = v.scaled(move_data(mv));
+                        v.t = step as f32 / 15.0 * (m.startup + m.active + m.recovery) * F;
+                        out.push((format!("{} {:?} roll {roll} t={:.3}", FIGHTERS[who].name, mv, v.t), v));
+                    }
+                }
                 // A throw that caught someone is a different picture: the hoist.
                 if mv == MoveId::Throw {
                     let mut c = f;
@@ -524,6 +566,8 @@ pub(crate) fn the_far_hand_stays_in_front_of_the_body() {
         if f.flies() && f.act == Act::Attack && f.mv == MoveId::FlyingKick { continue; }
         // Turned over in a somersault, the body's back is not the screen's.
         if draw::flip_of(&f) != 0.0 { continue; }
+        // Turned round in a spinning back kick, the back is toward the opponent: the far hand is behind it.
+        if draw::spin_turn(&f) > 0.15 { continue; }
         let k = bones_of(&f);
         if k.hand_rear.1 < k.neck.1 { continue; }
         let t = ((k.hip.1 - k.hand_rear.1) / (k.hip.1 - k.neck.1).max(1.0)).clamp(0.0, 1.0);
@@ -549,6 +593,8 @@ pub(crate) fn a_fighter_has_two_arms_two_legs_and_one_torso() {
         // each other, which is what getting up is; standing to attention
         // side on, one arm hangs in front of the other.
         if matches!(f.act, Act::Knockdown | Act::Bow) { continue; }
+        // Edge-on in the middle of a spinning back kick, the limbs line up one behind the other.
+        if draw::spin_turn(&f) > 0.15 { continue; }
         let k = bones_of(&f);
         let gap = |a: draw::V, b: draw::V| ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt();
         // One fist passing the other on its way somewhere is a punch going

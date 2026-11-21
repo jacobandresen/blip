@@ -56,6 +56,12 @@ pub(crate) fn cpu_think(g: &mut Game) -> CpuPlan {
             CpuPlan::Block
         };
     }
+    // The intercepting fist: DRAKE meets a blow still on its way out with a jab into it, as often as not,
+    // where the others block. (Only while it is winding up: after that it is too late to beat it.)
+    if formless(me.who) && foe.act == Act::Attack && dist < jab_range * 1.1 && foe.t < foe.scaled(move_data(foe.mv)).startup * F * 0.6
+        && roll() < 0.35 + 0.3 * g.difficulty {
+        return CpuPlan::Attack(MoveId::LowPunch);
+    }
     if foe.act == Act::Attack && dist < foe_range * 1.2 {
         // Block 55–95% against heavy or knockdown moves, 22–42% against jabs.
         let scary = move_data(foe.mv).damage >= 10 || move_data(foe.mv).knockdown;
@@ -175,6 +181,43 @@ pub(crate) fn cpu_think(g: &mut Game) -> CpuPlan {
         };
     }
 
+    // Jeet kune do has no pattern to read: up close DRAKE spreads his choices almost evenly over everything he
+    // has, feints out and back in, and jumps when nobody expects it.
+    if formless(me.who) {
+        let close = dist < jab_range * 1.1;
+        return match r {
+            _ if r < 0.11 => CpuPlan::Attack(MoveId::LowPunch),
+            _ if r < 0.21 => CpuPlan::Attack(MoveId::HighPunch),
+            _ if r < 0.31 => CpuPlan::Attack(MoveId::LowKick),
+            _ if r < 0.42 => if dist < high_range { CpuPlan::Attack(MoveId::HighKick) } else { CpuPlan::Attack(MoveId::LowKick) },
+            _ if r < 0.50 => CpuPlan::Attack(MoveId::Sweep),
+            _ if r < 0.57 && close => CpuPlan::Attack(MoveId::Uppercut),
+            _ if r < 0.66 => CpuPlan::Attack(MoveId::Special),
+            _ if r < 0.73 && foe.throw_rest <= 0.0 && dist <= throw_range(&me) => CpuPlan::Attack(MoveId::Throw),
+            _ if r < 0.76 => CpuPlan::Jump,
+            // The feint: a step out, to come straight back in on the next thought.
+            _ if r < 0.83 => CpuPlan::Retreat,
+            _ if r < 0.94 => CpuPlan::Block,
+            _ => CpuPlan::Approach,
+        };
+    }
+
+    // LANCER fights as the champion did in the Colosseum: kicks first, high ones most, the spinning heel kick often,
+    // the hands only to set them up.
+    if me.arch().build == Build::Duelist {
+        return match r {
+            _ if r < 0.12 => CpuPlan::Attack(MoveId::LowPunch),
+            _ if r < 0.20 => CpuPlan::Attack(MoveId::HighPunch),
+            _ if r < 0.34 => CpuPlan::Attack(MoveId::LowKick),
+            _ if r < 0.56 => if dist < high_range { CpuPlan::Attack(MoveId::HighKick) } else { CpuPlan::Attack(MoveId::LowKick) },
+            _ if r < 0.70 => CpuPlan::Attack(MoveId::Special),
+            _ if r < 0.75 => CpuPlan::Attack(MoveId::Sweep),
+            _ if r < 0.80 && foe.throw_rest <= 0.0 && dist <= throw_range(&me) => CpuPlan::Attack(MoveId::Throw),
+            _ if r < 0.94 => CpuPlan::Block,
+            _ => CpuPlan::Approach,
+        };
+    }
+
     // Up close every fighter keeps a fast option, even the heavy (without one
     // he was jabbed for a whole round); the heavy leans to the slow end of
     // the same list.
@@ -187,6 +230,7 @@ pub(crate) fn cpu_think(g: &mut Game) -> CpuPlan {
         Special::TalonKick => (0.12, 0.06),
         Special::LaserVision => (0.10, 0.09),
         Special::DriveBy => (0.11, 0.05),
+        Special::Nunchaku | Special::OneInch => (0.14, 0.05),
     };
     // The bands must leave room for the last two arms, or `Block` becomes
     // unreachable and the CPU stops guarding up close.
@@ -228,7 +272,13 @@ pub(crate) fn cpu_turn(g: &mut Game, side: usize, dt: f32) -> Input {
     if g.cpu_delay <= 0.0 || (jolted && g.cpu_delay < 0.12) {
         // Well behind, now and then it tries another way (about every five seconds of decisions).
         if well_behind(&g.p[1], &g.p[0]) && rand_int(0, 99) < 3 { g.cpu_style = Plan::pick(&g.p[1]); }
+        let was = g.cpu_plan;
         g.cpu_plan = cpu_think(g);
+        let jkd = formless(g.p[1].who);
+        // DRAKE never throws the same thing twice running: a repeat is thought again, once.
+        if jkd && matches!(was, CpuPlan::Attack(_)) && g.cpu_plan == was { g.cpu_plan = cpu_think(g); }
+        // And changes his whole game plan often (one thought in eight), where the others only do when losing.
+        if jkd && rand_int(0, 7) == 0 { g.cpu_style = Plan::pick(&g.p[1]); }
         // The early turtles fight alone: the call is kept for opponents who
         // have had three fights to learn to guard low.
         if g.cpu_plan == CpuPlan::Attack(MoveId::Special) && g.difficulty < 0.0
@@ -238,6 +288,9 @@ pub(crate) fn cpu_turn(g: &mut Game, side: usize, dt: f32) -> Input {
         // Faster decisions as the ladder climbs — this is the difficulty
         // dial that actually matters, far more than damage numbers.
         g.cpu_delay = 0.38 - 0.18 * g.difficulty + (rand_int(0, 12) as f32) * 0.01;
+        // Broken rhythm: DRAKE's next thought comes anywhere from half to one and a half times as soon (the
+        // same on average, so no harder for it), and his timing cannot be counted.
+        if jkd { g.cpu_delay *= 0.5 + (rand_int(0, 100) as f32) * 0.01; }
     }
     cpu_input(g)
 }

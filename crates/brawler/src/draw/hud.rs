@@ -22,16 +22,24 @@ pub(crate) fn draw_hud(blip: &Blip, g: &Game) {
         let px = if i == 0 { pad } else { WIN_W as f32 - pad - face };
         let py = y - 7.0;
         blip.fill_rect(px - 2.0, py - 2.0, face + 4.0, face + 4.0, INK);
-        blip.fill_rect(px, py, face, face, shade(rgb(a.color), 0.45));
+        // (The second of a mirror match in their alternate colours, as on the stage.)
+        let mirror = (i == 1 && g.p[0].who == g.p[1].who) || ((g.mode == Mode::Versus || i == 0) && !g.demo && g.costume[i]);
+        let back = if mirror { second_look(look_of(&a, 0.0)).cloth } else { rgb(a.color) };
+        blip.fill_rect(px, py, face, face, shade(back, 0.45));
         let fw = if i == 0 { 1.0 } else { -1.0 };
         // Wincing while the last blow is still draining off the bar.
         let mood = if f.health == 0 || g.ghost[i] > f.health as f32 + 0.5 { Mood::Hurt } else { Mood::Calm };
         let look = Look { bulk: a.bulk * 0.82, size: 0.82, wind: (0.0, 0.5), ..look_of(&a, 0.0) };
         let head = V(px + face / 2.0 + fw * 2.0, py + 13.0);
         draw_head(blip, &look, fw, head, V(head.0 - fw * 2.0, head.1 + 13.0), mood);
+        // Battered under 30%: a bruise swelling under the eye and a cut on the cheek.
+        if frac < 0.3 && f.health > 0 && a.build != Build::Spider {
+            blip.fill_circle(head.0 + fw * 5.0, head.1 + 2.0, 2.2, BlipColor { r: 0.46, g: 0.22, b: 0.42, a: 0.75 });
+            blip.fill_rect(head.0 + fw * 2.0 - 1.0, head.1 + 5.0, 3.0, 1.0, BlipColor { r: 0.80, g: 0.10, b: 0.10, a: 1.0 });
+        }
         // The neck runs out of the frame; the name plate squares it off.
         blip.fill_rect(px - 2.0, py + face, face + 4.0, 3.0, INK);
-        blip.draw_rect(px, py, face, face, rgb(a.trim));
+        blip.draw_rect(px, py, face, face, rgb(a.accent()));
         blip.fill_rect(x - 2.0, y - 2.0, bar_w + 4.0, bar_h + 4.0,
             BlipColor { r: 0.10, g: 0.10, b: 0.12, a: 1.0 });
         blip.fill_rect(x, y, bar_w, bar_h, BlipColor { r: 0.35, g: 0.06, b: 0.06, a: 1.0 });
@@ -122,7 +130,7 @@ pub(crate) fn draw_banner(blip: &Blip, g: &Game) {
             } else if g.slow <= 0.0 && g.result != RoundResult::Draw {
                 // Whose round it was, in their colour.
                 let a = g.p[(g.result == RoundResult::P2) as usize].arch();
-                stamp(blip, &format!("{} WINS", a.name), cy - 84.0, 3.0, rgb(a.trim));
+                stamp(blip, &format!("{} WINS", a.name), cy - 84.0, 3.0, rgb(a.accent()));
             }
             // The tally, once the fighters have settled.
             if g.bonus != [0, 0] && g.slow <= 0.0 {

@@ -39,7 +39,7 @@ use plan::*;
 use keys::*;
 use fight::*;
 use flow::*;
-use sound::{Sfx, Sounds};
+use sound::{throat_of, Sfx, Sounds};
 
 // ---- stage ---------------------------------------------------------------
 const WIN_W: i32 = 640;
@@ -89,9 +89,9 @@ async fn main() {
     web::set_players(TITLE_OPEN);
 
     let sfx = Sounds::load().await;
-    let mut music = Jukebox::new("brawler", &["DOCK", "TEMPLE", "SELECT", "AIRBASE", "BATHHOUSE", "VILLAGE", "FORTRESS", "ROOFTOP", "HOOD", "WALKOUT"]);
+    let mut music = Jukebox::new("brawler", &["DOCK", "TEMPLE", "SELECT", "AIRBASE", "BATHHOUSE", "VILLAGE", "FORTRESS", "ROOFTOP", "HOOD", "WALKOUT", "PAGODA", "COLOSSEUM"]);
     /// The theme of each stage, in stage order.
-    const STAGE_TRACK: [usize; STAGES] = [0, 1, 3, 4, 5, 6, 7, 8];
+    const STAGE_TRACK: [usize; STAGES] = [0, 1, 3, 4, 5, 6, 7, 8, 10, 0, 11];
     /// The title and select screens have a loop of their own: silence in
     /// front of a noisy game reads as not loaded.
     const SELECT_TRACK: usize = 9;
@@ -137,11 +137,28 @@ async fn main() {
                     g.snd(Sfx::Drums);
                     for f in g.p.iter_mut() { f.act = Act::Bow; f.shown = Act::Bow; f.t = 0.0; }
                 }
+                let mut cues = vec![];
+                // Who faces whom is known before the bell: DRAKE warms up against LANCER.
+                face_off(&mut g.p);
                 for f in g.p.iter_mut() {
                     f.t += dt;
+                    // DRAKE's opening flourish of the nunchaku hums as it turns.
+                    let warm = draw::intro_now(f) == draw::Intro::WarmUp;
+                    if formless(f.who) && f.act == Act::Bow && !warm && f.t > 0.15 && f.t < 0.6
+                        && (f.t / (4.0 * F)).floor() != ((f.t - dt) / (4.0 * F)).floor() { cues.push((Sfx::Swing, 0.35)); }
+                    // DRAKE's cry as he beckons, the round's first sound from him.
+                    if formless(f.who) && f.act == Act::Bow && !warm && f.t >= 0.7 && f.t - dt < 0.7 {
+                        cues.push((Sfx::Kiai(throat_of(f.who)), 0.9));
+                    }
+                    // Knuckles crack in the warm-up, twice.
+                    if f.act == Act::Bow && warm
+                        && [1.02f32, 1.24].iter().any(|&at| f.t >= at && f.t - dt < at) {
+                        cues.push((Sfx::Tick, 0.35));
+                    }
                     if f.act == Act::Bow && f.t >= BOW_TIME { f.act = Act::Idle; f.t = 0.0; }
                     note_handover(f, dt);
                 }
+                for (s, v) in cues { g.snd_at(s, v); }
                 if g.phase.tick(dt) {
                     g.state = State::Fight;
                     g.snd(Sfx::Bell);
@@ -159,7 +176,8 @@ async fn main() {
                 let inp = if blip::bot::active() { bot::fight(&g, dt) } else { human_input(&mut g, 0) };
                 let was_done = g.bonus_done > 0.0;
                 match update_bonus(&mut g, dt, inp) {
-                    Some(true) => { g.snd(Sfx::Smash); g.snd_at(Sfx::Cheer, 0.5); }
+                    // (DRAKE's boards crack as well as smash.)
+                    Some(true) => { g.snd(Sfx::Smash); g.snd_at(Sfx::Cheer, 0.5); if formless(g.p[0].who) { g.snd(Sfx::Tick); } }
                     Some(false) => g.snd(Sfx::HitHeavy),
                     None => {}
                 }
@@ -212,7 +230,7 @@ async fn main() {
         // The room under the fight: a crowd, with crickets behind it by the
         // river and the city under it on the roof; in the fortress only wind.
         let room = (!g.demo && matches!(g.state, State::Vs | State::RoundIntro | State::Fight | State::RoundEnd | State::Bonus))
-            .then_some(match g.stage { 5 => 1, 4 => 2, 6 => 3, _ => 0 });
+            .then_some(match g.stage { 5 | 8 => 1, 4 => 2, 6 => 3, _ => 0 });
         if room != ambient {
             match room {
                 Some(k) => blip::audio::play_ambient(&sfx.ambience[k]),
@@ -258,6 +276,9 @@ fn menu_step(g: &mut Game, who: usize, back: bool) -> bool {
     *slot = held;
     stepped
 }
+
+/// Whether a player's kick is down: confirming with it picks the alternate colours.
+fn menu_kick(g: &Game, who: usize) -> bool { any_held(pad(g.mode, who).kick) }
 
 /// The same, for a player's confirm — any of their attack buttons.
 fn menu_fire(g: &mut Game, who: usize) -> bool {

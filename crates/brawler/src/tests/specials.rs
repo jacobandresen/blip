@@ -348,3 +348,61 @@ pub(crate) fn the_giants_rage_jump_floors_anyone_standing_anywhere() {
     g.p[0].act = Act::Knockdown;
     assert!(!land_quake(&mut g, 0) && !g.p[0].stomp);
 }
+
+#[test]
+pub(crate) fn drakes_nunchaku_run_on_until_blocked_or_the_last() {
+    let who = FIGHTERS.iter().position(|a| a.name == "DRAKE").unwrap();
+    let mut g = Game::new();
+    g.start_match(0);
+    g.state = State::Fight;
+    g.p = [at(who, 300.0, 1.0), at(0, 350.0, -1.0)];
+    g.cpu_plan = CpuPlan::Wait;
+    g.cpu_delay = 99.0;
+    g.p[0].stumble_roll = 0;
+    g.p[0].start_attack(MoveId::Special);
+    assert_eq!(g.p[0].special(), Special::Nunchaku);
+    let x0 = g.p[0].x;
+    // Every strike lands and holds the opponent for the next; the sixth knocks down.
+    let mut hits = 0;
+    for _ in 0..400 {
+        let was = g.p[1].health;
+        g.cpu_delay = 99.0;
+        step_fight(&mut g, F, Input::default(), Input::default());
+        if g.p[1].health < was { hits += 1; }
+        if g.p[0].act != Act::Attack { break; }
+    }
+    assert_eq!(hits, STICK_STRIKES as usize, "the routine landed {hits} of its strikes");
+    assert_eq!(g.p[1].act, Act::Knockdown);
+    assert!(g.p[0].x > x0 + 40.0, "he did not step in: {} to {}", x0, g.p[0].x);
+    // Blocked, it stops.
+    let mut f = Fighter::new(who, 300.0, 1.0);
+    f.stumble_roll = 0;
+    f.start_attack(MoveId::Special);
+    f.t = (STICK_WHIRL + 1.0) * F;
+    let mut d = Fighter::new(0, 340.0, -1.0);
+    let back = Input { right: true, ..Input::default() };
+    resolve_hit(&mut f, &mut d, back);
+    assert_eq!(d.act, Act::Block);
+    assert!(f.hit_done && f.hit_box().is_none(), "the run went on after a block");
+}
+
+#[test]
+pub(crate) fn lancer_spins_into_his_heel_kick_and_drake_plucks_him() {
+    let who = |n: &str| FIGHTERS.iter().position(|a| a.name == n).unwrap();
+    let (lancer, drake) = (who("LANCER"), who("DRAKE"));
+    assert_eq!(STAGE_NAMES[home_of(lancer)], "THE COLOSSEUM");
+    let mut f = Fighter::new(lancer, 300.0, 1.0);
+    f.start_attack(MoveId::Special);
+    assert!(draw::kick_style(&f) == draw::KickStyle::Spin, "the special is not the spinning heel kick");
+    let m = f.scaled(move_data(MoveId::Special));
+    f.t = m.startup * F * 0.5;
+    assert!(draw::spin_turn(&f) > 0.5, "no back turned in the spin: {}", draw::spin_turn(&f));
+    // DRAKE plucks the chest hair over LANCER, and only over him.
+    let mut d = Fighter::new(drake, 300.0, 1.0);
+    d.act = Act::Victory;
+    d.foe = lancer;
+    assert!(draw::plucking(&d));
+    d.foe = 0;
+    assert!(!draw::plucking(&d));
+}
+
