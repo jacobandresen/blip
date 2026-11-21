@@ -37,7 +37,6 @@
 @media(max-width:700px) {
   .manual-book {grid-template-columns:minmax(0,1fr);width:calc(100% - 24px);margin-top:calc(84px + env(safe-area-inset-top,0px));padding:8px}
   .manual-leaf {border-radius:0 0 4px 4px}
-
 }
 
 /* The shelf manual opens as a book above the cabinet. */
@@ -64,7 +63,6 @@
   padding:13px;
 
   transform-origin:50% 100%;
-
 }
 @keyframes manual-lift-open {from{opacity:0;translate:-50% calc(-50% + 100px);scale:.78;rotate:x 10deg}to{opacity:1;translate:-50% -50%;scale:1;rotate:x 0deg}}
 .manual-open-page {
@@ -72,17 +70,13 @@
   min-width:0;
   min-height:0;
   overflow:hidden;
-
 }
 .manual-open-left {
-
   border-radius:5px 0 0 5px;
-
 }
 .manual-open-right {border-radius:0 5px 5px 0;}
 .manual-open-spine {
   z-index:3;
-
 }
 .manual-paper-mark {font:700 9px/1.5 'Courier New',monospace;}
 .manual-open-left h1 {
@@ -93,10 +87,8 @@
   text-shadow:0 1px #fff8e4,0 3px #8a704333;
 }
 .manual-contents li {
-
   gap:11px;
   align-items:baseline;
-
 }
 .manual-stamp {
   position:absolute;
@@ -109,7 +101,6 @@
 
   text-align:center;
   font:900 19px/.85 Georgia,serif;
-
 }
 .manual-stamp small {margin-top:5px;font:700 7px/1 'Courier New',monospace;letter-spacing:.1em}
 .manual-footnote {position:absolute;left:clamp(24px,5vw,66px);bottom:22px;}
@@ -122,21 +113,11 @@
   border-bottom:1px solid #987b5344;
 
   font:700 8px/1 'Courier New',monospace;
-
 }
 .manual-page-number b {font-size:10px}
 .manual-page-content {height:calc(100% - 36px);}
 .manual-page-content .page {max-width:none;padding:clamp(24px,4vw,50px) clamp(20px,4vw,58px) 52px;color:#4c4032;background:transparent}
-.manual-page-content h1 {
-  margin:0 0 9px;
-  color:#473322;
-  font:900 clamp(30px,4vw,50px)/1 Georgia,serif;
-  letter-spacing:.08em;
-  text-shadow:0 1px #fff0d2,0 2px #8c745233;
-}
 .manual-page-content p,.manual-page-content li {font:15px/1.7 Georgia,serif}
-.manual-page-content section {margin-bottom:22px}
-.manual-page-content .section-label,.manual-page-content .thoughts-label {color:#8d5837;font:700 10px/1.5 'Courier New',monospace;letter-spacing:.16em}
 .manual-page-content .divider {height:1px;margin:19px 0;background:#a38b67;opacity:.55}
 @keyframes manual-page-turn {
   0% { transform:rotateY(0); filter:brightness(1); }
@@ -168,16 +149,13 @@
 @media(max-width:700px) {
   .manual-overlay {padding:7px}
   .manual-open-book {
-
     min-height:0;
     padding:8px;
-
   }
   .manual-stamp,.manual-footnote {display:none}
   .manual-contents li {gap:7px;white-space:nowrap}
   .manual-open-spine {margin:0 -1px}
   .manual-page-content .page {padding:21px 17px 48px}
-  .manual-page-content h1 {font-size:31px}
   .manual-turn {bottom:11px;}
   .manual-turn-prev {left:14px}.manual-turn-next {right:14px}
 }
@@ -185,9 +163,7 @@
 
 /* A printed field book uses paper, cloth and ink rather than cabinet lights. */
 .manual-open-book {
-
   background:repeating-linear-gradient(0deg,#ffffff06 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,#00000015 0 1px,transparent 1px 3px),#383838;
-
 }
 .manual-open-book::before {
   content:"";
@@ -199,9 +175,7 @@
   pointer-events:none;
 }
 .manual-open-page {
-
   background:repeating-linear-gradient(112deg,#00000003 0 1px,transparent 1px 4px),radial-gradient(ellipse at 75% 15%,#f3f0e6,transparent 80%),linear-gradient(100deg,#c6c4b8,#e7e4d9 7%,#ebe8df 88%,#d6d3c7);
-
 }
 .manual-open-page::after {
   content:'';
@@ -209,13 +183,10 @@
   inset:0;
   z-index:0;
   pointer-events:none;
-
 }
 .manual-open-left {
   background:repeating-linear-gradient(72deg,#00000003 0 1px,transparent 1px 4px),radial-gradient(ellipse at 25% 15%,#f1eee4,transparent 80%),linear-gradient(90deg,#d4d1c5,#e9e6dc 8%,#e1ded2);
-
 }
-.manual-open-left h1,.manual-page-content h1 {color:#292a26;text-shadow:0 1px #fff9e8,0 2px #34342d22}
 .manual-contents li > span {display:flex;flex:1;align-items:baseline;gap:7px;min-width:0;white-space:nowrap}
 .manual-contents li > span i { flex:1; border-bottom:1px dotted #747267; display:block;min-width:18px }
 
@@ -232,8 +203,8 @@
 .manual-leaf-sheet .divider {display:none}
 
 .manual-page-content img {filter:grayscale(1) contrast(.9)}
-.manual-page-content table {width:100%;border-collapse:collapse;margin:7px 0 12px;font:12px/1.4 'Courier New',monospace}
-.manual-page-content td {padding:5px 6px;border-bottom:1px solid #77766a55;color:#33342f}
+.manual-page-content table {width:100%;border-collapse:collapse;}
+.manual-page-content td {border-bottom:1px solid #77766a55;}
 .manual-page-content kbd {padding:1px 4px;border:1px solid #77766a;font:700 10px 'Courier New',monospace}
 .manual-page-content .studio-dates,.manual-page-content .game-origin {
   margin:2px 0 7px;
@@ -252,15 +223,12 @@
 .manual-open-left h2 {font:700 12px/1 Georgia,serif;}
 .manual-contents li,.manual-contents li span {font:italic 12px/1.4 Georgia,serif;letter-spacing:0;color:#3f403a}
 .manual-contents li > b {  font:10px/1 Georgia,serif;color:#464740 }
-.manual-page-content .manual-chapter-number {margin:0 0 8px;font:italic 700 11px/1.2 Georgia,serif;letter-spacing:.2em;color:#66665d}
-.manual-page-content .manual-subchapter-title {margin:0 0 5px;font:700 clamp(22px,2.7vw,32px)/1.1 Georgia,serif;letter-spacing:0;color:#292a26}
-.manual-page-content .manual-chapter-deck {margin:0 0 20px;font:italic 14px/1.5 Georgia,serif;color:#66665d}
+.manual-page-content .manual-chapter-number {font:italic 700 11px/1.2 Georgia,serif;}
+.manual-page-content .manual-subchapter-title {font:700 clamp(22px,2.7vw,32px)/1.1 Georgia,serif;}
 .manual-page-content h3 {font:700 18px/1.2 Georgia,serif;}
 .manual-page-content .section-label,.manual-page-content .thoughts-label,.manual-page-content .impl-label {
   margin:16px 0 8px;
   font:italic 700 15px/1.3 Georgia,serif;
-  letter-spacing:0;
-  color:#41423c;
 }
 
 .manual-footnote {font:italic 11px/1.4 Georgia,serif}
@@ -296,7 +264,6 @@
 }
 @media(max-width:700px) {
   .manual-open-left h1 {color:#292a26}
-
 }
 
 /* Printed entries turn to leaves; the narrow book shows one leaf at a time. */
@@ -327,7 +294,6 @@
 .manual-game-contents button {min-height:32px}
 .manual-stamp {top:22px;right:24px;bottom:auto;width:52px;height:52px;font-size:13px;}
 .manual-contents-tab {
-
   position:absolute;
 
   z-index:5;
@@ -360,7 +326,8 @@
   .manual-contents button,.manual-game-contents button {font-size:11px}
   .manual-stamp,.manual-footnote {display:none}
   .manual-page-content .page {padding:18px 24px 38px}
-  .manual-page-content p,.manual-page-content li {font-size:14px;}
+  /* where the page fitting (arcade.js manualFitWhole) starts; its inline size then wins, so css_check calls it dead */
+  .manual-page-content p,.manual-page-content li {font-size:14px}
   .manual-page-content .manual-subchapter-title {font-size:24px}
 }
 
@@ -398,7 +365,6 @@
   top:3px;
   bottom:3px;
   pointer-events:none;
-
 }
 .manual-open-left::before {left:0;width:calc(2px + var(--read,0) * 8px)}
 .manual-open-right::before {right:0;width:calc(2px + (1 - var(--read,0)) * 8px)}
@@ -412,15 +378,15 @@
 .manual-flip-cover {z-index:5;pointer-events:none}
 .manual-page-turning .manual-open-right {  animation:none }
 /* The notes pages: ruled, with a few words in pencil. */
-.manual-notes {position:relative;min-height:calc(100% - 8px);margin-top:4px;background:repeating-linear-gradient(0deg,transparent 0 33px,#77766a55 33px 34px)}
-.manual-notes p {margin:0 0 24px!important;color:#77766b!important;font:700 10px/1 'Courier New',monospace!important;letter-spacing:.3em}
+.manual-notes {position:relative;min-height:calc(100% - 8px);margin-top:4px;}
+.manual-notes p {margin:0 0 24px!important;font:700 10px/1 'Courier New',monospace!important;}
 .manual-notes q {
   position:absolute;
   left:8%;
   top:76px;
   max-width:84%;
   transform:rotate(-1.4deg);
-  color:#44453f;
+
   opacity:.62;
   quotes:none;
   font:italic 19px/1.6 'Bradley Hand','Segoe Print','Chalkboard SE','Comic Sans MS',cursive;
@@ -828,7 +794,6 @@ header {
   /* Just enough padding to clear the fixed top bar; the rest goes to the
      game grid. */
   padding: calc(var(--cabinet-fascia-height) + 8px + env(safe-area-inset-top, 0px)) 0 12px;
-
 }
 
 .divider {
@@ -867,10 +832,8 @@ header {
   align-items: stretch;
   text-decoration: none;
   color: inherit;
-
 }
 
-.card:hover, .card.card-focused { transform:translateY(-4px) rotateX(1deg); }
 
 .card-serpent    { --c: var(--green);   }
 .card-bouncer    { --c: var(--cyan);    }
@@ -905,7 +868,6 @@ header {
 .card.card-focused,
 .card.card-active {
   border-color: var(--c);
-
 }
 @keyframes card-active-glow {
   0%, 100% {
@@ -926,11 +888,9 @@ header {
 
 .card-shot-wrap::before {
   position:absolute;pointer-events:none;
-
 }
 
 .card-shot {
-
   image-rendering: pixelated;
 }
 
@@ -948,7 +908,6 @@ header {
 .card-brawler:hover .card-shot,
 .card-brawler.card-focused .card-shot { transform: scale(1.05); }
 .card-brawler .card-shot-wrap::after {
-
   position: absolute;
   inset: 0;
   background: linear-gradient(105deg, transparent 42%, rgba(255,255,255,.22) 50%, transparent 58%);
@@ -964,9 +923,7 @@ header {
 }
 
 .card-title {
-
   text-transform: uppercase;
-
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1008,13 +965,8 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
 #game-grid .card * {pointer-events:none!important;cursor:default}
 #game-grid .card {position:absolute;left:50%;flex:none;margin:0;
   scroll-snap-align:center;
-
   }
-#game-grid .card:hover,#game-grid .card.card-focused,#game-grid .card.card-active {
-  animation:none;
-  border-color:#d0b27f;
-  box-shadow:0 18px 24px #000c,0 3px 0 #8f754e,inset 0 1px #fff4dc77,inset 0 -3px #0b0909;
-}
+#game-grid .card:hover,#game-grid .card.card-focused,#game-grid .card.card-active {animation:none}
 #game-grid .card:first-child {margin-left:0}
 #game-grid .card-active:not(:hover):not(.card-focused) {z-index:19}
 #game-grid .card-shot-wrap {flex:none;}
@@ -1059,7 +1011,6 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
 .jukebox-front::before {position:absolute;inset:-10px -7px;z-index:-1;border:1px solid #b39461;border-radius:8px;
   background:linear-gradient(135deg,#332922,#141216 65%);box-shadow:0 8px 18px #000b,inset 0 1px #f0d9ad55}
 #game-grid .card::before {
-
   transition:background-position .95s cubic-bezier(.25,.65,.25,1);}
 #game-grid .card.card-focused::before {background-position:0 0,0 0}
 #game-grid .card .card-shot {transform:none!important;transition:none;filter:none}
@@ -1120,7 +1071,6 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
   transform-style:flat!important;
   touch-action:pan-y!important;
 }
-/* The room behind the cabinets (wall, signs, wall art, carpet, light pools) is arcade-room.css. */
 
 /* Living screens (cards' .card-loop): the strip's 12 frames at 3 a second, over the still. */
 #game-grid .card-loop {position:absolute;inset:0;z-index:1;overflow:hidden;visibility:hidden;}
@@ -1146,9 +1096,7 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
   --trim:var(--machine-trim,var(--c));
   top:auto;bottom:3%;height:660px!important;width:300px!important;padding:0!important;
   border:0;border-radius:3px;overflow:visible;transform-style:preserve-3d;transform-origin:50% 100%;
-  background:
-    linear-gradient(90deg,#ffffff12,transparent 7% 93%,#0000004d),
-    linear-gradient(180deg,#24212b,#131117 38%,#0d0c11);
+  background:var(--machine-body);
   box-shadow:inset 6px 0 var(--trim),inset -6px 0 var(--trim),inset 8px 0 #0008,inset -8px 0 #0008;
   filter:none!important;opacity:1;clip-path:none;
   transition:none;
@@ -1165,29 +1113,21 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
 
 /* A phone on its side: the player stands close, the coin door below the frame. */
 #game-grid[data-close] .card,#game-grid[data-close] .card:is(:hover,.card-focused,.card-active,.no-credit) {top:3%;bottom:auto;transform-origin:50% 0}
-/* The cabinet's shadow on the carpet, with a pool of light under the chosen one. */
+/* The cabinet's shadow on the floor. */
 #game-grid .card::before {content:'';position:absolute;z-index:0;left:-14%;right:-14%;top:auto;bottom:-16px;width:auto;height:32px;border:0;border-radius:50%;
   background:radial-gradient(closest-side,#000d,#0000);box-shadow:none;pointer-events:none;transform:none}
-#game-grid .card.card-focused::before {background:radial-gradient(closest-side,#000c 40%,color-mix(in srgb,var(--trim) 35%,transparent) 70%,#0000)}
 /* Kick plate. */
 #game-grid .card::after {content:'';position:absolute;z-index:1;left:6px;right:6px;top:auto;bottom:0;width:auto;height:4.5%;transform:none;border:0;border-radius:0 0 2px 2px;
-  background:repeating-linear-gradient(90deg,#ffffff0a 0 1px,transparent 1px 3px),linear-gradient(#060608,#1b1b20 30%,#0b0b0e);
-  box-shadow:inset 0 2px 3px #000;pointer-events:none}
+  background:linear-gradient(#060608,#1b1b20 30%,#0b0b0e);box-shadow:inset 0 2px 3px #000;pointer-events:none}
 
-/* Sides: the classic upright profile, its back sloping down from the marquee, carrying the game's side art. */
-.machine-side {position:absolute;top:0;bottom:0;width:var(--machine-depth,200px);backface-visibility:hidden;
-  background:color-mix(in srgb,var(--trim) 85%,#fff);}
+/* Sides: the classic upright profile, its back sloping down from the marquee, edged in the game's colour. */
+.machine-side {position:absolute;top:0;bottom:0;width:var(--machine-depth,200px);backface-visibility:hidden;background:var(--trim)}
 #game-grid .card .machine-side {pointer-events:auto!important;cursor:pointer}
 .machine-side.right {left:100%;transform-origin:0 50%;transform:rotateY(90deg);clip-path:polygon(0 0,58% 0,100% 6%,100% 100%,10% 100%,10% 95.5%,0 95.5%)}
 .machine-side.left {right:100%;transform-origin:100% 50%;transform:rotateY(-90deg);clip-path:polygon(100% 0,42% 0,0 6%,0 100%,90% 100%,90% 95.5%,100% 95.5%)}
-.machine-side::before {content:'';position:absolute;inset:5px;clip-path:inherit;
-  background:var(--side-art,repeating-linear-gradient(150deg,transparent 0 30px,#ffffff30 30px 44px)),
-    linear-gradient(180deg,color-mix(in srgb,var(--trim) 55%,#0b0a10),#0d0c12 55%,#08070b);}
-.machine-side b {position:absolute;top:20%;left:50%;transform:translateX(-50%);writing-mode:vertical-rl;
-  font:400 34px/1 'Press Start 2P','Courier New',monospace;color:color-mix(in srgb,var(--trim) 70%,#fff);letter-spacing:.06em;
-  text-shadow:3px 3px 0 #000,0 0 14px color-mix(in srgb,var(--trim) 60%,transparent);white-space:nowrap}
-.machine-side.left b {transform:translateX(-50%) rotate(180deg)}
-.machine-side::after {content:'';position:absolute;inset:0;background:linear-gradient(90deg,#0000,#0007);}
+.machine-side::before {content:'';position:absolute;inset:5px;clip-path:inherit;background:linear-gradient(180deg,#1d1a22,#0d0c12 55%,#08070b)}
+/* The sides turn away from the light. */
+.machine-side::after {content:'';position:absolute;inset:0;background:linear-gradient(90deg,#0000,#0007)}
 .machine-side.left::after {background:linear-gradient(270deg,#0000,#0007)}
 
 /* Marquee (marquee.css), standing on the cabinet's top and a little wider than it. */
@@ -1203,13 +1143,12 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
 #game-grid .card-shot-wrap {
   position:absolute;z-index:2;left:5.5%;right:5.5%;top:12.8%;height:33.2%;width:auto;max-width:none;margin:0;padding:0;align-self:auto;aspect-ratio:auto;
   border:0;border-radius:6px;
-  background:radial-gradient(ellipse at 30% 0,#ffffff12,transparent 50%),#09090c;
-  box-shadow:inset 0 0 0 4px #000,inset 0 0 0 5px color-mix(in srgb,var(--trim) 70%,#fff),inset 0 0 0 8px #050507,0 0 0 2px #2c2a31,0 4px 10px #000c;
+  background:var(--machine-monitor);box-shadow:var(--machine-monitor-ring);
 }
 #game-grid .card-shot-wrap::before {content:none}
 #game-grid .card-shot-wrap::after {content:none}
 #game-grid .game-rom {position:absolute;inset:13px 14px 22px;display:block;padding:0;border:0;border-radius:16px/20px;overflow:hidden;background:#000;
-  box-shadow:0 0 0 3px #000,0 0 14px color-mix(in srgb,var(--trim) 45%,transparent)}
+  box-shadow:0 0 0 3px #000}
 /* Letterboxed, as the game draws itself. No filter or opacity: inside the turned cabinets iOS Safari drew a filtered or fading screen black. */
 #game-grid .game-rom .card-shot,#game-grid .card-shot-wrap img.card-shot {
   position:absolute;
@@ -1255,7 +1194,6 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
 /* The arcade's top bar stays whole in fullscreen too: logo, switches, manual and power. */
 :is(:root[data-fullscreen]:not([data-has-touch]),:root[data-bare]) body.cabinet-page .manual-pocket {display:flex}
 /* The controls and coin door are the machines' own: no deck along the bottom. */
-body.cabinet-page #kiosk-insert-btn {display:none!important}
 body.cabinet-page {padding-bottom:0!important;--cabinet-bottom-bar-height:0px}
 body.cabinet-page .screen-bezel {bottom:0!important}
 :root[data-layout="landscape"] body.cabinet-page .screen-bezel {bottom:env(safe-area-inset-bottom,0px)!important}
@@ -1280,7 +1218,7 @@ body.cabinet-page .screen-bezel {bottom:0!important}
 /* A vinyl sticker on the cabinet's front, put on by hand just above and right of Start: askew, die-cut with a
    white edge, a sheen, one corner peeling, lit as dimly as the cabinet around it. */
 .machine-sticker {position:absolute;z-index:5;left:calc(50% + 14px);top:calc(69.5% - 30px);transform:rotate(-13deg) skewX(-3deg);
-  filter:brightness(.82) saturate(.92) drop-shadow(0 1px .5px #000a);pointer-events:none}
+  filter:brightness(.82) saturate(.92) drop-shadow(0 1px .5px #000a);}
 .machine-sticker b {display:block;padding:5px 8px 4px;border:2.5px solid #fbf6ee;border-radius:11px;
   font:900 11px/1 'Hiragino Maru Gothic ProN','M PLUS Rounded 1c','Noto Sans CJK JP','Noto Sans JP','Noto Sans CJK TC',sans-serif;letter-spacing:.02em;
   color:#fff;text-shadow:-1px -1px #d2367f,1px -1px #d2367f,-1px 1px #d2367f,1px 1px #d2367f,0 2px #a8215f;
@@ -1292,184 +1230,40 @@ body.cabinet-page .screen-bezel {bottom:0!important}
 /* On a small screen the cabinet shrinks but Start does not: it stays a thumb wide (30px tall at least). */
 .card {--start-grow:max(1,calc(.76 / var(--arc-scale,1)))}
 .machine-start {appearance:none;position:absolute;z-index:5;left:50%;top:69.5%;bottom:auto;min-width:84px;height:40px;padding:0 8px;transform:translateX(-50%) scale(var(--start-grow));transform-origin:50% 0;
-  border:1px solid #060608;border-radius:7px;
-  background:linear-gradient(135deg,#77747a,#36343b 18%,#17161b 60%,#47434b);color:#392507;
+  border:1px solid #060608;border-radius:7px;background:linear-gradient(135deg,#55525a,#26242b 25%,#141317 70%,#36333b);color:#392507;
   font:400 10px/1 'Press Start 2P','Courier New',monospace;letter-spacing:.04em;text-shadow:0 1px #fff9;
-  box-shadow:inset 0 1px #d6d0ca88,inset 1px 0 #fff2,inset 0 -2px #08070b,0 2px 0 #050407,1px 5px 5px #000c,3px 8px 10px #0007;}
-.machine-start::before {
-  content:'';
-  position:absolute;
-  inset:3px;
-  border-radius:4px;
-  background:#151008;
-  box-shadow:inset 0 2px 3px #000,0 1px #c3bdb344;
-  pointer-events:none;
-}
-.machine-start-cap {position:absolute;inset:4px 5px 7px;display:grid;place-items:center;border:1px solid #fff0b777;border-radius:3px;
-  background:linear-gradient(115deg,#fff8dc66,transparent 36% 70%,#8e450026),radial-gradient(ellipse at 50% 45%,#fff1a6,#f5c83f 65%,#c58b16);
-  box-shadow:inset 0 2px 1px #fff4cd,inset 1px 0 #fff4,inset 0 -2px 3px #b37a13,0 2px 0 #9d6810,0 3px 0 #51360c,0 4px 2px #000a;
-  transition:transform .07s,box-shadow .07s;}
-.machine-start-cap::after {
-  content:'';
-  position:absolute;
-  inset:2px 3px;
-  border-radius:2px;
-  background:linear-gradient(172deg,#fff5 0 1px,transparent 2px 45%,#fff1 46%,transparent 48%);
-  pointer-events:none;
-}
+  box-shadow:inset 0 1px #ffffff40,0 2px 0 #050407,1px 5px 6px #000c}
+/* A lit plastic cap, domed, standing proud of its bezel. */
+.machine-start-cap {position:absolute;inset:4px 5px 7px;display:grid;place-items:center;border-radius:3px;
+  background:radial-gradient(ellipse at 50% 40%,#fff1a6,#f5c83f 65%,#c58b16);
+  box-shadow:inset 0 2px 1px #fff4cd,inset 0 -2px 3px #b37a13,0 2px 0 #9d6810,0 3px 2px #000a;transition:transform .07s,box-shadow .07s}
 /* The lit cap breathes as an opacity pulse: an animated text-shadow forced a layout every frame. */
-.machine-start-cap::before {
-  content:'';
-  position:absolute;
-  inset:0;
-  border-radius:inherit;
-  background:radial-gradient(ellipse at 50% 45%,#fffbe0,#fff6c800 75%);
-  opacity:0;
-  pointer-events:none;
-}
+.machine-start-cap::before {content:'';position:absolute;inset:0;border-radius:inherit;background:#fff6c8;opacity:0;pointer-events:none}
 .card-focused .machine-start-cap::before {animation:machine-start-glow 1.8s ease-in-out infinite}
 @keyframes machine-start-glow {50% {opacity:.4}}
-.machine-start:active .machine-start-cap {transform:translateY(2px);box-shadow:inset 0 1px 3px #9b691b88,0 1px 0 #51360c;animation:none}
+.machine-start:active .machine-start-cap {transform:translateY(2px);box-shadow:inset 0 1px 3px #9b691b88,0 1px 0 #9d6810;animation:none}
 
-/* Coin door: two coin entries, each lit red with its price, coin returns below and a lock between. */
-.machine-coinbox {appearance:none;position:absolute;z-index:5;left:50%;top:78.5%;bottom:auto;width:46%;height:14.5%;min-height:0;padding:0;transform:translateX(-50%);
-  border:2px solid #050506;border-radius:5px;
-  background:radial-gradient(circle at 7px 7px,#d4d0c6 0 .6px,#68676a 1px 1.8px,#09090c 2.5px,transparent 3px),
-    radial-gradient(circle at calc(100% - 7px) 7px,#d4d0c6 0 .6px,#68676a 1px 1.8px,#09090c 2.5px,transparent 3px),
-    repeating-linear-gradient(0deg,#ffffff03 0 1px,transparent 1px 3px),linear-gradient(115deg,#ffffff12,transparent 35%),linear-gradient(#38373e,#24232a 45%,#16151b);
-  box-shadow:inset 0 0 0 1px #959198,inset 0 0 0 3px #424047,inset 0 0 0 4px #09090d,inset 0 -5px 8px #0008,0 2px 0 #070609,2px 5px 6px #000b;filter:none}
-.machine-coinbox::before {content:'';position:absolute;inset:5px;border:1px solid #09090c;border-radius:2px;box-shadow:0 1px #ffffff12;pointer-events:none}
-.machine-coinbox::after {
-  content:'';
-  position:absolute;
-  right:-3px;
-  top:24%;
-  width:3px;
-  height:50%;
-  border-radius:1px;
-  background:repeating-linear-gradient(#66636b 0 5px,#16151a 6px 7px);
-  box-shadow:1px 1px 2px #000;
-  pointer-events:none;
-}
-.machine-coin-mech {position:absolute;top:12%;width:31%;height:44%;border-radius:3px;
-  background:linear-gradient(125deg,#eeebe3,#87858b 15%,#302f35 45%,#b8b5b4 73%,#4b494f);
-  box-shadow:inset 0 1px #fff9,inset 0 -1px #151318,0 1px 0 #050406,1px 3px 3px #000b,0 0 5px #ff321b22}
-.machine-coin-mech::before {content:'';position:absolute;inset:3px;border:1px solid #5a100c;border-radius:1px;
-  background:linear-gradient(115deg,#ffc5ad55,transparent 38%),repeating-linear-gradient(90deg,#ffcfb00c 0 1px,transparent 1px 3px),radial-gradient(ellipse at 50% 65%,#ff6845,#bb241b 65%,#610d0b);
-  box-shadow:inset 0 1px 1px #ffba9b99,inset 0 -2px 3px #430604,0 0 0 1px #1b1315}
-.machine-coin-mech:nth-of-type(1) {left:12%}
-.machine-coin-mech:nth-of-type(2) {right:12%}
-.machine-coin-slot {
-  position:absolute;
-  z-index:1;
-  top:17%;
-  left:50%;
-  width:12%;
-  height:39%;
-  transform:translateX(-50%);
-  border:1px solid #0d0b0d;
-  border-radius:2px;
-  background:linear-gradient(90deg,#000 40%,#2a2425 90%,#070608);
-  box-shadow:inset 1px 1px 2px #000,1px 0 #ffdfbd88;
-}
-.machine-coin-slot::before {
-  content:'';
-  position:absolute;
-  inset:-3px -4px;
-  border:2px solid;
-  border-color:#bab5ae #4f4c50 #777378 #d5d0c5;
-  border-radius:3px;
-  box-shadow:0 1px 2px #000b,inset 1px 0 #050407;
-  pointer-events:none;
-}
+/* Coin door: one coin entry, lit red with its price. */
+.machine-coinbox {appearance:none;position:absolute;z-index:5;left:50%;top:79%;bottom:auto;width:30%;height:11%;min-height:0;padding:0;transform:translateX(-50%);
+  border:2px solid #050506;border-radius:5px;background:linear-gradient(115deg,#ffffff14,transparent 35%),linear-gradient(#38373e,#24232a 45%,#16151b);
+  box-shadow:inset 0 0 0 1px #959198,inset 0 0 0 3px #424047,inset 0 -4px 6px #0008,2px 5px 6px #000b;filter:none}
+/* The coin entry: a chrome rim round a red lamp, the slot in its middle. */
+.machine-coin-mech {position:absolute;inset:16% 20%;border-radius:3px;background:linear-gradient(125deg,#eeebe3,#87858b 15%,#302f35 45%,#b8b5b4 73%,#4b494f);
+  box-shadow:0 1px 0 #050406,1px 3px 3px #000b}
+.machine-coin-mech::before {content:'';position:absolute;inset:3px;border-radius:1px;background:radial-gradient(ellipse at 50% 65%,#ff6845,#bb241b 65%,#610d0b);
+  box-shadow:inset 0 1px 1px #ffba9b99,inset 0 -2px 3px #430604}
+.machine-coin-slot {position:absolute;z-index:1;top:16%;left:50%;width:10%;height:40%;transform:translateX(-50%);border-radius:2px;
+  background:linear-gradient(90deg,#000 40%,#2a2425 90%);box-shadow:0 0 0 2px #8a868c,inset 1px 1px 2px #000}
 .machine-coin-slot::after {content:'';position:absolute;left:50%;top:-14px;width:12px;height:12px;border:1px solid #f3dc8d;border-radius:50%;
-  background:radial-gradient(circle at 35% 30%,#fff3ba,#b68035 70%);opacity:0;transform:translateX(-50%);pointer-events:none}
-.machine-coinbox.coin-inserting .machine-coin-mech:first-of-type .machine-coin-slot::after {animation:machine-coin-drop .3s ease-in both}
+  background:#d9a640;opacity:0;transform:translateX(-50%);pointer-events:none}
+.machine-coinbox.coin-inserting .machine-coin-slot::after {animation:machine-coin-drop .3s ease-in both}
 @keyframes machine-coin-drop {0%{opacity:1;transform:translate(-50%,-6px)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,10px)}}
-.machine-coin-price {
-  position:absolute;
-  left:0;
-  right:0;
-  bottom:12%;
-  color:#ffe8c6;
-  font:400 7px/1 'Press Start 2P','Courier New',monospace;
-  text-shadow:0 1px #5a0705,0 0 3px #ffb08b66;
-}
-.machine-coin-return {
-  position:absolute;
-  top:66%;
-  width:20%;
-  height:18%;
-  border:1px solid;
-  border-color:#09090c #454249 #68656a #141217;
-  border-radius:2px;
-  background:linear-gradient(#020204 45%,#17151b 75%,#323037);
-  box-shadow:inset 1px 3px 4px #000,0 -1px #000,0 1px #ffffff18;
-}
-.machine-coin-return::after {
-  content:'';
-  position:absolute;
-  left:-2px;
-  right:-2px;
-  bottom:-2px;
-  height:3px;
-  border-radius:0 0 2px 2px;
-  background:linear-gradient(#8a8588,#3a373e 40%,#131117);
-  box-shadow:0 2px 2px #0009;
-}
-.machine-coin-return:nth-of-type(3) {left:17.5%}
-.machine-coin-return:nth-of-type(4) {right:17.5%}
-.machine-coin-lock {
-  position:absolute;
-  left:50%;
-  top:68%;
-  width:9px;
-  height:9px;
-  transform:translateX(-50%);
-  border:1px solid #1b191d;
-  border-radius:50%;
-  background:conic-gradient(from -35deg,#eee8db,#6a686a,#d3cfc5,#46434a,#eee8db);
-  box-shadow:inset 0 0 0 1px #aaa69c,0 1px 2px #000;
-}
-.machine-coin-lock::after {content:'';position:absolute;left:3px;top:2px;width:2px;height:5px;background:#141217;border-radius:1px;box-shadow:1px 0 #f0e6d077}
-.machine-coinbox.coin-inserting .machine-coin-mech::before {filter:brightness(1.4);box-shadow:inset 0 1px #ffdac3,0 0 10px #ff4b2b77}
+.machine-coin-price {position:absolute;left:0;right:0;bottom:12%;color:#ffe8c6;font:400 7px/1 'Press Start 2P','Courier New',monospace;text-shadow:0 1px #5a0705}
+.machine-coinbox.coin-inserting .machine-coin-mech::before {filter:brightness(1.4)}
 #game-grid .card .machine-coinbox,#game-grid .card .machine-start {pointer-events:auto!important;cursor:pointer}
 .machine-coinbox:focus-visible,.machine-start:focus-visible {outline:2px solid #ffe0a1;outline-offset:3px}
 
 .pick-arrow {width:38px;height:38px;border-color:#8f7fb0;background:radial-gradient(circle at 50% 35%,#4a3f63,#1a1524)}
-#game-grid .card-rally {
-  --side-art:linear-gradient(transparent 30%,#fff2 30% 31%,transparent 31%),radial-gradient(circle at 60% 52%,#fff 0 9px,transparent 10px),linear-gradient(90deg,transparent 18%,#fffb 18% 24%,transparent 24%) 0 40%/100% 22% no-repeat;
-}
-#game-grid .card-serpent {
-  --side-art:repeating-linear-gradient(90deg,transparent 0 20px,#0000 20px),linear-gradient(90deg,transparent 30%,#9dff7a 30% 42%,transparent 42%) 0 20%/100% 26% no-repeat,linear-gradient(transparent 46%,#9dff7a 46% 54%,transparent 54%) 0 32%/60% 60% no-repeat,radial-gradient(circle at 36% 18%,#fff 0 4px,transparent 5px);
-}
-#game-grid .card-bouncer {
-  --side-art:linear-gradient(90deg,#ff5a5a 0 33%,#ffd25a 33% 66%,#5aff8a 66%) 12% 12%/76% 4% no-repeat,linear-gradient(90deg,#5ab4ff 0 50%,#c45aff 50%) 12% 18%/76% 4% no-repeat,radial-gradient(circle at 55% 52%,#fff 0 8px,transparent 9px);
-}
-#game-grid .card-galactic {
-  --side-art:radial-gradient(circle at 20% 15%,#fff 0 1.5px,transparent 2.5px) 0 0/60px 70px,radial-gradient(circle at 70% 60%,#fff9 0 1px,transparent 2px) 0 0/45px 50px,linear-gradient(160deg,transparent 40%,#ff5af1aa 40% 46%,transparent 46%);
-}
-#game-grid .card-meteors {
-  --side-art:radial-gradient(circle at 40% 30%,transparent 0 26px,#fffc 27px 30px,transparent 31px),radial-gradient(circle at 70% 62%,transparent 0 16px,#fff9 17px 19px,transparent 20px),radial-gradient(circle at 25% 75%,transparent 0 10px,#fff8 11px 13px,transparent 14px);
-}
-#game-grid .card-sky-raider {
-  --side-art:linear-gradient(transparent 60%,#3f7a35 60%),repeating-linear-gradient(0deg,transparent 0 40px,#ffffff22 40px 42px),linear-gradient(180deg,transparent 18%,#ff5a3a 18% 21%,transparent 21%) 0 0/100% 100% no-repeat;
-}
-#game-grid .card-brawler {
-  --side-art:repeating-conic-gradient(from 0deg at 50% 45%,#ffd84a33 0 8deg,transparent 8deg 16deg),radial-gradient(circle at 50% 45%,#ffd84a 0 14%,transparent 15%);
-}
-#game-grid .card-bubbler {
-  --side-art:radial-gradient(circle at 30% 30%,#fff6 0 3px,transparent 4px,transparent 0 24px,#fffb 25px 28px,transparent 29px),radial-gradient(circle at 66% 58%,transparent 0 18px,#fff9 19px 21px,transparent 22px),radial-gradient(circle at 40% 80%,transparent 0 11px,#fff8 12px 14px,transparent 15px);
-}
-#game-grid .card-adder {
-  --side-art:radial-gradient(ellipse 60% 30% at 40% 30%,transparent 0 62%,#ffe08a 63% 70%,transparent 71%),radial-gradient(ellipse 50% 40% at 60% 64%,transparent 0 62%,#7ad8ff 63% 70%,transparent 71%);
-}
-#game-grid .card-warlock {
-  --side-art:radial-gradient(circle at 50% 45%,transparent 0 10px,#fff4 11px 13px,transparent 14px),radial-gradient(circle at 50% 45%,transparent 0 24px,#fff2 25px 27px,transparent 28px),radial-gradient(circle at 50% 45%,transparent 0 38px,#fff1 39px 41px,transparent 42px);
-}
-#game-grid .card-rounds {
-  --side-art:radial-gradient(circle at 50% 100%,#ffd46a 0 18%,#ffd46a55 19% 30%,transparent 31%),repeating-linear-gradient(90deg,#e8b85c 0 22px,#be4e3c 22px 44px,#96bed6 44px 66px,#9cccA6 66px 88px);
-}
 :root[data-layout="landscape"] #game-grid .card {flex-direction:column;gap:0}
 @media (prefers-reduced-motion:reduce) {
   #game-grid .card {transition:none!important}
@@ -1477,253 +1271,11 @@ body.cabinet-page .screen-bezel {bottom:0!important}
   .machine-coinbox.coin-inserting .machine-coin-slot::after {animation:none}
 }
 
-/* The arcade room behind and under the cabinets (issue #65): wall, signs, wall art, floor and the light
-   pools. Linked after index.html's inline styles, so these rules keep the place they had there.
-
-   Every decorative layer is an element with data-room-layer and data-zone, aria-hidden and no pointer
-   events; test/arcade-room.mjs finds the layers by that attribute. Each layer owns:
-     wall    #game-grid's own background and .aisle-wall's panel joints (#67)
-     trim    .aisle-trim, the lit ceiling edge (#67)
-     neon    .aisle-neon, the BLIP script sign (#68)
-     open    .aisle-open, the OPEN sign, lit while a credit is banked (#68)
-     tiles   .aisle-tiles, a pixel maze mosaic covering the wall (#65, #69)
-     shadow  each machine's .card-backlight: its shadow on the wall and its marquee's glow above
-     cord    each machine's .card-cord, to a socket on the wall beside it
-     prop    what visitors left: .room-can on Defender, .room-wrapper on the floor by Serpent
-     carpet  .aisle-carpet (#71)
-     step    .aisle-step, the warm wall/floor nosing (#71)
-     pool    each machine's .card-pool (#71)
-   Back to front: wall → tiles → signs → floor/pools → cabinets.
-
-   :root[data-room="lite"] (?room=lite, set in index.html's head) drops room blur, glow and fine texture;
-   each layer writes its own lite rules beside its look. Cabinet styling is not the room's. */
-
-#game-grid {
-  /* Colours. The owner in brackets sets the final value. */
-  --room-wall-lit: #b8582f;        /* [#67] by the ceiling, where the trim lights it */
-  --room-wall: #8e3720;            /* [#67] terracotta, in the room's low light */
-  --room-wall-low: #561d12;        /* [#67] red-brown behind the cabinets' feet */
-  --room-wall-shade: #260a07;      /* [#67] at the floor */
-  --room-ceiling: #2b0d09;         /* [#67] above the fascia */
-  --room-trim-red: #c3302a;        /* [#67] */
-  --room-trim-yellow: #ffd36b;     /* [#67] */
-  --room-neon: #ff8a3d;            /* [#68] the orange tube */
-  --room-neon-core: #fff3dc;       /* [#68] its white-hot core */
-  --room-neon-glow: rgb(255 128 46 / .62); /* [#68] the halo on the wall */
-  --room-carpet-a: #6b211c;        /* [#71] */
-  --room-carpet-b: #180b08;        /* [#71] */
-  --room-grout: #77746d;           /* [#69] */
-  --room-tile-black: #242526;
-  --room-tile-white: #dedbd0;
-  --room-tile-purple: #80528f;
-  --room-tile-red: #d44b42;
-  --room-tile-yellow: #edc849;
-  --room-tile-blue: #355eab;
-  --room-tile-cyan: #5db5ba;
-
-  /* Shared regions, as a share of the room's height. The cabinets stand about 92% of the room's height and
-     their neighbours' sides cover the rest, so at rest the wall shows only in the band under the trim; a
-     full-height strip opens between machines as you walk (#67's checkpoint). The tiles therefore
-     start under the trim, read within the band at rest, and run down the wall to fill the walking gaps,
-     beside the sign rather than under it. */
-  --room-trim-top: 0%;    --room-trim-bottom: 7%;
-  --room-sign-top: 7%;    --room-sign-bottom: 17%;
-  --room-wall-top: 7%;    --room-wall-bottom: 68%;
-  --room-trim-min:24px; --room-trim-max:96px;
-  --room-trim-h: clamp(var(--room-trim-min), calc(var(--room-trim-bottom) - var(--room-trim-top)), var(--room-trim-max));
-  --room-band-bottom: 22%;         /* the band under the trim that shows at rest */
-  --room-floor-top: 65%;  --room-floor-bottom: 100%;
-  --room-edge-width: 14%;          /* outer room edges */
-
-  /* Repeats that the walk scrolls through (index.html reads them on layout, BlipAisle.layerOffset). */
-  --room-wall-period: 120px;
-  --room-carpet-period: 240px;
-  /* Three 80px columns × four 40px courses: offset red/black rectangles, seamless horizontally. */
-  --room-carpet-pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='160' viewBox='0 0 240 160'%3E%3Cpath fill='%23180b08' d='M0 0h240v160H0z'/%3E%3Cpath fill='%236b211c' d='M0 0h160v32H0zM80 80h160v32H80z'/%3E%3Cpath fill='%238d3026' d='M80 40h160v32H80zM0 120h80v32H0z'/%3E%3Cpath fill='%234b1713' d='M0 32h80v8H0zM160 112h80v8h-80zM160 120h80v32h-80z'/%3E%3C/svg%3E");
-
-  /* wall: orange-red panels lit from the ceiling, deepening to red-brown at the floor, a little darker at the
-     room's sides. The midtones stay warm behind the mosaic. */
-  background:
-    linear-gradient(90deg,rgb(20 5 3 / .62),transparent 16% 84%,rgb(20 5 3 / .62)),
-    linear-gradient(180deg,transparent calc(var(--room-floor-y,66%) - 7%),rgb(12 3 2 / .55) var(--room-floor-y,66%)),
-    radial-gradient(ellipse 75% 26% at 50% var(--room-trim-bottom),rgb(255 200 130 / .26),transparent 72%),
-    linear-gradient(180deg,var(--room-wall-lit) var(--room-trim-bottom),var(--room-wall) 30%,var(--room-wall-low) var(--room-floor-y,68%),var(--room-wall-shade));
-}
-:root[data-room="lite"] #game-grid {
-  background:
-    linear-gradient(90deg,rgb(20 5 3 / .62),transparent 16% 84%,rgb(20 5 3 / .62)),
-    linear-gradient(180deg,transparent calc(var(--room-floor-y,66%) - 7%),rgb(12 3 2 / .55) var(--room-floor-y,66%)),
-    linear-gradient(180deg,var(--room-wall-lit) var(--room-trim-bottom),var(--room-wall) 30%,var(--room-wall-low) var(--room-floor-y,68%),var(--room-wall-shade));
-}
-
-/* wall: the panels' joints, a dark groove with a lit edge, drifting past at half the machines' pace. */
-#game-grid .aisle-wall {position:absolute;z-index:0;top:0;bottom:0;left:-120px;right:-120px;pointer-events:none;
-  background:repeating-linear-gradient(90deg,rgb(74 18 9 / .5) 0 2px,rgb(255 196 150 / .09) 2px 3px,transparent 3px var(--room-wall-period))}
-
-/* trim: the lowered ceiling's edge, a broad red fascia over a strip of yellow light that washes the wall. It
-   belongs to the building, so it stays put as you walk. */
-#game-grid .aisle-trim {position:absolute;z-index:0;left:0;right:0;top:var(--room-trim-top);pointer-events:none;
-  height:var(--room-trim-h);
-  background:linear-gradient(180deg,var(--room-ceiling) 0 16%,#d63c31 16%,var(--room-trim-red) 42%,#8f1d17 72%,
-    #6e140f 74%,#fff3c8 76%,var(--room-trim-yellow) 86%,#e7a23e 100%);
-  box-shadow:0 4px 18px -2px rgb(255 198 104 / .6),0 1px 0 #ffe6a0}
-:root[data-room="lite"] #game-grid .aisle-trim {box-shadow:none}
-
-@media (min-height:1000px) {
-  #game-grid {--room-tall-sign-gap:clamp(70px,calc(var(--room-headroom-px,180px) - 64px),140px);
-    --room-tall-sign-h:max(36px,calc(var(--room-headroom-px,180px) - var(--room-tall-sign-gap) - 24px))}
-}
-
-/* A continuous ceramic maze wall. Copies fill one repeat of overscan on either side;
-   layout sets the repeat and cell size together so the grout stays square through resize and walking. */
-#game-grid .aisle-tiles {position:absolute;z-index:0;pointer-events:none;overflow:hidden;
-  display:flex;align-items:flex-start;
-  left:calc(-1 * var(--room-tiles-period));right:calc(-1 * var(--room-tiles-period));top:var(--room-trim-h);
-  height:calc(var(--room-floor-y,68%) - var(--room-trim-h));
-  background-color:var(--room-tile-black);
-  background-image:linear-gradient(90deg,var(--room-grout) 1.75%,transparent 1.75%),
-    linear-gradient(var(--room-grout) 1.75%,transparent 1.75%);
-  background-size:var(--room-tile-size) var(--room-tile-size);
-  will-change:transform}
-#game-grid .aisle-tiles svg {display:block;flex:0 0 var(--room-tiles-period);width:var(--room-tiles-period);height:auto}
-#game-grid .tile-black {fill:var(--room-tile-black)}
-#game-grid .tile-white {fill:var(--room-tile-white)}
-#game-grid .tile-purple {fill:var(--room-tile-purple)}
-#game-grid .tile-red {fill:var(--room-tile-red)}
-#game-grid .tile-yellow {fill:var(--room-tile-yellow)}
-#game-grid .tile-blue {fill:var(--room-tile-blue)}
-#game-grid .tile-cyan {fill:var(--room-tile-cyan)}
-#game-grid .tile-pupil {fill:#17213a}
-#game-grid .tile-grout {stroke:var(--room-grout)}
-:root[data-layout="landscape"] #game-grid .aisle-tiles {display:none}
-:root[data-room="lite"] #game-grid .tile-glaze {display:none}
-
-/* Carpet: broad offset red/black textile courses (R3). The floor moves with the machines, as established in
-   #76's perspective room, and sweeps faster nearer the player. The authored repeat is 240 × 160px; the fine
-   weave's 3px repeat divides it exactly. Lite keeps the rectangular pattern without the weave. */
-#game-grid .aisle-carpet {
-  position:absolute;z-index:0;left:-150%;right:-150%;top:var(--room-feet-y,97%);height:calc(var(--room-wall-z,190px) + 900px);pointer-events:none;
-  transform-origin:50% 0;
-  background:
-    linear-gradient(180deg,rgb(6 2 2 / .6),transparent 90px),
-    repeating-linear-gradient(0deg,rgb(255 222 184 / .055) 0 1px,transparent 1px 3px),
-    repeating-linear-gradient(90deg,rgb(0 0 0 / .13) 0 1px,transparent 1px 3px),
-    var(--room-carpet-pattern),
-    linear-gradient(var(--room-carpet-a),var(--room-carpet-b));
-  --p:var(--room-carpet-period);
-  background-size:100% 100%,3px 3px,3px 3px,var(--p) 160px,100% 100%;
-}
-:root[data-room="lite"] #game-grid .aisle-carpet {
-  background-image:linear-gradient(180deg,rgb(6 2 2 / .6),transparent 90px),var(--room-carpet-pattern);
-  background-size:100% 100%,var(--p) 160px;
-}
-#game-grid .aisle-step {position:absolute;z-index:0;left:0;right:0;top:calc(var(--room-floor-y,68%) - 3px);
-  height:clamp(4px,calc(var(--room-cab-w,300px) * .025),10px);pointer-events:none;
-  background:linear-gradient(#e0a450 0 14%,#a75a2b 16% 42%,#692a17 45% 75%,#260e08 80%)}
-
-/* pool: each machine's pool of light on the carpet, its opacity set by the walk. */
-#game-grid .card-pool {position:absolute;z-index:0;left:-35%;right:-35%;bottom:-70px;height:140px;
-  background:radial-gradient(closest-side,color-mix(in srgb,color-mix(in srgb,#b65728 75%,var(--trim)) 45%,transparent),transparent);transform:rotateX(78deg);transform-origin:50% 50%}
-:root[data-room="lite"] #game-grid .card-pool {background:none}
-
-/* Signs hang on the wall under the trim, where the cabinets leave it in view: beside the faced cabinet
-   (BLIP to its left, OPEN to its right) above the neighbours' tops, or on a phone, where there is room,
-   above it. The aisle script sets --room-cab-w, --room-cab-top and --room-side-top: the faced cabinet's
-   width and top and the neighbours' top at rest, as seen, beside the first machine. They are fixed to the
-   wall: as you walk they scroll with it, at half the machines' pace, and come round once a lap. */
-#game-grid {
-  --room-side: calc((100% - var(--room-cab-w, 300px)) / 2);
-  --room-sign-y: calc(var(--room-trim-h) + 6px);
-  --room-sign-box: calc(var(--room-side-top, 17%) - var(--room-trim-h) - 14px);
-}
-#game-grid :is(.aisle-neon,.aisle-open) {position:absolute;z-index:0;pointer-events:none;overflow:visible;will-change:transform}
-
-/* neon: cream-white core in an orange tube, with an amber halo on the wall; it warms up once on arrival. */
-#game-grid .aisle-neon {left:calc(var(--room-side) * .1);width:calc(var(--room-side) * .8);top:var(--room-sign-y);height:var(--room-sign-box);
-  filter:drop-shadow(0 0 2px #ffb070) drop-shadow(0 0 8px var(--room-neon-glow)) drop-shadow(0 0 22px rgb(255 120 40 / .38));
-  animation:neon-warm .6s linear 1}
-#game-grid .aisle-neon .neon-tube {stroke:var(--room-neon);stroke-width:8.5}
-#game-grid .aisle-neon .neon-core {stroke:var(--room-neon-core);stroke-width:3.4}
-#game-grid .aisle-neon .neon-supports {fill:#3a1a10}
-@keyframes neon-warm {0% {opacity:.12} 14% {opacity:.85} 22% {opacity:.25} 38% {opacity:1} 46% {opacity:.55} 60% {opacity:1}}
-
-/* open: a blue angular frame round red letters, smaller than BLIP. Unlit tubes until a credit is banked. */
-#game-grid .aisle-open {right:calc(var(--room-side) * .18);width:calc(var(--room-side) * .64);
-  top:calc(var(--room-sign-y) + var(--room-sign-box) * .15);height:calc(var(--room-sign-box) * .7);
-  opacity:.35;transition:opacity .3s}
-:root[data-credit] #game-grid .aisle-open {opacity:1;
-  filter:drop-shadow(0 0 2px rgb(120 180 255 / .9)) drop-shadow(0 0 8px rgb(255 60 60 / .5)) drop-shadow(0 0 16px rgb(60 140 255 / .32))}
-#game-grid .aisle-open .open-frame-tube {stroke:#2f8cff;stroke-width:5}
-#game-grid .aisle-open .open-frame-core {stroke:#dff1ff;stroke-width:1.8}
-#game-grid .aisle-open .open-letter-tube {stroke:#ff3434;stroke-width:5}
-#game-grid .aisle-open .open-letter-core {stroke:#ffe3da;stroke-width:1.8}
-
-/* A phone held upright: BLIP hangs centred above the cabinet, OPEN in the corner. */
-@media (max-width:499px) {
-  :root:not([data-layout="landscape"]) #game-grid {--room-trim-bottom:5%;
-    --room-sign-box:calc(var(--room-cab-top, 15%) - var(--room-trim-h) - 14px)}
-  :root:not([data-layout="landscape"]) #game-grid .aisle-neon {left:22%;width:56%}
-  :root:not([data-layout="landscape"]) #game-grid .aisle-open {right:3%;width:19%}
-}
-/* On its side the phone shows no wall: the cabinets reach the ceiling, and a sign could only hang behind a
-   neighbour's title. Both signs go. */
-:root[data-layout="landscape"] #game-grid :is(.aisle-neon,.aisle-open) {display:none}
-@media (min-height:1000px) and (min-width:500px) {
-  #game-grid .aisle-neon {top:calc(var(--room-trim-px,70px) + 6px);height:var(--room-tall-sign-h)}
-  #game-grid .aisle-open {top:calc(var(--room-trim-px,70px) + 12px);height:calc(var(--room-tall-sign-h) * .65)}
-}
-
-:root[data-room="lite"] #game-grid :is(.aisle-neon,.aisle-open) {filter:none}
-@media (prefers-reduced-motion:reduce) {
-  #game-grid .aisle-neon {animation:none}
-  #game-grid .aisle-open {transition:none}
-}
-
-/* shadow: lit from the trim above, each machine darkens the wall behind it, deepest low down, and its marquee
-   throws a little of its colour onto the wall over it. Both lie on the wall, 214px behind the machine's front. */
-#game-grid .card-backlight {position:absolute;left:-40%;right:-40%;top:-16%;bottom:0;transform:translateZ(-214px);
-  background:
-    radial-gradient(ellipse 40% 9% at 50% 10%,color-mix(in srgb,var(--trim) 34%,transparent),transparent 78%),
-    radial-gradient(ellipse 40% 62% at 50% 72%,rgb(8 2 1 / .72),rgb(8 2 1 / .36) 58%,transparent 84%)}
-
-/* cord: each machine's own, generated by the aisle script. It leaves a small junction box on the cabinet's right
-   side, by the control deck, hangs to the floor, lies slack across the floor of the gap (a plane seen from above:
-   y 0 the machines' fronts, 215 the wall) and climbs the wall's foot into a socket (a plane on the wall). */
-#game-grid .cord-box {position:absolute;left:100%;top:57%;width:30px;height:24px;transform-origin:0 0;
-  transform:rotateY(90deg) translate3d(34px,0,7px);background:linear-gradient(180deg,#3b3a40,#1d1c21);border:1px solid #0c0b0e;border-radius:2px;
-  box-shadow:inset 0 1px #6a6870,inset 0 -2px #0008}
-#game-grid .cord-box-front {position:absolute;left:100%;top:57%;width:7px;height:24px;transform:translateZ(-34px);
-  background:linear-gradient(90deg,#4a4950,#26252b);border-radius:1px}
-#game-grid .cord-drop {position:absolute;left:100%;top:calc(57% + 22px);width:24px;bottom:0;overflow:visible;transform:translateZ(-52px)}
-#game-grid .cord-floor {
-  position:absolute;
-  left:92%;
-  top:100%;
-  width:56%;
-  height:215px;
-
-  overflow:visible;
-  transform-origin:50% 0;
-  transform:rotateX(-90deg);
-}
-#game-grid .cord-wall {position:absolute;left:92%;bottom:0;width:56%;height:100px;overflow:visible;transform:translateZ(-214px)}
-#game-grid :is(.cord-floor,.cord-wall,.cord-drop) .cord-wire {fill:none;stroke:#0b0a0c;stroke-width:4.2;stroke-linecap:round;stroke-linejoin:round}
-#game-grid :is(.cord-floor,.cord-wall,.cord-drop) .cord-shine {fill:none;stroke:#7a655c;stroke-width:1.1;stroke-linecap:round;opacity:.6}
-#game-grid :is(.cord-floor,.cord-wall) .cord-shadow {fill:none;stroke:rgb(0 0 0 / .45);stroke-width:6;stroke-linecap:round}
-#game-grid .cord-socket rect {fill:#bfb093;stroke:#5f503d;stroke-width:.9}
-#game-grid .cord-socket .socket-shadow {fill:rgb(0 0 0 / .35);stroke:none}
-#game-grid .cord-socket circle {fill:#2e221b}
-#game-grid .cord-plug {fill:#151317}
-#game-grid .cord-plug-shadow {fill:rgb(0 0 0 / .4)}
-
-/* prop: a can somebody forgot on top of Defender, standing a little back from the front edge (so the edge hides its
-   foot from below): necked-in shoulder and rolled rim, a sharp highlight and the room warm in the metal, with a
-   soft shadow on the wall behind. And an empty sweet's wrapper, crumpled foil, on the carpet beside Serpent. */
-#game-grid .room-can {position:absolute;left:62%;bottom:100%;width:11%;overflow:visible;transform:translateZ(-70px)}
-#game-grid .room-can-shadow {position:absolute;left:58%;bottom:100%;width:22%;height:14%;transform:translateZ(-214px);
-  background:radial-gradient(ellipse 50% 70% at 50% 100%,rgb(6 2 1 / .55),transparent 72%)}
-#game-grid .room-wrapper {position:absolute;left:104%;top:100%;width:30%;overflow:visible;transform-origin:50% 0;
-  transform:translateZ(20px) rotateX(-90deg) rotateZ(-14deg)}
+/* The room: a plain wall meeting a plain floor at --room-floor-y (arcade.js), and each machine's shadow on the wall.
+   The colours are blip.css's --room-*, which the game page's wall shares. */
+#game-grid {background:var(--room-light),linear-gradient(180deg,var(--room-wall-top),var(--room-wall) var(--room-floor-y,68%),var(--room-floor) var(--room-floor-y,68%),var(--room-floor-low))}
+#game-grid .card-backlight {position:absolute;left:-30%;right:-30%;top:0;bottom:0;transform:translateZ(-214px);
+  background:radial-gradient(ellipse 45% 60% at 50% 70%,rgb(0 0 0 / .45),transparent 80%)}
 
 /* On a computer the room fills the window: the frame is the window less its margins, not a fixed 960px. */
 :root {--cabinet-width:calc(100vw - 32px)}

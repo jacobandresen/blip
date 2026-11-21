@@ -105,41 +105,7 @@
   /* sideways each lamp stands over its gutter's controls (stick, buttons and legends: some 220px) */
   top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 236px);transform:translateX(-50%)
 }
-/* The coin mechanism occupies its own bay beside every control deck. */
-.kiosk-bar:has(.deck-coin-slot) {
-  --coin-width:clamp(80px,22vw,88px);
-  --coin-bay:calc(var(--coin-width) + 4px);
-  perspective:180vw;
-  perspective-origin:50% 100%;
-}
-#topbar.kiosk-bar:has(.deck-coin-slot) {--coin-bay:calc(var(--coin-width) + 4px)}
-.kiosk-bar #insert-coin-btn.deck-coin-slot,
-.kiosk-bar #kiosk-insert-btn.deck-coin-slot {
-  --coin-size:clamp(34px,var(--cap,44px),48px);
-  position:absolute;top:4px;right:4px;bottom:0;box-sizing:border-box;
-  width:var(--coin-width);height:auto!important;margin:0;padding:3px;display:block;z-index:520;
-  pointer-events:auto;
-  border:1px solid #30281d;border-radius:5px;cursor:pointer;overflow:visible;
-  background:linear-gradient(110deg,#665d4b,#2d271e 45%,#91816a 92%,#332b21);
-  box-shadow:0 3px 0 #211a12,0 5px 8px #000c,inset 0 1px #cbbb9c;
-  color:inherit;text-shadow:none;animation:none;transition:none;
-  transform:rotateX(var(--bar-tilt,26deg));transform-origin:50% 100%;
-  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
-}
-.kiosk-bar .deck-coin-slot::after {content:none!important}
-.kiosk-bar .deck-coin-slot::before {content:'';position:absolute;inset:-3px;pointer-events:auto}
-.kiosk-bar .deck-coin-slot:focus-visible {outline:2px solid #e5cf9e;outline-offset:3px}
-:root[data-layout="landscape"] .kiosk-bar #insert-coin-btn.deck-coin-slot,
-:root[data-layout="landscape"] .kiosk-bar #kiosk-insert-btn.deck-coin-slot {
-  top:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px));height:62px!important;transform:none!important;
-}
-:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .kiosk-bar:has(.deck-coin-slot) {
-  display:block!important;height:0!important;background:none!important;border:0;
-}
-:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .kiosk-bar #insert-coin-btn.deck-coin-slot,
-:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .kiosk-bar #kiosk-insert-btn.deck-coin-slot {
-  top:auto;bottom:0;height:56px!important;
-}
+
 :root[data-layout="upright"] body.cabinet-page #topbar {
   left:max(16px, calc((100% - var(--cabinet-width)) / 2));
   right:max(16px, calc((100% - var(--cabinet-width)) / 2));
@@ -162,7 +128,7 @@ body.cabinet-page .deck-housing {
     inset 1px 0 #efd1a312,inset -1px 0 #0009,
     inset 0 2px #e6c39019,inset 0 8px 10px -8px #000;
 }
-/* Housing, controls and coin plate share the bar's perspective and hinge. */
+/* Housing and controls share the bar's perspective and hinge. */
 :root[data-layout="upright"] body.cabinet-page .deck-housing::before {
   content:'';position:absolute;left:5px;right:5px;top:0;height:6px;
   border-radius:6px 6px 0 0;pointer-events:none;
@@ -175,21 +141,10 @@ body.cabinet-page .deck-housing {
   background:linear-gradient(90deg,#08070899,#17121066 12%,#35292133 85%,#08070866);
   box-shadow:inset 3px 0 5px #0006,inset 0 2px 5px #0008;
 }
-body.cabinet-page .kiosk-bar .deck-coin-slot {
-  box-shadow:0 0 0 1px #0c0a09,2px 4px 6px #000b,5px 8px 10px #0005,inset 0 1px #cbbb9c;
-}
+
 :root[data-layout="landscape"] .deck-housing,
 :is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .deck-housing {display:none;}
-body.cabinet-page:has(.top-marquee-bar,#marquee-bar) .kiosk-bar :is(#insert-coin-btn,#kiosk-insert-btn).deck-coin-slot {
-  right:4px;padding:3px;
-}
-/* ---- Phones: room for a big thumb ---- */
-/* The coin bay is narrower on a phone, and the width goes to the controls. */
-.kiosk-bar:has(.deck-coin-slot) {--coin-width:clamp(62px,17vw,88px)}
-.kiosk-bar .deck-coin-slot,
-body.cabinet-page:has(.top-marquee-bar,#marquee-bar) .kiosk-bar :is(#insert-coin-btn,#kiosk-insert-btn).deck-coin-slot {
-  right:max(4px,env(safe-area-inset-right,0px));
-}
+
 @media (max-width: 340px) {
   .deck-credit-lamp,
 .deck-second-lamp {width:36px;padding-left:14px}
@@ -451,7 +406,6 @@ body.cabinet-page:has(.top-marquee-bar,#marquee-bar) .kiosk-bar :is(#insert-coin
     inset 0 1px 2px rgba(0, 0, 0, 0.45),
     0 4px 14px rgba(0, 0, 0, 0.5);
   pointer-events: auto;
-
 }
 :root[data-touch="paddles"][data-layout="landscape"] .ts-half:first-child,
 :root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-half:first-child {
@@ -624,9 +578,7 @@ body.cabinet-page #touch-strip.held .ts-glass {
   background:radial-gradient(ellipse at 30% 0,#e7d3a314,transparent 70%),linear-gradient(#29241f,#191619);
 }
 body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,0 0 12px #e8cea41a;}
-/* Free play (home screen, a game's own icon): no coin to put in. Hidden,
-   not removed, so the deck keeps the layout the layout tests measure. */
-:root[data-freeplay] .deck-coin-slot { visibility: hidden; }
+
 /* The deck: matte black glass, no wood, no wear. */
 :root[data-appstyle] body.cabinet-page .deck-housing { background: #000 !important; box-shadow: none !important; border: 0 !important; }
 :root[data-appstyle] body.cabinet-page .deck-housing::before,
@@ -651,7 +603,6 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
 :root:not([data-appstyle])[data-layout="upright"] body.cabinet-page .deck-housing {
   background:linear-gradient(90deg,#0007,#0000 12% 88%,#0007),var(--cabinet-shell);
   border:1px solid #ffffff14;border-bottom:0;
-
 }
 :root:not([data-appstyle])[data-layout="upright"] body.cabinet-page .deck-housing::after {content:none}
 :root:not([data-appstyle])[data-layout="upright"] body.cabinet-page .deck-housing::before {
@@ -693,7 +644,7 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
 :root[data-deck-preview] {--cabinet-width:100vw;background:transparent!important;overflow:hidden}
 :root[data-dials][data-layout="landscape"] {--dial: 84px; --ctl-cx: calc(max(10px, env(safe-area-inset-left, 0px)) + 42px);}
 :root[data-touch] :is(.deck-credit-lamp,.deck-second-lamp) {display:none}
-:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]):where(.game-page) :is(#topbar, #arcade-bezel, .cabinet-glass, .cab-rail) {
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]):where(.game-page) :is(#topbar, #arcade-bezel, .cabinet-glass) {
   display: none;
 }
 :root[data-dials][data-layout="landscape"] :is(#paddle-dial, #paddle-dial-p2) {
@@ -720,46 +671,17 @@ body.cabinet-page :is(.ts-tag,.ts-hint) {color:#c2b49c;font-family:'Courier New'
    The arcade's cabinets and the game page's top bar show the same sign; it is the same machine. */
 @font-face {font-family:'Press Start 2P';src:url(press-start-2p.woff2) format('woff2');font-display:swap}
 
-[data-machine="rally"] {--machine-trim:#e2513a;--marquee-art:repeating-linear-gradient(90deg,transparent 0 46%,#fff4 46% 47%,transparent 47%)}
-[data-machine="serpent"] {--machine-trim:#3ec44f;--marquee-ink:#f3ffdc;--marquee-art:repeating-linear-gradient(90deg,#0002 0 12px,transparent 12px 24px)}
-[data-machine="bouncer"] {
-  --machine-trim:#1fb7c4;
-  --marquee-ink:#efffff;
-  --marquee-art:linear-gradient(90deg,#ff5a5a55 0 20%,#ffd25a55 20% 40%,#5aff8a55 40% 60%,#5ab4ff55 60% 80%,#c45aff55 80%) 0 0/100% 22% no-repeat;
-}
-[data-machine="defender"] {
-  --machine-trim:#b046d6;
-  --marquee-ink:#fbeaff;
-  --marquee-art:radial-gradient(circle at 12% 30%,#fff 0 1px,transparent 2px),radial-gradient(circle at 86% 65%,#fff 0 1px,transparent 2px),radial-gradient(circle at 70% 20%,#fff9 0 1px,transparent 2px);
-}
-[data-machine="meteors"] {
-  --machine-trim:#8e98b3;
-  --marquee-ink:#fff;
-  --marquee-art:radial-gradient(circle at 20% 60%,transparent 0 7px,#fff8 8px 9px,transparent 10px),radial-gradient(circle at 82% 35%,transparent 0 5px,#fff8 6px 7px,transparent 8px);
-}
-[data-machine="raider"] {--machine-trim:#3a6fe0;--marquee-ink:#eef4ff;--marquee-art:repeating-linear-gradient(0deg,transparent 0 6px,#fff2 6px 7px)}
-[data-machine="brawler"] {
-  --machine-trim:#e0362a;
-  --marquee-ink:#fff3c4;
-  --marquee-art:repeating-conic-gradient(from 0deg at 50% 120%,#fff1 0 6deg,transparent 6deg 12deg);
-}
-[data-machine="bubbler"] {
-  --machine-trim:#45b6f0;
-  --marquee-ink:#ffffff;
-  --marquee-art:radial-gradient(circle at 12% 40%,transparent 0 7px,#fff9 8px 9px,transparent 10px),radial-gradient(circle at 90% 62%,transparent 0 5px,#fff9 6px 7px,transparent 8px);
-}
-[data-machine="adder"] {--machine-trim:#e09a2a;--marquee-ink:#fff5d8;--marquee-art:repeating-linear-gradient(45deg,transparent 0 14px,#fff2 14px 16px)}
-[data-machine="warlock"] {
-  --machine-trim:#9a46d6;
-  --marquee-ink:#f6ecff;
-  --marquee-art:radial-gradient(circle at 50% 45%,transparent 0 8px,#fff4 9px 11px,transparent 12px),radial-gradient(circle at 50% 45%,transparent 0 22px,#fff2 23px 25px,transparent 26px);
-}
-
-[data-machine="rounds"] {
-  --machine-trim:#f07896;
-  --marquee-ink:#fff6e6;
-  --marquee-art:radial-gradient(circle at 50% 120%,#ffd46a 0 22px,#ffd46a55 23px 36px,transparent 37px),repeating-linear-gradient(90deg,transparent 0 18px,#fff2 18px 20px);
-}
+[data-machine="rally"] {--machine-trim:#e2513a}
+[data-machine="serpent"] {--machine-trim:#3ec44f;--marquee-ink:#f3ffdc}
+[data-machine="bouncer"] {--machine-trim:#1fb7c4;--marquee-ink:#efffff}
+[data-machine="defender"] {--machine-trim:#b046d6;--marquee-ink:#fbeaff}
+[data-machine="meteors"] {--machine-trim:#8e98b3;--marquee-ink:#fff}
+[data-machine="raider"] {--machine-trim:#3a6fe0;--marquee-ink:#eef4ff}
+[data-machine="brawler"] {--machine-trim:#e0362a;--marquee-ink:#fff3c4}
+[data-machine="bubbler"] {--machine-trim:#45b6f0;--marquee-ink:#ffffff}
+[data-machine="adder"] {--machine-trim:#e09a2a;--marquee-ink:#fff5d8}
+[data-machine="warlock"] {--machine-trim:#9a46d6;--marquee-ink:#f6ecff}
+[data-machine="rounds"] {--machine-trim:#f07896;--marquee-ink:#fff6e6}
 
 .machine-marquee,#game-grid .card-title.machine-marquee {
   /* !important where the arcade's older card rules force a plain title. */
@@ -767,13 +689,10 @@ body.cabinet-page :is(.ts-tag,.ts-hint) {color:#c2b49c;font-family:'Courier New'
   display:flex;align-items:center;justify-content:center;box-sizing:border-box;
   font:400 20px/1 'Press Start 2P','Courier New',monospace;letter-spacing:.02em;font-style:normal;text-align:center;text-decoration:none;white-space:nowrap;
   color:var(--marquee-ink,#fff7d6)!important;-webkit-text-fill-color:currentColor;
-  text-shadow:-2px -2px #120c18,2px -2px #120c18,-2px 2px #120c18,2px 2px #120c18,3px 4px 0 color-mix(in srgb,var(--trim) 70%,#000),0 0 18px color-mix(in srgb,var(--trim) 80%,#fff);
-  background:
-    radial-gradient(ellipse 62% 85% at 50% 50%,#ffffff40,transparent 72%),
-    var(--marquee-art,linear-gradient(transparent,transparent)),
-    linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff),var(--trim) 40%,color-mix(in srgb,var(--trim) 45%,#000))!important;
+  text-shadow:-2px -2px #120c18,2px -2px #120c18,-2px 2px #120c18,2px 2px #120c18,0 4px #120c18;
+  background:var(--machine-marquee)!important;
   border:3px solid #09080c;border-radius:4px 4px 2px 2px;
-  box-shadow:inset 0 0 0 1px #ffffff55,inset 0 -5px 9px #0006,0 0 30px color-mix(in srgb,var(--trim) 55%,transparent),0 5px 0 #050407;
+  box-shadow:inset 0 0 0 1px #ffffff55,inset 0 -5px 9px #0006,0 0 24px color-mix(in srgb,var(--trim) 45%,transparent),0 5px 0 #050407;
 }
 
 /* No double-tap-to-zoom: an iPad fires it on fast repeated taps and jumps the
@@ -783,43 +702,9 @@ html {
   touch-action: manipulation;
 }
 
-.kiosk-btn {
-  font-family: 'Courier New', Courier, monospace;
-
-  font-weight: 900;
-
-  /* A lit fixture: near-white core, the colour in a layered glow, and a glow
-     on the button edge too. */
-
-  text-decoration: none;
-  text-transform: uppercase;
-  cursor: pointer;
-  user-select: none;
-  flex-shrink: 0;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  white-space: nowrap;
-  padding: 9px 16px;
-
-}
-.kiosk-btn:active {
-  transform: translateY(2px);
-  border-bottom-width: 1px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.75), inset 0 2px 5px rgba(0,0,0,0.5);
-}
-
 @media (prefers-reduced-motion: reduce) {
   #need-coin-overlay,
   #need-coin-overlay .nco-msg { animation: none; }
-}
-/* Keep the coin control visible as a steady physical highlight while locked. */
-body.need-coin #insert-coin-btn,
-body.need-coin #kiosk-insert-btn {
-  border-color:#e3a457;
-  color:#fff0d2;
-  text-shadow:0 1px 0 rgba(0,0,0,.72);
-  animation:none!important;
-  transform:rotateX(var(--bar-tilt,26deg))!important;
 }
 
 /* ---- BLIP logo ---- The name plate (blip-logo.svg), the same top left on every
@@ -836,11 +721,11 @@ body.need-coin #kiosk-insert-btn {
 @media (max-width:600px) {
   .blip-logo {top:calc(9px + env(safe-area-inset-top,0px));width:86px;height:34px}
 }
+/* The coin button is never seen: the machines' coin doors, the coin wall and the keys drop credits through it. */
+#insert-coin-btn,#kiosk-insert-btn {display:none}
 
-/* ---- Top marquee strip ---- The lit sign the logo (left) and coin slot
-   (right) sit in on the non-game pages; game pages use game.js's
-   #marquee-bar. Above the scanline/vignette overlays; pointer-events: none,
-   the logo and coin button float above it. */
+/* ---- Top marquee strip ---- The strip the logo sits in on the arcade; game pages use game.js's
+   #marquee-bar. pointer-events: none: the logo and switches float above it. */
 .top-marquee-bar {
   position: fixed;
   top: 0;
@@ -852,125 +737,6 @@ body.need-coin #kiosk-insert-btn {
   z-index: 201;
   pointer-events: none;
   background: linear-gradient(180deg, #101010, #000 92%);
-
-}
-
-/* ---- Coin slot + drop animation ---- Shared by #insert-coin-btn (games) and
-   #kiosk-insert-btn (other pages), pinned top right to mirror the logo; the
-   slot graphic (::after) is at its right end. position: fixed anchors
-   #coin-drop-anim. */
-#insert-coin-btn,
-#kiosk-insert-btn {
-  position: fixed;
-  /* Mirror .blip-logo: top 0, same height, 8px from the edge, same top pad. */
-  top: 0;
-
-  z-index: 500;
-  box-sizing: border-box;
-
-  padding: env(safe-area-inset-top, 0px) 8px 0;
-  margin: 0;
-
-  align-items: center;
-  gap: 7px;
-  overflow: visible;
-
-  letter-spacing: 1px;
-  /* Idle it is part of the strip (hairline underline, no lift); it lights up
-     on hover or while beckoning. */
-
-  animation: none;
-  transition: color .2s, text-shadow .2s, box-shadow .2s, border-color .2s;
-}
-#insert-coin-btn:hover,
-#kiosk-insert-btn:hover {
-  color: #f6ffb8;
-  border-color: #6acf5a;
-  text-shadow: 0 0 4px #fff, 0 0 12px #e6dc32, 0 0 24px #e6dc32;
-}
-#insert-coin-btn:active,
-#kiosk-insert-btn:active {
-  transform: perspective(180vw) rotateX(var(--bar-tilt,26deg));
-  box-shadow: none;
-  color: #fff;
-  text-shadow: 0 0 6px #fff, 0 0 18px #e6dc32, 0 0 40px #e6dc32;
-}
-/* The coin mechanism, as on a real coin door: a small brushed-chrome plate
-   with a screw at each corner, a red reject button, and the coin entry, a
-   narrow recessed slot backlit orange so it can be found in a dark arcade. */
-#insert-coin-btn::after,
-#kiosk-insert-btn::after {
-  content: '';
-  display: inline-block;
-  flex-shrink: 0;
-  width: 26px;
-  height: 18px;
-  border-radius: 3px;
-  background:
-    /* screws */
-    radial-gradient(circle at 3px 3px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
-    radial-gradient(circle at 23px 3px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
-    radial-gradient(circle at 3px 15px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
-    radial-gradient(circle at 23px 15px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
-    /* reject button: a red dome with a highlight */
-    radial-gradient(circle at 5px 9px, #ffd0c8 0 0.5px, #ff4a36 1.2px, #a3160c 2.4px, #3a0804 2.9px, transparent 3.3px),
-    /* the slot: dark inside, lit orange at its lips */
-    linear-gradient(180deg, transparent 5px, #ffb347 6px, #120600 7px, #000 9px, #120600 11px, #ffb347 12px, transparent 13px)
-      center / 100% 100% no-repeat,
-    radial-gradient(ellipse 12px 4px at 14px 9px, rgba(255, 150, 40, 0.55), transparent 70%),
-    /* brushed steel */
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.07) 0 1px, rgba(0, 0, 0, 0.05) 1px 2px),
-    linear-gradient(135deg, #e3e6ea 0%, #9aa0a7 38%, #d4d8dd 55%, #7d838b 100%);
-  box-shadow:
-    inset 1px 1px 0 rgba(255, 255, 255, 0.55),
-    inset -1px -1px 0 rgba(0, 0, 0, 0.45),
-    0 1px 2px rgba(0, 0, 0, 0.9),
-    0 0 6px rgba(255, 150, 40, 0.18);
-}
-
-/* The coin slides across the face, turns edge-on, and recedes into the slit. */
-#coin-drop-anim {
-  --coin-size: clamp(34px,var(--cap,44px),48px);
-  position: absolute;
-  right: calc(var(--slot-x, 13px) - 40px);
-  top: 50%;
-  width: 80px;
-  height: 56px;
-  overflow: hidden;
-  perspective: 120px;
-  transform:translateY(-50%);
-  pointer-events: none;
-  z-index: 5;
-}
-#coin-drop-anim::before {
-  content: '';
-  position: absolute;
-  left: calc((80px - var(--coin-size))/2);
-  top: calc((56px - var(--coin-size))/2);
-  width: var(--coin-size);
-  height: var(--coin-size);
-  border-radius: 50%;
-  transform-origin: 50% 50%;
-  opacity: 0;
-  background:url("quarter-1964.svg") center/contain no-repeat;
-  box-shadow:0 0 2px #000a,inset 0 0 0 1px #f4f3e9;
-  filter:drop-shadow(0 1px 1px #000);
-}
-#coin-drop-anim.dropping::before {
-  animation: coin-drop .82s cubic-bezier(.3,.55,.4,1) both;
-}
-@keyframes coin-drop {
-  0%   { opacity:1; transform:translate3d(-14px,0,0) rotateX(0deg) scale(1); }
-  34%  { opacity:1; transform:translate3d(-5px,0,0) rotateX(0deg) scale(1); }
-  50%  { opacity:1; transform:translate3d(0,0,0) rotateX(78deg) scale(.96); }
-  68%  { opacity:1; transform:translate3d(0,0,-3px) rotateX(82deg) scale(.92); }
-  78%  { opacity:.9; transform:translate3d(0,0,-7px) rotateX(82deg) scale(.9); }
-  100% { opacity:0; transform:translate3d(0,0,-30px) rotateX(84deg) scale(.75); }
-}
-
-/* Narrow portrait phones (≤ 480 px) — shrink text so all three bar items fit */
-@media (max-width: 480px) {
-  .kiosk-btn {   padding: 7px 10px; }
 }
 
 /* A one-player game's second station is on the panel, as on a two-player cabinet, but takes no input. */
@@ -989,7 +755,6 @@ body.need-coin #kiosk-insert-btn {
    here there is room. Keyed on the pointer, not the viewport width. */
 @media (pointer: coarse) and (min-width: 621px) {
   :root[data-players] {
-
     --stick-w: clamp(60px, 6.4vw, 104px);
   }
 }   
@@ -1032,7 +797,6 @@ body.need-coin #kiosk-insert-btn {
   height:12px;
   border-radius:50%;
   border:1px solid #553329;
-
 }
 
 :root[data-credit] .blip-power-indicator {border-color:#866c43;color:#c3b08d;box-shadow:0 2px 9px #000b,inset 0 1px #fff2d42b}
@@ -1051,78 +815,6 @@ body.need-coin #kiosk-insert-btn {
 /* In fullscreen an idle mouse pointer is hidden (cabinet.js sets the attribute). */
 :root[data-fullscreen][data-cursor-idle],
 :root[data-fullscreen][data-cursor-idle] * { cursor: none !important; }
-.kiosk-btn:hover {  border-color:#f0bb73; border-bottom-color:#251414; }
-.kiosk-btn:active { border-bottom-color:#180e10; }
-#insert-coin-btn,
-#kiosk-insert-btn {
-  border:1px solid rgba(255,207,143,.45);
-  border-top:0;
-
-  color:#ffe2ad;
-  text-shadow:0 0 8px rgba(255,188,100,.55);
-
-}
-#insert-coin-btn:hover,
-#kiosk-insert-btn:hover,
-#insert-coin-btn:focus-visible,
-#kiosk-insert-btn:focus-visible {
-  color:#fff8e9;
-  border-color:rgba(255,229,179,.9);
-  text-shadow:0 0 5px #fff,0 0 13px #ffd17a,0 0 25px #e88c4d;
-  box-shadow:0 5px 16px rgba(0,0,0,.42),0 0 18px rgba(237,161,83,.24);
-}
-#insert-coin-btn::after,
-#kiosk-insert-btn::after {
-  background:
-    radial-gradient(circle at 3px 3px,#ffe9c7 0 .6px,#826142 1.2px,transparent 1.7px),
-    radial-gradient(circle at 15px 3px,#ffe9c7 0 .6px,#826142 1.2px,transparent 1.7px),
-    radial-gradient(circle at 3px 23px,#ffe9c7 0 .6px,#826142 1.2px,transparent 1.7px),
-    radial-gradient(circle at 15px 23px,#ffe9c7 0 .6px,#826142 1.2px,transparent 1.7px),
-    radial-gradient(circle at 8.3px 5.3px,#ffd7b9 0 .5px,#ff6545 1.2px,#a3160c 2.4px,#3a0804 2.9px,transparent 3.3px),
-    linear-gradient(90deg,transparent 7px,#ffc267 7px,#120600 7.8px,#000 9px,#120600 10.2px,#ffc267 11px,transparent 11px) center 11px / 100% 12px no-repeat,
-    radial-gradient(ellipse 5px 9px at 9px 17px,rgba(255,169,67,.62),transparent 70%),
-    repeating-linear-gradient(0deg,rgba(255,255,255,.06) 0 1px,rgba(0,0,0,.05) 1px 2px),
-    linear-gradient(135deg,#efd4ad 0%,#a88159 38%,#e2c49c 55%,#75573b 100%);
-}
-
-/* The controls are shallow pockets cut into the wood fascia, not buttons
-   sitting on top of it. Keep the grain visible and the bevel inside. */
-body:has(.top-marquee-bar) #kiosk-insert-btn,
-#insert-coin-btn,
-#kiosk-insert-btn {
-  border-left:1px solid rgba(25,13,11,.78);
-  border-right:1px solid rgba(25,13,11,.78);
-  border-bottom:1px solid rgba(255,207,143,.32);
-  border-radius:0 0 7px 7px;
-  background:
-    repeating-linear-gradient(174deg,rgba(255,213,160,.055) 0 1px,transparent 1px 8px),
-    linear-gradient(180deg,rgba(24,12,12,.58),rgba(51,28,24,.3)),
-    linear-gradient(180deg,#684430,#392721);
-  box-shadow:inset 0 3px 7px rgba(12,6,7,.58),inset 0 1px rgba(9,5,5,.72),inset 0 -1px rgba(255,220,166,.1);
-}
-body:has(.top-marquee-bar) #kiosk-insert-btn:hover,
-#insert-coin-btn:hover,
-body:has(.top-marquee-bar) #kiosk-insert-btn:focus-visible,
-#kiosk-insert-btn:hover,
-#insert-coin-btn:focus-visible,
-#kiosk-insert-btn:focus-visible {
-  border-color:rgba(255,213,153,.62);
-  background:
-    repeating-linear-gradient(174deg,rgba(255,225,180,.07) 0 1px,transparent 1px 8px),
-    linear-gradient(180deg,rgba(24,12,12,.46),rgba(62,35,27,.24)),
-    linear-gradient(180deg,#704932,#432c25);
-  box-shadow:inset 0 3px 7px rgba(12,6,7,.5),inset 0 1px rgba(9,5,5,.62),inset 0 -1px rgba(255,220,166,.16);
-}
-#insert-coin-btn:active,
-#kiosk-insert-btn:active { transform:translateY(1px); }
-body.need-coin #kiosk-insert-btn,
-#insert-coin-btn.needs-coin,
-#kiosk-insert-btn.needs-coin {
-  background:
-    repeating-linear-gradient(174deg,rgba(255,213,160,.055) 0 1px,transparent 1px 8px),
-    linear-gradient(180deg,rgba(47,22,14,.42),rgba(80,40,22,.24)),
-    linear-gradient(180deg,#684430,#392721);
-}
 
 .top-marquee-bar {
   display:flex;
@@ -1135,27 +827,12 @@ body.need-coin #kiosk-insert-btn,
   left:50%;
   transform:translateX(-50%);
 }
-.top-marquee-bar .marquee-bulbs,#marquee-bar .marquee-bulbs {
-  position:absolute;
-  top:50%;
-  width:min(110px,calc(50vw - var(--marquee-side-gap,77px)));
-  max-width:110px;
-  height:4px;
-  background-image:radial-gradient(circle,#8dfaff 0 1.6px,transparent 2px);
-  background-size:18px 4px;
-  background-repeat:repeat-x;
-  background-position:center;
-  filter:drop-shadow(0 0 4px #28dff5) drop-shadow(0 0 8px rgba(220,61,255,.42));
-  transform:translateY(-50%);
-}
+
 .top-marquee-bar { --marquee-side-gap:77px; }
 #marquee-bar { --marquee-side-gap:77px; }
-.top-marquee-bar .marquee-bulbs:first-of-type,#marquee-bar .marquee-bulbs:first-of-type { right:calc(50% + var(--marquee-side-gap)); }
-.top-marquee-bar .marquee-bulbs:last-of-type,#marquee-bar .marquee-bulbs:last-of-type { left:calc(50% + var(--marquee-side-gap)); }
 
 @media (max-width:520px) {
   .top-marquee-bar,#marquee-bar { --marquee-side-gap:57px; }
-  .top-marquee-bar .marquee-bulbs,#marquee-bar .marquee-bulbs { width:min(40px,calc(50vw - 57px));max-width:40px; }
 }
 
 /* Raised title glass. */
@@ -1167,7 +844,6 @@ body.need-coin #kiosk-insert-btn,
   align-items:center;
   background:
     var(--cabinet-shell);
-
 }
 #marquee-bar.jukebox-marquee #marquee-name {
   top:calc(6px + env(safe-area-inset-top,0px));
@@ -1176,37 +852,15 @@ body.need-coin #kiosk-insert-btn,
   justify-content:center;
 
   border-radius:5px;
-
 }
-.top-marquee-bar .marquee-bulbs,
-#marquee-bar.jukebox-marquee .marquee-bulbs { margin-top:18px; }
 
 @media (max-width:520px) {
-
   .top-marquee-bar,#marquee-bar.jukebox-marquee {height:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px))}
-}
-
-/* Keep the fascia and its mounted controls identical on every page. */
-body:has(.top-marquee-bar) #kiosk-insert-btn,
-body:has(#marquee-bar) #insert-coin-btn {
-  right:calc(env(safe-area-inset-right,0px) + 10px);
-  height:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
-  padding-left:10px;
-  padding-right:10px;
-  font-size:12px;
-}
-@media (max-width:480px) {
-  body:has(.top-marquee-bar) #kiosk-insert-btn,
-  body:has(#marquee-bar) #insert-coin-btn {
-    height:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
-  }
 }
 
 @media (max-width:620px), (pointer:coarse) and (max-width:950px) and (max-height:520px) {
   #marquee-name {visibility:hidden!important}
 }
-
-.deck-coin-slot #coin-drop-anim {left:calc(50% - 40px);right:auto;top:50%}
 
 :root {   --cabinet-width:960px;--dock-clearance:82px }
 /* The fascia casts onto the recessed mechanisms without enlarging the bar. */
@@ -1223,63 +877,21 @@ body:has(#marquee-bar) #insert-coin-btn {
 #marquee-bar #marquee-name[href] {cursor:pointer;text-decoration:none;pointer-events:auto}
 #marquee-bar #marquee-name[href]:focus-visible {outline:1px solid #dfc799;outline-offset:3px}
 
+/* The manual in a felt-lined slot on the top bar, showing its spine: navy book cloth with the title in gold. */
 .manual-pocket {position:fixed;right:calc(env(safe-area-inset-right,0px) + 92px);top:calc((var(--cabinet-fascia-height) - 32px) / 2 + env(safe-area-inset-top,0px));z-index:520;
   display:flex;align-items:center;justify-content:center;width:144px;height:32px;padding:4px 7px 5px;box-sizing:border-box;
-  border:1px solid #806849;border-top-color:#33271d;border-bottom-color:#b1976b;border-radius:4px;
-  background:linear-gradient(90deg,#080505,#1a100d 8%,#20140e 80%,#080505);
-  box-shadow:inset 0 5px 7px #000,inset 3px 0 4px #0009,inset -3px 0 4px #000a,0 0 0 1px #140d09,0 -1px 1px #1b100c,0 1px 0 #c8a87133;}
-.manual-pocket::before {content:'';position:absolute;inset:0 0 auto;height:8px;z-index:3;pointer-events:none;border-radius:2px 2px 0 0;
-  background:linear-gradient(#080504dd,#08050488 35%,transparent);box-shadow:inset 0 1px #060303}
-.manual-pocket::after {content:'';position:absolute;left:2px;right:2px;bottom:2px;height:5px;z-index:2;pointer-events:none;border-radius:1px 1px 3px 3px;
-  background:radial-gradient(ellipse 7px 5px at 50% 0,#110b08 75%,transparent 85%),repeating-linear-gradient(174deg,#e5b37b08 0 1px,transparent 1px 6px),linear-gradient(#67472e,#38251c 65%,#22150f);
-  box-shadow:0 -1px 2px #000b,inset 0 1px #aa82524d}
-.cabinet-manual {position:relative;z-index:1;display:flex;align-items:center;justify-content:center;width:126px;height:23px;margin:0 0 2px;padding:0 8px;
-  border:1px solid #353021;border-bottom-color:#8c8060;border-radius:3px 2px 2px 3px;color:#e0dcc9;text-align:center;text-decoration:none;white-space:nowrap;transform:none;
-  appearance:none;cursor:pointer;font:900 8px/1 'Courier New',monospace;letter-spacing:.08em;
-  background:repeating-linear-gradient(0deg,#ddd2a208 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,#0002 0 1px,transparent 1px 3px),linear-gradient(90deg,#302e21 0 7px,#7b7458 7px 9px,#645e43 10px,#514c35 60%,#3f3c2a);
-  box-shadow:0 2px 2px #000c,2px 0 3px #000b,inset 0 1px #b9b38c33,inset 0 -2px #20281b;
-  transition:transform .22s cubic-bezier(.2,.7,.15,1),filter .2s,box-shadow .2s;box-sizing:border-box}
+  border-radius:6px;background:#050507;box-shadow:inset 0 3px 5px #000,0 0 0 1px #000,0 1px 0 1px #ffffff17}
+.cabinet-manual {position:relative;z-index:1;display:flex;align-items:center;justify-content:center;width:126px;height:23px;margin:0 0 2px;padding:0 8px 0 14px;
+  border:0;border-radius:3px 5px 5px 3px;color:#e6c06a;text-align:center;text-decoration:none;white-space:nowrap;transform:none;
+  appearance:none;cursor:pointer;font:700 8px/1 Georgia,serif;
+  background:linear-gradient(180deg,#ffffff26,#fff0 35% 70%,#0005),#1f3556;
+  box-shadow:0 1px 1px #000,0 3px 5px #000b,inset 0 1px #ffffff40;
+  transition:transform .2s cubic-bezier(.2,.7,.15,1);box-sizing:border-box}
 .cabinet-manual:focus-visible {outline:1px solid #e0c48b;outline-offset:2px}
-.cabinet-manual::before {
-  content:'';
-  position:absolute;
-  left:7px;
-  top:2px;
-  bottom:2px;
-  width:2px;
-  border-left:1px solid #c0b18d;
-  border-right:1px solid #302f25;
-  pointer-events:none;
-}
-.cabinet-manual::after {
-  content:'';
-  position:absolute;
-  right:-3px;
-  top:2px;
-  bottom:2px;
-  width:4px;
-  border:1px solid #aaa48b;
-  border-left:0;
-  border-radius:0 2px 2px 0;
-  background:repeating-linear-gradient(0deg,#ded6be 0 1px,#888777 1px 2px);
-  box-shadow:1px 1px 2px #0009;
-  pointer-events:none;
-}
-.manual-book-spine {
-  position:absolute;
-  left:0;
-  top:0;
-  bottom:0;
-  width:7px;
-  border-right:1px solid #a99c78;
-  border-radius:4px 0 0 2px;
-  background:linear-gradient(90deg,#242216,#5e583d 56%,#302f20);
-}
-.manual-page-edges {display:none}
+.manual-book-spine {position:absolute;left:0;top:0;bottom:0;width:9px;border-radius:3px 0 0 3px;background:#0e1a2c;box-shadow:inset -1px 0 #e4c47599}
 .manual-book-copy {display:flex;align-items:center;justify-content:center;min-width:0;white-space:nowrap}
-.manual-book-copy strong {color:#cabc94;font:700 8px/1 Georgia,serif;letter-spacing:.1em;text-shadow:0 1px #182011,0 -1px #cbb78322}
-.manual-book-copy small {display:none}
-.cabinet-manual:is(:hover,:focus-visible,.card-focused) {transform:translateY(-1px);filter:brightness(1.12)}
+.manual-book-copy strong {color:#e6c06a;font:700 8px/1 Georgia,serif;letter-spacing:.2em;text-shadow:0 1px #000a}
+.cabinet-manual:is(:hover,:focus-visible,.card-focused) {transform:translateY(-2px)}
 .cabinet-manual.manual-away {visibility:hidden;pointer-events:none}
 .manual-transit {position:fixed;left:0;top:0;right:auto;margin:0;z-index:20001;pointer-events:none;transition:none;transform-origin:50% 75%}
 .manual-transit .manual-book-copy strong {font-size:inherit}
@@ -1292,8 +904,8 @@ body:has(#marquee-bar) #insert-coin-btn {
     height:27px;
     padding:4px 4px 5px;
   }
-  .cabinet-manual {width:82px;height:19px;padding:0 4px 0 10px;font-size:7px}
-  .manual-book-copy strong {font-size:8px;letter-spacing:.02em}
+  .cabinet-manual {width:82px;height:19px;padding:0 4px 0 12px;font-size:7px}
+  .manual-book-copy strong {font-size:7px;letter-spacing:.06em}
 }
 @media(prefers-reduced-motion:reduce) {.cabinet-manual {transition:none}}
 
@@ -1308,7 +920,7 @@ body.cabinet-page::after {
   background: radial-gradient(ellipse at center, transparent 43%, rgba(12,5,11,.58) 100%);
 }
     /* ---- screen bezel — frames the game grid like a monitor set into the
-       cabinet, complete with corner screws and a glass glare ---- */
+       cabinet ---- */
     .screen-bezel {
       position: fixed;
       top: calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
@@ -1349,61 +961,8 @@ body.cabinet-page::after {
         transparent 82%, rgba(255,255,255,.02) 100%);
       pointer-events: none;
     }
-    .screen-bezel .screw {
-      position: absolute;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, #f0d7a8, #92734d 34%, #281816 72%);
-      box-shadow: 0 1px 1px rgba(255,239,208,.62), 0 1px 3px rgba(0,0,0,.88), inset 0 0 0 1px rgba(255,222,167,.25);
-    }
-    .screen-bezel .screw::after {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 6px;
-      height: 1px;
-      background: #000;
-      transform: translate(-50%, -50%) rotate(35deg);
-    }
-    .screen-bezel .screw.tl { top: 9px; left: 9px; }
-    .screen-bezel .screw.tr { top: 9px; right: 9px; }
-    .screen-bezel .screw.bl { bottom: 9px; left: 9px; }
-    .screen-bezel .screw.br { bottom: 9px; right: 9px; }
     @media (max-width: 520px) {
       .screen-bezel { padding: 20px 14px 48px; border-radius: 14px; }
-    }
-
-    .cab-rail {
-      position: fixed;
-      top: 0;
-      bottom: 0;
-      width: 64px;
-      display: none;
-      pointer-events: none;
-      z-index: 4;
-      background:
-        linear-gradient(90deg, transparent 0 10%, rgba(255,201,117,.22) 10.5%, transparent 11.5% 89%, rgba(255,201,117,.18) 90%, transparent 91%),
-        repeating-linear-gradient(173deg, transparent 0 8px, rgba(236,164,102,.075) 9px, transparent 11px 18px),
-        radial-gradient(circle at 50% 0, #ffca73 0 2.4px, rgba(255,202,116,.18) 3px, transparent 4px) 0 44px / 100% 150px repeat-y,
-        linear-gradient(90deg, #8a5937, #4b2d29 52%, #1c1417);
-    }
-    /* bright seam where the rail meets the screen — sells it as a distinct panel */
-    .cab-rail::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 2px;
-      background: linear-gradient(180deg, transparent, rgba(255,218,160,.42) 15%, rgba(255,218,160,.42) 85%, transparent);
-    }
-    .cab-rail.left  { left: 0; box-shadow: inset -14px 0 28px rgba(0,0,0,.75), inset 9px 0 18px rgba(255,174,97,.11); }
-    .cab-rail.left::after  { right: 0; }
-    .cab-rail.right { right: 0; box-shadow: inset 14px 0 28px rgba(0,0,0,.75), inset 9px 0 18px rgba(255,174,97,.11); transform: scaleX(-1); }
-    .cab-rail.right::after { right: 0; }
-    @media (min-width: 1180px) {
-      .cab-rail { display: block; }
     }
 
 .cabinet-glass {
@@ -1413,24 +972,10 @@ body.cabinet-page::after {
 }
 .jukebox-game-screen > .cabinet-glass { position:absolute; inset:0; }
 
-.cabinet-stars {
-  position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:0;
-}
-.cabinet-stars i {
-  position:absolute; width:1px; height:1px; border-radius:50%; background:#ffe1a5;
-}
-body.cabinet-page .cab-rail {
-  background:
-    var(--plastic-grain),
-    linear-gradient(90deg,#ffffff0d,transparent 14% 80%,#0000004d),
-    linear-gradient(180deg,#2e2f33,#202124 60%,#18191b);
-}
-
 @media(max-width:620px) {
   :root { --dock-clearance:75px; --title-left:126px; }
   #marquee-bar.jukebox-marquee #marquee-name {
     visibility:visible!important;
-
   }
 }
 @media(max-width:480px) {
@@ -1475,10 +1020,7 @@ body.cabinet-page .cab-rail {
 }
 #card-button:hover, #card-button:focus-visible, :root[data-card] #card-button,
 body:has(#glcanvas) #card-button {
-  border-color:#ffe2a0;color:#fff9df;
-  background:radial-gradient(circle at 35% 28%,#ffe8af,#bc752a 65%,#724015);
-  box-shadow:0 0 5px 2px #ffc85799,0 0 13px #ffb43b77,inset 0 1px 3px #fff6;
-  text-shadow:0 0 4px #fff1b8;
+  border-color:#ffe2a0;text-shadow:0 0 4px #fff1b8;
 }
 #card-button:focus-visible {outline:2px solid #fff3ca;outline-offset:3px}
 /* Wide: beside the title window, away from the manual. Phones: between the title and the manual book. */
@@ -1490,42 +1032,22 @@ body:has(#glcanvas) #card-button {
 }
 
 #controls-card {
-  position:fixed;left:50%;z-index:160;width:min(480px,calc(100vw - 32px));box-sizing:border-box;
-  top:calc(var(--marquee-h) + env(safe-area-inset-top,0px) + 22px);padding:26px 13px 14px;
-  border:2px solid #b5aa8d;border-radius:11px;background:#243e3c;text-align:center;font-family:'Courier New',monospace;
-  box-shadow:0 14px 28px #000b,0 3px 0 #8f754e,inset 0 1px #fff4dc77,inset 0 -3px #0b0909;
-  transform:translate(-50%,calc(-100% - 110px)) rotate(-2.2deg);transform-origin:50% 0;
-  opacity:0;visibility:hidden;pointer-events:none;
-  transition:transform .6s cubic-bezier(.2,.85,.25,1.04),opacity .25s,visibility 0s .6s;
+  position:fixed;left:50%;z-index:160;width:min(460px,calc(100vw - 32px));box-sizing:border-box;
+  top:calc(var(--marquee-h) + env(safe-area-inset-top,0px) + 14px);text-align:center;font-family:'Courier New',monospace;
+  transform:translate(-50%,-24px);opacity:0;visibility:hidden;pointer-events:none;
+  transition:transform .35s cubic-bezier(.2,.85,.25,1),opacity .25s,visibility 0s .35s;
 }
-#controls-card::before {content:'';position:absolute;inset:3px;border:1px solid #f5edda55;border-radius:7px;pointer-events:none}
 :root[data-card] #controls-card {
-  transform:translate(-50%,0) rotate(-.6deg);opacity:1;visibility:visible;pointer-events:auto;cursor:pointer;
-  transition:transform .6s cubic-bezier(.2,.85,.25,1.04),opacity .25s,visibility 0s;
+  transform:translate(-50%,0);opacity:1;visibility:visible;pointer-events:auto;cursor:pointer;
+  transition:transform .35s cubic-bezier(.2,.85,.25,1),opacity .25s,visibility 0s;
 }
-.cc-paper {position:relative;padding:12px 12px 10px;border:1px solid #a88b61;border-radius:3px;color:#30251d;
-  background:linear-gradient(135deg,#f1e6ce,#d9c7a5);box-shadow:inset 0 1px #fff8e8,0 2px 4px #120d0b99}
-.cc-punch {position:absolute;top:7px;left:50%;width:40px;height:10px;transform:translateX(-50%);pointer-events:none}
-.cc-punch::before, .cc-punch::after {content:'';position:absolute;top:1px;width:8px;height:8px;border-radius:50%;
-  background:radial-gradient(circle at 35% 30%,#e8d6ae 0 1px,#171313 2px 3px,#b49565 3.5px 4px,transparent 4.5px)}
-.cc-punch::before {left:3px}
-.cc-punch::after {right:3px}
+/* A printed card: cream stock with a soft shadow under it. */
+.cc-paper {position:relative;padding:14px 14px 16px;border-radius:4px;color:#30251d;
+  background:linear-gradient(135deg,#f3e9d2,#ddcca9);box-shadow:inset 0 1px #fff8e8,0 12px 26px #000b,0 2px 4px #120d0b99}
 .cc-title {margin:0;color:#3e5f59;font-size:10px;font-weight:700;letter-spacing:.3em}
 .cc-game {margin:5px 0 12px;color:#742e36;font:900 clamp(20px,5.5vw,28px)/1 'Courier New',monospace;letter-spacing:.14em}
-.cc-foot {margin:12px 0 0;color:#765733;font-size:8px;letter-spacing:.2em}
 #controls-card .pc-legend {padding-top:12px;border-top:1px solid #65807777}
 
-/* The arm: a rod fixed to the card slides out of a brass sleeve under the top bar, so the card is carried down. */
-.cc-rod {position:absolute;left:50%;bottom:calc(100% - 4px);width:9px;height:240px;margin-left:-4.5px;z-index:-1;
-  background:linear-gradient(90deg,#51483a,#d8cba8 40%,#8c7d5e 70%,#2f2a22);border-radius:2px 2px 0 0;box-shadow:1px 0 2px #0008}
-.cc-clamp {position:absolute;left:50%;top:-9px;width:42px;height:13px;margin-left:-21px;border:1px solid #6e5a38;border-radius:4px;
-  background:linear-gradient(180deg,#e2cf9f,#9d8454 55%,#6b5738);box-shadow:0 2px 3px #000a,inset 0 1px #fff6;
-  background-image:radial-gradient(circle at 20% 50%,#2a2118 0 1.5px,transparent 2px),radial-gradient(circle at 80% 50%,#2a2118 0 1.5px,transparent 2px),linear-gradient(180deg,#e2cf9f,#9d8454 55%,#6b5738)}
-#card-sleeve {position:fixed;left:50%;z-index:161;width:20px;height:34px;margin-left:-10px;border:1px solid #6e5a38;border-radius:0 0 4px 4px;
-  top:calc(var(--marquee-h) + env(safe-area-inset-top,0px) - 12px);
-  background:linear-gradient(90deg,#4a3d27,#e8d6a8 35%,#a58d5c 65%,#3b2f1d);box-shadow:0 3px 4px #000a;
-  visibility:hidden;transition:visibility 0s .6s}
-:root[data-card] #card-sleeve {visibility:visible;transition:none}
 @media (prefers-reduced-motion:reduce) {#controls-card, :root[data-card] #controls-card {transition:opacity .2s}}
 
 .pc-legend {display:flex;gap:12px 24px;flex-wrap:wrap;justify-content:center}
@@ -1630,7 +1152,6 @@ html:where(.game-page) {
   background:
     repeating-linear-gradient(174deg, transparent 0 7px, rgba(255,210,154,.045) 8px, transparent 10px 15px),
     linear-gradient(180deg,#684430 0%,#392721 48%,#1a1519 100%);
-
 }
 
 :where(.game-page) #marquee-name {
@@ -1642,17 +1163,7 @@ html:where(.game-page) {
 
   line-height: 1;
 }
-/* Neon pinstripes flank the mechanical title cells. */
-.marquee-bulbs {
-  flex: 1 1 auto;
 
-  animation: none;
-}
-:root[data-live] .marquee-bulbs { animation-play-state: paused; }
-
-@keyframes marquee-bulbs {
-  50% { filter: drop-shadow(0 0 1px #ffd16a); opacity: .5; }
-}
 /* The shared bezel stays behind the separately positioned game canvas. */
 #arcade-bezel { z-index: 0; pointer-events: none; }
 
@@ -1724,17 +1235,14 @@ canvas {
    slot's swell and the logo's hint are cut off at the bar's own bottom. */
 :is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]):where(.game-page) body::after { display: none; }
 :is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]):where(.game-page) #marquee-bar { box-shadow: none; }
-:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]):where(.game-page) :is(.blip-logo, #insert-coin-btn) {
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]):where(.game-page) .blip-logo {
   clip-path: inset(0 -80px);
   transform: none !important;
 }
+
 /* ---- Bottom bar — game-page overrides ---- */
 
-/* Coin slot + drop animation: shared with the kiosk landing/history/about
-   pages' own insert-coin button, so it lives in blip.css (scoped to
-   "#insert-coin-btn, #kiosk-insert-btn") rather than duplicated here. */
-
-/* Lock the playfield while preserving the coin slot and physical controls. */
+/* Lock the playfield while keeping the physical controls. */
 #need-coin-overlay {
   position:fixed;right:0;
   bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px));
@@ -1783,7 +1291,7 @@ canvas {
 
 /* Phones — a fatter marquee strip so the BLIP logo and coin slot over its
    ends are easy thumb targets (blip.css bumps those to a 46px box). The
-   bezel and top screws follow it down. */
+   bezel follows it down. */
 @media (max-width: 480px) {
   :root { --marquee-h: var(--cabinet-fascia-height); }
 }
@@ -1880,7 +1388,6 @@ canvas {
   top: calc(var(--marquee-h) + env(safe-area-inset-top, 0px) + 10px);
   padding: 12px 10px 8px;
 }
-:root[data-layout="landscape"] #controls-card .cc-foot { display: none; }
 
 /* ---- App style ---- A game opened from the home screen or its own icon
    wears an app's look: a frosted title bar with a way Home, the game on
@@ -1892,13 +1399,8 @@ canvas {
   background: #000;
 }
 :root[data-appstyle] body { background: #000; }
-:root[data-appstyle] .cabinet-stars,
-:root[data-appstyle] .cab-rail,
-:root[data-appstyle] .screen-bezel .screw,
 :root[data-appstyle] .cabinet-glass,
 :root[data-appstyle] .manual-pocket,
-:root[data-appstyle] .marquee-bulbs,
-:root[data-appstyle] #card-sleeve,
 :root[data-appstyle] .blip-logo-mark { display: none !important; }
 :root[data-appstyle] #arcade-bezel { background: #000; border: 0; box-shadow: none; border-radius: 0; }
 :root[data-appstyle] #arcade-bezel::before, :root[data-appstyle] #arcade-bezel::after { display: none; }
@@ -1964,11 +1466,6 @@ canvas {
 :root[data-appstyle][data-card] #controls-card {
   transform: translate(-50%, 0); transition: transform .32s cubic-bezier(.32, .72, 0, 1), opacity .2s, visibility 0s;
 }
-:root[data-appstyle] #controls-card::before,
-:root[data-appstyle] #controls-card .cc-rod,
-:root[data-appstyle] #controls-card .cc-clamp,
-:root[data-appstyle] #controls-card .cc-punch,
-:root[data-appstyle] #controls-card .cc-foot { display: none; }
 :root[data-appstyle] .cc-paper { padding: 0; border: 0; background: none; box-shadow: none; color: #fff; }
 :root[data-appstyle] .cc-title { color: rgba(235, 235, 245, .6); font: 600 12px/1 var(--app-font); letter-spacing: .02em; text-transform: uppercase; }
 :root[data-appstyle] .cc-game { margin: 6px 0 14px; color: #fff; font: 700 24px/1.1 var(--app-font); letter-spacing: -.01em; text-transform: capitalize; }
@@ -2068,7 +1565,6 @@ canvas {
 
 /* The top bar is the machine's marquee (blip.css), the sign it wears in the arcade, lit across the whole bar
    with the game's name; the flip tiles and the ROM slot are gone. App style keeps its own title bar. */
-:root:not([data-appstyle]) #marquee-bar.jukebox-marquee .marquee-bulbs,
 :root:not([data-appstyle]) #marquee-bar.jukebox-marquee::before,
 :root:not([data-appstyle]) #marquee-bar.jukebox-marquee::after,
 :root:not([data-appstyle]) #marquee-name.machine-marquee::before,
@@ -2078,20 +1574,20 @@ canvas {
   --trim:var(--machine-trim,#9a9aa6);
 
   border:0!important;border-bottom:3px solid #09080c!important;
-  box-shadow:inset 0 0 0 1px #ffffff40,inset 0 -5px 9px #0006,0 0 30px color-mix(in srgb,var(--trim) 45%,transparent)!important;
+  box-shadow:inset 0 0 0 1px #ffffff40,inset 0 -5px 9px #0006!important;
 }
 :root:not([data-appstyle]) #marquee-bar.jukebox-marquee #marquee-name.machine-marquee {
   gap:0;padding:0 14px;background:none!important;border:0!important;box-shadow:none!important;
 }
 :root:not([data-appstyle]):where(.game-page) .machine-marquee-name {
   font:400 20px/1 'Press Start 2P','Courier New',monospace;letter-spacing:.02em;color:var(--marquee-ink,#fff7d6);-webkit-text-fill-color:currentColor;
-  text-shadow:-2px -2px #120c18,2px -2px #120c18,-2px 2px #120c18,2px 2px #120c18,3px 4px 0 color-mix(in srgb,var(--trim) 70%,#000),0 0 18px color-mix(in srgb,var(--trim) 80%,#fff);
+  text-shadow:-2px -2px #120c18,2px -2px #120c18,-2px 2px #120c18,2px 2px #120c18,0 4px #120c18;
 }
 @media (max-width:520px) {
   :root:not([data-appstyle]) #marquee-bar.jukebox-marquee #marquee-name.machine-marquee {padding:0 4px 0 14px}
   :root:not([data-appstyle]):where(.game-page) .machine-marquee-name {
     font-size:12px;
-    text-shadow:-1px -1px #120c18,1px -1px #120c18,-1px 1px #120c18,1px 1px #120c18,2px 2px 0 color-mix(in srgb,var(--trim) 70%,#000);
+    text-shadow:-1px -1px #120c18,1px -1px #120c18,-1px 1px #120c18,1px 1px #120c18,0 2px #120c18;
   }
 }
 
@@ -2112,24 +1608,25 @@ canvas {
 body:has(#launch-frame:not(.launch-frame-out)) #loader { visibility: hidden; }
 
 /* In the arcade the game page is its machine up close (data-machine, from game.js); its surfaces are the machine's (below). */
-:root[data-machine]:not([data-appstyle]) #arcade-bezel .screw { display: none; }
 
 /* ==== The machine ==== Physical surfaces shared by the arcade's cabinets and the game pages (data-machine). */
+/* The room the machines stand in: a plain wall over a plain floor, on both pages. */
+:root {--room-wall-top:#3a2e29;--room-wall:#241c19;--room-floor:#16110f;--room-floor-low:#0c0908;
+  /* Light from the ceiling, falling off towards the floor and the room's sides. */
+  --room-light:radial-gradient(ellipse 70% 45% at 50% 0,rgb(255 214 170 / .14),transparent 75%),linear-gradient(90deg,rgb(0 0 0 / .35),transparent 18% 82%,rgb(0 0 0 / .35))}
 /* Physical surfaces shared by the overview cabinet and its game page. Layout stays with each view. */
 [data-machine] {
   --trim:var(--machine-trim,#9a9aa6);
-  --machine-body:linear-gradient(90deg,#ffffff12,transparent 7% 93%,#0000004d),linear-gradient(180deg,#24212b,#131117 38%,#0d0c11);
+  --machine-body:linear-gradient(90deg,#ffffff10,transparent 7% 93%,#00000040),linear-gradient(180deg,#24212b,#131117 38%,#0d0c11);
   --machine-monitor:radial-gradient(ellipse at 30% 0,#ffffff12,transparent 50%),#09090c;
-  --machine-monitor-ring:inset 0 0 0 4px #000,inset 0 0 0 5px color-mix(in srgb,var(--trim) 70%,#fff),inset 0 0 0 8px #050507,0 0 0 2px #2c2a31,0 4px 10px #000c;
-  --machine-glare:linear-gradient(160deg,#ffffff1a,#ffffff06 28%,transparent 40%),repeating-linear-gradient(0deg,#0000 0 2px,#00000024 2px 3px),radial-gradient(ellipse at 50% 50%,transparent 58%,#0008);
+  --machine-monitor-ring:inset 0 0 0 4px #000,inset 0 0 0 6px color-mix(in srgb,var(--trim) 70%,#fff),inset 0 0 0 8px #050507,0 4px 10px #000c;
+  /* The tube under its glass: a soft reflection from above and darker corners. */
+  --machine-glare:linear-gradient(160deg,#ffffff16,#ffffff05 28%,transparent 40%),radial-gradient(ellipse at 50% 50%,transparent 60%,#0007);
   --machine-speaker:radial-gradient(circle,#000 0 1.4px,transparent 1.8px) 0 50%/6px 6px,linear-gradient(#3a3940,#1d1c22);
-  --machine-apron:linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff) 0 1px,var(--trim) 2px 5px,color-mix(in srgb,var(--trim) 55%,#000) 7px,#151318 9px,#252229 11px,#100e13 100%);
-  --machine-marquee:radial-gradient(ellipse 62% 85% at 50% 50%,#ffffff40,transparent 72%),var(--marquee-art,linear-gradient(transparent,transparent)),linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff),var(--trim) 40%,color-mix(in srgb,var(--trim) 45%,#000));
+  --machine-apron:linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff) 0 1px,var(--trim) 2px 5px,color-mix(in srgb,var(--trim) 55%,#000) 7px,#151318 9px,#100e13);
+  /* Backlit: brightest in the middle, darker at the top and bottom edges. */
+  --machine-marquee:radial-gradient(ellipse 62% 85% at 50% 50%,#ffffff40,transparent 72%),linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff),var(--trim) 40%,color-mix(in srgb,var(--trim) 50%,#000));
 }
-
-/* The overview's dimensions and 3D transforms are defined in index.html. */
-#game-grid .card {background:var(--machine-body)}
-#game-grid .card-shot-wrap {background:var(--machine-monitor);}
 #game-grid .game-rom::after {background:var(--machine-glare)}
 #game-grid .machine-speaker {background:var(--machine-speaker)}
 #game-grid .machine-controls::after {background:var(--machine-apron)}
@@ -2151,13 +1648,9 @@ body:has(#launch-frame:not(.launch-frame-out)) #loader { visibility: hidden; }
 :root[data-machine]:not([data-appstyle]) #arcade-bezel::before,
 :root[data-machine]:not([data-appstyle]) #arcade-bezel::after {content:none}
 :root[data-machine]:not([data-appstyle]) .cabinet-glass {
-  background:var(--machine-glare);border-radius:16px/20px;box-shadow:0 0 0 3px #000,0 0 14px color-mix(in srgb,var(--trim) 45%,transparent);
+  background:var(--machine-glare);border-radius:16px/20px;box-shadow:0 0 0 3px #000;
 }
 :root[data-machine]:not([data-appstyle]) canvas {clip-path:inset(0 round 16px / 20px)}
-:root[data-machine]:not([data-appstyle]) .cab-rail {
-  background:var(--machine-body);box-shadow:inset 6px 0 var(--trim),inset -2px 0 #0008;
-}
-:root[data-machine]:not([data-appstyle]) .cab-rail::after {background:var(--trim)}
 body > .machine-speaker {
   position:fixed;z-index:4;pointer-events:none;
   top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px) + 3px);
@@ -2232,72 +1725,6 @@ body > .machine-speaker {
   color:#fff;background:radial-gradient(circle at 50% 30%,#4b4d53,#1d1e22 70%,#0b0b0d);
   box-shadow:0 0 0 1px #000,0 0 0 2px #ffffff40,0 0 10px #8fb8ff66,inset 0 1px #ffffff59;
 }
-:root:not([data-appstyle]) .manual-pocket::before {background:linear-gradient(#000c,#0000)}
-:root:not([data-appstyle]) .manual-pocket::after {display:none}
-/* The manual in its pocket shows its spine: navy book cloth, rounded, with gold double fillets at each end,
-   the title in gold foil, a gilt fore-edge and the tail of its red ribbon, in a slot lined with black felt. */
-:root:not([data-appstyle]) .manual-pocket {
-  border:0;
-  border-radius:6px;
-  background:radial-gradient(ellipse 80% 120% at 50% 0,#1a1b22,#050507 70%);
-  box-shadow:inset 0 3px 5px #000,inset 0 -1px #ffffff0d,0 0 0 1px #000,0 1px 0 1px #ffffff17;
-}
-:root:not([data-appstyle]) .cabinet-manual {
-  overflow:visible;border:0;border-radius:3px 5px 5px 3px;
-  background:
-    linear-gradient(180deg,#ffffff2e,#fff0 30% 70%,#0006),
-    repeating-linear-gradient(0deg,#ffffff0a 0 1px,transparent 1px 2px),repeating-linear-gradient(90deg,#00000024 0 1px,transparent 1px 2px),
-    linear-gradient(180deg,#2f4a72,#1f3556 50%,#14243d);
-  box-shadow:0 1px 1px #000,0 3px 5px #000b,inset 0 1px #ffffff40,inset 0 -1px #0009;
-}
-:root:not([data-appstyle]) .cabinet-manual::before {
-  left:12px;right:9px;top:4px;bottom:4px;width:auto;border:0;
-  background:linear-gradient(90deg,#e4c475 0 1px,#0000 1px 3px,#e4c475 3px 4px,#0000 4px calc(100% - 4px),#e4c475 calc(100% - 4px) calc(100% - 3px),#0000 calc(100% - 3px) calc(100% - 1px),#e4c475 calc(100% - 1px));
-  opacity:.85;
-}
-:root:not([data-appstyle]) .cabinet-manual::after {
-  right:-2px;top:2px;bottom:2px;width:3px;border:0;border-radius:0 2px 2px 0;
-  background:repeating-linear-gradient(0deg,#f8e6a8 0 1px,#b98d3f 1px 2px);box-shadow:1px 0 1px #0008;
-}
-:root:not([data-appstyle]) .manual-book-spine {
-  width:9px;
-  border:0;
-  border-radius:3px 0 0 3px;
-  background:linear-gradient(90deg,#0b1424,#1b2e4b 55%,#0e1a2c);
-  box-shadow:inset -1px 0 #e4c47599;
-}
-:root:not([data-appstyle]) .manual-book-copy strong {
-  font:700 8px/1 Georgia,serif;letter-spacing:.2em;text-indent:.2em;
-  background:linear-gradient(180deg,#fff3c8,#e6c06a 45%,#a8792f 56%,#efd28a);-webkit-background-clip:text;background-clip:text;color:transparent;
-  filter:drop-shadow(0 1px 0 #000a);text-shadow:none;
-}
-@media(max-width:600px) {
-  :root:not([data-appstyle]) .manual-book-copy strong {font-size:7px;letter-spacing:.04em;text-indent:0}
-  :root:not([data-appstyle]) .manual-book-copy {padding:0 6px 0 2px}
-}
-/* The spine carries the cover's title: the BLIP plate and MANUAL. A hover lifts it a little out of its slot. */
-:root:not([data-appstyle]) .manual-book-copy {gap:6px}
-:root:not([data-appstyle]) .manual-book-plate {display:block;height:15px;width:auto;filter:drop-shadow(0 1px 1px #000a)}
-:root:not([data-appstyle]) .cabinet-manual {cursor:pointer;transition:transform .2s cubic-bezier(.2,.7,.15,1),box-shadow .2s}
-:root:not([data-appstyle]) .cabinet-manual:is(:hover,:focus-visible) {
-  transform:translateY(-3px);
-  filter:none;
-  box-shadow:0 1px 1px #000,0 7px 9px #000c,inset 0 1px #ffffff40,inset 0 -1px #0009;
-}
-@media(max-width:600px) {
-  :root:not([data-appstyle]) .manual-book-plate { height:11px; }
-  :root:not([data-appstyle]) .cabinet-manual::before {
-    left:11px;
-    right:6px;
-    background:linear-gradient(90deg,#e4c475 0 1px,#0000 1px calc(100% - 1px),#e4c475 calc(100% - 1px));
-    display:none;
-  }
-}
-:root:not([data-appstyle]) .manual-page-edges {
-  display:block;position:absolute;right:26%;bottom:-8px;width:5px;height:10px;pointer-events:none;
-  background:linear-gradient(90deg,#7d1a14,#c0372b 50%,#86201a);clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%);
-  filter:drop-shadow(0 1px 1px #000a);
-}
 /* The machine is always switched on: its power lamp always burns. */
 :root:not([data-appstyle]) .blip-power-indicator {
   border:0;
@@ -2311,29 +1738,20 @@ body > .machine-speaker {
 }
 
 /* ---- Up close, in the same room ----
-   On a screen wider than the machine, the arcade's wall shows either side of it: the same lowered ceiling,
-   the same maze mosaic (room-tiles.svg, made from the arcade's own) drawn larger because we stand closer,
-   and the same carpet. The cabinet is a column in its own laminate and trim. */
+   On a screen wider than the machine, the arcade's wall and floor show either side of it. The cabinet is a
+   column in its own laminate and trim. */
 @media (min-width:1017px) {
   :root[data-machine]:not([data-appstyle],[data-deck-preview],[data-bare]) body {
     --column:calc(var(--cabinet-width) + 56px);
-    --room-top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
-    --room-tile:clamp(34px,4.4vh,56px);
     box-shadow:none;
     background:
-      linear-gradient(90deg,#0009,transparent 22px calc(100% - 22px),#0009) center top / var(--column) 100% no-repeat,
       linear-gradient(90deg,var(--trim) 0 6px,#0008 6px 8px,transparent 8px calc(100% - 8px),#0008 calc(100% - 8px) calc(100% - 6px),var(--trim) calc(100% - 6px)) center top / var(--column) 100% no-repeat,
-      linear-gradient(90deg,#ffffff12,transparent 7% 93%,#0000004d) center top / var(--column) 100% no-repeat,
+      linear-gradient(90deg,#ffffff10,transparent 7% 93%,#00000040) center top / var(--column) 100% no-repeat,
       linear-gradient(180deg,#24212b,#131117 38%,#0d0c11) center top / var(--column) 100% no-repeat,
-      linear-gradient(90deg,transparent calc(50% - var(--column) / 2 - 56px),#000b calc(50% - var(--column) / 2),#000b calc(50% + var(--column) / 2),transparent calc(50% + var(--column) / 2 + 56px)),
-      linear-gradient(180deg,#000c,#0000 26px) center calc(100% - 9vh) / 100% 26px no-repeat,
-      repeating-linear-gradient(90deg,#6b211c 0 80px,#180b08 80px 160px) center bottom / 100% 9vh no-repeat,
-      linear-gradient(180deg,#2b0d09 0 16%,#d63c31 16%,#c3302a 42%,#8f1d17 72%,#6e140f 74%,#fff3c8 76%,#ffd36b 86%,#e7a23e 100%) 0 var(--room-top) / 100% 46px no-repeat,
-      radial-gradient(ellipse 60% 30% at 50% 0,rgb(255 200 130 / .22),transparent 70%) 0 calc(var(--room-top) + 46px) / 100% 60% no-repeat,
-      url(room-tiles.svg) center calc(var(--room-top) + 46px) / calc(var(--room-tile) * 32) auto repeat-x,
-      linear-gradient(180deg,#b8582f,#8e3720 30%,#561d12 80%,#260a07);
+      linear-gradient(90deg,transparent calc(50% - var(--column) / 2 - 56px),#0008 calc(50% - var(--column) / 2),#0008 calc(50% + var(--column) / 2),transparent calc(50% + var(--column) / 2 + 56px)),
+      var(--room-light),
+      linear-gradient(180deg,var(--room-wall-top),var(--room-wall) 91vh,var(--room-floor) 91vh,var(--room-floor-low));
   }
-  :root[data-machine]:not([data-appstyle],[data-deck-preview],[data-bare]) .cab-rail {display:none}
 }
 
 /* Rally: the spinners stand a fifth of the way in from each end of the panel, where hands fall, with their

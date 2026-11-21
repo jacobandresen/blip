@@ -23,7 +23,7 @@ const CROPS = {
   bouncer:           { art: 'screenshot.png', cx: 0.50, cy: 0.42, w: 0.92 },
   defender: { art: 'screenshot.png', cx: 0.52, cy: 0.40, w: 0.80 },
   rally:             { art: 'screenshot.png', cx: 0.50, cy: 0.50, w: 0.98 },
-  meteors:           { art: 'screenshot.png', cx: 0.70, cy: 0.24, w: 0.52 },
+  meteors:           { art: 'screenshot.png', cx: 0.52, cy: 0.40, w: 0.50 },
   raider:        { art: 'screenshot.png', cx: 0.46, cy: 0.30, w: 0.56 },
   brawler:           { art: 'card.png',       cx: 0.50, cy: 0.36, w: 0.82 },
   bubbler:           { art: 'screenshot.png', cx: 0.50, cy: 0.70, w: 0.56 },

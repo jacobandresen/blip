@@ -36,7 +36,7 @@ const VIEWS = [
 ];
 // [page, with a credit, two players]
 function pages(games) {
-  return [['index.html'], ['index.html', 1], ['index.html?room=lite'], ['home.html'], ['guide.html'],
+  return [['index.html'], ['index.html', 1], ['home.html'], ['guide.html'],
     ['index.html?manual=controls'], ...games.flatMap((g) => [[`${g}/index.html`], [`${g}/index.html`, 1, 1]]),
     ['serpent/index.html?app'], ['bubbler/index.html?app', 0, 1], ['rally/index.html?controls=pad'],
     ['brawler/index.html?controls=pad', 1, 1], ['bubbler/index.html?controls=stick', 1], ['warlock/index.html?controls=touch', 1, 1],

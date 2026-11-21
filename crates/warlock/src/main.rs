@@ -1932,8 +1932,9 @@ fn draw_bonus_hint(blip: &Blip, g: &Game) {
 
 fn draw_taunt(blip: &Blip, g: &Game) {
     draw_bonus_hint(blip, g);
+    let banner_up = g.banner.as_ref().is_some_and(|(_, t)| *t > 0.0);
     if let Some((text, t)) = &g.taunt {
-        if *t > 0.0 {
+        if *t > 0.0 && !banner_up {
             blip.draw_centered_outlined(text, WIN_W as f32 / 2.0, HUD_H as f32 + 10.0, 2.0, WARLOCK_C, BLIP_BLACK);
         }
     }

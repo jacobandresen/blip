@@ -453,10 +453,12 @@ impl Art {
             State::Play | State::Dead | State::Bonus => {
                 self.draw_cellar(blip, g, t);
                 self.draw_panel(blip, g, t);
-                draw_taunt(blip, g);
                 blip.draw_hud(g.sess.score, hud_lives(g));
+                // One message at a time: the chamber's title card, else a banner, else a taunt.
                 if g.intro > 0.0 && g.state == State::Play {
                     self.draw_title_card(blip, g);
+                } else {
+                    draw_taunt(blip, g);
                 }
             }
         }

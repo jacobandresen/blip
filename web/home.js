@@ -44,7 +44,7 @@ function gameApp(slug, inDock) {
   button.className = 'app-button';
   button.dataset.slug = slug;
   button.setAttribute('aria-label', name + (twoPlayer(slug) ? ', 1 or 2 players' : ''));
-  button.innerHTML = '<span class="app-icon"><img src="' + slug + '/icon-192.png?v=22" alt="" draggable="false"></span>' +
+  button.innerHTML = '<span class="app-icon"><img src="' + slug + '/icon-192.png?v=23" alt="" draggable="false"></span>' +
     '<span class="app-label">' + name + '</span>';
   if (twoPlayer(slug) && !inDock) {
     var badge = document.createElement('span');
@@ -275,7 +275,7 @@ function launchFrames(slug, button) {
   var atIcon = 'translate(' + icon.left + 'px,' + icon.top + 'px) scale(' + s + ')';
   var atMiddle = 'translate(' + cx + 'px,' + cy + 'px) scale(1)';
   var img = zoom.querySelector('img');
-  img.src = slug + '/icon-512.png?v=22';
+  img.src = slug + '/icon-512.png?v=23';
   img.style.transformOrigin = '0 0';
   zoom.style.width = W + 'px';
   zoom.style.height = H + 'px';
@@ -360,7 +360,7 @@ function openActions(slug, from) {
   var game = BLIP_GAMES[slug];
   document.getElementById('action-title').textContent = blipTitleCase(game.name) + ' \u00b7 ' + (twoPlayer(slug) ? '1 or 2 players' : '1 player');
   var icon = from.querySelector('.app-icon').getBoundingClientRect();
-  lift.querySelector('img').src = slug + '/icon-192.png?v=22';
+  lift.querySelector('img').src = slug + '/icon-192.png?v=23';
   Object.assign(lift.style, { left: icon.left + 'px', top: icon.top + 'px', width: icon.width + 'px', height: icon.height + 'px' });
   lift.hidden = false;
   showSheet(actionSheet, from);
@@ -497,7 +497,7 @@ function renderSearch() {
     return !q || BLIP_GAMES[slug].name.toLowerCase().indexOf(q) >= 0 || slug.replace('_', ' ').indexOf(q) >= 0;
   });
   searchResults.innerHTML = hits.length ? hits.map(function (slug, i) {
-    return '<li><button type="button" data-slug="' + slug + '"' + (i === 0 && q ? ' class="first"' : '') + '><img src="' + slug + '/icon-192.png?v=22" alt=""><span>' +
+    return '<li><button type="button" data-slug="' + slug + '"' + (i === 0 && q ? ' class="first"' : '') + '><img src="' + slug + '/icon-192.png?v=23" alt=""><span>' +
       blipTitleCase(BLIP_GAMES[slug].name) + '<small>' + genreOf(slug) + '</small></span></button></li>';
   }).join('') : '<li class="search-none">No games match “' + escapeHtml(searchInput.value.trim()) + '”.</li>';
 }
