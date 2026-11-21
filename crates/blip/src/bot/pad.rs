@@ -34,8 +34,6 @@ impl Pad {
         self
     }
 
-    pub fn left(&mut self) -> &mut Self { self.hold(BLIP_KEY_LEFT) }
-    pub fn right(&mut self) -> &mut Self { self.hold(BLIP_KEY_RIGHT) }
     pub fn up(&mut self) -> &mut Self { self.hold(BLIP_KEY_UP) }
     pub fn down(&mut self) -> &mut Self { self.hold(BLIP_KEY_DOWN) }
 
@@ -81,11 +79,6 @@ impl Pad {
     pub fn steer_with(&mut self, at: f32, target: f32, slack: f32, less: KeyCode, more: KeyCode) -> &mut Self {
         if target < at - slack { self.hold(less); } else if target > at + slack { self.hold(more); }
         self
-    }
-
-    /// Is `key` in this frame's controls?
-    pub fn has(&self, key: KeyCode) -> bool {
-        self.keys.contains(&key)
     }
 
     /// Hand this frame's controls to the game.

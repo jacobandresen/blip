@@ -201,28 +201,12 @@ async fn main() {
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title => draw_title(&blip, &g, &pit),
-            State::Play => {
-                let (dx, dy) = blip::shake(g.shake, OUT_SHAKE, 4.0);
-                blip.set_offset(dx, dy);
-                draw_play(&blip, &g, &pit);
-                blip.set_offset(0.0, 0.0);
-            }
+            State::Play => blip.shaken(g.shake, OUT_SHAKE, 4.0, || draw_play(&blip, &g, &pit)),
             State::Over => draw_over(&blip, &g),
         }
         g.shake = (g.shake - dt).max(0.0);
 
-        blip.next_frame(60).await;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn each_seat_has_distinct_join_and_turn_keys() {
-        assert_eq!(seat_keys(0), [BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_SPACE]);
-        assert_eq!(seat_keys(1), [BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_J]);
+        blip.next_frame().await;
     }
 }
 
@@ -235,11 +219,11 @@ const SAND: BlipColor = BlipColor { r: 0.60, g: 0.52, b: 0.36, a: 1.0 };
 /// Dead trails stay solid; passable gaps keep the seat's colour at 23% brightness.
 fn draw_viper(blip: &Blip, s: &arena::Snake) {
     let c = s.colour();
-    let gap = BlipColor { r: c.r * 0.23, g: c.g * 0.23, b: c.b * 0.23, ..c };
+    let gap = blip::shade(c, 0.23);
     let thick = arena::BODY_R * 2.0;
     let pts = || s.path.iter().enumerate().rev().map(|(i, p)| (p.x, p.y, s.in_hole(i)));
     // A dark edge under the body and a light stripe along its back; gaps keep only their dim stroke.
-    let ink = BlipColor { r: c.r * 0.3, g: c.g * 0.3, b: c.b * 0.3, ..c };
+    let ink = blip::shade(c, 0.3);
     let none = BlipColor { a: 0.0, ..c };
     blip.draw_polyline(pts(), thick + 2.0, ink, none);
     blip.draw_polyline(pts(), thick, c, gap);
@@ -254,7 +238,7 @@ fn draw_viper(blip: &Blip, s: &arena::Snake) {
     let (dx, dy) = (s.heading.cos(), s.heading.sin());
     let (px, py) = (-dy, dx);
     let at = |f: f32, w: f32| macroquad::math::vec2(s.head.x + dx * f + px * w, s.head.y + dy * f + py * w);
-    let dark = BlipColor { r: c.r * 0.55, g: c.g * 0.55, b: c.b * 0.55, ..c };
+    let dark = blip::shade(c, 0.55);
     macroquad::shapes::draw_triangle(at(7.0, 0.0), at(-2.5, 6.5), at(-2.5, -6.5), dark);
     macroquad::shapes::draw_triangle(at(-2.5, 6.5), at(-2.5, -6.5), at(-9.0, 0.0), dark);
     macroquad::shapes::draw_triangle(at(5.5, 0.0), at(-2.0, 5.0), at(-2.0, -5.0), c);
@@ -264,7 +248,7 @@ fn draw_viper(blip: &Blip, s: &arena::Snake) {
         blip.fill_rect(e.x - 1.0, e.y - 1.0, 2.0, 2.0, BLIP_WHITE);
         blip.fill_rect(e.x - 0.5, e.y - 0.5, 1.0, 1.0, BLIP_BLACK);
     }
-    let t = macroquad::time::get_time() as f32;
+    let t = blip::now();
     if (t * 1.3 + s.seat as f32 * 0.37).fract() < 0.18 {
         let (a, b) = (at(7.0, 0.0), at(11.0, 0.0));
         let red = BlipColor { r: 0.9, g: 0.2, b: 0.25, a: 1.0 };
@@ -346,4 +330,15 @@ fn draw_over(blip: &Blip, g: &Game) {
         !g.timer.active());
     let length = g.world.snakes.first().map_or(0, |s| s.len_s);
     blip.draw_game_over_note(&format!("ROUND {}   LENGTH {length}", g.world.round), SAND);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_seat_has_distinct_join_and_turn_keys() {
+        assert_eq!(seat_keys(0), [BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_SPACE]);
+        assert_eq!(seat_keys(1), [BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_J]);
+    }
 }

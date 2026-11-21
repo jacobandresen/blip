@@ -2,10 +2,7 @@
 
 use std::f32::consts::PI;
 
-use blip::input::{
-    coin_start, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
-    BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
-};
+use blip::input::{coin_start, key_pressed, Stick, BLIP_KEY_SPACE};
 use blip::macroquad::rand::rand;
 use blip::macroquad::texture::Texture2D;
 use blip::{
@@ -153,25 +150,17 @@ struct Brick { kind: usize, hp: u8, alive: bool, wobble: f32 }
 /// A shard of a broken brick, tumbling off the bottom of the screen: its outline around its centre.
 struct Shard { x: f32, y: f32, vx: f32, vy: f32, turn: f32, spin: f32, pts: Vec<(f32, f32)>, color: BlipColor }
 
-/// The shards' own random numbers (xorshift), so breaking a brick never moves the game's.
-struct ShardRng(u32);
-impl ShardRng {
-    fn next(&mut self) -> f32 {
-        self.0 ^= self.0 << 13;
-        self.0 ^= self.0 >> 17;
-        self.0 ^= self.0 << 5;
-        (self.0 >> 8) as f32 / (1u32 << 24) as f32
-    }
-}
+/// The shards' own random numbers, so breaking a brick never moves the game's.
+use blip::wav::Rng as ShardRng;
 
 /// Crack a brick at `(bx, by)` from the impact point `hit` into 3 to 7 shards: cuts run out from the impact at
 /// uneven angles, and each shard is the piece of the rectangle between two cuts. Shards fly out from the impact,
 /// pushed along the ball's travel.
 fn shatter(bx: f32, by: f32, hit: (f32, f32), push: (f32, f32), base: BlipColor, rng: &mut ShardRng) -> Vec<Shard> {
     let (w, h) = (BRICK_W as f32, BRICK_H as f32);
-    let n = 3 + (rng.next() * 5.0) as usize;
+    let n = 3 + (rng.next_f32() * 5.0) as usize;
     // Cuts jitter within the middle of their share of the circle: wider jitter left slivers that read as lines.
-    let mut cuts: Vec<f32> = (0..n).map(|k| (k as f32 + 0.35 + rng.next() * 0.3) / n as f32 * std::f32::consts::TAU).collect();
+    let mut cuts: Vec<f32> = (0..n).map(|k| (k as f32 + 0.35 + rng.next_f32() * 0.3) / n as f32 * std::f32::consts::TAU).collect();
     cuts.sort_by(f32::total_cmp);
     // Where a ray from the impact leaves the rectangle.
     let exit = |a: f32| {
@@ -201,24 +190,24 @@ fn shatter(bx: f32, by: f32, hit: (f32, f32), push: (f32, f32), base: BlipColor,
         let (cx, cy) = poly.iter().fold((0.0, 0.0), |s, p| (s.0 + p.0, s.1 + p.1));
         let (cx, cy) = (cx / poly.len() as f32, cy / poly.len() as f32);
         let mid = (a0 + a1) / 2.0;
-        let fling = 50.0 + rng.next() * 90.0;
-        let light = 0.75 + rng.next() * 0.4;
+        let fling = 50.0 + rng.next_f32() * 90.0;
+        let light = 0.75 + rng.next_f32() * 0.4;
         out.push(Shard {
             x: cx, y: cy,
             vx: mid.cos() * fling + push.0 * 0.15, vy: mid.sin() * fling + push.1 * 0.15 - 60.0,
-            turn: 0.0, spin: (rng.next() - 0.5) * 14.0,
+            turn: 0.0, spin: (rng.next_f32() - 0.5) * 14.0,
             pts: poly.iter().map(|p| (p.0 - cx, p.1 - cy)).collect(),
             color: BlipColor { r: (base.r * light).min(1.0), g: (base.g * light).min(1.0), b: (base.b * light).min(1.0), a: 1.0 },
         });
     }
     // Crumbs: a few small chips thrown wider than the shards.
-    for _ in 0..(5 + (rng.next() * 5.0) as usize) {
-        let a = rng.next() * std::f32::consts::TAU;
-        let (s, v) = (1.0 + rng.next() * 1.5, 60.0 + rng.next() * 120.0);
-        let dark = 0.6 + rng.next() * 0.3;
+    for _ in 0..(5 + (rng.next_f32() * 5.0) as usize) {
+        let a = rng.next_f32() * std::f32::consts::TAU;
+        let (s, v) = (1.0 + rng.next_f32() * 1.5, 60.0 + rng.next_f32() * 120.0);
+        let dark = 0.6 + rng.next_f32() * 0.3;
         out.push(Shard {
             x: hit.0, y: hit.1, vx: a.cos() * v + push.0 * 0.1, vy: a.sin() * v - 40.0,
-            turn: 0.0, spin: (rng.next() - 0.5) * 20.0,
+            turn: 0.0, spin: (rng.next_f32() - 0.5) * 20.0,
             pts: vec![(-s, -s), (s, -s), (s, s), (-s, s)],
             color: BlipColor { r: base.r * dark, g: base.g * dark, b: base.b * dark, a: 1.0 },
         });
@@ -261,7 +250,6 @@ struct Game {
     /// The continue offered at game over, and the best score of the run before one was taken (a continue starts the
     /// score afresh; the run's best is what is reported).
     cont: blip::Continue,
-    run_best: i32,
     state: State,
     /// Seconds since a brick last broke (see SEEK_AFTER).
     since_break: f32,
@@ -296,7 +284,6 @@ impl Game {
             sess: Session::new(LIVES_START),
             dead_timer: Timer::default(),
             cont: blip::Continue::default(),
-            run_best: 0,
             state: State::Title,
             since_break: 0.0,
             chain: 0,
@@ -417,7 +404,6 @@ impl Game {
 
     fn start_game(&mut self) {
         self.sess.reset(LIVES_START);
-        self.run_best = 0;
         blip::bot::levels(LAYOUTS as usize);
         self.ball_speed = BALL_SPEED_0;
         self.reset_drops();
@@ -429,10 +415,7 @@ impl Game {
 
     /// A continue taken: the same bricks, fresh lives, the score afresh, a new ball on the paddle.
     fn continue_play(&mut self) {
-        blip::bot::add("continues", 1.0);
-        self.run_best = self.run_best.max(self.sess.score);
-        self.sess.score = 0;
-        self.sess.lives = LIVES_START;
+        self.sess.play_on(LIVES_START);
         self.ball_speed = BALL_SPEED_0;
         self.reset_drops();
         self.pad_x = ((WIN_W - PAD_W) / 2) as f32;
@@ -473,8 +456,8 @@ fn update_title(g: &mut Game) {
 fn move_paddle(g: &mut Game, dt: f32) {
     let prev_x = g.pad_x;
     for (i, pressed) in [
-        key_pressed(BLIP_KEY_LEFT) || key_pressed(BLIP_KEY_A),
-        key_pressed(BLIP_KEY_RIGHT) || key_pressed(BLIP_KEY_D),
+        Stick::Left.pressed(),
+        Stick::Right.pressed(),
     ].into_iter().enumerate() {
         g.tap_age[i] += dt;
         if !pressed { continue; }
@@ -488,8 +471,8 @@ fn move_paddle(g: &mut Game, dt: f32) {
     }
     g.dash_t = (g.dash_t - dt).max(0.0);
     let dash = 1.0 + DASH_BOOST * g.dash_t / DASH_SECS;
-    let left = key_active(BLIP_KEY_LEFT) || key_active(BLIP_KEY_A);
-    let right = key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D);
+    let left = Stick::Left.active();
+    let right = Stick::Right.active();
     if let Some(tx) = g.touch_x {
         let step = PAD_SPEED_TOUCH * dt;
         g.pad_x += clamp(tx - g.pad_w / 2.0 - g.pad_x, -step, step);
@@ -509,7 +492,7 @@ fn update_launch(g: &mut Game, dt: f32) {
     g.fx.update(dt);
     g.ball_x = g.pad_x + (g.pad_w / 2.0 - BALL_W as f32 / 2.0);
     g.ball_y = (PAD_Y - BALL_H - 2) as f32;
-    if key_pressed(BLIP_KEY_SPACE) || key_pressed(BLIP_KEY_UP) || key_pressed(BLIP_KEY_W) {
+    if key_pressed(BLIP_KEY_SPACE) || Stick::Up.pressed() {
         g.state = State::Play;
     }
 }
@@ -555,7 +538,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 LifeResult::StillAlive => { g.dead_timer.start(1.2); State::Dead }
                 LifeResult::GameOver => {
                     // A new best (over the run's continues) gets the win jingle after the lost ball.
-                    if web::beats_best(g.sess.score.max(g.run_best)) { play_sfx(&sfx.win); }
+                    if g.sess.beats_best() { play_sfx(&sfx.win); }
                     g.cont.start(CONTINUE_SECS);
                     State::Over
                 }
@@ -1009,7 +992,7 @@ fn update_over(g: &mut Game, dt: f32) {
     match g.cont.update(dt, blip::input::btn1_pressed()) {
         Some(true) => g.continue_play(),
         Some(false) => {
-            web::report_score(g.sess.score.max(g.run_best));
+            g.sess.report();
             g.state = State::Title;
         }
         None => {}
@@ -1019,17 +1002,12 @@ fn update_over(g: &mut Game, dt: f32) {
 /// A shard: its face as a fan of triangles, then a darker edge so neighbouring shards read apart.
 fn draw_shard(blip: &Blip, s: &Shard) {
     let (sn, cs) = s.turn.sin_cos();
-    let at = |p: (f32, f32)| blip::macroquad::math::vec2(s.x + p.0 * cs - p.1 * sn, s.y + p.0 * sn + p.1 * cs);
-    let centre = blip::macroquad::math::vec2(s.x, s.y);
+    let pts: Vec<(f32, f32)> = s.pts.iter().map(|p| (s.x + p.0 * cs - p.1 * sn, s.y + p.0 * sn + p.1 * cs)).collect();
     let edge = BlipColor { r: s.color.r * 0.5, g: s.color.g * 0.5, b: s.color.b * 0.5, a: 1.0 };
-    let n = s.pts.len();
-    for k in 0..n {
-        let (a, b) = (at(s.pts[k]), at(s.pts[(k + 1) % n]));
-        blip::macroquad::shapes::draw_triangle(centre, a, b, s.color);
-    }
-    for k in 0..n {
-        let (a, b) = (at(s.pts[k]), at(s.pts[(k + 1) % n]));
-        blip.draw_line(a.x, a.y, b.x, b.y, edge);
+    blip.fill_fan((s.x, s.y), &pts, s.color);
+    for k in 0..pts.len() {
+        let (a, b) = (pts[k], pts[(k + 1) % pts.len()]);
+        blip.draw_line(a.0, a.1, b.0, b.1, edge);
     }
 }
 
@@ -1099,7 +1077,7 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
 
     // Seeking: the brick the ball is bending toward pulses.
     if g.seeking() {
-        let pulse = 0.5 + 0.5 * (blip::macroquad::time::get_time() as f32 * 8.0).sin();
+        let pulse = 0.5 + 0.5 * (blip::now() * 8.0).sin();
         if let Some((tx, ty)) = g.nearest_brick() {
             let (x, y) = (tx - BRICK_W as f32 / 2.0 - 2.0, ty - BRICK_H as f32 / 2.0 - 2.0);
             blip.draw_rect(x, y, BRICK_W as f32 + 4.0, BRICK_H as f32 + 4.0, BlipColor { r: 1.0, g: 0.95, b: 0.6, a: pulse });
@@ -1140,7 +1118,7 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
 fn draw_title(blip: &Blip, hi: i32, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9]) {
     draw_backdrop(blip, 1);
     // A full wall of the game's bricks, a ripple running along it.
-    let t0 = blip::macroquad::time::get_time() as f32;
+    let t0 = blip::now();
     for row in 0..3 {
         for col in 0..BRICK_COLS {
             let kind = ((row + col) % 6) as usize;
@@ -1163,7 +1141,7 @@ fn draw_title(blip: &Blip, hi: i32, paddle: &Texture2D, ball: &Texture2D, shade:
     for (i, line) in lines.iter().enumerate() {
         blip.draw_centered(line, (WIN_H * 2 / 3 + 20 * i as i32) as f32, 2.0, BLIP_GRAY);
     }
-    let t = blip::macroquad::time::get_time() as f32;
+    let t = blip::now();
     let cx = WIN_W as f32 * 0.5 + (t * 1.2).sin() * 132.0;
     let bx = cx - BALL_W as f32 * 0.5;
     let by = PAD_Y as f32 - 48.0 + (t * 2.0).sin() * 7.0;
@@ -1250,21 +1228,19 @@ async fn main() {
             State::Over  => {
                 draw_backdrop(&blip, g.sess.level);
                 blip.draw_game_over(g.sess.score, web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, false);
-                if g.cont.showing() {
-                    blip.draw_game_over_prompt(&format!("CONTINUE? {}", g.cont.seconds()), BLIP_YELLOW);
-                }
+                blip.draw_continue(&g.cont, BLIP_YELLOW);
             }
             State::Launch | State::Play | State::Dead => {
                 draw_play(&blip, &g, &paddle, &ball, &ball_shade, &brick, &drops);
                 // The ball waits on the paddle after every lost life; say so.
-                if g.state == State::Launch && (blip::macroquad::time::get_time() * 2.0) as i64 % 2 == 0 {
+                if g.state == State::Launch && blip::blink(2.0) {
                     let prompt = web::controls().pick("PRESS SPACE", "PRESS FIRE", "TAP TO LAUNCH");
                     blip.draw_centered(prompt, (PAD_Y - 90) as f32, 3.0, BLIP_WHITE);
                 }
             }
         }
 
-        blip.next_frame(60).await;
+        blip.next_frame().await;
     }
 }
 
@@ -1306,7 +1282,7 @@ mod tests {
         g.continue_play();
         assert!(!g.bricks[0].alive, "the bricks already broken stay broken");
         assert!(g.state == State::Launch);
-        assert_eq!((g.sess.lives, g.sess.score, g.run_best), (LIVES_START, 0, 700));
+        assert_eq!((g.sess.lives, g.sess.score, g.sess.run_best()), (LIVES_START, 0, 700));
     }
 
     fn rot_z(t: f32) -> Mat3 { let (s, c) = t.sin_cos(); [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]] }

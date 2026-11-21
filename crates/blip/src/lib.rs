@@ -102,73 +102,52 @@ pub fn build_assets(assets: Vec<Asset>, music: Vec<(String, Vec<u8>)>) {
     }
 }
 
-#[cfg(feature = "engine")]
-pub mod audio;
-#[cfg(feature = "engine")]
-pub mod bot;
-#[cfg(feature = "engine")]
-pub mod grid;
-#[cfg(feature = "engine")]
-pub mod color;
-#[cfg(feature = "engine")]
-pub mod ctx;
-#[cfg(feature = "engine")]
-pub mod draw;
-#[cfg(feature = "engine")]
-pub mod font;
-#[cfg(feature = "engine")]
-pub mod fx;
-#[cfg(feature = "engine")]
-pub mod input;
-#[cfg(feature = "engine")]
+/// Items that need the game engine (macroquad); a build script builds without them.
+macro_rules! engine {
+    ($($item:item)*) => { $(#[cfg(feature = "engine")] $item)* };
+}
+
 pub mod math;
-#[cfg(feature = "engine")]
-pub mod pool;
-#[cfg(feature = "engine")]
-pub mod session;
-#[cfg(feature = "engine")]
-pub mod timer;
-#[cfg(feature = "engine")]
-pub mod web;
-#[cfg(feature = "engine")]
-pub use audio::{
-    play_alert, play_ambient, play_music_volume, play_sfx, play_sfx_volume, stop_alert, stop_ambient,
-    stop_music, BlipSound, Jukebox,
-};
-#[cfg(feature = "engine")]
-pub use color::{
-    blend, hsv, shade, BLIP_BLACK, BLIP_BLUE, BLIP_CYAN, BLIP_DARKGRAY, BLIP_GRAY, BLIP_GREEN, BLIP_MAGENTA,
-    BLIP_ORANGE, BLIP_RED, BLIP_WHITE, BLIP_YELLOW, NEON_CYAN, NEON_GREEN, NEON_MAGENTA, NEON_ORANGE, NEON_PINK,
-    NEON_PURPLE, NEON_YELLOW,
-};
-#[cfg(feature = "engine")]
-pub use ctx::{window_conf, Blip};
-#[cfg(feature = "engine")]
-pub use draw::{load_png, load_png_smooth};
-#[cfg(feature = "engine")]
-pub use fx::{draw_fireworks, shake, Fx};
-#[cfg(feature = "engine")]
-pub use fx::{EffectParticle, EffectParticles};
-#[cfg(feature = "engine")]
-pub use math::{
-    angle_diff, clamp, distance, ease_out_cubic, lerp, rand_int, rand_range_f32, rand_seed,
-    rects_overlap, scatter, segment_circle_overlap, segment_rect_overlap, smoothstep01, spool, wrap, frame_starts, swept_from, sweep_hits,
-};
-#[cfg(feature = "engine")]
-pub use pool::{pool_iter, pool_iter_mut, pool_spawn, Pooled};
-#[cfg(feature = "engine")]
-pub use session::{Continue, LifeResult, Session, Streak, CONTINUE_GRACE, GAME_OVER_MIN_WAIT};
-#[cfg(feature = "engine")]
-pub use timer::Timer;
 
-// Re-export macroquad's color::Color as BlipColor for game code.
-#[cfg(feature = "engine")]
-pub use macroquad::color::Color as BlipColor;
-// Re-export Texture2D as BlipTex for symmetry with the C API.
-#[cfg(feature = "engine")]
-pub use macroquad::texture::Texture2D as BlipTex;
+engine! {
+    pub mod audio;
+    pub mod bot;
+    pub mod color;
+    pub mod ctx;
+    mod draw;
+    pub mod font;
+    pub mod fx;
+    pub mod grid;
+    pub mod input;
+    pub mod pool;
+    pub mod session;
+    pub mod testing;
+    pub mod timer;
+    pub mod web;
 
-// Convenience re-export so games don't need to depend on macroquad directly
-// for the few items they use most.
-#[cfg(feature = "engine")]
-pub use macroquad;
+    pub use audio::{
+        play_alert, play_ambient, play_music_volume, play_sfx, play_sfx_volume, stop_alert, stop_ambient,
+        stop_music, BlipSound, Jukebox,
+    };
+    pub use color::{
+        blend, hsv, shade, BLIP_BLACK, BLIP_BLUE, BLIP_CYAN, BLIP_DARKGRAY, BLIP_GRAY, BLIP_GREEN, BLIP_MAGENTA,
+        BLIP_ORANGE, BLIP_RED, BLIP_WHITE, BLIP_YELLOW, NEON_CYAN, NEON_GREEN, NEON_MAGENTA, NEON_ORANGE, NEON_PINK,
+        NEON_PURPLE, NEON_YELLOW,
+    };
+    pub use ctx::{window_conf, Blip};
+    pub use draw::{load_png, load_png_smooth};
+    pub use fx::{draw_fireworks, shake, EffectParticle, EffectParticles, Fx};
+    pub use math::{
+        angle_diff, clamp, distance, ease_out_cubic, frame_starts, lerp, rand_int, rand_range_f32, rand_seed,
+        rects_overlap, scatter, segment_circle_overlap, segment_rect_overlap, smoothstep01, spool, sweep_hits,
+        swept_from, wrap,
+    };
+    pub use pool::{pool_iter, pool_iter_mut, pool_spawn, Pooled};
+    pub use session::{Continue, LifeResult, Session, Streak, CONTINUE_GRACE, GAME_OVER_MIN_WAIT};
+    pub use timer::{blink, now, Timer};
+
+    /// macroquad's colour, as the games name it.
+    pub use macroquad::color::Color as BlipColor;
+    /// macroquad itself, so a game needs no dependency of its own for the few items it uses directly.
+    pub use macroquad;
+}

@@ -68,7 +68,7 @@ fn mack_driveby_keeps_going_after_he_is_knocked_down() {
 fn ten_mack_circuits_run_every_rung_through_the_fight_loop() {
     // The bot and the CPU draw on the shared random numbers: without the lock this shifted them under the
     // balance simulations running beside it, which then passed or failed by scheduling.
-    let _sim = super::balance::simulating(0x3AC4);
+    let _sim = simulating(0x3AC4);
     let who = FIGHTERS.iter().position(|a| a.name == "MACK").unwrap();
     for run in 0..10 {
         let mut g = Game::new();
@@ -184,8 +184,7 @@ pub(crate) fn a_fighter_who_blocks_correctly_takes_far_less_than_one_who_does_no
     // something. Same attacker, same attack, one defender holding back
     // and crouching, the other standing still.
     let mut sweeping = |frame: usize, _p: &[Fighter; 2]| {
-        let mut a = Input::default();
-        a.down = true;
+        let mut a = Input { down: true, ..Default::default() };
         if frame % 40 < 2 { a.kick_low = true; } // sweep on a loop
         [a, Input::default()]
     };
@@ -195,12 +194,9 @@ pub(crate) fn a_fighter_who_blocks_correctly_takes_far_less_than_one_who_does_no
     let damage_taken_standing = FIGHTERS[open[1].who].health - open[1].health;
 
     let mut sweeping_vs_block = |frame: usize, _p: &[Fighter; 2]| {
-        let mut a = Input::default();
-        a.down = true;
+        let mut a = Input { down: true, ..Default::default() };
         if frame % 40 < 2 { a.kick_low = true; }
-        let mut b = Input::default();
-        b.right = true; // away from P1, who is on the left
-        b.down = true;  // and low, because a sweep is low
+        let b = Input { right: true, down: true, ..Default::default() }; // away from P1, who is on the left // and low, because a sweep is low
         [a, b]
     };
     let guarded = spar(0, 1, 74.0, 60 * 10, &mut sweeping_vs_block);
@@ -218,14 +214,7 @@ pub(crate) fn nobody_gets_stuck_in_a_state_they_cannot_leave() {
     // that produces, both fighters must still be able to act at the end
     // — a state machine with a dead end is a game that freezes.
     let mut mash = |frame: usize, _p: &[Fighter; 2]| {
-        let mut a = Input::default();
-        a.punch_low = frame.is_multiple_of(3);
-        a.kick_high = frame.is_multiple_of(5);
-        a.down = frame % 7 < 3;
-        a.up = frame.is_multiple_of(31);
-        a.right = frame % 11 < 5;
-        a.left = frame % 13 < 4;
-        a.special = frame.is_multiple_of(97);
+        let a = Input { punch_low: frame.is_multiple_of(3), kick_high: frame.is_multiple_of(5), down: frame % 7 < 3, up: frame.is_multiple_of(31), right: frame % 11 < 5, left: frame % 13 < 4, special: frame.is_multiple_of(97), ..Default::default() };
         [a, a]
     };
     let mut p = spar(0, 2, 200.0, 60 * 12, &mut mash);
@@ -588,7 +577,7 @@ pub(crate) fn the_finishing_blow_plays_in_slow_motion_and_the_bar_drains_after_i
 #[test]
 #[ignore = "a measurement, printed; takes a while"]
 fn bot_round_wins_up_the_ladder() {
-    let _sim = super::balance::simulating(7);
+    let _sim = simulating(7);
     let pick: usize = std::env::var("PICK").ok().and_then(|p| p.parse().ok()).unwrap_or(0);
     let mut total = 0;
     for rung in 0..RUNGS {
@@ -619,7 +608,7 @@ fn bot_round_wins_up_the_ladder() {
 #[test]
 #[ignore = "a measurement, a few seconds: cargo test --release -p brawler foe_strength -- --ignored --nocapture"]
 fn foe_strength() {
-    let _sim = super::balance::simulating(7);
+    let _sim = simulating(7);
     let win_rate = |foe: usize, dial: f32| {
         let (mut won, mut fought) = (0, 0);
         for pick in (0..FIGHTERS.len()).filter(|&p| p != foe) {

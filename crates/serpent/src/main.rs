@@ -1,9 +1,6 @@
 //! Serpent (Snake), Rust port of `games/serpent/main.c` on macroquad.
 
-use blip::input::{
-    coin_start, play_again, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
-    BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
-};
+use blip::input::{coin_start, play_again, Stick};
 use blip::macroquad::texture::Texture2D;
 use blip::{
     GAME_OVER_MIN_WAIT,
@@ -48,6 +45,11 @@ const STREAK_STEPS: i32 = 22;
 const STREAK_MAX: i32 = 5;
 
 const GOLD: BlipColor = BlipColor { r: 1.0, g: 0.84, b: 0.20, a: 1.0 };
+
+/// The snake's scales, `k` of the way from head (0) to tail (1).
+fn scale_green(k: f32) -> BlipColor {
+    blip::blend(BlipColor { r: 0.36, g: 0.86, b: 0.36, a: 1.0 }, BlipColor { r: 0.16, g: 0.50, b: 0.20, a: 1.0 }, k)
+}
 
 /// The pixel centre of a board cell.
 fn cell_centre(c: Cell) -> (f32, f32) {
@@ -384,10 +386,10 @@ fn update_title(g: &mut Game) {
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    if key_pressed(BLIP_KEY_UP)    || key_pressed(BLIP_KEY_W) { g.queue_turn(Dir::Up); }
-    if key_pressed(BLIP_KEY_DOWN)  || key_pressed(BLIP_KEY_S) { g.queue_turn(Dir::Down); }
-    if key_pressed(BLIP_KEY_LEFT)  || key_pressed(BLIP_KEY_A) { g.queue_turn(Dir::Left); }
-    if key_pressed(BLIP_KEY_RIGHT) || key_pressed(BLIP_KEY_D) { g.queue_turn(Dir::Right); }
+    if Stick::Up.pressed() { g.queue_turn(Dir::Up); }
+    if Stick::Down.pressed() { g.queue_turn(Dir::Down); }
+    if Stick::Left.pressed() { g.queue_turn(Dir::Left); }
+    if Stick::Right.pressed() { g.queue_turn(Dir::Right); }
 
     // Real time, not steps: the deadline must not stretch as the snake speeds up.
     if g.bonus_active() {
@@ -489,7 +491,7 @@ fn lose_life(g: &mut Game, sfx: &Sounds, why: &str) {
         LifeResult::StillAlive => State::Dead,
         LifeResult::GameOver => {
             // A new best gets the level-up chime after the crash.
-            if web::beats_best(g.sess.score) { play_sfx(&sfx.level); }
+            if g.sess.beats_best() { play_sfx(&sfx.level); }
             State::Over
         }
     };
@@ -565,7 +567,7 @@ fn spawn_after_meal(g: &mut Game, (shears, bonus): (bool, bool), sfx: &Sounds) {
     if !g.spawn_food() {
         g.state = State::Over;
         g.dead_timer.start(GAME_OVER_MIN_WAIT);
-        web::report_score(g.sess.score);
+        g.sess.report();
     }
 }
 
@@ -578,7 +580,7 @@ fn update_dead(g: &mut Game, dt: f32) {
     while g.popped < due {
         let k = g.popped as f32 / g.snake_len.max(2) as f32;
         let (x, y) = cell_centre(g.snake_at(g.popped));
-        g.fx.burst(x, y, 4, 80.0, BlipColor { r: lerp(0.36, 0.16, k), g: lerp(0.86, 0.50, k), b: lerp(0.36, 0.20, k), a: 1.0 });
+        g.fx.burst(x, y, 4, 80.0, scale_green(k));
         g.popped += 1;
     }
     if g.dead_timer.tick(dt) {
@@ -648,7 +650,7 @@ fn draw_snake(blip: &Blip, g: &Game) {
     let shade = |i: usize| -> BlipColor {
         if flash { return BLIP_RED; }
         let k = i as f32 / n.max(2) as f32;
-        BlipColor { r: lerp(0.36, 0.16, k), g: lerp(0.86, 0.50, k), b: lerp(0.36, 0.20, k), a: 1.0 }
+        scale_green(k)
     };
     // Body radius tapers toward the tail; a swallowed food bulges it as it travels down.
     let base_r = CELL as f32 / 2.0 - 3.0;
@@ -675,7 +677,7 @@ fn draw_snake(blip: &Blip, g: &Game) {
             let hi = BlipColor { r: (c.r + 0.25).min(1.0), g: (c.g + 0.12).min(1.0), b: (c.b + 0.2).min(1.0), a: 1.0 };
             blip.fill_capsule(x0, y0, x1, y1, radius(i) * 0.32, radius(i - 1) * 0.32, hi);
             if i % 2 == 0 && i + 2 < n {
-                blip.fill_circle(x0, y0, radius(i) * 0.5, BlipColor { r: c.r * 0.6, g: c.g * 0.6, b: c.b * 0.6, a: 1.0 });
+                blip.fill_circle(x0, y0, radius(i) * 0.5, blip::shade(c, 0.6));
             }
         }
     }
@@ -700,7 +702,7 @@ fn draw_snake(blip: &Blip, g: &Game) {
     blip.fill_capsule(nx, ny, sx, sy, hr + 1.5, hr * 0.8 + 1.5, ink);
     blip.fill_capsule(nx, ny, sx, sy, hr, hr * 0.8, head);
     // A forked tongue flicks out now and then, in the direction of travel.
-    if g.state == State::Play && blip::macroquad::time::get_time().rem_euclid(1.6) < 0.18 {
+    if g.state == State::Play && blip::now().rem_euclid(1.6) < 0.18 {
         let (bx, by) = (hx + fx * (hr + 2.0), hy + fy * (hr + 2.0));
         let (tx, ty) = (hx + fx * (hr + 8.0), hy + fy * (hr + 8.0));
         blip.draw_line_ex(bx, by, tx, ty, 2.0, BLIP_RED);
@@ -765,7 +767,7 @@ fn draw_obstacles(blip: &Blip, g: &Game) {
 
 /// The food, breathing a little so the eye finds it; the bonus and the shears.
 fn draw_pickups(blip: &Blip, g: &Game, food: &Texture2D) {
-    let breathe = 1.0 + 0.08 * (blip::macroquad::time::get_time() as f32 * 5.0).sin();
+    let breathe = 1.0 + 0.08 * (blip::now() * 5.0).sin();
     let fs = CELL as f32 * breathe;
     let (fcx, fcy) = ((g.food.c * CELL) as f32 + CELL as f32 / 2.0, (HUD_H + g.food.r * CELL) as f32 + CELL as f32 / 2.0);
     blip.draw_texture(food, fcx - fs / 2.0, fcy - fs / 2.0, fs, fs);
@@ -789,7 +791,7 @@ fn draw_bonus(blip: &Blip, g: &Game) {
     let hot = BlipColor { r: 1.0, g: 0.98, b: 0.72, a: 1.0 };
     // A golden mouse facing the way it last ran: body, head, two round ears, a wiggling tail.
     let (fx, fy) = (g.mouse_dir.0 as f32, g.mouse_dir.1 as f32);
-    let t = blip::macroquad::time::get_time() as f32;
+    let t = blip::now();
     let (tx, ty) = (cx - fx * r * 1.0, cy - fy * r * 1.0);
     let wig = (t * 14.0).sin() * r * 0.5;
     blip.draw_line_ex(tx, ty, tx - fx * r * 0.9 - fy * wig, ty - fy * r * 0.9 + fx * wig, 1.5, gold);
@@ -830,7 +832,7 @@ fn draw_title(blip: &Blip, hi: i32) {
     blip.draw_start_prompt((WIN_H / 2) as f32);
     blip.draw_centered(by.pick("ARROW KEYS OR WASD", "STEER WITH THE PAD", "SWIPE TO STEER"),
         (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
-    draw_title_snake(blip, blip::macroquad::time::get_time() as f32);
+    draw_title_snake(blip, blip::now());
 }
 
 /// A snake winding across the title screen after a golden mouse, wrapping round: drawn as in play, an outlined body
@@ -845,7 +847,7 @@ fn draw_title_snake(blip: &Blip, t: f32) {
     let ink = BlipColor { r: 0.02, g: 0.12, b: 0.04, a: 1.0 };
     let shade = |i: usize| {
         let k = i as f32 / SEGS as f32;
-        BlipColor { r: lerp(0.36, 0.16, k), g: lerp(0.86, 0.50, k), b: lerp(0.36, 0.20, k), a: 1.0 }
+        scale_green(k)
     };
     let r = |i: usize| 11.0 * if i + 5 >= SEGS { 0.5 + 0.5 * (SEGS - 1 - i) as f32 / 5.0 } else { 1.0 };
     let pts: Vec<(f32, f32)> = (0..SEGS).map(|i| at(i as f32 * 10.0)).collect();
@@ -859,7 +861,7 @@ fn draw_title_snake(blip: &Blip, t: f32) {
         let c = shade(i);
         let hi = BlipColor { r: (c.r + 0.25).min(1.0), g: (c.g + 0.12).min(1.0), b: (c.b + 0.2).min(1.0), a: 1.0 };
         blip.fill_capsule(pts[i].0, pts[i].1, pts[i - 1].0, pts[i - 1].1, r(i) * 0.32, r(i - 1) * 0.32, hi);
-        if i % 2 == 0 && i + 3 < SEGS { blip.fill_circle(pts[i].0, pts[i].1, r(i) * 0.5, BlipColor { r: c.r * 0.6, g: c.g * 0.6, b: c.b * 0.6, a: 1.0 }); }
+        if i % 2 == 0 && i + 3 < SEGS { blip.fill_circle(pts[i].0, pts[i].1, r(i) * 0.5, blip::shade(c, 0.6)); }
     }
     let (hx, hy) = pts[0];
     blip.fill_circle(hx + 2.0, hy, 13.5, ink);
@@ -933,16 +935,11 @@ async fn main() {
         match g.state {
             State::Title => draw_title(&blip, web::high_score()),
             State::Over  => draw_over(&blip, &g, web::high_score()),
-            State::Play | State::Dead => {
-                let (dx, dy) = blip::shake(g.shake, CRASH_SHAKE, 5.0);
-                blip.set_offset(dx, dy);
-                draw_play(&blip, &g, &food);
-                blip.set_offset(0.0, 0.0);
-            }
+            State::Play | State::Dead => blip.shaken(g.shake, CRASH_SHAKE, 5.0, || draw_play(&blip, &g, &food)),
         }
         g.shake = (g.shake - dt).max(0.0);
 
-        blip.next_frame(60).await;
+        blip.next_frame().await;
     }
 }
 

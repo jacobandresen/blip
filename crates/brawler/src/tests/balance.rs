@@ -16,19 +16,6 @@ pub(crate) struct RoundStats {
     pub(crate) timed_out: bool,
 }
 
-/// Every test that runs the CPU takes this first: the RNG is process-global
-/// and `cargo test` runs in parallel, so without the lock (and a seed inside
-/// it) the balance tests pass or fail by scheduling.
-pub(crate) static SIMULATION: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-pub(crate) fn simulating(seed: u64) -> std::sync::MutexGuard<'static, ()> {
-    // A poisoned lock just means some other simulation test already
-    // failed its assertion; this one can still run.
-    let guard = SIMULATION.lock().unwrap_or_else(|e| e.into_inner());
-    blip::rand_seed(seed);
-    guard
-}
-
 pub(crate) fn fight_round(pick: usize, foe_index: usize, style: fn(usize, &[Fighter; 2]) -> Input) -> RoundStats {
     fight_round_seen(pick, foe_index, style, &mut |_, _, _| {})
 }
@@ -53,25 +40,8 @@ pub(crate) fn fight_round_seen(pick: usize, foe_index: usize, style: fn(usize, &
         stats.seconds += F;
 
         let p_in = style(frame, &g.p);
-        g.cpu_delay -= F;
-        if g.cpu_delay <= 0.0 {
-            g.cpu_plan = cpu_think(&mut g);
-            g.cpu_delay = 0.38 - 0.18 * g.difficulty;
-        }
-        let c_in = cpu_input(&g);
-        let ins = [p_in, c_in];
-
-        for i in 0..2 {
-            let other = g.p[1 - i].x;
-            if g.p[i].free() && !g.p[i].airborne() {
-                g.p[i].facing = if other >= g.p[i].x { 1.0 } else { -1.0 };
-            }
-            let close = face_off(&mut g.p)[i];
-            apply_input(&mut g.p[i], ins[i], close, F);
-            advance(&mut g.p[i], F);
-            g.p[i].x = clamp(g.p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
-        }
-        separate(&mut g.p);
+        let ins = [p_in, timed_cpu(&mut g)];
+        move_both(&mut g, ins);
 
         for (a, (dmg, blocked, knock)) in resolve_trades(&mut g.p, ins).into_iter().enumerate() {
             if dmg > 0 {

@@ -45,38 +45,6 @@ impl<T> EffectParticles<T> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{shake, EffectParticle, EffectParticles};
-
-    #[test]
-    fn a_shake_stays_within_its_amplitude_and_ends_still() {
-        for k in 0..100 {
-            let (dx, dy) = shake(k as f32 * 0.003, 0.3, 5.0);
-            assert!(dx.abs() <= 5.0 && dy.abs() <= 5.0);
-        }
-        assert_eq!(shake(0.0, 0.3, 5.0), (0.0, 0.0));
-        assert_eq!(shake(-0.1, 0.3, 5.0), (0.0, 0.0));
-    }
-
-    #[test]
-    fn effect_particles_share_motion_and_lifetime_updates() {
-        let mut particles = EffectParticles::new(10.0, 1.0);
-        particles.push(EffectParticle {
-            x: 1.0, y: 2.0, vx: 4.0, vy: 0.0, life: 0.5, max_life: 0.5, data: (),
-        });
-        particles.update(0.25);
-        let p = particles.iter().next().unwrap();
-        assert!((p.x - 2.0).abs() < 1e-6);
-        assert!((p.y - 2.0).abs() < 1e-6);
-        assert!((p.vx - 3.0).abs() < 1e-6);
-        assert!((p.vy - 2.5).abs() < 1e-6);
-        assert!((p.life - 0.25).abs() < 1e-6);
-        particles.update(0.25);
-        assert_eq!(particles.iter().count(), 0);
-    }
-}
-
 /// How long a popup stays up, and how far it rises (px).
 const POPUP_SECS: f32 = 0.8;
 const POPUP_RISE: f32 = 28.0;
@@ -200,10 +168,42 @@ impl Fx {
             // Rises quickly then settles; holds full colour for the first half.
             let y = p.y - POPUP_RISE * (1.0 - (1.0 - k) * (1.0 - k));
             let a = if k < 0.5 { 1.0 } else { 1.0 - (k - 0.5) * 2.0 };
-            let w = p.text.chars().count() as f32 * 6.0 * 2.0;
+            let w = font::text_width(&p.text, 2.0);
             let x = (p.x - w / 2.0).clamp(2.0, blip.width as f32 - w - 2.0);
-            font::draw_text(&p.text, x + 1.0, y + 1.0, 2.0, Color { r: 0.0, g: 0.0, b: 0.0, a: a * 0.7 });
-            font::draw_text(&p.text, x, y, 2.0, Color { a, ..p.c });
+            blip.draw_text(&p.text, x + 1.0, y + 1.0, 2.0, Color { r: 0.0, g: 0.0, b: 0.0, a: a * 0.7 });
+            blip.draw_text(&p.text, x, y, 2.0, Color { a, ..p.c });
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{shake, EffectParticle, EffectParticles};
+
+    #[test]
+    fn a_shake_stays_within_its_amplitude_and_ends_still() {
+        for k in 0..100 {
+            let (dx, dy) = shake(k as f32 * 0.003, 0.3, 5.0);
+            assert!(dx.abs() <= 5.0 && dy.abs() <= 5.0);
+        }
+        assert_eq!(shake(0.0, 0.3, 5.0), (0.0, 0.0));
+        assert_eq!(shake(-0.1, 0.3, 5.0), (0.0, 0.0));
+    }
+
+    #[test]
+    fn effect_particles_share_motion_and_lifetime_updates() {
+        let mut particles = EffectParticles::new(10.0, 1.0);
+        particles.push(EffectParticle {
+            x: 1.0, y: 2.0, vx: 4.0, vy: 0.0, life: 0.5, max_life: 0.5, data: (),
+        });
+        particles.update(0.25);
+        let p = particles.iter().next().unwrap();
+        assert!((p.x - 2.0).abs() < 1e-6);
+        assert!((p.y - 2.0).abs() < 1e-6);
+        assert!((p.vx - 3.0).abs() < 1e-6);
+        assert!((p.vy - 2.5).abs() < 1e-6);
+        assert!((p.life - 0.25).abs() < 1e-6);
+        particles.update(0.25);
+        assert_eq!(particles.iter().count(), 0);
     }
 }

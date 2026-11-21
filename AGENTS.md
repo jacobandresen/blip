@@ -72,7 +72,9 @@ npm run test:playthrough         # every bot playthrough (BLIP_PLAYTHROUGH_GAME=
 node tools/fun_report.mjs [game] # fun score per game; CI fails a PR that lowers one (crates/blip/src/bot/FUN.md)
 ```
 
-Run the narrowest check while working, then the wider ones for shared code. Browser tests are headless and
+Run the narrowest check while working, then the wider ones for shared code. `blip::testing` holds what the Rust tests
+share: `seeded(n)`, taken first by a test that depends on the random numbers (they are global; tests run in parallel),
+`climbs`, `never_falls` and `never_rises` for difficulty ramps, and `assert_grid` for authored maps. Browser tests are headless and
 muted; native playtests set `BLIP_SILENT=1` and on Linux use `xvfb-run` when there is no display.
 [`test/visual.md`](test/visual.md) explains what the visual check does and does not prove.
 
@@ -91,7 +93,8 @@ settings and goals on the bot's stats; a run ends when its goals are met. Runs a
 Natively: `BLIP_BOT=1` plays and prints a `RESULT` line; `BLIP_BOT_LEVEL=<n>` starts at level n,
 `BLIP_BOT_SHOTS=<dir>` saves frames, `BLIP_BOT_FUZZ=<seed>` sends random input, and a game's own switches
 are `BLIP_BOT_<NAME>`. A refactor that must not change play: the same `BLIP_BOT=1 BLIP_BOT_SEED=n` run prints the same `RESULT` line
-before and after. `node tools/playtest_levels.mjs [game ...]` plays every level and fails on a panic
+before and after, and one that must not change the picture saves the same `BLIP_BOT_SHOTS` frames (a bot run
+animates by its own clock). `node tools/playtest_levels.mjs [game ...]` plays every level and fails on a panic
 or a level the bot cannot start.
 
 Every bot run also reports fun measures (`fun_*`; [FUN.md](crates/blip/src/bot/FUN.md)): a game whose player can be hit

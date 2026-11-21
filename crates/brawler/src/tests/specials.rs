@@ -67,7 +67,7 @@ pub(crate) fn mack_calls_a_slow_counterable_drive_by() {
     assert!(shot.x > stop && (shot.y - shot_y).abs() < 0.01);
     g.p[0].facing = -1.0;
     g.spawn_driveby_round(0, 16, 1, DRIVEBY_SHOT_TIMES[1]);
-    let reverse = g.bolts.iter().filter(|b| b.active).last().unwrap();
+    let reverse = g.bolts.iter().rfind(|b| b.active).unwrap();
     assert_eq!(reverse.vx, -520.0, "the drive-by follows MACK's facing");
 }
 
@@ -181,9 +181,9 @@ pub(crate) fn a_web_holds_for_five_seconds_or_two_blows() {
     assert_eq!(f.webbed, WEB_SECS);
     assert_eq!(WEB_SECS, 5.0);
     // One blow leaves it on; the second takes it off.
-    f.hurt(5, 1.0);
+    f.hurt(5);
     assert!(f.webbed > 0.0);
-    f.hurt(5, 1.0);
+    f.hurt(5);
     assert_eq!(f.webbed, 0.0, "two blows did not break the web");
     // And another does not hold straight away.
     assert!(!f.web(), "webbed again the moment it came off");

@@ -11,9 +11,8 @@ fn pose_cell(name: &str, row: usize, frame: usize, flip: bool) -> Image {
         for x in 0..w {
             let sx = frame as u32 * w + if flip { w - 1 - x } else { x };
             let sy = row as u32 * h + y;
-            let at = ((sy * sheet.w + sx) * 4) as usize;
-            cell.set_rgba(x as i32, y as i32, sheet.px[at], sheet.px[at + 1],
-                sheet.px[at + 2], sheet.px[at + 3]);
+            let [r, g, b, a] = sheet.get(sx as i32, sy as i32);
+            cell.set_rgba(x as i32, y as i32, r, g, b, a);
         }
     }
     cell

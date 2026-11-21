@@ -1,6 +1,5 @@
-//! Math and collision helpers — small utilities used across all games.
-
-use macroquad::rand;
+//! Math and collision helpers — small utilities used across all games. The random ones need the engine; the rest
+//! serve build scripts too.
 
 /// Clamp `v` so it stays within `[lo, hi]`.
 #[inline]
@@ -40,12 +39,13 @@ pub fn wrap(v: f32, lo: f32, hi: f32) -> f32 {
 /// Random `f32` in the half-open range `[lo, hi)`.
 ///
 /// Returns `lo` when `hi <= lo`.
+#[cfg(feature = "engine")]
 #[inline]
 pub fn rand_range_f32(lo: f32, hi: f32) -> f32 {
     if hi <= lo {
         return lo;
     }
-    rand::gen_range(lo, hi)
+    macroquad::rand::gen_range(lo, hi)
 }
 
 /// Shortest signed angle from `from` to `to`, in `[-π, π)`.
@@ -78,16 +78,18 @@ pub fn smoothstep01(t: f32) -> f32 {
 
 /// Seed the random number generator. For tests: the generator is global, so
 /// an unseeded simulation depends on what the tests beside it drew first.
+#[cfg(feature = "engine")]
 pub fn rand_seed(seed: u64) {
-    rand::srand(seed);
+    macroquad::rand::srand(seed);
 }
 
 /// Random integer in the inclusive range `[lo, hi]`.
+#[cfg(feature = "engine")]
 pub fn rand_int(lo: i32, hi: i32) -> i32 {
     if hi <= lo {
         return lo;
     }
-    rand::gen_range(lo as i64, hi as i64 + 1) as i32
+    macroquad::rand::gen_range(lo as i64, hi as i64 + 1) as i32
 }
 
 /// Axis-aligned bounding-box (AABB) overlap test.
@@ -163,10 +165,31 @@ pub fn scatter(k: usize, salt: u32) -> f32 {
     (h % 1024) as f32 / 1024.0
 }
 
+/// Whether (x, y) is inside the polygon `pts` (even-odd rule).
+pub fn in_polygon(pts: &[(f32, f32)], x: f32, y: f32) -> bool {
+    let mut inside = false;
+    let mut j = pts.len() - 1;
+    for i in 0..pts.len() {
+        let ((xi, yi), (xj, yj)) = (pts[i], pts[j]);
+        if (yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi {
+            inside = !inside;
+        }
+        j = i;
+    }
+    inside
+}
+
+/// The box round some points: (left, top, right, bottom).
+pub fn bounds(pts: &[(f32, f32)]) -> (f32, f32, f32, f32) {
+    pts.iter().fold((f32::MAX, f32::MAX, f32::MIN, f32::MIN), |(x0, y0, x1, y1), &(x, y)| {
+        (x0.min(x), y0.min(y), x1.max(x), y1.max(y))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        angle_diff, ease_out_cubic, rand_range_f32, rand_seed, scatter, segment_circle_overlap,
+        angle_diff, bounds, ease_out_cubic, in_polygon, rand_range_f32, rand_seed, scatter, segment_circle_overlap,
         segment_rect_overlap, smoothstep01, wrap,
     };
 
@@ -247,5 +270,14 @@ mod tests {
         assert!(differs > 90);
         let mean = (0..1000).map(|k| scatter(k, 7)).sum::<f32>() / 1000.0;
         assert!((0.4..0.6).contains(&mean), "mean {mean}");
+    }
+
+    #[test]
+    fn a_point_is_inside_a_square_and_outside_its_notch() {
+        let sq = [(0.0, 0.0), (4.0, 0.0), (4.0, 4.0), (0.0, 4.0)];
+        assert!(in_polygon(&sq, 2.0, 2.0) && !in_polygon(&sq, 5.0, 2.0));
+        let notch = [(0.0, 0.0), (4.0, 0.0), (4.0, 4.0), (2.0, 1.0), (0.0, 4.0)];
+        assert!(!in_polygon(&notch, 2.0, 3.0) && in_polygon(&notch, 1.0, 1.0));
+        assert_eq!(bounds(&notch), (0.0, 0.0, 4.0, 4.0));
     }
 }

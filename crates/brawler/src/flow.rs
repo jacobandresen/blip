@@ -239,9 +239,7 @@ pub(crate) fn update_continue(g: &mut Game, dt: f32, fire: bool) {
     let taken = g.cont.update(dt, fire);
     if taken == Some(true) {
         // A continue starts the score afresh; the run's best is what is reported at the end.
-        blip::bot::add("continues", 1.0);
-        g.run_best = g.run_best.max(g.sess.score);
-        g.sess.reset(1);
+        g.sess.play_on(1);
         g.p[0].rounds = 0;
         g.p[1].rounds = 0;
         g.mercy = (g.mercy + MERCY).min(MERCY * 3.0);
@@ -249,7 +247,7 @@ pub(crate) fn update_continue(g: &mut Game, dt: f32, fire: bool) {
         g.start_match(g.opponent_index);
         g.announce();
     } else if taken == Some(false) {
-        web::report_score(g.sess.score.max(g.run_best));
+        g.sess.report();
         g.state = State::Over;
         g.phase.start(1.2);
     }
@@ -304,7 +302,7 @@ pub(crate) fn update_match_end(g: &mut Game, dt: f32) {
     } else {
         g.sess.add_score(5000);
         blip::bot::finish("won");
-        web::report_score(g.sess.score);
+        g.sess.report();
         g.state = State::Won;
         g.phase.start(1.2);
     }

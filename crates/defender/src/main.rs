@@ -1,9 +1,6 @@
 //! Space Invaders-inspired shooter.
 
-use blip::input::{
-    coin_start, play_again, key_active, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
-    BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
-};
+use blip::input::{coin_start, key_active, play_again, Stick, BLIP_KEY_SPACE};
 use blip::macroquad::rand::rand;
 use blip::macroquad::texture::Texture2D;
 use blip::{
@@ -1040,8 +1037,8 @@ fn update_explosions(g: &mut Game, dt: f32) {
 
 /// The cannon has mass: it spools up to full speed and brakes over ~0.08 s.
 fn move_ship(g: &mut Game, dt: f32) {
-    let mut moving_left = key_active(BLIP_KEY_LEFT) || key_active(BLIP_KEY_A);
-    let mut moving_right = key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D);
+    let mut moving_left = Stick::Left.active();
+    let mut moving_right = Stick::Right.active();
     let dir = moving_right as i32 - moving_left as i32;
     let mut target = dir as f32 * PLAYER_SPEED;
     // A finger asks for the speed that closes the gap in TOUCH_CLOSE_SECS,
@@ -1069,8 +1066,7 @@ fn move_ship(g: &mut Game, dt: f32) {
 fn fire(g: &mut Game, sfx: &Sounds) {
     let shoot = !g.respawn_grace.active()
         && (key_active(BLIP_KEY_SPACE)
-            || key_active(BLIP_KEY_UP)
-            || key_active(BLIP_KEY_W));
+            || Stick::Up.active());
     if shoot {
         if let Some(i) = g.free_bullet(true) {
             play_sfx(&sfx.shoot);
@@ -1227,16 +1223,13 @@ fn update_chips(g: &mut Game, dt: f32) {
     g.chips.retain(|c| c.ttl > 0.0);
 }
 
-fn draw_chips(g: &Game) {
-    use blip::macroquad::math::vec2;
+fn draw_chips(blip: &Blip, g: &Game) {
     for c in &g.chips {
         let a = (c.ttl / CHIP_SECS).min(1.0);
         let s = 2.0 + 2.0 * a;
         let (sn, cs) = c.turn.sin_cos();
-        let p = |u: f32, v: f32| vec2(c.x + u * cs - v * sn, c.y + u * sn + v * cs);
-        let col = BlipColor { a, ..c.c };
-        blip::macroquad::shapes::draw_triangle(p(-s, -s), p(s, -s), p(s, s), col);
-        blip::macroquad::shapes::draw_triangle(p(-s, -s), p(s, s), p(-s, s), col);
+        let p = |u: f32, v: f32| (c.x + u * cs - v * sn, c.y + u * sn + v * cs);
+        blip.fill_quad(p(-s, -s), p(s, -s), p(s, s), p(-s, s), BlipColor { a, ..c.c });
     }
 }
 
@@ -1537,11 +1530,11 @@ fn draw_play(blip: &Blip, g: &Game,
              player: &Texture2D, alien: &[[Texture2D; 2]; 3],
              explosion: &Texture2D, shield: &Texture2D, bullet: &Texture2D,
              saucer: &Texture2D) {
-    draw_backdrop(blip, blip::macroquad::time::get_time() as f32);
+    draw_backdrop(blip, blip::now());
     // The ground line pulses red while the invaders are close to landing.
     let lowest = g.aliens.iter().filter(|a| a.alive).map(|a| a.y + ALIEN_H as f32).fold(0.0, f32::max);
     let ground = if g.state == State::Play && lowest > (GROUND_Y - LANDING_WARN) as f32
-        && (blip::macroquad::time::get_time() * 4.0) as i64 % 2 == 0 { BLIP_RED } else { BLIP_GREEN };
+        && blip::blink(4.0) { BLIP_RED } else { BLIP_GREEN };
     blip.fill_rect(0.0, GROUND_Y as f32 - 1.0, WIN_W as f32, 2.0, ground);
 
     for s in 0..SHIELDS {
@@ -1558,7 +1551,7 @@ fn draw_play(blip: &Blip, g: &Game,
         }
     }
 
-    let now = blip::macroquad::time::get_time() as f32;
+    let now = blip::now();
     for (i, a) in g.aliens.iter().enumerate() {
         if !a.alive { continue; }
         // The one about to dive shakes and flashes white: the tell.
@@ -1638,7 +1631,7 @@ fn draw_play(blip: &Blip, g: &Game,
     }
 
     draw_ufo(blip, g, saucer);
-    draw_chips(g);
+    draw_chips(blip, g);
     g.fx.draw(blip);
     // Bombs last, so a kill's burst and score never hide one falling from the formation.
     for b in g.bullets.iter().filter(|b| b.active && !b.player) {
@@ -1670,7 +1663,7 @@ fn streak_label(s: &blip::Streak) -> String {
 }
 
 fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: i32) {
-    draw_backdrop(blip, blip::macroquad::time::get_time() as f32);
+    draw_backdrop(blip, blip::now());
     blip.draw_centered("DEFENDER", (WIN_H / 5 + 14) as f32, 6.0, BLIP_MAGENTA);
     // The title is 6 x 7 = 42px tall: the high score clears it by a real margin.
     blip.draw_hi(hi, (WIN_H / 5 + 93) as f32, BLIP_YELLOW);
@@ -1685,7 +1678,7 @@ fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: i32) {
     let row2 = (WIN_H / 2) as f32;
 
     // The invaders' two-frame shuffle, one beat every half second.
-    let beat = (blip::macroquad::time::get_time() * 2.0) as i64;
+    let beat = (blip::now() * 2.0) as i64;
     let frame = beat.rem_euclid(2) as usize;
     blip.draw_texture_tinted(&alien[0][frame], ax, row0 + voff, dw, dh, alien_color(0));
     blip.draw_texture_tinted(&alien[1][frame], ax, row1 + voff, dw, dh, alien_color(1));
@@ -1708,7 +1701,7 @@ fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: i32) {
 
 fn draw_clear(blip: &Blip, level: i32, t: f32) {
     // Fireworks over the town the cannon kept safe.
-    draw_backdrop(blip, blip::macroquad::time::get_time() as f32);
+    draw_backdrop(blip, blip::now());
     blip::draw_fireworks(blip, t, (60.0, (PLAY_Y + 60) as f32, (WIN_W - 120) as f32, 220.0),
         &[BLIP_MAGENTA, BLIP_CYAN, BLIP_GREEN, BLIP_YELLOW]);
     let buf = format!("LEVEL {}", level);
@@ -1766,8 +1759,8 @@ async fn main() {
         g.lost_run.1 -= dt;
         if prev_state != State::Over && g.state == State::Over {
             // A new best ends on the level-clear jingle, not the game-over one.
-            play_sfx(if web::beats_best(g.sess.score) { &sfx.level_clear } else { &sfx.game_over });
-            web::report_score(g.sess.score);
+            play_sfx(if g.sess.beats_best() { &sfx.level_clear } else { &sfx.game_over });
+            g.sess.report();
         }
 
         blip.clear(BLIP_BLACK);
@@ -1775,7 +1768,7 @@ async fn main() {
             State::Title => draw_title(&blip, &alien, web::high_score()),
             State::Win   => draw_clear(&blip, g.sess.level, 1.5 - g.dead_timer.remaining()),
             State::Over  => {
-                draw_backdrop(&blip, blip::macroquad::time::get_time() as f32);
+                draw_backdrop(&blip, blip::now());
                 blip.draw_game_over(g.sess.score, web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active());
             }
             State::Play | State::Dead => {
@@ -1783,7 +1776,7 @@ async fn main() {
             }
         }
 
-        blip.next_frame(60).await;
+        blip.next_frame().await;
     }
 }
 
@@ -1838,18 +1831,11 @@ mod tests {
         // The point of the fight is that it is the thing a run is aiming
         // at. If the fifth one is no harder than the first, the levels
         // between them have not been climbing toward anything.
-        let mut prev = None;
-        for level in [5, 10, 15, 20, 25] {
-            let mut g = at_level(level);
-            g.start_boss();
-            let now = (g.boss_hp, g.boss_speed(), g.boss_volley_gap());
-            if let Some((hp, speed, gap)) = prev {
-                assert!(now.0 > hp, "level {level}'s mothership has no more health than the last");
-                assert!(now.1 > speed, "level {level}'s mothership is no faster than the last");
-                assert!(now.2 <= gap, "level {level}'s mothership fires no harder than the last");
-            }
-            prev = Some(now);
-        }
+        let boss = |level| { let mut g = at_level(level); g.start_boss(); g };
+        let levels = [5, 10, 15, 20, 25];
+        blip::testing::climbs("mothership health", levels, |l| boss(l).boss_hp);
+        blip::testing::climbs("mothership speed", levels, |l| boss(l).boss_speed());
+        blip::testing::never_rises("volley gap", levels, |l| boss(l).boss_volley_gap());
     }
 
     #[test]

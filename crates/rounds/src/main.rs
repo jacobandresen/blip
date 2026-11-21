@@ -129,7 +129,7 @@ async fn main() {
 
     loop {
         let dt = blip.delta_time;
-        let t = blip::macroquad::time::get_time() as f32;
+        let t = blip::now();
         if blip::bot::active() { bot::drive(&g); }
         let was = g.state;
         match g.state {
@@ -189,7 +189,7 @@ async fn main() {
             if g.state == State::Crash { web::haptic(); }
             // A new best (over the run's continues) ends on the perfect-day fanfare instead.
             if g.state == State::Over {
-                if web::beats_best(g.sess.score.max(g.run_best)) { play_sfx_volume(&sfx.perfect, 1.0); } else { play_sfx_volume(&sfx.game_over, 0.8); }
+                if g.sess.beats_best() { play_sfx_volume(&sfx.perfect, 1.0); } else { play_sfx_volume(&sfx.game_over, 0.8); }
             }
         }
         for cue in std::mem::take(&mut g.cues) { play(&sfx, cue); }
@@ -217,12 +217,12 @@ async fn main() {
                 match g.state {
                     State::Card => draw::draw_card(&blip, &g, t),
                     State::Tally => draw::draw_tally(&blip, &g),
-                    State::Week => draw::draw_week(&blip, &g, t),
+                    State::Week => draw::draw_week(&blip, &g),
                     State::Over => draw::draw_over(&blip, &g, web::high_score()),
                     _ => {}
                 }
             }
         }
-        blip.next_frame(60).await;
+        blip.next_frame().await;
     }
 }

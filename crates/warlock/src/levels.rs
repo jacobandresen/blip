@@ -332,10 +332,7 @@ pub mod tests {
     fn every_room_is_rectangular_bordered_and_connected() {
         for (i, room) in ROOMS.iter().chain(mirrored().iter()).enumerate() {
             let tag = format!("room {}", i + 1);
-            assert_eq!(room.maze.len(), ROWS, "{tag}: wrong row count");
-            for (r, row) in room.maze.iter().enumerate() {
-                assert_eq!(row.len(), COLS, "{tag}: row {r} not {COLS} wide");
-            }
+            blip::testing::assert_grid(&tag, room.maze, COLS, ROWS);
             for c in 0..COLS as i32 {
                 assert!(room.maze[0].chars().nth(c as usize) == Some('#'), "{tag}: top open");
                 assert!(room.maze[ROWS - 1].chars().nth(c as usize) == Some('#'), "{tag}: bottom open");

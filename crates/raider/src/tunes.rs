@@ -4,9 +4,11 @@
 use std::f32::consts::PI;
 
 use blip::wav::{
-    encode_pcm16_half, encode_pcm16_mono, encode_pcm16_music, halved, low_pass, mix_into, mix_into_f32,
-    ms_to_samples, soft_limit_to_pcm16, tame, warm, Rng, MIX_KNEE, SAMPLE_RATE,
+    encode_pcm16_half, encode_pcm16_mono, encode_pcm16_music, fold_tail, halved, limit_pcm16, low_pass, mix_into,
+    mix_into_f32, ms_to_samples, soft_limit_to_pcm16, tame, warm, Rng, MIX_KNEE, SAMPLE_RATE,
 };
+use blip::math::smoothstep01;
+use blip::cosy::SR;
 use blip::Asset;
 
 // Rock music uses detuned saws or saw/square guitars, tanh drive and a low-pass cabinet filter.
@@ -15,11 +17,10 @@ use blip::Asset;
 /// Rock kick: tight and dry with a hard beater click that cuts through
 /// distorted guitar; much less boom than `techno::kick`.
 fn rock_kick(buf: &mut [f32], off: usize, vol: f32) {
-    let sr = SAMPLE_RATE as f32;
-    let n = (sr * 0.11) as usize;
-    let click_n = (sr * 0.004) as usize;
+    let n = (SR * 0.11) as usize;
+    let click_n = (SR * 0.004) as usize;
     for i in 0..n.min(buf.len().saturating_sub(off)) {
-        let t = i as f32 / sr;
+        let t = i as f32 / SR;
         let e = (1.0 - i as f32 / n as f32).powf(2.1);
         let freq = 48.0 + 95.0 * (-t / 0.028).exp(); // 143 Hz -> 48 Hz, fast
         let body = (2.0 * PI * freq * t).sin();
@@ -42,11 +43,10 @@ fn rock_kick(buf: &mut [f32], off: usize, vol: f32) {
 /// real ringing decay (unlike the dry, choked `march_snare`): this is the
 /// backbeat the whole groove leans on, so it needs to carry.
 fn rock_snare(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
-    let sr = SAMPLE_RATE as f32;
-    let n = (sr * 0.15) as usize;
+    let n = (SR * 0.15) as usize;
     let mut prev = 0.0f32;
     for i in 0..n.min(buf.len().saturating_sub(off)) {
-        let t = i as f32 / sr;
+        let t = i as f32 / SR;
         let e = (1.0 - i as f32 / n as f32).powf(1.5);
         let white = rng.next_f32() * 2.0 - 1.0;
         let hp = white - prev; // crude 1st-order highpass -> "snap"
@@ -77,11 +77,10 @@ fn rock_hat(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32, open: bool) {
 /// Crash cymbal — a long noise wash with a couple of inharmonic partials
 /// for shimmer. Marks the top of a section.
 fn crash(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
-    let sr = SAMPLE_RATE as f32;
-    let n = (sr * 0.85) as usize;
+    let n = (SR * 0.85) as usize;
     let mut prev = 0.0f32;
     for i in 0..n.min(buf.len().saturating_sub(off)) {
-        let t = i as f32 / sr;
+        let t = i as f32 / SR;
         let e = (1.0 - i as f32 / n as f32).powf(1.7);
         let white = rng.next_f32() * 2.0 - 1.0;
         let hp = white - 0.7 * prev;
@@ -93,16 +92,15 @@ fn crash(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
 
 /// Distorted root/fifth/octave power chord; `palm` selects muted or open articulation.
 fn power_chord(buf: &mut [f32], off: usize, root: f32, ms: f32, vol: f32, palm: bool) {
-    let sr = SAMPLE_RATE as f32;
-    let n = (sr * ms / 1000.0) as usize;
+    let n = ms_to_samples(ms);
     if n == 0 {
         return;
     }
-    let att = (sr * 0.0018) as usize + 1;
+    let att = (SR * 0.0018) as usize + 1;
     let decay_pow = if palm { 2.6 } else { 0.7 };
     let drive = if palm { 7.5 } else { 11.0 };
     let cutoff = if palm { 2_500.0 } else { 3_400.0 };
-    let alpha = 1.0 - (-2.0 * PI * cutoff / sr).exp();
+    let alpha = 1.0 - (-2.0 * PI * cutoff / SR).exp();
     // root, fifth (3:2), octave — the fifth kept a touch quieter so the
     // chord has a root rather than a hollow parallel-fifths drone.
     const IVL: [(f32, f32); 3] = [(1.0, 1.0), (1.5, 0.7), (2.0, 0.9)];
@@ -120,7 +118,7 @@ fn power_chord(buf: &mut [f32], off: usize, root: f32, ms: f32, vol: f32, palm: 
         for &(mult, w) in &IVL {
             for d in [-1.0f32, 1.0] {
                 let f = root * mult * (1.0 + d * DETUNE);
-                ph[k] += f / sr;
+                ph[k] += f / SR;
                 ph[k] -= ph[k].floor();
                 raw += (2.0 * ph[k] - 1.0) * w;
                 k += 1;
@@ -138,19 +136,18 @@ fn lead_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, bend: 
     while freq > 660.0 {
         freq *= 0.5;
     } // an octave down until it sings, not screams
-    let sr = SAMPLE_RATE as f32;
-    let n = (sr * ms / 1000.0) as usize;
+    let n = ms_to_samples(ms);
     if n == 0 {
         return;
     }
-    let att = (sr * 0.006) as usize + 1;
+    let att = (SR * 0.006) as usize + 1;
     let bend_from = 2f32.powf(-bend / 12.0);
-    let bend_n = ((sr * 0.065) as usize).max(1);
-    let alpha = 1.0 - (-2.0 * PI * 3_200.0 / sr).exp();
+    let bend_n = ((SR * 0.065) as usize).max(1);
+    let alpha = 1.0 - (-2.0 * PI * 3_200.0 / SR).exp();
     let mut ph = 0.0f32;
     let mut lp = 0.0f32;
     for i in 0..n.min(buf.len().saturating_sub(off)) {
-        let t = i as f32 / sr;
+        let t = i as f32 / SR;
         let prog = i as f32 / n as f32;
         let a = if i < att {
             i as f32 / att as f32
@@ -168,7 +165,7 @@ fn lead_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, bend: 
             1.0
         };
         let f = freq * vib * b;
-        ph += f / sr;
+        ph += f / SR;
         ph -= ph.floor();
         let saw = 2.0 * ph - 1.0;
         let sq = if ph < 0.5 { 1.0 } else { -1.0 };
@@ -183,23 +180,22 @@ fn lead_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, bend: 
 /// at the fundamental, locked to the rhythm-guitar root. Medium decay, a
 /// little pick grit; sits under the guitars without fighting them.
 fn bass_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
-    let sr = SAMPLE_RATE as f32;
-    let n = (sr * ms / 1000.0) as usize;
+    let n = ms_to_samples(ms);
     if n == 0 {
         return;
     }
-    let att = (sr * 0.003) as usize + 1;
-    let alpha = 1.0 - (-2.0 * PI * 1_700.0 / sr).exp();
+    let att = (SR * 0.003) as usize + 1;
+    let alpha = 1.0 - (-2.0 * PI * 1_700.0 / SR).exp();
     let mut ph = 0.0f32;
     let mut lp = 0.0f32;
     for i in 0..n.min(buf.len().saturating_sub(off)) {
-        let t = i as f32 / sr;
+        let t = i as f32 / SR;
         let a = if i < att {
             i as f32 / att as f32
         } else {
             (1.0 - (i - att) as f32 / (n - att).max(1) as f32).powf(1.4)
         };
-        ph += freq / sr;
+        ph += freq / SR;
         ph -= ph.floor();
         let driven = ((2.0 * ph - 1.0) * 2.3).tanh();
         lp += alpha * (driven - lp);
@@ -212,19 +208,18 @@ fn bass_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
 /// from `freq` toward nothing while the note blooms once and then chokes.
 fn dive_bomb(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
     let (freq, vol) = (tame(freq), vol * 0.6);
-    let sr = SAMPLE_RATE as f32;
-    let n = (sr * ms / 1000.0) as usize;
+    let n = ms_to_samples(ms);
     if n == 0 {
         return;
     }
-    let alpha = 1.0 - (-2.0 * PI * 2_600.0 / sr).exp();
+    let alpha = 1.0 - (-2.0 * PI * 2_600.0 / SR).exp();
     let mut ph = 0.0f32;
     let mut lp = 0.0f32;
     for i in 0..n.min(buf.len().saturating_sub(off)) {
         let prog = i as f32 / n as f32;
         let f = (freq * (1.0 - prog).powf(2.2)).max(18.0);
         let e = (1.0 - prog).powf(1.3) * (1.0 + 0.4 * prog);
-        ph += f / sr;
+        ph += f / SR;
         ph -= ph.floor();
         let saw = 2.0 * ph - 1.0;
         let sq = if ph < 0.5 { 1.0 } else { -1.0 };
@@ -273,11 +268,9 @@ fn drum_fill(buf: &mut [f32], bar_off: usize, step_samples: usize, rng: &mut Rng
 /// Main Raider theme in E minor: intro, verse, chorus, solo, chorus.
 /// The fixed gallop hook anchors the verse; the chorus moves Em–C–G–D.
 pub fn loop1_wav() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
     let bpm = 150.0_f32;
     let steps_per_bar = 16usize;
-    let step_ms = 60_000.0 / bpm / 4.0; // 16th note = 100 ms
-    let step_samples = (sr * step_ms / 1000.0) as usize;
+    let (step_ms, step_samples) = blip::techno::sixteenth(bpm); // 100 ms
 
     // intro(1) + verse(8) + chorus(4) + solo(8) + chorus(4)
     const INTRO: usize = 1;
@@ -520,11 +513,9 @@ pub fn loop1_wav() -> Vec<u8> {
 
 /// Second Raider loop: 176 BPM drop-D thrash in D minor, with a chromatic break and solo.
 pub fn loop2_wav() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
     let bpm = 176.0_f32;
     let steps_per_bar = 16usize;
-    let step_ms = 60_000.0 / bpm / 4.0;
-    let step_samples = (sr * step_ms / 1000.0) as usize;
+    let (step_ms, step_samples) = blip::techno::sixteenth(bpm);
 
     const INTRO: usize = 1;
     const RIFF_A: usize = INTRO + 6;
@@ -701,19 +692,17 @@ pub fn loop2_wav() -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
-const SR_F: f32 = SAMPLE_RATE as f32;
 
 // ---------------------------------------------------------------------- //
 // Tone / noise helpers (self-contained, same idiom as the other games)     //
 // ---------------------------------------------------------------------- //
 
 fn gen_tone(freq: f32, dur_ms: f32, amp: f32) -> Vec<i16> {
-    let sr = SAMPLE_RATE as f32;
     let n = ms_to_samples(dur_ms);
     let fade = SAMPLE_RATE as usize / 200;
     let mut s = Vec::with_capacity(n);
     for i in 0..n {
-        let t = i as f32 / sr;
+        let t = i as f32 / SR;
         let mut e = 1.0_f32;
         if i < fade { e = i as f32 / fade as f32; }
         if i + fade > n { e = (n - i) as f32 / fade as f32; }
@@ -790,7 +779,6 @@ fn max_power_sfx() -> Vec<u8> {
 /// entrance, tier 1 through 7 alike (the boss's own name banner is what
 /// signals which one it is).
 fn boss_warning_sfx() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
     let dur_ms = 500.0;
     let n = ms_to_samples(dur_ms);
     let mut s = Vec::with_capacity(n);
@@ -798,7 +786,7 @@ fn boss_warning_sfx() -> Vec<u8> {
     for i in 0..n {
         let t = i as f32 / n as f32;
         let freq = 500.0 + (t * std::f32::consts::PI * 2.0).sin() * 220.0; // wobbles ~280-720Hz
-        phase += freq / sr;
+        phase += freq / SR;
         let env = if t < 0.05 { t / 0.05 } else if t > 0.85 { (1.0 - t) / 0.15 } else { 1.0 };
         let wave = (2.0 * std::f32::consts::PI * phase).sin();
         s.push((env * 0.4 * 27000.0 * wave) as i16);
@@ -832,13 +820,12 @@ fn victory_sfx() -> Vec<u8> {
 
 /// Generate a wing-gun report; `pitch` and `seed` vary the takes for autofire.
 fn gun_report(seed: u32, pitch: f32) -> Vec<f32> {
-    let sr = SAMPLE_RATE as f32;
     let n = ms_to_samples(120.0);
     let mut rng = Rng(seed | 1);
     let mut dry = vec![0.0f32; n];
     let (mut lo, mut bp_lo, mut bp_hi, mut phase) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
     for (i, out) in dry.iter_mut().enumerate() {
-        let t = i as f32 / sr;
+        let t = i as f32 / SR;
         let w = rng.next_f32() * 2.0 - 1.0;
         // crack: noise band-passed round 1.5-5 kHz, driven hard, ~4ms
         bp_hi += (w - bp_hi) * 0.55 * pitch.min(1.2);
@@ -848,7 +835,7 @@ fn gun_report(seed: u32, pitch: f32) -> Vec<f32> {
         lo += (w - lo) * 0.09 * pitch;
         let body = (lo * 5.0).tanh() * (-t / 0.025).exp();
         // thump: 180 -> 90 Hz, saturated so a phone speaker keeps it
-        phase += pitch * (90.0 + 90.0 * (-t / 0.01).exp()) / sr;
+        phase += pitch * (90.0 + 90.0 * (-t / 0.01).exp()) / SR;
         let thump = ((2.0 * PI * phase).sin() * 4.0).tanh() * (-t / 0.02).exp();
         // bolt: two short metallic clacks
         let mut bolt = 0.0;
@@ -911,13 +898,12 @@ fn enemy_gun_sfx() -> Vec<u8> {
 /// A backfire from an engine starved near a stall: a sharp pop in the
 /// exhaust, a low thump, and a crackle as it clears.
 fn backfire_sfx() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
     let n = ms_to_samples(280.0);
     let mut rng = Rng(0x0B_ACF1);
     let mut buf = vec![0.0f32; n];
     let (mut lp, mut crack) = (0.0f32, 0.0f32);
     for (i, out) in buf.iter_mut().enumerate() {
-        let t = i as f32 / sr;
+        let t = i as f32 / SR;
         let w = rng.next_f32() * 2.0 - 1.0;
         lp += (w - lp) * 0.2;
         let pop = lp * (-t / 0.012).exp();
@@ -933,20 +919,19 @@ fn backfire_sfx() -> Vec<u8> {
 /// classic "pyeww" of a spinning slug tearing away, a whistle falling from
 /// `f0` with a wavering pitch, a little air noise round it.
 fn ricochet_sfx(f0: f32, seed: u32) -> Vec<i16> {
-    let sr = SAMPLE_RATE as f32;
     let n = ms_to_samples(420.0);
     let mut rng = Rng(seed | 1);
     let mut buf = vec![0.0f32; n];
     let (mut phase, mut hp_prev) = (0.0f32, 0.0f32);
     for (i, out) in buf.iter_mut().enumerate() {
-        let t = i as f32 / sr;
+        let t = i as f32 / SR;
         let w = rng.next_f32() * 2.0 - 1.0;
         let hp = w - hp_prev;
         hp_prev = w;
         let tick = hp * (-t / 0.003).exp() + (2.0 * PI * 3100.0 * t).sin() * (-t / 0.006).exp() * 0.5;
         // whistle: falls to ~40% of f0 and wavers as the slug tumbles
         let f = f0 * (0.4 + 0.6 * (-t / 0.16).exp()) * (1.0 + 0.035 * (2.0 * PI * 23.0 * t).sin());
-        phase += f / sr;
+        phase += f / SR;
         let env = (t / 0.012).min(1.0) * (-t / 0.13).exp();
         let whistle = (2.0 * PI * phase).sin() * env;
         let air = w * env * 0.12;
@@ -958,12 +943,11 @@ fn ricochet_sfx(f0: f32, seed: u32) -> Vec<i16> {
 /// A round striking the fuselage: a sharp tick, a short metallic ring from
 /// two inharmonic partials, and a dull knock underneath.
 fn hit_sfx() -> Vec<i16> {
-    let sr = SAMPLE_RATE as f32;
     let n = ms_to_samples(160.0);
     let mut rng = Rng(0x417C_0DE5);
     let mut buf = vec![0.0f32; n];
     for (i, out) in buf.iter_mut().enumerate() {
-        let t = i as f32 / sr;
+        let t = i as f32 / SR;
         let w = rng.next_f32() * 2.0 - 1.0;
         let tick = w * (-t / 0.004).exp();
         let ring = ((2.0 * PI * 1180.0 * t).sin() + 0.6 * (2.0 * PI * 1730.0 * t).sin()) * (-t / 0.035).exp();
@@ -989,13 +973,12 @@ struct Blast {
 
 /// Generate a seeded explosion from blast, roar, secondary, debris and echo layers.
 fn explosion_sfx(b: Blast) -> Vec<i16> {
-    let sr = SAMPLE_RATE as f32;
-    let n = (b.secs * sr) as usize;
+    let n = (b.secs * SR) as usize;
     let mut rng = Rng(b.seed | 1);
-    let mut buf = vec![0.0f32; n + (0.3 * sr) as usize];
+    let mut buf = vec![0.0f32; n + (0.3 * SR) as usize];
     let (mut lp1, mut lp2, mut phase, mut turb, mut turb_lp) = (0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32);
     for i in 0..n {
-        let t = i as f32 / sr;
+        let t = i as f32 / SR;
         let k = t / b.secs;
         let attack = (t / 0.002).min(1.0);
         let decay = (1.0 - k).max(0.0).powf(1.6) * (-t / (b.secs * 0.4)).exp();
@@ -1009,7 +992,7 @@ fn explosion_sfx(b: Blast) -> Vec<i16> {
         turb_lp += (turb - turb_lp) * 0.002;
         let roar = lp2 * 3.4 * (0.65 + 4.0 * turb_lp.abs());
         // the boom: a saturated low sine falling from boom_hz to a third
-        phase += b.boom_hz * (0.33 + 0.67 * (-t / 0.08).exp()) / sr;
+        phase += b.boom_hz * (0.33 + 0.67 * (-t / 0.08).exp()) / SR;
         let boom = ((2.0 * PI * phase).sin() * 3.0).tanh() * (-t / (b.secs * 0.22)).exp();
         // the blast front: a hard crack of bright noise in the first ms
         let front = w * (-t / 0.0025).exp() * 1.4 + lp1 * (-t / 0.015).exp() * 1.2;
@@ -1017,14 +1000,14 @@ fn explosion_sfx(b: Blast) -> Vec<i16> {
     }
     // secondary explosions: smaller, later, each its own crack and thump
     for _ in 0..b.secondaries {
-        let at = (b.secs * (0.12 + 0.5 * rng.next_f32()) * sr) as usize;
+        let at = (b.secs * (0.12 + 0.5 * rng.next_f32()) * SR) as usize;
         let size = 0.35 + 0.4 * rng.next_f32();
         let f = b.boom_hz * (1.3 + 0.6 * rng.next_f32());
         let mut lp = 0.0f32;
-        for i in 0..(0.18 * sr) as usize {
+        for i in 0..(0.18 * SR) as usize {
             let j = at + i;
             if j >= buf.len() { break; }
-            let t = i as f32 / sr;
+            let t = i as f32 / SR;
             let w = rng.next_f32() * 2.0 - 1.0;
             lp += (w - lp) * 0.25;
             buf[j] += size * b.amp * ((2.0 * PI * f * t).sin() * (-t / 0.05).exp() + lp * 1.5 * (-t / 0.03).exp());
@@ -1033,14 +1016,14 @@ fn explosion_sfx(b: Blast) -> Vec<i16> {
     // debris: short metal clinks scattering away, two inharmonic partials
     // each so they read as torn panels rather than tones
     for _ in 0..b.debris {
-        let at = (b.secs * (0.08 + 0.6 * rng.next_f32()) * sr) as usize;
+        let at = (b.secs * (0.08 + 0.6 * rng.next_f32()) * SR) as usize;
         let f = 1200.0 + 2200.0 * rng.next_f32();
         let ring = 0.004 + 0.008 * rng.next_f32();
         let vol = 0.10 + 0.10 * rng.next_f32();
-        for i in 0..(ring * 6.0 * sr) as usize {
+        for i in 0..(ring * 6.0 * SR) as usize {
             let j = at + i;
             if j >= buf.len() { break; }
-            let t = i as f32 / sr;
+            let t = i as f32 / SR;
             let tone = (2.0 * PI * f * t).sin() + 0.6 * (2.0 * PI * f * 2.37 * t).sin();
             buf[j] += tone * (-t / ring).exp() * vol * b.amp;
         }
@@ -1048,7 +1031,7 @@ fn explosion_sfx(b: Blast) -> Vec<i16> {
     // the sea and the sky give a little back: two soft, darker echoes
     let dry = buf.clone();
     for &(delay, gain) in &[(0.11f32, 0.28f32), (0.24, 0.16)] {
-        let d = (delay * sr) as usize;
+        let d = (delay * SR) as usize;
         let mut lp = 0.0f32;
         for i in d..buf.len() {
             lp += (dry[i - d] - lp) * 0.15;
@@ -1057,11 +1040,10 @@ fn explosion_sfx(b: Blast) -> Vec<i16> {
     }
     let end = buf.iter().rposition(|v| v.abs() > 1e-4).map_or(1, |i| i + 1);
     buf.truncate(end);
-    let fade = (0.02 * sr) as usize;
+    let fade = (0.02 * SR) as usize;
     let len = buf.len();
     for i in 0..fade.min(len) { buf[len - 1 - i] *= i as f32 / fade as f32; }
-    let scaled: Vec<f32> = buf.iter().map(|v| v * 22_000.0).collect();
-    soft_limit_to_pcm16(&scaled, MIX_KNEE)
+    limit_pcm16(&buf, 22_000.0)
 }
 
 /// Takes of each explosion size: enemy planes and boats, the player, bosses.
@@ -1125,24 +1107,16 @@ fn turret_fire_sfx() -> Vec<u8> {
     encode_pcm16_mono(&buf)
 }
 
-/// Hermite smoothstep, clamped to 0..1: ramps the engine's pitch and chop
-/// through the start-up.
-fn smooth01(x: f32) -> f32 {
-    let x = x.clamp(0.0, 1.0);
-    x * x * (3.0 - 2.0 * x)
-}
-
 /// The carrier launch start-up in one shot: the starter whirring, the engine
 /// catching on a couple of uneven chugs, then the prop spinning up to idle.
 /// ~1.9s, played as the launch begins over the engine loops.
 fn engine_start_sfx() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
     let dur_s = 1.9_f32;
     let n = ms_to_samples(dur_s * 1000.0);
     let mut rng = Lcg(0x0E17_0011);
     let mut s = vec![0f32; n];
     for i in 0..n {
-        let t = i as f32 / sr;
+        let t = i as f32 / SR;
         let k = i as f32 / n as f32;
 
         // Starter motor: a low buzz with a fast amplitude wobble (the
@@ -1156,7 +1130,7 @@ fn engine_start_sfx() -> Vec<u8> {
         // The engine: pitch and blade-chop rate ramp up from a lumpy
         // catch to a steady idle over the second half of the clip.
         let eng_env = (k / 0.30).min(1.0);
-        let spin = smooth01((k - 0.22) / 0.62);
+        let spin = smoothstep01((k - 0.22) / 0.62);
         let f0 = 34.0 + 46.0 * spin;
         let chop_hz = 5.0 + 20.0 * spin;
         let chop = 0.4 + 0.6 * ((2.0 * PI * chop_hz * t).sin() * 0.5 + 0.5).powf(1.7);
@@ -1205,14 +1179,14 @@ const BLADE_PER_CRANK: f32 = 2.0;
 /// One cylinder's exhaust pop into `buf` at sample `at`: a burst of dark
 /// noise and a short low thump. Higher `rpm` is a harder, brighter bark.
 fn exhaust_pop(buf: &mut [f32], at: usize, amp: f32, rpm: f32, rng: &mut Rng) {
-    let len = (0.03 * SR_F) as usize;
+    let len = (0.03 * SR) as usize;
     let body = 95.0 + 45.0 * rpm;
     let bright = 0.13 + 0.10 * rpm;
     let mut lp = 0.0f32;
     for i in 0..len {
         let j = at + i;
         if j >= buf.len() { break; }
-        let t = i as f32 / SR_F;
+        let t = i as f32 / SR;
         let w = rng.next_f32() * 2.0 - 1.0;
         lp += (w - lp) * bright;
         // the exhaust stack rings at two pipe modes
@@ -1226,7 +1200,7 @@ fn exhaust_pop(buf: &mut [f32], at: usize, amp: f32, rpm: f32, rng: &mut Rng) {
 fn prop_roar(buf: &mut [f32], blade_hz: f32, level: f32, rng: &mut Rng) {
     let (mut l1, mut l2) = (0.0f32, 0.0f32);
     for (i, v) in buf.iter_mut().enumerate() {
-        let t = i as f32 / SR_F;
+        let t = i as f32 / SR;
         let w = rng.next_f32() * 2.0 - 1.0;
         l1 += (w - l1) * 0.04;
         l2 += (l1 - l2) * 0.04;
@@ -1242,9 +1216,9 @@ fn engine_loop(rpm: f32, sputter: bool) -> Vec<u8> {
     let crank = ((CRANK_HZ * rpm / 2.0).round() * 2.0).max(4.0);
     let firing = (crank * 6.0) as usize; // firings per second
     let mut rng = Rng(0x0E61_4E55 ^ firing as u32);
-    let mut buf = vec![0.0f32; n + (0.05 * SR_F) as usize];
+    let mut buf = vec![0.0f32; n + (0.05 * SR) as usize];
     for k in 0..firing {
-        let at = (((k as f32 + CYL_TIMING[k % 12]) / firing as f32).max(0.0) * SR_F) as usize;
+        let at = (((k as f32 + CYL_TIMING[k % 12]) / firing as f32).max(0.0) * SR) as usize;
         let mut amp = CYLINDERS[k % 12] * (0.75 + 0.25 * rpm.min(1.2));
         if sputter {
             let r = rng.next_f32();
@@ -1254,10 +1228,8 @@ fn engine_loop(rpm: f32, sputter: bool) -> Vec<u8> {
         exhaust_pop(&mut buf, at, amp, rpm, &mut rng);
     }
     prop_roar(&mut buf, BLADE_PER_CRANK * crank, 0.35 + 0.25 * rpm, &mut rng);
-    let tail = buf.split_off(n);
-    for (i, v) in tail.iter().enumerate() { buf[i] += v; }
-    let scaled: Vec<f32> = buf.iter().map(|v| v * 11_000.0).collect();
-    half_rate(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
+    let buf = fold_tail(buf, n);
+    half_rate(&limit_pcm16(&buf, 11_000.0))
 }
 
 /// Seconds into `engine_splutter_sfx` the engine dies, and catches again.
@@ -1270,11 +1242,11 @@ pub const SPLUTTER_SECS: f32 = 1.6;
 /// prop windmilling and two coughs, then catches with a pop and runs again.
 /// Rendered at the cruise loop's level, so it crossfades with it.
 fn engine_splutter_sfx() -> Vec<u8> {
-    let n = (SPLUTTER_SECS * SR_F) as usize;
+    let n = (SPLUTTER_SECS * SR) as usize;
     let crank = CRANK_HZ;
     let firing = crank * 6.0;
     let mut rng = Rng(0x5B1A_7731);
-    let mut buf = vec![0.0f32; n + (0.05 * SR_F) as usize];
+    let mut buf = vec![0.0f32; n + (0.05 * SR) as usize];
     let count = (SPLUTTER_SECS * firing) as usize;
     for k in 0..count {
         let t = k as f32 / firing;
@@ -1288,24 +1260,23 @@ fn engine_splutter_sfx() -> Vec<u8> {
         if (0.4..1.1).contains(&t) && rng.next_f32() < 0.3 { amp *= 2.4; } // a cough
         // the engine slows as it starves, and the pops get duller
         let rpm = if t < 1.05 { 1.0 - 0.35 * (t / 1.05) } else { 0.65 + 0.35 * ((t - 1.05) / 0.35).min(1.0) };
-        let at = ((t + CYL_TIMING[k % 12] / firing) * SR_F) as usize;
+        let at = ((t + CYL_TIMING[k % 12] / firing) * SR) as usize;
         exhaust_pop(&mut buf, at, amp, rpm, &mut rng);
     }
     // two coughs as it tries to catch, and the pop as it does
     for &(t, a) in &[(0.55f32, 3.2f32), (0.83, 2.6), (1.08, 3.6)] {
-        for k in 0..3 { exhaust_pop(&mut buf, ((t + k as f32 * 0.012) * SR_F) as usize, a, 0.7, &mut rng); }
+        for k in 0..3 { exhaust_pop(&mut buf, ((t + k as f32 * 0.012) * SR) as usize, a, 0.7, &mut rng); }
     }
     let mut roar = vec![0.0f32; buf.len()];
     prop_roar(&mut roar, BLADE_PER_CRANK * crank, 0.6, &mut rng);
     for (v, r) in buf.iter_mut().zip(&roar) { *v += r; }
     buf.truncate(n);
     // fade out under the returning loop
-    let f0 = ((SPLUTTER_CATCHES + 0.05) * SR_F) as usize;
+    let f0 = ((SPLUTTER_CATCHES + 0.05) * SR) as usize;
     for (i, v) in buf.iter_mut().enumerate().skip(f0) {
         *v *= 1.0 - (i - f0) as f32 / (n - f0) as f32;
     }
-    let scaled: Vec<f32> = buf.iter().map(|v| v * 11_000.0).collect();
-    half_rate(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
+    half_rate(&limit_pcm16(&buf, 11_000.0))
 }
 
 /// A flak shell bursting at altitude: the hard crack of the charge, a dull
@@ -1319,13 +1290,13 @@ fn flak_burst_sfx() -> Vec<u8> {
 /// A laser turret charging, 1.3 s: a whine climbing two octaves, its
 /// tremolo quickening, so the ear counts down with the eye.
 fn laser_charge_sfx() -> Vec<u8> {
-    let n = (1.3 * SR_F) as usize;
+    let n = (1.3 * SR) as usize;
     let mut ph = 0.0f32;
     let mut buf = vec![0.0f32; n];
     for (i, v) in buf.iter_mut().enumerate() {
         let k = i as f32 / n as f32;
-        let t = i as f32 / SR_F;
-        ph += (320.0 * 4f32.powf(k)) / SR_F;
+        let t = i as f32 / SR;
+        ph += (320.0 * 4f32.powf(k)) / SR;
         let trem = 0.6 + 0.4 * (2.0 * PI * (6.0 + 30.0 * k) * t).sin();
         let tone = (2.0 * PI * ph).sin() + 0.3 * (2.0 * PI * ph * 2.0).sin();
         *v = tone * trem * (0.25 + 0.75 * k) * (t / 0.02).min(1.0) * 9_000.0;
@@ -1336,12 +1307,12 @@ fn laser_charge_sfx() -> Vec<u8> {
 /// A laser turret's beam, 0.7 s: a harsh electric buzz with a crackle,
 /// cutting off.
 fn laser_fire_sfx() -> Vec<u8> {
-    let n = (0.7 * SR_F) as usize;
+    let n = (0.7 * SR) as usize;
     let mut rng = Rng(0x1A5E_F12E);
     let mut buf = vec![0.0f32; n];
     let mut lp = 0.0f32;
     for (i, v) in buf.iter_mut().enumerate() {
-        let t = i as f32 / SR_F;
+        let t = i as f32 / SR;
         let k = i as f32 / n as f32;
         let saw = |f: f32| 2.0 * (t * f).fract() - 1.0;
         let w = rng.next_f32() * 2.0 - 1.0;
@@ -1357,14 +1328,13 @@ fn laser_fire_sfx() -> Vec<u8> {
 /// the 110 Hz fundamental, its harmonics and the tremolo all complete whole
 /// cycles in the buffer, so it loops without a seam.
 fn barrier_hum_sfx() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
     let dur_ms = 400.0;
     let n = ms_to_samples(dur_ms);
     let f0 = 110.0_f32; // A2 — 44 whole cycles over 400ms
     let trem_hz = 5.0_f32; // 2 whole cycles over 400ms
     let mut s = Vec::with_capacity(n);
     for i in 0..n {
-        let t = i as f32 / sr;
+        let t = i as f32 / SR;
         let fund = (2.0 * std::f32::consts::PI * f0 * t).sin();
         let harm = (2.0 * std::f32::consts::PI * f0 * 2.0 * t).sin() * 0.4;
         let buzz = (2.0 * std::f32::consts::PI * f0 * 3.0 * t).sin() * 0.22;
@@ -1379,12 +1349,11 @@ fn barrier_hum_sfx() -> Vec<u8> {
 /// player: an octave up with a fifth, and a hard 12.5 Hz throb. Every part
 /// fits whole cycles into 400 ms, so it loops without a click.
 fn barrier_hum2_sfx() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
     let n = ms_to_samples(400.0);
     let tau = 2.0 * std::f32::consts::PI;
     let mut s = Vec::with_capacity(n);
     for i in 0..n {
-        let t = i as f32 / sr;
+        let t = i as f32 / SR;
         let tone = (tau * 220.0 * t).sin() + 0.5 * (tau * 330.0 * t).sin() + 0.25 * (tau * 110.0 * t).sin();
         let throb = 0.55 + 0.45 * (tau * 12.5 * t).sin().max(0.0);
         s.push(((tone * 0.6).tanh() * throb * 15_000.0) as i16);

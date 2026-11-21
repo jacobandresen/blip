@@ -18,6 +18,34 @@ pub const BLIP_KEY_G:       KeyCode = KeyCode::G;
 pub const BLIP_KEY_J:       KeyCode = KeyCode::J;
 pub const BLIP_KEY_K:       KeyCode = KeyCode::K;
 
+/// A direction on the stick: an arrow key or its WASD twin.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Stick { Up, Down, Left, Right }
+
+impl Stick {
+    /// The arrow key and the letter key for this direction.
+    pub const fn keys(self) -> [KeyCode; 2] {
+        match self {
+            Stick::Up => [BLIP_KEY_UP, BLIP_KEY_W],
+            Stick::Down => [BLIP_KEY_DOWN, BLIP_KEY_S],
+            Stick::Left => [BLIP_KEY_LEFT, BLIP_KEY_A],
+            Stick::Right => [BLIP_KEY_RIGHT, BLIP_KEY_D],
+        }
+    }
+    /// Either key held ([`key_held`]).
+    pub fn held(self) -> bool { any_held(&self.keys()) }
+    /// Either key held or tapped this frame ([`key_active`]).
+    pub fn active(self) -> bool { self.keys().into_iter().any(key_active) }
+    /// Either key gone down this frame ([`key_pressed`]).
+    pub fn pressed(self) -> bool { any_pressed(&self.keys()) }
+}
+
+/// Is any of these keys held?
+pub fn any_held(keys: &[KeyCode]) -> bool { keys.iter().any(|&k| key_held(k)) }
+
+/// Did any of these keys go down this frame?
+pub fn any_pressed(keys: &[KeyCode]) -> bool { keys.iter().any(|&k| key_pressed(k)) }
+
 /// Primary fire / jump / confirm — true only on the frame the key goes down.
 #[inline]
 pub fn btn1_pressed() -> bool { key_pressed(BLIP_KEY_SPACE) }

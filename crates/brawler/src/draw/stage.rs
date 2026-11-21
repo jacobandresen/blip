@@ -499,12 +499,7 @@ pub(crate) fn draw_pagoda(blip: &Blip, shake: f32, t: f32, roar: Roar) {
     let c = |r, g, b| BlipColor { r, g, b, a: 1.0 };
     // Dusk: indigo overhead, the last of the light red along the mountains.
     let sky_at = |k: f32| BlipColor { r: 0.06 + 0.40 * k * k, g: 0.05 + 0.15 * k * k, b: 0.15 + 0.12 * k, a: 1.0 };
-    let bands = 16;
-    let h = HORIZON / bands as f32;
-    for i in 0..bands {
-        let k = i as f32 / (bands - 1) as f32;
-        blip.fill_rect(0.0, i as f32 * h + shake, WIN_W as f32, h + 1.0, sky_at(k));
-    }
+    blip.fill_bands(0.0, shake, WIN_W as f32, HORIZON, 16, sky_at);
     let low = sky_at(1.0);
     blip.fill_rect(0.0, HORIZON + shake, WIN_W as f32, FLOOR_Y - HORIZON, low);
     for i in 0..30 {
@@ -655,12 +650,7 @@ pub(crate) fn draw_island(blip: &Blip, shake: f32, t: f32, roar: Roar) {
     const HORIZON: f32 = 250.0;
     let c = |r, g, b| BlipColor { r, g, b, a: 1.0 };
     let sky_at = |k: f32| BlipColor { r: 0.46 + 0.36 * k, g: 0.66 + 0.24 * k, b: 0.92 - 0.02 * k, a: 1.0 };
-    let bands = 14;
-    let h = HORIZON / bands as f32;
-    for i in 0..bands {
-        let k = i as f32 / (bands - 1) as f32;
-        blip.fill_rect(0.0, i as f32 * h + shake, WIN_W as f32, h + 1.0, sky_at(k));
-    }
+    blip.fill_bands(0.0, shake, WIN_W as f32, HORIZON, 14, sky_at);
     let low = sky_at(1.0);
     blip.fill_rect(0.0, HORIZON + shake, WIN_W as f32, FLOOR_Y - HORIZON, low);
     // Clouds drifting.
@@ -748,10 +738,7 @@ pub(crate) fn draw_colosseum(blip: &Blip, shake: f32, t: f32, focus: f32, roar: 
     let w = WIN_W as f32;
     let top = FLOOR_Y + shake;
     // The sky over the far side, seen through the arches.
-    for i in 0..10 {
-        let k = i as f32 / 9.0;
-        blip.fill_rect(0.0, i as f32 * 22.0 + shake, w, 23.0, c(0.38 + 0.30 * k, 0.60 + 0.22 * k, 0.86 + 0.06 * k));
-    }
+    blip.fill_bands(0.0, shake, w, 220.0, 10, |k| c(0.38 + 0.30 * k, 0.60 + 0.22 * k, 0.86 + 0.06 * k));
     // The far side of the bowl: tier on tier of sunlit arcades, paler with distance.
     let stone = c(0.86, 0.74, 0.56);
     for tier in 0..4 {
@@ -1257,12 +1244,7 @@ pub(crate) fn draw_dock(blip: &Blip, shake: f32, t: f32, roar: Roar) {
     let sky_at = |k: f32| BlipColor {
         r: 0.99 - 0.76 * k, g: 0.52 - 0.40 * k, b: 0.34 + 0.06 * k, a: 1.0,
     };
-    let bands = 16;
-    let h = HORIZON / bands as f32;
-    for i in 0..bands {
-        let k = i as f32 / (bands - 1) as f32;
-        blip.fill_rect(0.0, i as f32 * h + shake, WIN_W as f32, h + 1.0, sky_at(1.0 - k));
-    }
+    blip.fill_bands(0.0, shake, WIN_W as f32, HORIZON, 16, |k| sky_at(1.0 - k));
     let low = sky_at(0.0);
     // Everything below the gradient, before the near layers cover it.
     // Without this the strip between the horizon and the quay is
@@ -1477,12 +1459,7 @@ pub(crate) fn draw_temple(blip: &Blip, shake: f32, t: f32, roar: Roar) {
     let sky_at = |k: f32| BlipColor {
         r: 0.05 + 0.13 * k, g: 0.06 + 0.13 * k, b: 0.13 + 0.17 * k, a: 1.0,
     };
-    let bands = 14;
-    let h = HORIZON / bands as f32;
-    for i in 0..bands {
-        let k = i as f32 / (bands - 1) as f32;
-        blip.fill_rect(0.0, i as f32 * h + shake, WIN_W as f32, h + 1.0, sky_at(k));
-    }
+    blip.fill_bands(0.0, shake, WIN_W as f32, HORIZON, 14, sky_at);
     let low = sky_at(1.0);
     blip.fill_rect(0.0, HORIZON + shake, WIN_W as f32, FLOOR_Y - HORIZON, low);
 
@@ -1599,12 +1576,7 @@ pub(crate) fn draw_temple(blip: &Blip, shake: f32, t: f32, roar: Roar) {
 /// A sky in flat bands from `top` down to `low` at the horizon, and `low`
 /// carried on down to the floor so no layer leaves a hole.
 pub(crate) fn draw_sky(blip: &Blip, shake: f32, horizon: f32, top: BlipColor, low: BlipColor) {
-    let bands = 14;
-    let h = horizon / bands as f32;
-    for i in 0..bands {
-        let k = i as f32 / (bands - 1) as f32;
-        blip.fill_rect(0.0, i as f32 * h + shake, WIN_W as f32, h + 1.0, blend(top, low, k));
-    }
+    blip.fill_bands(0.0, shake, WIN_W as f32, horizon, 14, |k| blend(top, low, k));
     blip.fill_rect(0.0, horizon + shake, WIN_W as f32, FLOOR_Y - horizon, low);
 }
 

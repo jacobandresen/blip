@@ -13,7 +13,7 @@
 //! - [`remember`]: what a bot keeps between frames; [`best`] the cheapest of some options (nearest, soonest,
 //!   safest); [`chance`] a coin with odds; [`may_continue`] whether to take a continue offered at game over.
 //! - Stats: [`add`], [`set`], [`reached_level`]; the run ends with one
-//!   `RESULT` line ([`finish`]), with the fun measures of [`fun`] (`fun_*`); [`near`] feeds them.
+//!   `RESULT` line ([`finish`]), with the fun measures of `fun.rs` (`fun_*`); [`near`] feeds them.
 //!
 //! Switches (native only; the web build never runs a bot):
 //! `BLIP_BOT=1` plays at a fixed 60 Hz. `BLIP_BOT_MAXT` sets the time limit,

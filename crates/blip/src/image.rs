@@ -2,6 +2,17 @@
 
 use png::{BitDepth, ColorType, Encoder};
 
+/// How many of a pixel's 3x3 samples `inside` covers (0 to 9): an antialiased edge.
+pub fn coverage(x: i32, y: i32, inside: impl Fn(f32, f32) -> bool) -> u32 {
+    let mut n = 0;
+    for sy in 0..3 {
+        for sx in 0..3 {
+            n += inside(x as f32 + (sx as f32 + 0.5) / 3.0, y as f32 + (sy as f32 + 0.5) / 3.0) as u32;
+        }
+    }
+    n
+}
+
 /// An RGBA8 image canvas. Origin is top-left; `(0,0,0,0)` background.
 pub struct Image {
     pub w: u32,
@@ -29,6 +40,13 @@ impl Image {
         self.px[off + 1] = g;
         self.px[off + 2] = b;
         self.px[off + 3] = a;
+    }
+
+    /// The pixel at (x, y); clear outside the image.
+    pub fn get(&self, x: i32, y: i32) -> [u8; 4] {
+        if x < 0 || y < 0 || x as u32 >= self.w || y as u32 >= self.h { return [0; 4]; }
+        let o = (y as usize * self.w as usize + x as usize) * 4;
+        [self.px[o], self.px[o + 1], self.px[o + 2], self.px[o + 3]]
     }
 
     /// Composite an unpremultiplied color over the existing pixel.
@@ -75,13 +93,11 @@ impl Image {
         let bottom = ((from.1.max(to.1) + radius).ceil() as i32).min(self.h as i32);
         for y in top..bottom {
             for x in left..right {
-                let mut covered = 0;
-                for sy in 0..3 { for sx in 0..3 {
-                    let px = x as f32 + (sx as f32 + 0.5) / 3.0 - from.0;
-                    let py = y as f32 + (sy as f32 + 0.5) / 3.0 - from.1;
+                let covered = coverage(x, y, |sx, sy| {
+                    let (px, py) = (sx - from.0, sy - from.1);
                     let along = px * ux + py * uy;
-                    if (0.0..=length).contains(&along) && (px * uy - py * ux).abs() <= radius { covered += 1; }
-                } }
+                    (0.0..=length).contains(&along) && (px * uy - py * ux).abs() <= radius
+                });
                 if covered > 0 {
                     self.blend(x, y, [color[0], color[1], color[2], (color[3] as f32 * covered as f32 / 9.0).round() as u8]);
                 }

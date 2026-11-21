@@ -17,8 +17,6 @@ use macroquad::time::get_frame_time;
 use macroquad::window::{clear_background, get_internal_gl, next_frame, screen_height, screen_width, Conf};
 
 use crate::color::*;
-use crate::draw;
-use crate::font;
 
 /// Create the macroquad window configuration. Pass the result to `#[macroquad::main(conf)]`.
 /// `width` and `height` set the *virtual* canvas size — the window is resizable and will
@@ -191,7 +189,7 @@ void main() {
 "#;
 
 /// The main blip runtime. Create one at the start of `main` with `Blip::new(w, h)`,
-/// then call `blip.next_frame(60).await` at the end of every game loop iteration.
+/// then call `blip.next_frame().await` at the end of every game loop iteration.
 /// Read `blip.delta_time` each frame to get the elapsed seconds since the last tick.
 pub struct Blip {
     pub width:      i32,
@@ -375,6 +373,15 @@ impl Blip {
         set_camera(&cam);
     }
 
+    /// Draw with `draw` shaken by [`crate::shake`] (`left` of `secs` to go, at most `amp` pixels), then the view
+    /// restored.
+    pub fn shaken(&self, left: f32, secs: f32, amp: f32, draw: impl FnOnce()) {
+        let (dx, dy) = crate::shake(left, secs, amp);
+        self.set_offset(dx, dy);
+        draw();
+        self.set_offset(0.0, 0.0);
+    }
+
     /// Shift everything drawn after this by `(dx, dy)` canvas pixels, for a
     /// screen shake; `set_offset(0.0, 0.0)` restores the normal view.
     pub fn set_offset(&self, dx: f32, dy: f32) {
@@ -463,7 +470,7 @@ impl Blip {
     /// End the current frame: blit the virtual canvas to the screen (with CRT effects),
     /// then yield to macroquad and wait for the next frame.
     /// Call this exactly once at the bottom of your game loop.
-    pub async fn next_frame(&mut self, _target_fps: i32) {
+    pub async fn next_frame(&mut self) {
         // A playtest's hit boxes go on the canvas, under the glass like the game.
         self.apply_camera();
         crate::bot::overlay();
@@ -817,142 +824,6 @@ impl Blip {
     /// (the default, tuned for bright lines on a black field).
     pub fn set_bloom(&mut self, k: f32) { self.bloom = k.clamp(0.0, 1.0); }
 
-    /// Fill the canvas with a solid colour. Call this at the start of your draw pass.
-    #[inline]
-    pub fn clear(&self, c: Color) { draw::clear(c); }
-    /// Draw a solid filled rectangle.
-    #[inline]
-    pub fn fill_rect(&self, x: f32, y: f32, w: f32, h: f32, c: Color) {
-        draw::fill_rect(x, y, w, h, c);
-    }
-    /// Draw a 1-pixel outline rectangle (no fill).
-    #[inline]
-    pub fn draw_rect(&self, x: f32, y: f32, w: f32, h: f32, c: Color) {
-        draw::draw_rect(x, y, w, h, c);
-    }
-    /// Draw a circle outline with the given radius and line width.
-    #[inline]
-    pub fn draw_circle(&self, cx: f32, cy: f32, r: f32, width: f32, c: Color) {
-        draw::draw_circle(cx, cy, r, width, c);
-    }
-    /// Draw a 1-pixel line between two points.
-    #[inline]
-    pub fn draw_line(&self, x1: f32, y1: f32, x2: f32, y2: f32, c: Color) {
-        draw::draw_line(x1, y1, x2, y2, c);
-    }
-    /// Draw a line of arbitrary thickness between two points.
-    #[inline]
-    pub fn draw_line_ex(&self, x1: f32, y1: f32, x2: f32, y2: f32, thickness: f32, c: Color) {
-        draw::draw_line_ex(x1, y1, x2, y2, thickness, c);
-    }
-    pub fn draw_polyline(&self, points: impl IntoIterator<Item = (f32, f32, bool)>, thickness: f32, color: Color, alternate: Color) {
-        draw::draw_polyline(points, thickness, color, alternate);
-    }
-    /// Draw a neon glowing line — a soft halo under a bright core. Use for vector
-    /// silhouettes (ship outlines, asteroid edges) that should read as "lit up".
-    #[inline]
-    pub fn draw_glow_line(&self, x1: f32, y1: f32, x2: f32, y2: f32, c: Color) {
-        draw::draw_glow_line(x1, y1, x2, y2, c);
-    }
-    /// Draw a solid filled circle. (`cx`, `cy`) is the centre, `r` is the radius.
-    #[inline]
-    pub fn fill_circle(&self, cx: f32, cy: f32, r: f32, c: Color) {
-        draw::fill_circle(cx, cy, r, c);
-    }
-    /// Draw a tapered capsule between two points; see [`draw::fill_capsule`].
-    #[inline]
-    pub fn fill_capsule(&self, x1: f32, y1: f32, x2: f32, y2: f32, r1: f32, r2: f32, c: Color) {
-        draw::fill_capsule(x1, y1, x2, y2, r1, r2, c);
-    }
-    /// Draw a two-colour sunburst; see [`draw::fill_sunburst`].
-    #[inline]
-    pub fn fill_sunburst(&self, cx: f32, cy: f32, rays: usize, turn: f32, reach: f32, colors: [Color; 2]) {
-        draw::fill_sunburst(cx, cy, rays, turn, reach, colors);
-    }
-    /// Draw a soft glowing circle — halo under a bright core. Good for thruster flames,
-    /// muzzle flashes, and explosion particles.
-    #[inline]
-    pub fn fill_glow_circle(&self, cx: f32, cy: f32, r: f32, c: Color) {
-        draw::fill_glow_circle(cx, cy, r, c);
-    }
-    /// Draw a texture stretched to fill the given rectangle.
-    #[inline]
-    pub fn draw_texture(&self, tex: &macroquad::texture::Texture2D, x: f32, y: f32, w: f32, h: f32) {
-        draw::draw_texture(tex, x, y, w, h);
-    }
-    /// Draw a pixel region of a texture into the given rectangle.
-    #[inline]
-    #[allow(clippy::too_many_arguments)]
-    pub fn draw_texture_region(
-        &self, tex: &macroquad::texture::Texture2D, sx: f32, sy: f32, sw: f32, sh: f32,
-        x: f32, y: f32, w: f32, h: f32,
-    ) {
-        draw::draw_texture_region(tex, sx, sy, sw, sh, x, y, w, h);
-    }
-    /// Draw one cell of a sprite sheet, rotated about its centre.
-    #[inline]
-    #[allow(clippy::too_many_arguments)]
-    pub fn draw_texture_cell(
-        &self, tex: &macroquad::texture::Texture2D, col: u32, cols: u32, row: u32, rows: u32,
-        x: f32, y: f32, w: f32, h: f32, rotation: f32,
-    ) {
-        draw::draw_texture_cell(tex, col, cols, row, rows, x, y, w, h, rotation);
-    }
-    /// Draw a texture stretched to fill the given rectangle, multiplied by a tint colour.
-    #[inline]
-    pub fn draw_texture_tinted(
-        &self, tex: &macroquad::texture::Texture2D, x: f32, y: f32, w: f32, h: f32, tint: Color,
-    ) {
-        draw::draw_texture_tinted(tex, x, y, w, h, tint);
-    }
-    /// Draw a tinted texture mirrored when `face` is negative, for a figure
-    /// drawn facing right.
-    #[inline]
-    #[allow(clippy::too_many_arguments)]
-    pub fn draw_texture_facing(
-        &self, tex: &macroquad::texture::Texture2D, x: f32, y: f32, w: f32, h: f32, tint: Color, face: f32,
-    ) {
-        draw::draw_texture_facing(tex, x, y, w, h, tint, face);
-    }
-
-    // ----- font helpers -----
-
-    /// Draw a single character at pixel position (`x`, `y`). `sz` is the pixel scale.
-    #[inline]
-    pub fn draw_char(&self, c: char, x: f32, y: f32, sz: f32, color: Color) {
-        font::draw_char(c, x, y, sz, color);
-    }
-    /// Draw a left-aligned string.
-    #[inline]
-    pub fn draw_text(&self, text: &str, x: f32, y: f32, sz: f32, color: Color) {
-        font::draw_text(text, x, y, sz, color);
-    }
-    /// Draw a left-aligned string outlined in `ink`, to be read over a picture.
-    #[inline]
-    pub fn draw_text_outlined(&self, text: &str, x: f32, y: f32, sz: f32, color: Color, ink: Color) {
-        font::draw_text_outlined(text, x, y, sz, color, ink);
-    }
-    /// Draw an outlined string centred on `cx`.
-    #[inline]
-    pub fn draw_centered_outlined(&self, text: &str, cx: f32, y: f32, sz: f32, color: Color, ink: Color) {
-        font::draw_text_outlined(text, cx - font::text_width(text, sz) / 2.0, y, sz, color, ink);
-    }
-    /// Draw an integer as text — avoids a `format!` call.
-    #[inline]
-    pub fn draw_number(&self, n: i32, x: f32, y: f32, sz: f32, color: Color) {
-        font::draw_number(n, x, y, sz, color);
-    }
-    /// Return the x coordinate that would horizontally centre `text` on this canvas.
-    #[inline]
-    pub fn text_cx(&self, text: &str, sz: i32) -> i32 {
-        font::text_cx(self.width, text, sz)
-    }
-    /// Draw a string horizontally centred on this canvas.
-    #[inline]
-    pub fn draw_centered(&self, text: &str, y: f32, sz: f32, color: Color) {
-        font::draw_centered(self.width, text, y, sz, color);
-    }
-
     /// Draw SCORE, the best score and LIVES across the top.
     /// The high-score field is clipped between the left and right fields.
     /// Where the HUD's SCORE starts: the shell clips 3 screen pixels, which at half scale is 6 game pixels.
@@ -1077,6 +948,11 @@ impl Blip {
         self.draw_centered(text, Self::game_over_prompt_y(h), 3.0, color);
     }
 
+    /// The continue offer's count, while it shows.
+    pub fn draw_continue(&self, cont: &crate::Continue, color: Color) {
+        if cont.showing() { self.draw_game_over_prompt(&format!("CONTINUE? {}", cont.seconds()), color); }
+    }
+
     /// Two thirds down, or lower on a short screen, to leave the note its line.
     fn game_over_prompt_y(h: f32) -> f32 {
         (h * 2.0 / 3.0).max(h / 2.0 + 80.0)
@@ -1088,7 +964,7 @@ impl Blip {
     pub fn draw_best(&self, score: i32, hi: i32, y: f32, new_color: Color) {
         if hi > 0 && score >= hi {
             // It flashes (its colour and white, four times a second): the moment a player most wants to see.
-            let lit = (macroquad::time::get_time() * 4.0) as i64 % 2 == 0;
+            let lit = crate::blink(4.0);
             self.draw_centered("NEW BEST!", y, 2.0, if lit { new_color } else { BLIP_WHITE });
         } else if hi > 0 {
             self.draw_centered(&format!("BEST {hi}"), y, 2.0, BLIP_GRAY);

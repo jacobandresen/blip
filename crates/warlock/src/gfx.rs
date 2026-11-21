@@ -6,6 +6,7 @@
 //! light, deep crimson and old gold accents.
 
 use blip::image::Image;
+use blip::math::{bounds, in_polygon};
 use blip::Asset;
 
 /// One sprite or tile cell, in pixels.
@@ -47,26 +48,10 @@ fn mix(a: C, b: C, t: f32) -> C {
     [f(a[0], b[0]), f(a[1], b[1]), f(a[2], b[2]), f(a[3], b[3])]
 }
 
-fn put(img: &mut Image, x: i32, y: i32, c: C) {
-    if c[3] == 255 {
-        img.set_rgba(x, y, c[0], c[1], c[2], 255);
-    } else {
-        img.blend(x, y, c);
-    }
-}
-
-fn get(img: &Image, x: i32, y: i32) -> C {
-    if x < 0 || y < 0 || x >= img.w as i32 || y >= img.h as i32 {
-        return [0; 4];
-    }
-    let o = ((y as u32 * img.w + x as u32) * 4) as usize;
-    [img.px[o], img.px[o + 1], img.px[o + 2], img.px[o + 3]]
-}
-
 fn rect(img: &mut Image, x: i32, y: i32, w: i32, h: i32, c: C) {
     for yy in y..y + h {
         for xx in x..x + w {
-            put(img, xx, yy, c);
+            img.blend(xx, yy, c);
         }
     }
 }
@@ -78,7 +63,7 @@ fn ellipse(img: &mut Image, cx: f32, cy: f32, rx: f32, ry: f32, c: C) {
             let dx = (x as f32 + 0.5 - cx) / rx;
             let dy = (y as f32 + 0.5 - cy) / ry;
             if dx * dx + dy * dy <= 1.0 {
-                put(img, x, y, c);
+                img.blend(x, y, c);
             }
         }
     }
@@ -90,28 +75,11 @@ fn disc(img: &mut Image, cx: f32, cy: f32, r: f32, c: C) {
 
 /// A filled polygon (even-odd), sampled at pixel centres.
 fn poly(img: &mut Image, pts: &[(f32, f32)], c: C) {
-    let (mut x0, mut y0, mut x1, mut y1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
-    for &(x, y) in pts {
-        x0 = x0.min(x);
-        y0 = y0.min(y);
-        x1 = x1.max(x);
-        y1 = y1.max(y);
-    }
+    let (x0, y0, x1, y1) = bounds(pts);
     for y in y0.floor() as i32..=y1.ceil() as i32 {
         for x in x0.floor() as i32..=x1.ceil() as i32 {
-            let (px, py) = (x as f32 + 0.5, y as f32 + 0.5);
-            let mut inside = false;
-            let mut j = pts.len() - 1;
-            for i in 0..pts.len() {
-                let (xi, yi) = pts[i];
-                let (xj, yj) = pts[j];
-                if (yi > py) != (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi {
-                    inside = !inside;
-                }
-                j = i;
-            }
-            if inside {
-                put(img, x, y, c);
+            if in_polygon(pts, x as f32 + 0.5, y as f32 + 0.5) {
+                img.blend(x, y, c);
             }
         }
     }
@@ -130,7 +98,7 @@ fn line(img: &mut Image, a: (f32, f32), b: (f32, f32), w: f32, c: C) {
             let t = (((px - a.0) * dx + (py - a.1) * dy) / len2).clamp(0.0, 1.0);
             let (qx, qy) = (a.0 + dx * t - px, a.1 + dy * t - py);
             if qx * qx + qy * qy <= r * r {
-                put(img, x, y, c);
+                img.blend(x, y, c);
             }
         }
     }
@@ -140,7 +108,7 @@ fn line(img: &mut Image, a: (f32, f32), b: (f32, f32), w: f32, c: C) {
 fn relight(img: &mut Image, f: impl Fn(i32, i32, C) -> C) {
     for y in 0..img.h as i32 {
         for x in 0..img.w as i32 {
-            let c = get(img, x, y);
+            let c = img.get(x, y);
             if c[3] > 0 {
                 let n = f(x, y, c);
                 img.set_rgba(x, y, n[0], n[1], n[2], n[3]);
@@ -155,10 +123,10 @@ fn outline(img: &mut Image) {
     let src = Image { w: img.w, h: img.h, px: img.px.clone() };
     for y in 0..img.h as i32 {
         for x in 0..img.w as i32 {
-            if get(&src, x, y)[3] > 40 {
+            if src.get(x, y)[3] > 40 {
                 continue;
             }
-            let near = [(-1, 0), (1, 0), (0, -1), (0, 1)].iter().any(|&(dx, dy)| get(&src, x + dx, y + dy)[3] > 120);
+            let near = [(-1, 0), (1, 0), (0, -1), (0, 1)].iter().any(|&(dx, dy)| src.get(x + dx, y + dy)[3] > 120);
             if near {
                 img.set_rgba(x, y, INK[0], INK[1], INK[2], 235);
             }
@@ -170,7 +138,7 @@ fn outline(img: &mut Image) {
 fn stamp(dst: &mut Image, src: &Image, ox: i32, oy: i32) {
     for y in 0..src.h as i32 {
         for x in 0..src.w as i32 {
-            let c = get(src, x, y);
+            let c = src.get(x, y);
             if c[3] > 0 {
                 dst.set_rgba(ox + x, oy + y, c[0], c[1], c[2], c[3]);
             }
@@ -182,7 +150,7 @@ fn mirror(img: &Image) -> Image {
     let mut out = Image::new(img.w, img.h);
     for y in 0..img.h as i32 {
         for x in 0..img.w as i32 {
-            let c = get(img, x, y);
+            let c = img.get(x, y);
             out.set_rgba(img.w as i32 - 1 - x, y, c[0], c[1], c[2], c[3]);
         }
     }
@@ -221,7 +189,7 @@ fn floor_tile(seed: u32) -> Image {
                 if yy == y + h - 2 || xx == x + w - 2 {
                     c = shade(c, 0.72);
                 }
-                put(&mut img, xx, yy, c);
+                img.blend(xx, yy, c);
             }
         }
     }
@@ -230,7 +198,7 @@ fn floor_tile(seed: u32) -> Image {
         let mut x = 4.0 + hash(8, 1, seed) * 24.0;
         let mut y = 3.0 + hash(8, 2, seed) * 8.0;
         for k in 0..10 {
-            put(&mut img, x as i32, y as i32, shade(MORTAR, 1.3));
+            img.blend(x as i32, y as i32, shade(MORTAR, 1.3));
             x += hash(k, 3, seed) * 2.0 - 0.8;
             y += 1.4;
         }
@@ -267,7 +235,7 @@ fn floor_decor(kind: u32) -> Image {
                 for x in 0..32 {
                     let d = ((x - 6) * (x - 6) + (y - 26) * (y - 26)) as f32;
                     if d < 90.0 && hash(x, y, 77) > 0.35 + d / 200.0 {
-                        put(&mut img, x, y, mix(rgb(0x2c3a26), rgb(0x46593a), hash(x, y, 78)));
+                        img.blend(x, y, mix(rgb(0x2c3a26), rgb(0x46593a), hash(x, y, 78)));
                     }
                 }
             }
@@ -305,7 +273,7 @@ fn wall_cap(seed: u32) -> Image {
                     if yy == row * 8 + 1 {
                         c = shade(c, 1.25);
                     }
-                    put(&mut img, xx, yy, c);
+                    img.blend(xx, yy, c);
                 }
             }
             x += w;
@@ -338,7 +306,7 @@ fn wall_face(seed: u32) -> Image {
                     if yy == y0 + 9 {
                         c = shade(c, 0.7);
                     }
-                    put(&mut img, xx, yy, c);
+                    img.blend(xx, yy, c);
                 }
             }
             x += w;
@@ -348,7 +316,7 @@ fn wall_face(seed: u32) -> Image {
     // a damp streak
     if seed % 2 == 1 {
         for y in 4..30 {
-            put(&mut img, 22, y, rgba(0x0e1218, 90));
+            img.blend(22, y, rgba(0x0e1218, 90));
         }
     }
     img
@@ -421,7 +389,7 @@ pub fn flagstones(w: u32, h: u32, seed: u32) -> Image {
             let a = dir + (hash(k, j, seed + 11) - 0.5) * 1.4;
             x += a.cos() * 1.3;
             y += a.sin() * 1.3;
-            put(&mut img, x as i32, y as i32, rgba(0x0b0c10, 170));
+            img.blend(x as i32, y as i32, rgba(0x0b0c10, 170));
         }
     }
     img
@@ -573,8 +541,8 @@ fn imp(frame: i32) -> Image {
     rect(&mut img, 13, 13, 1, 2, INK);
     rect(&mut img, 18, 13, 1, 2, INK);
     line(&mut img, (12.5, 17.5), (19.5, 17.5), 1.0, deep);
-    put(&mut img, 13, 18, rgb(0xf4f0e0));
-    put(&mut img, 18, 18, rgb(0xf4f0e0));
+    img.blend(13, 18, rgb(0xf4f0e0));
+    img.blend(18, 18, rgb(0xf4f0e0));
     // feet and claws
     rect(&mut img, 12, 27, 3, 2, deep);
     rect(&mut img, 17, 27, 3, 2, deep);
@@ -639,7 +607,7 @@ fn hound(frame: i32) -> Image {
     poly(&mut img, &[(20.0, 14.0), (25.0, 10.0), (27.0, 16.0), (22.0, 20.0)], fur);
     ellipse(&mut img, 25.0, 12.5, 3.6, 3.0, fur);
     poly(&mut img, &[(26.0, 11.0), (31.0, 13.0), (30.5, 15.0), (26.0, 15.5)], fur); // snout
-    put(&mut img, 31, 13, INK);
+    img.blend(31, 13, INK);
     poly(&mut img, &[(22.5, 10.5), (23.5, 5.0), (25.5, 9.5)], dark); // ear
     rect(&mut img, 26, 11, 2, 2, rgb(0xff8a2a)); // ember eye
     // embers smoulder in cracks along the neck
@@ -649,7 +617,7 @@ fn hound(frame: i32) -> Image {
     for k in 0..3 {
         let x = 10 + k * 4;
         rect(&mut img, x, 14, 2, 1, rgb(0xffb347));
-        put(&mut img, x + 1, 13, rgb(0xffb347));
+        img.blend(x + 1, 13, rgb(0xffb347));
     }
     sculpt(&mut img, 14.0, 8.0);
     outline(&mut img);
@@ -691,7 +659,7 @@ fn gargoyle(frame: i32, spread: bool) -> Image {
     for k in 0..12 {
         let x = 10 + (hash(k, 1, 4) * 12.0) as i32;
         let y = 16 + (hash(k, 2, 4) * 10.0) as i32;
-        put(&mut img, x, y, rgb(0x4d6b3c));
+        img.blend(x, y, rgb(0x4d6b3c));
     }
     line(&mut img, (18.0, 18.0), (20.0, 23.0), 1.0, deep);
     sculpt(&mut img, 12.0, 8.0);
@@ -729,8 +697,8 @@ fn warlock(frame: i32, cast: bool) -> Image {
     ellipse(&mut img, 16.0, 8.5, 3.8, 4.0, rgb(0x0b0a10));
     rect(&mut img, 14, 8, 1, 1, violet);
     rect(&mut img, 17, 8, 1, 1, violet);
-    put(&mut img, 14, 7, shade(violet, 0.6));
-    put(&mut img, 17, 7, shade(violet, 0.6));
+    img.blend(14, 7, shade(violet, 0.6));
+    img.blend(17, 7, shade(violet, 0.6));
     sculpt(&mut img, 12.0, 4.0);
     outline(&mut img);
     img
@@ -786,7 +754,7 @@ fn rune_stone(clean: bool) -> Image {
     sculpt(&mut img, 12.0, 6.0);
     // glyphs stay at full brightness after the shading
     for (x, y) in [(16, 10), (16, 16), (16, 22)] {
-        put(&mut img, x, y, glow);
+        img.blend(x, y, glow);
     }
     outline(&mut img);
     img
@@ -850,7 +818,7 @@ fn candles() -> Image {
         rect(&mut img, (x - w / 2.0) as i32, top as i32, 1, (27.0 - top) as i32, shade(wax, 1.12));
         // a drip
         rect(&mut img, (x + w / 2.0) as i32, (top + 2.0) as i32, 1, 3, shade(wax, 0.85));
-        put(&mut img, x as i32, top as i32 - 1, rgb(0x2a1d14)); // wick
+        img.blend(x as i32, top as i32 - 1, rgb(0x2a1d14)); // wick
     }
     sculpt(&mut img, 10.0, 10.0);
     outline(&mut img);
@@ -893,8 +861,8 @@ fn dragon_skull() -> Image {
     // teeth
     for k in 0..7 {
         let x = 34 + k * 3;
-        put(&mut img, x, 21, rgb(0xf1ead6));
-        put(&mut img, x, 22, rgb(0xf1ead6));
+        img.blend(x, 21, rgb(0xf1ead6));
+        img.blend(x, 22, rgb(0xf1ead6));
     }
     // eye socket, nostril, cheek ridge
     ellipse(&mut img, 29.0, 13.5, 4.0, 3.0, rgb(0x0c0b0a));

@@ -5,6 +5,7 @@
 //!   cars, dogs, skaters, stalls, sprinklers and bridge railings (each moving as the game moves it), and the clearest
 //!   that heads for the door wins;
 //! - throws go the moment a paper thrown now lands where it does good (the slot when it is still to come).
+//!
 //! On the Canal Run it lines up the best target that can still be reached. `BLIP_BOT_PLAYERS=2` rides the tandem.
 
 use super::*;
@@ -301,9 +302,9 @@ fn turn_left(g: &Game, pad: &mut Pad) {
 fn hit_boxes(g: &Game) {
     let seg = g.seg();
     let (ix, iy) = (CRASH_INSET.0 / 2.0, CRASH_INSET.1 / 2.0);
-    let me = Mover::still(g.bike_x, crate::draw::sy(g, g.bike_d)).sized(BIKE_HW - ix, BIKE_HL - iy);
+    let me = Mover::still(g.bike_x, crate::draw::sy(g.bike_d)).sized(BIKE_HW - ix, BIKE_HL - iy);
     let hazards: Vec<Mover> = g.hazards.iter().filter(|h| !h.gone && h.seg == seg && h.solid())
-        .map(|h| { let (hw, hl) = h.size(); Mover::still(h.x, crate::draw::sy(g, h.d)).sized(hw - ix, hl - iy) }).collect();
+        .map(|h| { let (hw, hl) = h.size(); Mover::still(h.x, crate::draw::sy(h.d)).sized(hw - ix, hl - iy) }).collect();
     blip::bot::near(&[me], &hazards);
 }
 

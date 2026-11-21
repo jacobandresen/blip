@@ -357,7 +357,6 @@ struct Game {
     /// The continue offered at game over, and the best score of the run before one was taken (a continue starts
     /// the score afresh; the run's best is what is reported).
     cont: blip::Continue,
-    run_best: i32,
     died_this_room: bool,
     cleared_no_death: i32,
     sfx: Option<Sounds>,
@@ -408,7 +407,6 @@ impl Game {
             fx: Fx::new(),
             dead_timer: Timer::default(),
             cont: blip::Continue::default(),
-            run_best: 0,
             died_this_room: false,
             cleared_no_death: 0,
             sfx: None,
@@ -617,7 +615,6 @@ impl Game {
         // A playtest can start with fewer lives (BLIP_BOT_LIVES), to reach game over soon.
         let lives = blip::bot::num("LIVES").map_or(LIVES_START, |n| n as i32);
         self.sess.reset(lives);
-        self.run_best = 0;
         blip::bot::levels(levels::ROOMS.len());
         self.lives = [lives, LIVES_START];
         self.active = [true, false];
@@ -1430,7 +1427,7 @@ impl Game {
                 self.cont.start(CONTINUE_SECS);
                 self.state = State::Over;
                 // A new best (over the run's continues) rings the chamber-cleared chord instead of the knell.
-                self.sfx(if web::beats_best(self.sess.score.max(self.run_best)) { Sfx::Chamber } else { Sfx::Over });
+                self.sfx(if self.sess.beats_best() { Sfx::Chamber } else { Sfx::Over });
             }
         }
     }
@@ -1762,9 +1759,7 @@ impl Game {
     fn check_over_again(&mut self, dt: f32) {
         match self.cont.update(dt, self.bolt_pressed(0)) {
             Some(true) => {
-                blip::bot::add("continues", 1.0);
-                self.run_best = self.run_best.max(self.sess.score);
-                self.sess.score = 0;
+                self.sess.play_on(LIVES_START);
                 self.lives = [LIVES_START, LIVES_START];
                 self.active = [true, self.two_player];
                 self.dead_index = None;
@@ -1773,7 +1768,7 @@ impl Game {
             }
             Some(false) => {
                 if !self.two_player {
-                    web::report_score(self.sess.score.max(self.run_best));
+                    self.sess.report();
                 }
                 self.state = State::Title;
             }
@@ -1963,9 +1958,7 @@ fn draw_over(blip: &Blip, g: &Game) {
     let hi = web::high_score();
     blip.draw_game_over(g.sess.score, hi, WARLOCK_C, BLIP_YELLOW, BLIP_WHITE, false);
     blip.draw_game_over_note(&format!("WINGS CLEARED {}", g.cleared_no_death), BLIP_GRAY);
-    if g.cont.showing() {
-        blip.draw_game_over_prompt(&format!("CONTINUE? {}", g.cont.seconds()), BLIP_YELLOW);
-    }
+    blip.draw_continue(&g.cont, BLIP_YELLOW);
 }
 
 // ---- entry ----------------------------------------------------------------
@@ -2008,7 +2001,7 @@ async fn main() {
             dt = 1.0 / 60.0;
         }
         #[allow(unused_mut)]
-        let mut t = blip::macroquad::time::get_time() as f32;
+        let mut t = blip::now();
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(at) = std::env::var("WARLOCK_T").ok().and_then(|v| v.parse::<f32>().ok()) {
             t = at + frame as f32 / 60.0;
@@ -2056,7 +2049,7 @@ async fn main() {
         blip.clear(BLIP_BLACK);
         art.draw_frame(&blip, &g, t);
 
-        blip.next_frame(60).await;
+        blip.next_frame().await;
     }
 }
 

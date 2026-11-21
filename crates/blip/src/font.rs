@@ -1,72 +1,78 @@
-//! 5×7 bitmap font for digits, case-insensitive A–Z, and `! : - . ( )`.
+//! 5×7 bitmap font for digits, case-insensitive A–Z, and `! : - . ( )`, drawn through `Blip`.
 //! `sz` scales each pixel; at 2.0 each glyph is 10×14.
 
 use macroquad::color::Color;
+use macroquad::shapes::draw_rectangle;
 
-use crate::draw::fill_rect;
-
-pub use crate::glyphs::FONT;
-use crate::glyphs::glyph_index as char_to_glyph;
+use crate::glyphs::{glyph_index, FONT};
+use crate::Blip;
 
 const OUTLINE_OFFSETS: [(f32, f32); 8] = [
     (-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0),
     (-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0),
 ];
 
-/// Draw a single character at pixel position (`x`, `y`). Unknown characters are silently skipped.
-pub fn draw_char(c: char, x: f32, y: f32, sz: f32, color: Color) {
-    let Some(idx) = char_to_glyph(c) else { return };
-    for (row, bits) in FONT[idx].iter().enumerate() {
-        for col in 0..5 {
-            if bits & (1 << (4 - col)) != 0 {
-                fill_rect(x + col as f32 * sz, y + row as f32 * sz, sz, sz, color);
-            }
-        }
-    }
-}
-
-/// Draw a left-aligned string. Each character is 6×sz pixels wide (5 pixels + 1 gap).
-pub fn draw_text(text: &str, x: f32, y: f32, sz: f32, color: Color) {
-    let mut cx = x;
-    for c in text.chars() {
-        draw_char(c, cx, y, sz, color);
-        cx += 6.0 * sz;
-    }
-}
-
-/// Draw a string with an outline of `ink` all round it, one font pixel thick
-/// at small sizes: lettering that has to be read over a picture.
-pub fn draw_text_outlined(text: &str, x: f32, y: f32, sz: f32, color: Color, ink: Color) {
-    // The outline is never more solid than the text: fading text left a dark smudge of outline behind. Each pass
-    // gets the alpha that its OUTLINE_OFFSETS.len() overlapping copies stack up to (solid stays solid).
-    let target = ink.a.min(color.a);
-    let a = if target >= 1.0 { 1.0 } else { 1.0 - (1.0 - target).powf(1.0 / OUTLINE_OFFSETS.len() as f32) };
-    let ink = Color { a, ..ink };
-    let d = (sz * 0.5).max(1.0);
-    for (dx, dy) in OUTLINE_OFFSETS {
-        draw_text(text, x + dx * d, y + dy * d, sz, ink);
-    }
-    draw_text(text, x, y, sz, color);
-}
-
 /// Width of a string in pixels at size `sz` (a fixed 6-pixel cell).
 pub fn text_width(text: &str, sz: f32) -> f32 {
     text.chars().count() as f32 * 6.0 * sz
 }
 
-/// Convenience wrapper to draw an integer without allocating a String at the call site.
-pub fn draw_number(n: i32, x: f32, y: f32, sz: f32, color: Color) {
-    draw_text(&n.to_string(), x, y, sz, color);
-}
+impl Blip {
+    /// Draw a single character at pixel position (`x`, `y`). Unknown characters are silently skipped.
+    pub fn draw_char(&self, c: char, x: f32, y: f32, sz: f32, color: Color) {
+        let Some(idx) = glyph_index(c) else { return };
+        for (row, bits) in FONT[idx].iter().enumerate() {
+            for col in 0..5 {
+                if bits & (1 << (4 - col)) != 0 {
+                    draw_rectangle(x + col as f32 * sz, y + row as f32 * sz, sz, sz, color);
+                }
+            }
+        }
+    }
 
-/// Return the x coordinate that would centre `text` within a canvas of `width` pixels.
-pub fn text_cx(width: i32, text: &str, sz: i32) -> i32 {
-    (width - text.chars().count() as i32 * 6 * sz) / 2
-}
+    /// Draw a left-aligned string. Each character is 6×sz pixels wide (5 pixels + 1 gap).
+    pub fn draw_text(&self, text: &str, x: f32, y: f32, sz: f32, color: Color) {
+        let mut cx = x;
+        for c in text.chars() {
+            self.draw_char(c, cx, y, sz, color);
+            cx += 6.0 * sz;
+        }
+    }
 
-/// Draw a horizontally centred string within a canvas of `width` pixels.
-pub fn draw_centered(width: i32, text: &str, y: f32, sz: f32, color: Color) {
-    draw_text(text, text_cx(width, text, sz as i32) as f32, y, sz, color);
+    /// Draw a string with an outline of `ink` all round it, one font pixel thick
+    /// at small sizes: lettering that has to be read over a picture.
+    pub fn draw_text_outlined(&self, text: &str, x: f32, y: f32, sz: f32, color: Color, ink: Color) {
+        // The outline is never more solid than the text: fading text left a dark smudge of outline behind. Each pass
+        // gets the alpha that its OUTLINE_OFFSETS.len() overlapping copies stack up to (solid stays solid).
+        let target = ink.a.min(color.a);
+        let a = if target >= 1.0 { 1.0 } else { 1.0 - (1.0 - target).powf(1.0 / OUTLINE_OFFSETS.len() as f32) };
+        let ink = Color { a, ..ink };
+        let d = (sz * 0.5).max(1.0);
+        for (dx, dy) in OUTLINE_OFFSETS {
+            self.draw_text(text, x + dx * d, y + dy * d, sz, ink);
+        }
+        self.draw_text(text, x, y, sz, color);
+    }
+
+    /// Draw an outlined string centred on `cx`.
+    pub fn draw_centered_outlined(&self, text: &str, cx: f32, y: f32, sz: f32, color: Color, ink: Color) {
+        self.draw_text_outlined(text, cx - text_width(text, sz) / 2.0, y, sz, color, ink);
+    }
+
+    /// Draw an integer as text.
+    pub fn draw_number(&self, n: i32, x: f32, y: f32, sz: f32, color: Color) {
+        self.draw_text(&n.to_string(), x, y, sz, color);
+    }
+
+    /// The x coordinate that centres `text` on this canvas.
+    pub fn text_cx(&self, text: &str, sz: i32) -> i32 {
+        (self.width - text.chars().count() as i32 * 6 * sz) / 2
+    }
+
+    /// Draw a string horizontally centred on this canvas.
+    pub fn draw_centered(&self, text: &str, y: f32, sz: f32, color: Color) {
+        self.draw_text(text, self.text_cx(text, sz as i32) as f32, y, sz, color);
+    }
 }
 
 #[cfg(test)]

@@ -2,12 +2,12 @@
 #![allow(dead_code)]
 
 use blip::wav::{
-    encode_pcm16_half, encode_pcm16_mono, encode_pcm16_music, env, fade_out, low_pass, ms_to_samples,
-    soft_limit_to_pcm16, tame, warm, Rng, MIX_KNEE, SAMPLE_RATE,
+    encode_pcm16_half, encode_pcm16_mono, encode_pcm16_music, env, fade_out, fold_tail, limit_pcm16, low_pass,
+    ms_to_samples, soft_limit_to_pcm16, tame, warm, Rng, MIX_KNEE, SAMPLE_RATE,
 };
 use blip::Asset;
+use blip::cosy::SR;
 
-const SRF: f32 = SAMPLE_RATE as f32;
 
 /// Plucked string using Karplus–Strong averaging; upper harmonics decay first.
 pub(super) fn pluck(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, rng: &mut Rng) {
@@ -74,11 +74,11 @@ fn hi_hat(buf: &mut [f32], off: usize, gain: f32, rng: &mut Rng) {
     let n = ms_to_samples(38.0).min(buf.len().saturating_sub(off));
     let (mut prev, mut phase) = (0.0f32, 0.0f32);
     for i in 0..n {
-        let t = i as f32 / SRF;
+        let t = i as f32 / SR;
         let noise = rng.next_f32() * 2.0 - 1.0;
         let high = noise - prev;
         prev = noise;
-        phase += std::f32::consts::TAU / SRF;
+        phase += std::f32::consts::TAU / SR;
         let metal = (phase * 5_317.0).sin() + (phase * 7_691.0).sin() + (phase * 9_211.0).sin();
         buf[off + i] += (high * 0.24 + metal * 0.12) * (-t * 72.0).exp() * gain * 2500.0;
     }
@@ -108,12 +108,12 @@ pub(super) fn flute(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, 
     let n = ms_to_samples(ms).min(buf.len().saturating_sub(off));
     let (mut ph, mut air) = (0.0f32, 0.0f32);
     for i in 0..n {
-        let t = i as f32 / SRF;
+        let t = i as f32 / SR;
         let k = i as f32 / n as f32;
         // Blown from just under the note, as the player's lip finds it.
         let scoop = 1.0 - 0.03 * (-t / 0.05).exp();
         let vib = 1.0 + 0.007 * (t / 0.35).min(1.0) * (2.0 * std::f32::consts::PI * 5.2 * t).sin();
-        ph += 2.0 * std::f32::consts::PI * freq * scoop * vib / SRF;
+        ph += 2.0 * std::f32::consts::PI * freq * scoop * vib / SR;
         air += ((rng.next_f32() * 2.0 - 1.0) - air) * 0.25;
         let e = (t / 0.09).min(1.0) * (1.0 - k).powf(0.7);
         let tone = ph.sin() + 0.28 * (2.0 * ph).sin() + 0.10 * (3.0 * ph).sin();
@@ -126,7 +126,7 @@ pub(super) fn flute(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, 
 fn chime(buf: &mut [f32], off: usize, freq: f32, gain: f32) {
     let n = ms_to_samples(520.0).min(buf.len().saturating_sub(off));
     for i in 0..n {
-        let t = i as f32 / SRF;
+        let t = i as f32 / SR;
         let ph = 2.0 * std::f32::consts::PI * freq * t;
         buf[off + i] += (ph.sin() + 0.3 * (2.0 * ph).sin()) * (-t * 7.0).exp() * gain * 2400.0;
     }
@@ -172,7 +172,7 @@ impl Theme<'_> {
         let bars = 4 * order.len();
         let steps = bars * 16;
         // Room past the end for the last notes to ring out in, which is
-        // then folded back onto the top — see `wrap_tail`.
+        // then folded back onto the top — see `fold_tail`.
         let body = step * steps;
         let n = body + ms_to_samples(1400.0);
         let mut buf = vec![0.0f32; n];
@@ -373,7 +373,7 @@ impl Theme<'_> {
                 pluck(&mut buf, off, degree(scale, root, d + 2) * 0.5, beat_ms * 1.2, 0.3, &mut rng);
             }
         }
-        wrap_tail(&mut buf, body);
+        let mut buf = fold_tail(buf, body);
         // Fight music: brighter than the house warmth, and as loud as the other
         // games' (the koto alone sat 12 dB under them).
         low_pass(&mut buf[..body], 6500.0);
@@ -381,14 +381,6 @@ impl Theme<'_> {
             *v *= 2.6;
         }
         soft_limit_to_pcm16(&buf[..body], MIX_KNEE)
-    }
-}
-
-/// Fold what rings out past the end of the loop onto its start, so tails
-/// carry over the loop point instead of the music stopping dead.
-fn wrap_tail(buf: &mut [f32], body: usize) {
-    for i in body..buf.len() {
-        buf[i - body] += buf[i];
     }
 }
 
@@ -616,7 +608,7 @@ pub fn ambience_wav(kind: usize) -> Vec<u8> {
         } else {
             // Wind: a narrow band whose pitch rises and falls with the gusts.
             let gust = 0.5 + 0.5 * turn(1.0, 0.0) * turn(3.0, 0.2);
-            let f = 2.0 * (std::f32::consts::PI * (260.0 + 420.0 * gust) / SRF).sin();
+            let f = 2.0 * (std::f32::consts::PI * (260.0 + 420.0 * gust) / SR).sin();
             let high = noise - low - 0.35 * bp;
             bp += f * high;
             low += f * bp;
@@ -645,13 +637,13 @@ pub fn crowd_wav(long: bool) -> Vec<u8> {
 /// Noise through a resonant band-pass (state-variable filter) at `center`
 /// Hz, rising in `attack` and dying with time constant `decay` (seconds).
 fn band(buf: &mut [f32], at: f32, center: f32, q: f32, amp: f32, attack: f32, decay: f32, rng: &mut Rng) {
-    let off = (at * SRF) as usize;
-    let n = ((attack + decay * 6.0) * SRF) as usize;
-    let f = 2.0 * (std::f32::consts::PI * center / SRF).sin();
+    let off = (at * SR) as usize;
+    let n = ((attack + decay * 6.0) * SR) as usize;
+    let f = 2.0 * (std::f32::consts::PI * center / SR).sin();
     let damp = 1.0 / q;
     let (mut low, mut bp) = (0.0f32, 0.0f32);
     for i in 0..n.min(buf.len().saturating_sub(off)) {
-        let t = i as f32 / SRF;
+        let t = i as f32 / SR;
         let x = rng.next_f32() * 2.0 - 1.0;
         let high = x - low - damp * bp;
         bp += f * high;
@@ -665,11 +657,11 @@ fn band(buf: &mut [f32], at: f32, center: f32, q: f32, amp: f32, attack: f32, de
 /// a room instead of in your ear.
 fn room(buf: &mut Vec<f32>, wet: f32) {
     let taps = [(0.011, 0.30), (0.017, 0.22), (0.026, 0.15), (0.037, 0.10), (0.051, 0.06)];
-    let extra = (0.06 * SRF) as usize;
+    let extra = (0.06 * SR) as usize;
     let dry = buf.clone();
     buf.resize(dry.len() + extra, 0.0);
     for (d, g) in taps {
-        let off = (d * SRF) as usize;
+        let off = (d * SR) as usize;
         let mut lp = 0.0f32;
         for (i, x) in dry.iter().enumerate() {
             lp += (x - lp) * 0.35;
@@ -678,31 +670,19 @@ fn room(buf: &mut Vec<f32>, wet: f32) {
     }
 }
 
-/// Two gentle low-pass poles at `hz`: air and a room take the fizz off.
-fn soften(buf: &mut [f32], hz: f32) {
-    let a = 1.0 - (-2.0 * std::f32::consts::PI * hz / SRF).exp();
-    let (mut l1, mut l2) = (0.0f32, 0.0f32);
-    for v in buf.iter_mut() {
-        l1 += a * (*v - l1);
-        l2 += a * (l1 - l2);
-        *v = l2;
-    }
-}
-
 fn render(mut buf: Vec<f32>, gain: f32) -> Vec<i16> {
-    soften(&mut buf, 5000.0);
+    low_pass(&mut buf, 5000.0);
     room(&mut buf, 1.0);
     fade_out(&mut buf, ms_to_samples(10.0));
-    let scaled: Vec<f32> = buf.iter().map(|v| v * gain).collect();
-    soft_limit_to_pcm16(&scaled, MIX_KNEE)
+    limit_pcm16(&buf, gain)
 }
 
 /// A very short damped sine: the pitch centre of a knock, dead in ~50 ms.
 fn knock(buf: &mut [f32], at: f32, f: f32, amp: f32, tau: f32) {
-    let off = (at * SRF) as usize;
-    let n = ((tau * 5.0) * SRF) as usize;
+    let off = (at * SR) as usize;
+    let n = ((tau * 5.0) * SR) as usize;
     for i in 0..n.min(buf.len().saturating_sub(off)) {
-        let t = i as f32 / SRF;
+        let t = i as f32 / SR;
         buf[off + i] += (2.0 * std::f32::consts::PI * f * t).sin() * amp * (-t / tau).exp() * (t / 0.0008).min(1.0);
     }
 }
@@ -719,8 +699,8 @@ fn voice(
     amp: f32,
     rng: &mut Rng,
 ) {
-    let off = (at * SRF) as usize;
-    let n = (dur * SRF) as usize;
+    let off = (at * SR) as usize;
+    let n = (dur * SR) as usize;
     let formants = [(vowel.0, 80.0, 1.0), (vowel.1, 110.0, 0.55), (vowel.2, 160.0, 0.3)];
     let mut state = [(0.0f32, 0.0f32); 3];
     let (mut ph, mut jit) = (0.0f32, 0.0f32);
@@ -728,7 +708,7 @@ fn voice(
         let k = i as f32 / n as f32;
         jit = jit * 0.995 + (rng.next_f32() - 0.5) * 0.004;
         let f = (f0 + (f1 - f0) * k) * (1.0 + jit);
-        ph += f / SRF;
+        ph += f / SR;
         let mut src = 0.0f32;
         let harmonics = ((3800.0 / f) as usize).max(1);
         for h in 1..=harmonics {
@@ -739,7 +719,7 @@ fn voice(
         let x = src * (1.0 - breath) * shimmer * 0.35 + air * breath * 1.6;
         let mut y = 0.0f32;
         for (j, &(fc, bw, g)) in formants.iter().enumerate() {
-            let fq = 2.0 * (std::f32::consts::PI * fc / SRF).sin();
+            let fq = 2.0 * (std::f32::consts::PI * fc / SR).sin();
             let damp = bw / fc * 2.0;
             let (low, bp) = &mut state[j];
             let high = x - *low - damp * *bp;
@@ -767,7 +747,7 @@ fn hit(thud: f32, weight: f32, seed: u32) -> Vec<i16> { blow(thud, weight, false
 /// fighter taking it has their own voice (`hurt`).
 fn blow(thud: f32, weight: f32, shin: bool, seed: u32) -> Vec<i16> {
     let mut rng = Rng(seed);
-    let mut buf = vec![0.0f32; (0.34 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.34 * SR) as usize];
     let (crack, body, cloth) = if shin { (0.55, 1.35, 1.8) } else { (1.0, 1.0, 1.0) };
     // the smack: skin on skin, a crack and a crackle
     band(&mut buf, 0.0, if shin { 1700.0 } else { 2400.0 }, 1.2, 0.9 * crack, 0.0003, 0.003 + 0.002 * weight, &mut rng);
@@ -806,8 +786,8 @@ fn wail(buf: &mut [f32], at: f32, dur: f32, t: Throat, contour: &[(f32, f32, f32
     // The open "aah" a cry can flip into before it thins (the long reference: its 2nd harmonic 8 to 10 dB over the
     // 1st just after the flip, falling to -20 by three quarters through).
     const BRIGHT: [f32; 6] = [0.0, 8.0, -12.0, -16.0, -20.0, -26.0];
-    let off = (at * SRF) as usize;
-    let n = (dur * SRF) as usize;
+    let off = (at * SR) as usize;
+    let n = (dur * SR) as usize;
     let mut ph = 0.0f32;
     let (mut wander, mut swell) = (0.0f32, 0.0f32);
     for i in 0..n.min(buf.len().saturating_sub(off)) {
@@ -821,7 +801,7 @@ fn wail(buf: &mut [f32], at: f32, dur: f32, t: Throat, contour: &[(f32, f32, f32
         let f = t.f0 * (a.1 + (b.1 - a.1) * u) * (1.0 + 0.02 * wander);
         let gain = 10f32.powf((a.2 + (b.2 - a.2) * u) / 20.0);
         let open = a.3 + (b.3 - a.3) * u;
-        ph += f / SRF;
+        ph += f / SR;
         let head = ((k - chest) / 0.02).clamp(0.0, 1.0);
         let mut src = 0.0f32;
         for h in 0..6 {
@@ -841,7 +821,7 @@ fn wail(buf: &mut [f32], at: f32, dur: f32, t: Throat, contour: &[(f32, f32, f32
 /// DRAKE struck: a short falsetto yelp, or with `heavy` the cry falling away (the reference's at 49 s, quick).
 fn yelp(t: Throat, take: u32, heavy: bool) -> Vec<i16> {
     let mut rng = Rng(0x7E1 ^ take.wrapping_mul(7_919));
-    let mut buf = vec![0.0f32; (0.6 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.6 * SR) as usize];
     if heavy {
         wail(&mut buf, 0.0, 0.42, t, &[(0.0, 1.6, -4.0, 0.0), (0.12, 1.7, -2.0, 0.0), (0.16, 3.9, 0.0, 0.4), (0.4, 3.6, -2.0, 0.0), (1.0, 2.2, -14.0, 0.0)], 0.14, &mut rng);
     } else {
@@ -865,8 +845,8 @@ fn meow() -> Vec<i16> {
          (0.85, 800.0, -10.0, 0.4), (1.0, 660.0, -16.0, 0.6)];
     let mut rng = Rng(0xCA7);
     let dur = 0.62;
-    let n = (dur * SRF) as usize;
-    let mut buf = vec![0.0f32; (0.9 * SRF) as usize];
+    let n = (dur * SR) as usize;
+    let mut buf = vec![0.0f32; (0.9 * SR) as usize];
     let mut ph = 0.0f32;
     for (i, out) in buf.iter_mut().enumerate().take(n) {
         let k = i as f32 / n as f32;
@@ -875,10 +855,10 @@ fn meow() -> Vec<i16> {
         let u = if b.0 > a.0 { (k - a.0) / (b.0 - a.0) } else { 0.0 };
         let u = u * u * (3.0 - 2.0 * u);
         // A slight waver, as a small throat holds a note.
-        let f = (a.1 + (b.1 - a.1) * u) * (1.0 + 0.012 * (i as f32 / SRF * 7.0 * std::f32::consts::TAU).sin());
+        let f = (a.1 + (b.1 - a.1) * u) * (1.0 + 0.012 * (i as f32 / SR * 7.0 * std::f32::consts::TAU).sin());
         let gain = 10f32.powf((a.2 + (b.2 - a.2) * u) / 20.0);
         let bright = a.3 + (b.3 - a.3) * u;
-        ph += f / SRF;
+        ph += f / SR;
         let mut s = 0.0;
         for h in 0..5 {
             if f * (h + 1) as f32 > 7500.0 { break; }
@@ -895,7 +875,7 @@ fn meow() -> Vec<i16> {
 /// DRAKE knocked out: the long falsetto cry, held and falling away to nothing.
 fn keen_down(t: Throat) -> Vec<i16> {
     let mut rng = Rng(0xD0E);
-    let mut buf = vec![0.0f32; (1.0 * SRF) as usize];
+    let mut buf = vec![0.0f32; (1.0 * SR) as usize];
     wail(&mut buf, 0.0, 0.85, t, &[(0.0, 1.6, -4.0, 0.0), (0.08, 1.7, -2.0, 0.0), (0.1, 4.1, 0.0, 0.6), (0.35, 4.0, 0.0, 0.2), (0.7, 2.8, -6.0, 0.0), (1.0, 1.9, -18.0, 0.0)], 0.09, &mut rng);
     hall(&mut buf, 0.35, 0.7);
     render(buf, 5_200.0)
@@ -905,10 +885,10 @@ fn keen_down(t: Throat) -> Vec<i16> {
 /// yells (dubbed in a studio) carry one: their floor between harmonics is 20 to 40 dB down, where a dry voice is 60.
 fn hall(buf: &mut Vec<f32>, wet: f32, secs: f32) {
     let dry = buf.clone();
-    buf.resize(dry.len() + (secs * SRF) as usize, 0.0);
+    buf.resize(dry.len() + (secs * SR) as usize, 0.0);
     let mut tail = vec![0.0f32; buf.len()];
     for d in [0.0297f32, 0.0371, 0.0411, 0.0437] {
-        let n = (d * SRF) as usize;
+        let n = (d * SR) as usize;
         let g = 10f32.powf(-3.0 * d / secs);
         let mut line = vec![0.0f32; buf.len()];
         let mut lp = 0.0f32;
@@ -919,7 +899,7 @@ fn hall(buf: &mut Vec<f32>, wet: f32, secs: f32) {
             tail[i] += back * 0.25;
         }
     }
-    let n = (0.005 * SRF) as usize;
+    let n = (0.005 * SR) as usize;
     let mut ap = vec![0.0f32; buf.len()];
     for i in 0..buf.len() {
         let back = if i >= n { ap[i - n] } else { 0.0 };
@@ -934,7 +914,7 @@ fn hall(buf: &mut Vec<f32>, wet: f32, secs: f32) {
 /// "HAH"; and a held cry that ends on a clipped second.
 fn keen(t: Throat, take: u32) -> Vec<i16> {
     let mut rng = Rng(0xD7A ^ take.wrapping_mul(7_919));
-    let mut buf = vec![0.0f32; (1.05 * SRF) as usize];
+    let mut buf = vec![0.0f32; (1.05 * SR) as usize];
     match take % 5 {
         // "HAH!": a burst and a short high hold, open, falling.
         3 => wail(&mut buf, 0.0, 0.34, t, &[(0.0, 1.6, -6.0, 0.0), (0.14, 1.7, -3.0, 0.0), (0.18, 3.6, 0.0, 0.6), (0.6, 3.8, 0.0, 0.3), (1.0, 3.2, -6.0, 0.0)], 0.16, &mut rng),
@@ -964,7 +944,7 @@ fn throat_vowel(v: (f32, f32, f32), t: Throat) -> (f32, f32, f32) { (v.0 * t.siz
 /// or with `heavy` a longer cry that breaks and falls.
 fn hurt(t: Throat, take: u32, heavy: bool) -> Vec<i16> {
     let mut rng = Rng(0x4A11 ^ take.wrapping_mul(7919) ^ t.f0 as u32);
-    let mut buf = vec![0.0f32; (0.42 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.42 * SR) as usize];
     // the breath forced out ahead of the voice
     band(&mut buf, 0.0, 1500.0 * t.size, 1.0, 0.35, 0.001, 0.014, &mut rng);
     if heavy {
@@ -985,7 +965,7 @@ fn hurt(t: Throat, take: u32, heavy: bool) -> Vec<i16> {
 /// the front and gone in a fifth of a second.
 fn kiai(t: Throat, take: u32) -> Vec<i16> {
     let mut rng = Rng(0x7A1 ^ take.wrapping_mul(104_729) ^ t.f0 as u32);
-    let mut buf = vec![0.0f32; (0.36 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.36 * SR) as usize];
     let ah = throat_vowel(AH, t);
     match take % 3 {
         0 => {
@@ -1015,7 +995,7 @@ fn trimmed(mut s: Vec<i16>) -> Vec<i16> {
 /// The knockout cry in a fighter's own voice: long, falling away.
 fn ko_cry(t: Throat) -> Vec<i16> {
     let mut rng = Rng(0xC1 ^ t.f0 as u32);
-    let mut buf = vec![0.0f32; (0.9 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.9 * SR) as usize];
     voice(&mut buf, 0.0, 0.75, t.f0 * 1.75, t.f0 * 0.8, throat_vowel(AH, t), 0.3, 1.1, &mut rng);
     render(buf, 12_000.0)
 }
@@ -1028,7 +1008,7 @@ fn block_sfx() -> Vec<i16> { block_take(0x51A7) }
 /// Another take of the block, from its own seed.
 fn block_take(seed: u32) -> Vec<i16> {
     let mut rng = Rng(seed);
-    let mut buf = vec![0.0f32; (0.2 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.2 * SR) as usize];
     band(&mut buf, 0.0, 520.0, 1.6, 1.2, 0.0004, 0.008, &mut rng);
     band(&mut buf, 0.0, 1300.0, 1.0, 0.6, 0.0005, 0.01, &mut rng);
     band(&mut buf, 0.004, 800.0, 0.8, 0.3, 0.002, 0.02, &mut rng);
@@ -1040,21 +1020,21 @@ fn block_take(seed: u32) -> Vec<i16> {
 /// thuds, a short dead knock of the planks, the gi, and a winded "oof".
 fn crunch() -> Vec<i16> {
     let mut rng = Rng(0x5A);
-    let mut buf = vec![0.0f32; (0.6 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.6 * SR) as usize];
     band(&mut buf, 0.0, 85.0, 0.9, 3.0, 0.002, 0.05, &mut rng);
     band(&mut buf, 0.0, 240.0, 1.2, 0.9, 0.001, 0.012, &mut rng);
     band(&mut buf, 0.0, 700.0, 1.0, 0.35, 0.001, 0.02, &mut rng);
     band(&mut buf, 0.09, 80.0, 0.9, 2.2, 0.002, 0.045, &mut rng);
     band(&mut buf, 0.09, 220.0, 1.2, 0.6, 0.001, 0.01, &mut rng);
     band(&mut buf, 0.05, 600.0, 0.8, 0.2, 0.01, 0.07, &mut rng);
-    soften(&mut buf, 1400.0); // a body is soft: the fall is all low
+    low_pass(&mut buf, 1400.0); // a body is soft: the fall is all low
     render(buf, 26_000.0)
 }
 
 /// A footfall on the walk: the sole set down, a soft knock and the brush of it, quiet under everything.
 fn step(seed: u32) -> Vec<i16> {
     let mut rng = Rng(seed);
-    let mut buf = vec![0.0f32; (0.09 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.09 * SR) as usize];
     band(&mut buf, 0.0, 180.0, 1.0, 0.9, 0.002, 0.012, &mut rng);
     band(&mut buf, 0.004, 2200.0, 0.9, 0.22, 0.004, 0.012, &mut rng);
     render(buf, 18_000.0)
@@ -1063,7 +1043,7 @@ fn step(seed: u32) -> Vec<i16> {
 /// Boots on boards: a short dead knock with a heel click.
 fn land(seed: u32) -> Vec<i16> {
     let mut rng = Rng(seed);
-    let mut buf = vec![0.0f32; (0.16 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.16 * SR) as usize];
     band(&mut buf, 0.0, 150.0, 1.0, 1.4, 0.001, 0.02, &mut rng);
     band(&mut buf, 0.0, 420.0, 1.4, 0.5, 0.0005, 0.008, &mut rng);
     band(&mut buf, 0.0, 3000.0, 1.5, 0.3, 0.0003, 0.002, &mut rng);
@@ -1074,7 +1054,7 @@ fn land(seed: u32) -> Vec<i16> {
 /// hitting the boards.
 fn ko() -> Vec<i16> {
     let mut rng = Rng(0xF157);
-    let mut buf = vec![0.0f32; (1.1 * SRF) as usize];
+    let mut buf = vec![0.0f32; (1.1 * SR) as usize];
     band(&mut buf, 0.0, 2400.0, 1.2, 1.0, 0.0003, 0.005, &mut rng);
     band(&mut buf, 0.0, 300.0, 2.0, 1.8, 0.0006, 0.03, &mut rng);
     band(&mut buf, 0.001, 110.0, 0.8, 2.2, 0.002, 0.05, &mut rng);
@@ -1095,7 +1075,7 @@ fn whoosh(ms: f32, vol: f32, seed: u32) -> Vec<i16> {
     for (i, out) in buf.iter_mut().enumerate() {
         let k = i as f32 / n as f32;
         let center = 260.0 + 900.0 * (k * std::f32::consts::PI).sin().powf(1.5);
-        let f = 2.0 * (std::f32::consts::PI * center / SRF).sin();
+        let f = 2.0 * (std::f32::consts::PI * center / SR).sin();
         let x = rng.next_f32() * 2.0 - 1.0;
         let high = x - low - 0.55 * bp;
         bp += f * high;
@@ -1103,7 +1083,7 @@ fn whoosh(ms: f32, vol: f32, seed: u32) -> Vec<i16> {
         let flutter = 1.0 + 0.18 * (k * 60.0).sin();
         *out = bp * (k * std::f32::consts::PI).sin().powf(1.3) * flutter * vol;
     }
-    soften(&mut buf, 2200.0);
+    low_pass(&mut buf, 2200.0);
     render(buf, 16_000.0)
 }
 
@@ -1183,7 +1163,7 @@ fn bell() -> Vec<i16> {
 /// light in a band that sweeps up, and a low body under both.
 fn projectile() -> Vec<i16> {
     let mut rng = Rng(0x2B01);
-    let mut buf = vec![0.0f32; (0.5 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.5 * SR) as usize];
     voice(&mut buf, 0.0, 0.3, 190.0, 240.0, AH, 0.25, 0.8, &mut rng);
     for k in 0..10 {
         let t = k as f32 / 10.0;
@@ -1204,12 +1184,12 @@ fn laser() -> Vec<i16> {
         let t = i as f32 / n as f32;
         let e = env(i, n, ms_to_samples(3.0), ms_to_samples(240.0));
         let f = 1500.0 * (1.0 - t).powf(1.6) + 260.0;
-        a += 2.0 * std::f32::consts::PI * f / SRF;
-        b += 2.0 * std::f32::consts::PI * f * 1.035 / SRF;
+        a += 2.0 * std::f32::consts::PI * f / SR;
+        b += 2.0 * std::f32::consts::PI * f * 1.035 / SR;
         let hiss = (rng.next_f32() * 2.0 - 1.0) * 0.18 * (1.0 - t);
         *out = (a.sin() * 0.5 + b.sin() * 0.4 + hiss) * e * 7000.0;
     }
-    soften(&mut buf, 4200.0);
+    low_pass(&mut buf, 4200.0);
     soft_limit_to_pcm16(&buf, MIX_KNEE)
 }
 
@@ -1217,14 +1197,14 @@ fn laser() -> Vec<i16> {
 /// twice, and grit coming down after.
 fn quake() -> Vec<i16> {
     let mut rng = Rng(0x9A4E);
-    let mut buf = vec![0.0f32; (1.0 * SRF) as usize];
+    let mut buf = vec![0.0f32; (1.0 * SR) as usize];
     band(&mut buf, 0.0, 62.0, 1.4, 4.0, 0.004, 0.16, &mut rng);
     band(&mut buf, 0.0, 120.0, 1.0, 2.2, 0.002, 0.07, &mut rng);
     knock(&mut buf, 0.0, 70.0, 1.6, 0.06);
     band(&mut buf, 0.14, 90.0, 1.2, 1.8, 0.004, 0.1, &mut rng);
     band(&mut buf, 0.0, 420.0, 0.9, 0.5, 0.001, 0.03, &mut rng);
     band(&mut buf, 0.2, 1500.0, 0.7, 0.12, 0.08, 0.12, &mut rng);
-    soften(&mut buf, 1800.0);
+    low_pass(&mut buf, 1800.0);
     render(buf, 6_200.0)
 }
 
@@ -1232,7 +1212,7 @@ fn quake() -> Vec<i16> {
 /// the forearms. Nothing like a hit, nothing like a block.
 fn parry() -> Vec<i16> {
     let mut rng = Rng(0x7E4C);
-    let mut buf = vec![0.0f32; (0.5 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.5 * SR) as usize];
     for (f, amp, tau) in [(1568.0f32, 0.8f32, 0.09f32), (2637.0, 0.55, 0.06), (3951.0, 0.3, 0.035)] {
         knock(&mut buf, 0.0, f, amp, tau);
     }
@@ -1244,7 +1224,7 @@ fn parry() -> Vec<i16> {
 /// Caught swinging: a dry crack laid over the hit, sharper than any of them.
 fn counter() -> Vec<i16> {
     let mut rng = Rng(0xC0A7);
-    let mut buf = vec![0.0f32; (0.22 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.22 * SR) as usize];
     band(&mut buf, 0.0, 3400.0, 1.4, 1.3, 0.0002, 0.004, &mut rng);
     band(&mut buf, 0.0015, 1900.0, 1.6, 0.8, 0.0002, 0.006, &mut rng);
     knock(&mut buf, 0.0, 190.0, 1.2, 0.02);
@@ -1271,11 +1251,11 @@ fn whistle() -> Vec<i16> {
     let mut rng = Rng(0x3157);
     let (mut ph, mut air) = (0.0f32, 0.0f32);
     for (i, out) in buf.iter_mut().enumerate() {
-        let t = i as f32 / SRF;
+        let t = i as f32 / SR;
         // 0.16 s on the low note, a quick slide, the rest on the high one.
         let k = ((t - 0.16) / 0.05).clamp(0.0, 1.0);
         let f = 1250.0 + 650.0 * k * k * (3.0 - 2.0 * k);
-        ph += 2.0 * std::f32::consts::PI * f / SRF;
+        ph += 2.0 * std::f32::consts::PI * f / SR;
         air += ((rng.next_f32() * 2.0 - 1.0) - air) * 0.5;
         let gap = if (0.13..0.16).contains(&t) { 0.25 } else { 1.0 };
         let e = (t / 0.015).min(1.0) * ((0.52 - t) / 0.12).clamp(0.0, 1.0) * gap;
@@ -1288,7 +1268,7 @@ fn whistle() -> Vec<i16> {
 /// wet slap of it sticking.
 fn thwip() -> Vec<i16> {
     let mut rng = Rng(0x7419);
-    let mut buf = vec![0.0f32; (0.36 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.36 * SR) as usize];
     for k in 0..8 {
         let t = k as f32 / 8.0;
         band(&mut buf, 0.012 * k as f32, 900.0 + 3200.0 * t, 3.0, 0.7 * (1.0 - 0.4 * t), 0.004, 0.012, &mut rng);
@@ -1331,11 +1311,11 @@ fn verdict(won: bool) -> Vec<i16> {
 /// breath of it.
 fn bellow() -> Vec<i16> {
     let mut rng = Rng(0x6A44);
-    let mut buf = vec![0.0f32; (0.8 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.8 * SR) as usize];
     voice(&mut buf, 0.0, 0.7, 96.0, 70.0, AH, 0.25, 1.3, &mut rng);
     voice(&mut buf, 0.01, 0.66, 49.0, 36.0, OO, 0.15, 0.9, &mut rng);
     band(&mut buf, 0.0, 300.0, 0.8, 0.25, 0.05, 0.12, &mut rng);
-    soften(&mut buf, 2200.0);
+    low_pass(&mut buf, 2200.0);
     render(buf, 13_000.0)
 }
 
@@ -1343,7 +1323,7 @@ fn bellow() -> Vec<i16> {
 /// ordinary one, and it ends in a clap of air.
 fn heavy_swing() -> Vec<i16> {
     let mut rng = Rng(0x5E11);
-    let mut buf = vec![0.0f32; (0.42 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.42 * SR) as usize];
     for k in 0..10 {
         let t = k as f32 / 10.0;
         let up = 1.0 - (2.0 * t - 1.0).abs();
@@ -1369,7 +1349,7 @@ fn drum_call() -> Vec<i16> {
 /// blow, and the hoops ringing on the boards.
 fn smash() -> Vec<i16> {
     let mut rng = Rng(0x5A4A);
-    let mut buf = vec![0.0f32; (0.5 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.5 * SR) as usize];
     knock(&mut buf, 0.0, 170.0, 1.4, 0.02);
     band(&mut buf, 0.0, 420.0, 1.0, 1.6, 0.001, 0.03, &mut rng);
     for k in 0..6 {
@@ -1388,10 +1368,10 @@ fn tweet() -> Vec<i16> {
     let mut buf = vec![0.0f32; n];
     let mut ph = 0.0f32;
     for (i, out) in buf.iter_mut().enumerate() {
-        let t = i as f32 / SRF;
+        let t = i as f32 / SR;
         let k = (t / 0.13).fract();
         let f = 1500.0 + 700.0 * k + 120.0 * ((t / 0.13).floor() % 2.0);
-        ph += 2.0 * std::f32::consts::PI * f / SRF;
+        ph += 2.0 * std::f32::consts::PI * f / SR;
         let e = (k / 0.1).min(1.0) * (1.0 - k).powf(1.5) * (1.0 - t / 0.52);
         *out = ph.sin() * e * 3900.0;
     }
@@ -1401,7 +1381,7 @@ fn tweet() -> Vec<i16> {
 /// A wood block: the menu moving a step.
 fn tick() -> Vec<i16> {
     let mut rng = Rng(0x71C4);
-    let mut buf = vec![0.0f32; (0.09 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.09 * SR) as usize];
     knock(&mut buf, 0.0, 940.0, 1.0, 0.007);
     knock(&mut buf, 0.0, 1430.0, 0.4, 0.004);
     band(&mut buf, 0.0, 2600.0, 1.5, 0.3, 0.0002, 0.002, &mut rng);
@@ -1423,7 +1403,7 @@ fn gong() -> Vec<i16> {
         (452.0, 0.2, 0.26),
     ] {
         for (i, out) in buf.iter_mut().enumerate() {
-            let t = i as f32 / SRF;
+            let t = i as f32 / SR;
             // The shimmer blooms a moment after the stroke.
             let swell = (t / (0.02 + 60.0 / freq / 100.0)).min(1.0);
             *out += (2.0 * std::f32::consts::PI * freq * t).sin() * (-t / tau).exp() * swell * amp * 3200.0;
@@ -1441,14 +1421,13 @@ fn gong() -> Vec<i16> {
 /// nearly out.
 fn heartbeat() -> Vec<i16> {
     let mut rng = Rng(0x4EA7);
-    let mut buf = vec![0.0f32; (0.86 * SRF) as usize];
+    let mut buf = vec![0.0f32; (0.86 * SR) as usize];
     for (at, amp) in [(0.0f32, 1.0f32), (0.21, 0.7)] {
         knock(&mut buf, at, 58.0, amp * 1.6, 0.05);
         band(&mut buf, at, 90.0, 1.2, amp * 1.2, 0.004, 0.03, &mut rng);
     }
-    soften(&mut buf, 900.0);
-    let scaled: Vec<f32> = buf.iter().map(|v| v * 3300.0).collect();
-    soft_limit_to_pcm16(&scaled, MIX_KNEE)
+    low_pass(&mut buf, 900.0);
+    limit_pcm16(&buf, 3300.0)
 }
 
 /// The effects, as `sounds/NAME.wav`.
@@ -1565,7 +1544,7 @@ pub fn walkout_wav() -> Vec<u8> {
     const BARS: usize = 16;
     const HOOK: [(usize, i32); 8] = [(0, 62), (3, 69), (7, 65), (10, 67),
         (16, 60), (22, 65), (26, 64), (30, 57)];
-    let step = (SRF * 60.0 / BPM / 4.0) as usize;
+    let step = (SR * 60.0 / BPM / 4.0) as usize;
     let body = step * BARS * 16;
     let mut buf = vec![0.0; body + ms_to_samples(1800.0)];
     let mut rng = Rng(0x2026);
@@ -1597,8 +1576,8 @@ pub fn walkout_wav() -> Vec<u8> {
             let freq = hz(note);
             let n = step * if beat == 0 { 6 } else { 3 };
             for i in 0..n {
-                let phase = std::f32::consts::TAU * freq * i as f32 / SRF;
-                let attack = (i as f32 / (SRF * 0.008)).min(1.0);
+                let phase = std::f32::consts::TAU * freq * i as f32 / SR;
+                let attack = (i as f32 / (SR * 0.008)).min(1.0);
                 let decay = (1.0 - i as f32 / n as f32).powf(1.4);
                 buf[off + i] += (phase.sin() + 0.18 * (phase * 2.0).sin()) * attack * decay * 5400.0;
             }
@@ -1609,8 +1588,7 @@ pub fn walkout_wav() -> Vec<u8> {
             pluck(&mut buf, off + step * 3, hz(note), 420.0, 0.15, &mut rng);
         }
     }
-    wrap_tail(&mut buf, body);
-    encode_pcm16_music(&soft_limit_to_pcm16(&buf[..body], MIX_KNEE))
+    encode_pcm16_music(&soft_limit_to_pcm16(&fold_tail(buf, body), MIX_KNEE))
 }
 
 /// The music: each tune as a WAV to play.

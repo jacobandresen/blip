@@ -535,7 +535,7 @@ pub(crate) fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: 
         defender.crouch_block = hold.down;
         defender.stun = m.blockstun * F;
         let chip = if attacker.mv == MoveId::Special { (m.damage / CHIP_DIVISOR).max(1) } else { 0 };
-        if chip > 0 && !defender.shelled() { defender.hurt(chip, attacker.size()); }
+        if chip > 0 && !defender.shelled() { defender.hurt(chip); }
         return (0, true, false);
     }
 
@@ -554,7 +554,7 @@ pub(crate) fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: 
         && !attacker.chained {
         attacker.cancel_t = CANCEL_WINDOW;
     }
-    defender.hurt(damage, attacker.size());
+    defender.hurt(damage);
     attacker.hit_clean = true;
     // A flying kick that connects stops flying, so the attacker can act
     // before the defender's hitstun ends. A blocked one carries on through,

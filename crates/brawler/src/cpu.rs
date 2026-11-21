@@ -326,7 +326,6 @@ pub(crate) fn cpu_input(g: &Game) -> Input {
         // A flier's kick is the laser, which ends the round: the CPU keeps it
         // for when it plans a special, and punches otherwise.
         CpuPlan::Attack(id) if me.flies() && id != MoveId::Special => {
-            let _ = id;
             inp.punch_low = true;
         }
         CpuPlan::Attack(id) => match id {
