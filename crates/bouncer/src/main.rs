@@ -200,18 +200,6 @@ fn shatter(bx: f32, by: f32, hit: (f32, f32), push: (f32, f32), base: BlipColor,
             color: BlipColor { r: (base.r * light).min(1.0), g: (base.g * light).min(1.0), b: (base.b * light).min(1.0), a: 1.0 },
         });
     }
-    // Crumbs: a few small chips thrown wider than the shards.
-    for _ in 0..(5 + (rng.next_f32() * 5.0) as usize) {
-        let a = rng.next_f32() * std::f32::consts::TAU;
-        let (s, v) = (1.0 + rng.next_f32() * 1.5, 60.0 + rng.next_f32() * 120.0);
-        let dark = 0.6 + rng.next_f32() * 0.3;
-        out.push(Shard {
-            x: hit.0, y: hit.1, vx: a.cos() * v + push.0 * 0.1, vy: a.sin() * v - 40.0,
-            turn: 0.0, spin: (rng.next_f32() - 0.5) * 20.0,
-            pts: vec![(-s, -s), (s, -s), (s, s), (-s, s)],
-            color: BlipColor { r: base.r * dark, g: base.g * dark, b: base.b * dark, a: 1.0 },
-        });
-    }
     out
 }
 
@@ -799,7 +787,6 @@ fn break_brick(g: &mut Game, i: usize, speed: f32, sfx: &Sounds, blasted: bool) 
     let times = g.chain.min(CHAIN_MAX);
     let points = (BRICK_ROWS - row) * 10 * g.sess.level * times;
     g.sess.add_score(points);
-    g.fx.burst(mx, my, 10, 120.0, BRICK_COLORS[g.bricks[i].kind]);
     // The brick shatters from where the ball struck it (its centre when blasted), and its neighbours shake.
     let hit = if blasted { (mx, my) } else {
         ((g.ball_x + BALL_W as f32 / 2.0).clamp(bx + 2.0, bx + BRICK_W as f32 - 2.0),
@@ -812,10 +799,9 @@ fn break_brick(g: &mut Game, i: usize, speed: f32, sfx: &Sounds, blasted: bool) 
         let (r, c) = (row + dr, col + dc);
         if (0..BRICK_ROWS).contains(&r) && (0..BRICK_COLS).contains(&c) { g.bricks[(r * BRICK_COLS + c) as usize].wobble = 1.0; }
     }
+    // Only a multiplied score earns a label; plain points show in the score.
     if times > 1 {
         g.fx.popup(mx, my, &format!("{points} X{times}"), BLIP_YELLOW);
-    } else {
-        g.fx.popup(mx, my, &format!("{points}"), BLIP_WHITE);
     }
     // Same ramp on every level, so the ball plays identically no
     // matter how far the player has gotten.
@@ -1259,9 +1245,7 @@ mod tests {
             let mut rng = ShardRng(seed.wrapping_mul(2654435761) | 1);
             let hit = (100.0 + (seed % 7) as f32 * 6.0, 50.0 + (seed % 3) as f32 * 6.0);
             let pieces = shatter(100.0, 50.0, hit, (0.0, -200.0), BLIP_RED, &mut rng);
-            // Crumbs are squares centred on their own middle; shards are the rest.
-            let crumb = |s: &&Shard| s.pts.len() == 4 && s.pts[0].0 == s.pts[0].1 && s.pts[2] == (-s.pts[0].0, -s.pts[0].1);
-            let shards: Vec<&Shard> = pieces.iter().filter(|s| !crumb(s)).collect();
+            let shards: Vec<&Shard> = pieces.iter().collect();
             assert!((3..=7).contains(&shards.len()), "seed {seed}: {} shards", shards.len());
             let total: f32 = shards.iter().map(|s| area(&s.pts)).sum();
             let brick = (BRICK_W * BRICK_H) as f32;

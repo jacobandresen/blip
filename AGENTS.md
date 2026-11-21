@@ -40,7 +40,6 @@ Never edit these by hand; regenerate them:
 - `web/<game>/icon-*`, `manifest.json`, guide icons: `node tools/make_game_icons.mjs`
 - `web/<game>/attract.webp`: `node tools/make_attract_strips.mjs <game>`
 - Brawler's pose sheets, card and poster: `node tools/make_brawler_art.mjs`
-- `web/room-tiles.svg`: `node tools/make_room_tiles.mjs`
 
 A change under `web/` needs `node tools/bump_web_versions.mjs` (once per commit: the service worker's cache
 and the `?v=` links), then `npm run build:web` to copy `game.html` to the game pages.

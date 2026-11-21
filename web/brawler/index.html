@@ -13,7 +13,7 @@
   <link rel="icon" type="image/x-icon" href="../favicon.ico?v=3">
   <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png?v=3">
   <link rel="icon" type="image/svg+xml" href="../favicon.svg?v=3">
-  <link rel="apple-touch-icon" href="icon-180.png?v=22">
+  <link rel="apple-touch-icon" href="icon-180.png?v=23">
   <!-- Stepped into from the arcade: nothing is painted until game.js has laid the page out, so the browser keeps the
        arcade's last frame up meanwhile (data-launching, cleared by game.js). -->
   <script>
@@ -41,16 +41,16 @@
     document.title = name + ' \u00b7 BLIP';
     document.querySelector('meta[name=apple-mobile-web-app-title]').content = name;
   }());</script>
-  <script src="../cabinet.js?v=111"></script>
-  <link rel="stylesheet" href="../blip.css?v=181">
+  <script src="../cabinet.js?v=115"></script>
+  <link rel="stylesheet" href="../blip.css?v=185">
   <script src="../controller.js?v=2" defer></script>
-  <script src="../game.js?v=12" defer blocking="render"></script>
+  <script src="../game.js?v=13" defer blocking="render"></script>
 </head>
 <body class="cabinet-page">
 
   <a class="blip-logo" href="../index.html" aria-label="BLIP — cabinet"><img class="blip-logo-mark" src="../blip-logo.svg" alt=""></a>
 
-  <button id="insert-coin-btn" class="kiosk-btn"></button>
+  <button id="insert-coin-btn"></button>
 
 
 
@@ -91,11 +91,7 @@
 
   <!-- #marquee-bar (per-game backlit name sign) is injected by game.js -->
   <span class="machine-speaker" aria-hidden="true"></span>
-  <div class="cab-rail left"></div>
-  <div class="cab-rail right"></div>
   <div id="arcade-bezel" class="screen-bezel">
-    <span class="screw tl"></span><span class="screw tr"></span>
-    <span class="screw bl"></span><span class="screw br"></span>
   </div>
   <div class="cabinet-glass"></div>
   <canvas id="glcanvas" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>

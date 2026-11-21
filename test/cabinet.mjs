@@ -27,10 +27,9 @@ test('the aisle shows one complete, selectable cabinet for every game', async (t
   assert.deepEqual(cabinets, GAMES.map(([slug, title]) => ({
     slug, title, hasScreen: true, hasCoinDoor: true, hasStart: true, deck: `machine-deck.html?game=${slug}`,
   })));
-  const marqueeArt = await page.locator('#game-grid .card').evaluateAll((cards) =>
-    cards.map((card) => getComputedStyle(card).getPropertyValue('--marquee-art').trim()));
-  assert.equal(new Set(marqueeArt).size, GAMES.length, 'each machine has its own printed marquee motif');
-  assert.ok(marqueeArt.every((art) => art.includes('gradient')));
+  const trims = await page.locator('#game-grid .card').evaluateAll((cards) =>
+    cards.map((card) => getComputedStyle(card).getPropertyValue('--machine-trim').trim()));
+  assert.equal(new Set(trims).size, GAMES.length, 'each machine wears its own colour');
   assert.equal(await page.locator('body > .kiosk-bar').count(), 0, 'the controls belong to the machines');
   assert.equal(await page.locator('#kiosk-insert-btn').isVisible(), false, 'the coin doors belong to the machines');
   assert.equal(await page.locator('#card-button,#controls-card').count(), 0, 'no "?" and no operator’s card on the arcade');

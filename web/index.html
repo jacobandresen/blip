@@ -29,8 +29,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=3">
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=3">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=3">
-  <link rel="stylesheet" href="blip.css?v=181">
-  <link rel="stylesheet" href="arcade.css?v=8">
+  <link rel="stylesheet" href="blip.css?v=185">
+  <link rel="stylesheet" href="arcade.css?v=10">
   <!-- Match the shared cabinet controls before first paint. -->
   <script>
     if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
@@ -53,17 +53,6 @@
       }
     } catch (e) {}
 
-    // Resolve the room before paint: explicit mode wins, otherwise use lite on a small supported device.
-    var roomMode = 'full';
-    var roomAsked = null;
-    try { roomAsked = new URLSearchParams(location.search).get('room'); } catch (e) {}
-    if (roomAsked === 'full' || roomAsked === 'lite') roomMode = roomAsked;
-    else if (['hardwareConcurrency','deviceMemory'].some(function (name) {
-      try { var value = navigator[name]; return typeof value === 'number' && isFinite(value) && value > 0 && value <= 2; }
-      catch (e) { return false; }
-    })) roomMode = 'lite';
-    document.documentElement.setAttribute('data-room', roomMode);
-
     try {
       if (localStorage.getItem('blip-fullscreen') === '1')
         document.documentElement.setAttribute('data-fullscreen', '');
@@ -77,157 +66,16 @@
   <div class="top-marquee-bar"></div>
   <!-- Coin slot: top-right corner of the cabinet panel, mirroring the
        BLIP ARCADE logo at top-left. -->
-  <button class="kiosk-btn" id="kiosk-insert-btn"></button>
+  <button id="kiosk-insert-btn"></button>
 
-  <div class="cab-rail left"></div>
-  <div class="cab-rail right"></div>
 
   <header></header>
 
   <div class="divider"></div>
 
   <div class="screen-bezel" id="screen-bezel">
-    <span class="screw tl"></span><span class="screw tr"></span>
-    <span class="screw bl"></span><span class="screw br"></span>
     <div class="jukebox-game-screen"><div class="cabinet-glass" aria-hidden="true"></div></div>
     <div class="jukebox-front" id="jukebox-front">
-  <!-- The room's neon signs (arcade.css): an original BLIP script, and an OPEN sign lit by a credit. -->
-  <template id="room-signs">
-    <svg class="aisle-neon" viewBox="0 0 190 108" aria-hidden="true" focusable="false">
-      <defs>
-        <g id="neon-blip" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M34 20C31 42 28 62 25 84"/>
-          <path d="M20 30C32 15 66 12 66 30C66 43 50 49 32 50C56 48 76 56 72 70C68 84 44 90 24 84C40 90 62 84 74 76"/>
-          <path d="M74 76C88 68 100 44 102 26C103 14 92 14 91 28C90 44 90 66 96 80C100 87 108 78 112 66C114 60 115 56 116 52C115 64 114 74 118 80C122 85 130 76 134 62C136 55 137 51 138 47L130 104"/>
-          <path d="M135 56C146 42 170 44 166 63C163 79 144 83 134 75"/>
-          <path d="M118 36L119 35"/>
-        </g>
-      </defs>
-      <g class="neon-supports"><rect x="22" y="76" width="4" height="13" rx="1.5"/><rect x="93" y="70" width="4" height="13" rx="1.5"/><rect x="157" y="60" width="4" height="13" rx="1.5"/></g>
-      <use href="#neon-blip" class="neon-tube"/>
-      <use href="#neon-blip" class="neon-core"/>
-    </svg>
-    <svg class="aisle-open" viewBox="0 0 132 60" aria-hidden="true" focusable="false">
-      <defs>
-        <path id="neon-open-frame" d="M14 5H118L128 30L118 55H14L4 30Z" fill="none" stroke-linejoin="round"/>
-        <g id="neon-open-letters" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="25" y="18" width="16" height="24" rx="7"/>
-          <path d="M50 42V18H58C66 18 66 31 58 31H50"/>
-          <path d="M84 18H72V42H84M72 30H81"/>
-          <path d="M93 42V18L107 42V18"/>
-        </g>
-      </defs>
-      <use href="#neon-open-frame" class="open-frame-tube"/>
-      <use href="#neon-open-frame" class="open-frame-core"/>
-      <use href="#neon-open-letters" class="open-letter-tube"/>
-      <use href="#neon-open-letters" class="open-letter-core"/>
-    </svg>
-  </template>
-  <!-- A tiled maze tribute, repeated across the whole wall. Each cell is one ceramic tile. -->
-  <template id="room-tiles">
-    <div class="aisle-tiles" aria-hidden="true">
-      <svg viewBox="0 0 1280 680" aria-hidden="true" focusable="false">
-        <defs>
-          <pattern id="tile-joints" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M0 40V0H40" fill="none" class="tile-grout" stroke-width="1.4"/>
-          </pattern>
-          <linearGradient id="tile-glaze" x2=".3" y2="1">
-            <stop stop-color="#fff2d6" stop-opacity=".18"/>
-            <stop offset=".35" stop-color="#fff2d6" stop-opacity="0"/>
-            <stop offset="1" stop-color="#000" stop-opacity="0"/>
-          </linearGradient>
-          <radialGradient id="tile-reflection">
-            <stop stop-color="#fff4dc" stop-opacity=".32"/>
-            <stop offset="1" stop-color="#fff4dc" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <path class="tile-black" d="M0 0H1280V680H0Z"/>
-        <!-- Maze runs meet at each repeat's edges; its corridors leave room for the chase. -->
-        <path class="tile-blue" d="M0 0H1280V40H0ZM0 280H400V320H0ZM440 280H880V320H440ZM920 280H1280V320H920ZM40 360H360V400H80V480H40ZM440 360H800V400H480V480H440ZM880 360H1240V480H1200V400H880ZM0 560H200V520H240V600H0ZM320 520H600V560H360V640H320ZM680 520H960V560H720V640H680ZM1040 520H1080V560H1280V600H1040Z"/>
-        <!-- Open mouth and stepped silhouettes, drawn on the tile grid rather than as smooth sprites. -->
-        <path class="tile-yellow" d="M120 40H240V80H280V120H200V160H280V200H240V240H120V200H80V80H120Z"/>
-        <path class="tile-red" d="M560 40H680V80H720V240H680V200H640V240H600V200H560V240H520V80H560Z"/>
-        <path class="tile-cyan" d="M840 40H960V80H1000V240H960V200H920V240H880V200H840V240H800V80H840Z"/>
-        <path class="tile-purple" d="M1120 40H1200V80H1240V240H1200V200H1160V240H1120V200H1080V80H1120Z"/>
-        <path class="tile-white" d="M320 120H360V160H320ZM400 120H440V160H400ZM560 80H600V160H560ZM640 80H680V160H640ZM840 80H880V160H840ZM920 80H960V160H920ZM1120 80H1160V160H1120ZM1200 80H1240V160H1200ZM160 440H200V480H160ZM240 440H280V480H240ZM560 440H600V480H560ZM640 440H680V480H640ZM1040 440H1080V480H1040ZM1120 440H1160V480H1120Z"/>
-        <path class="tile-pupil" d="M560 120H600V160H560ZM640 120H680V160H640ZM840 120H880V160H840ZM920 120H960V160H920ZM1120 120H1160V160H1120ZM1200 120H1240V160H1200Z"/>
-        <g class="tile-glaze">
-          <path d="M0 0H1280V680H0Z" fill="url(#tile-glaze)"/>
-          <ellipse cx="180" cy="150" rx="110" ry="150" fill="url(#tile-reflection)"/>
-          <ellipse cx="900" cy="90" rx="90" ry="130" fill="url(#tile-reflection)"/>
-        </g>
-        <path d="M0 0H1280V680H0Z" fill="url(#tile-joints)"/>
-      </svg>
-    </div>
-  </template>
-  <!-- What stands round the machines (arcade.css): a power cord to the wall, and what visitors left behind. -->
-  <template id="room-dressing">
-    <svg class="room-can" viewBox="0 0 34 63" aria-hidden="true" focusable="false">
-      <defs>
-        <linearGradient id="can-metal" x1="0" x2="1">
-          <stop offset="0" stop-color="#2a0305"/><stop offset=".1" stop-color="#7a0a10"/><stop offset=".22" stop-color="#c8141c"/>
-          <stop offset=".29" stop-color="#ff9c8f"/><stop offset=".31" stop-color="#fff1ec"/><stop offset=".335" stop-color="#ff8a7c"/>
-          <stop offset=".42" stop-color="#d0161e"/><stop offset=".66" stop-color="#a80f17"/><stop offset=".74" stop-color="#e04a3c"/>
-          <stop offset=".8" stop-color="#9c0e15"/><stop offset=".93" stop-color="#4c0609"/><stop offset="1" stop-color="#1c0203"/>
-        </linearGradient>
-        <linearGradient id="can-alu" x1="0" x2="1">
-          <stop offset="0" stop-color="#3a3c42"/><stop offset=".2" stop-color="#8d929c"/><stop offset=".3" stop-color="#f4f5f7"/>
-          <stop offset=".36" stop-color="#a9adb6"/><stop offset=".7" stop-color="#7d828c"/><stop offset=".78" stop-color="#c3c7ce"/><stop offset="1" stop-color="#2e3035"/>
-        </linearGradient>
-        <linearGradient id="can-room" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#ff9a4a" stop-opacity=".22"/><stop offset=".35" stop-color="#ff9a4a" stop-opacity="0"/>
-          <stop offset=".8" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".5"/>
-        </linearGradient>
-        <clipPath id="can-body"><path d="M2 13Q2 10.5 4.6 9.2L6.2 7.4H27.8L29.4 9.2Q32 10.5 32 13V56.5Q32 58.5 30 59.6L28 61H6L4 59.6Q2 58.5 2 56.5Z"/></clipPath>
-      </defs>
-      <!-- body -->
-      <path d="M2 13Q2 10.5 4.6 9.2L6.2 7.4H27.8L29.4 9.2Q32 10.5 32 13V56.5Q32 58.5 30 59.6L28 61H6L4 59.6Q2 58.5 2 56.5Z" fill="url(#can-metal)"/>
-      <g clip-path="url(#can-body)">
-        <!-- the print: a white band with the name, wrapping round the cylinder -->
-        <path d="M2 26Q17 29 32 26V35Q17 38 2 35Z" fill="#efe9df" opacity=".9"/>
-        <text x="17" y="34.6" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-size="7" font-weight="900" fill="#b3121a" letter-spacing=".3" transform="translate(17 0) scale(.92 1) translate(-17 0)">COLA</text>
-        <!-- the room in the metal: warm light from above, darkness below, the highlight over the print -->
-        <rect x="0" y="0" width="34" height="63" fill="url(#can-room)"/>
-        <rect x="2" y="9" width="1.1" height="51" fill="#ff9a4a" opacity=".45"/>
-      </g>
-      <!-- necked-in shoulder and the rolled rim, seen from below -->
-      <path d="M4.6 9.2L6.2 7.4Q7 5.4 8.4 4.6H25.6Q27 5.4 27.8 7.4L29.4 9.2Q17 11 4.6 9.2Z" fill="url(#can-alu)"/>
-      <path d="M8 4.8Q17 6.6 26 4.8L26 3.2Q17 4.6 8 3.2Z" fill="url(#can-alu)"/>
-      <path d="M8 3.2Q17 4.6 26 3.2" stroke="#45484f" stroke-width=".5" fill="none"/>
-      <path d="M4.6 9.2Q17 11 29.4 9.2" stroke="#2a0a0b" stroke-width=".6" fill="none" opacity=".7"/>
-    </svg>
-    <span class="room-can-shadow" aria-hidden="true"></span>
-    <svg class="room-wrapper" viewBox="0 0 84 40" aria-hidden="true" focusable="false">
-      <defs>
-        <linearGradient id="foil" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#ff6cb6"/><stop offset=".45" stop-color="#e02a86"/><stop offset=".55" stop-color="#ffd2ea"/><stop offset=".65" stop-color="#d6237c"/><stop offset="1" stop-color="#8e1452"/>
-        </linearGradient>
-        <linearGradient id="foil-end" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stop-color="#b78a12"/><stop offset=".5" stop-color="#ffe27a"/><stop offset="1" stop-color="#c99a1c"/>
-        </linearGradient>
-      </defs>
-      <!-- its shadow on the carpet -->
-      <path d="M10 22L22 15L30 18L42 13L56 17L66 14L77 20L68 27L56 25L44 30L31 26L20 29Z" fill="rgb(0 0 0 / .45)" transform="translate(2 3)"/>
-      <!-- the twisted ends, crumpled flat -->
-      <path d="M4 17L14 12L17 15L21 14L22 22L18 24L15 27L6 25L9 21Z" fill="url(#foil-end)"/>
-      <path d="M14 12L17 15L15 19L9 21Z" fill="#fff3b8" opacity=".55"/>
-      <path d="M80 15L70 11L68 14L63 13L62 21L66 23L68 26L78 23L74 19Z" fill="url(#foil-end)"/>
-      <path d="M70 11L68 14L71 18L74 19Z" fill="#7a5a0a" opacity=".5"/>
-      <!-- the opened middle: foil facets catching the light -->
-      <path d="M21 14L31 10L43 12L55 9L63 13L62 21L54 26L42 24L31 27L22 22Z" fill="url(#foil)"/>
-      <g opacity=".85">
-        <path d="M31 10L36 17L43 12Z" fill="#ffc2e0"/>
-        <path d="M43 12L48 19L55 9Z" fill="#ff8cc8"/>
-        <path d="M36 17L42 24L48 19Z" fill="#b51b68"/>
-        <path d="M22 22L31 27L28 18Z" fill="#a1175c"/>
-        <path d="M55 9L63 13L57 16Z" fill="#fff0f7"/>
-        <path d="M48 19L54 26L57 16Z" fill="#ff5aa8"/>
-      </g>
-      <!-- crinkle lines and the print's white stripe, broken by the folds -->
-      <path d="M24 16L30 15L35 19M40 14L46 17L52 13M38 22L44 20L50 23M27 21L33 22" stroke="#fff" stroke-width=".7" fill="none" opacity=".75"/>
-      <path d="M25 18Q33 15 38 18T52 16L60 17" stroke="#fff6fb" stroke-width="1.8" fill="none" opacity=".55" stroke-dasharray="7 2 5 3"/>
-    </svg>
-  </template>
   <div class="game-grid" id="game-grid" aria-label="Arcade machines. Use the left and right arrows to walk between games.">
 
     <article class="card card-rally" data-game-url="rally/index.html">
@@ -239,48 +87,48 @@
 
     <article class="card card-bouncer" data-game-url="bouncer/index.html">
       <div class="card-shot-wrap">
-        <img class="card-shot" src="bouncer/screenshot.png?v=24" alt="Bouncer gameplay">
+        <img class="card-shot" src="bouncer/screenshot.png?v=25" alt="Bouncer gameplay">
       </div>
       <div class="card-title">BOUNCER</div>
     </article>
 
     <article class="card card-galactic" data-game-url="defender/index.html">
       <div class="card-shot-wrap">
-        <img class="card-shot" src="defender/screenshot.png?v=24" alt="Defender gameplay">
+        <img class="card-shot" src="defender/screenshot.png?v=25" alt="Defender gameplay">
       </div>
       <div class="card-title">DEFENDER</div>
     </article>
 
     <article class="card card-bubbler" data-game-url="bubbler/index.html">
       <div class="card-shot-wrap">
-        <img class="card-shot" src="bubbler/screenshot.png?v=24" alt="Bubbler gameplay">
+        <img class="card-shot" src="bubbler/screenshot.png?v=25" alt="Bubbler gameplay">
       </div>
       <div class="card-title">BUBBLER</div>
     </article>
 
     <article class="card card-sky-raider" data-game-url="raider/index.html">
       <div class="card-shot-wrap">
-        <img class="card-shot" src="raider/screenshot.png?v=24" alt="Raider gameplay">
+        <img class="card-shot" src="raider/screenshot.png?v=25" alt="Raider gameplay">
       </div>
       <div class="card-title">RAIDER</div>
     </article>
     <article class="card card-meteors" data-game-url="meteors/index.html">
       <div class="card-shot-wrap">
-        <img class="card-shot" src="meteors/screenshot.png?v=24" alt="Meteors gameplay">
+        <img class="card-shot" src="meteors/screenshot.png?v=25" alt="Meteors gameplay">
       </div>
       <div class="card-title">METEORS</div>
     </article>
 
     <article class="card card-serpent" data-game-url="serpent/index.html">
       <div class="card-shot-wrap">
-        <img class="card-shot" src="serpent/screenshot.png?v=24" alt="Serpent gameplay">
+        <img class="card-shot" src="serpent/screenshot.png?v=25" alt="Serpent gameplay">
       </div>
       <div class="card-title">SERPENT</div>
     </article>
 
     <article class="card card-brawler" data-game-url="brawler/index.html">
       <div class="card-shot-wrap">
-        <img class="card-shot" src="brawler/card.png?v=32" alt="Brawler: a high kick, over the sign">
+        <img class="card-shot" src="brawler/card.png?v=33" alt="Brawler: a high kick, over the sign">
       </div>
       <div class="card-title">BRAWLER</div>
     </article>
@@ -378,9 +226,9 @@
 
   <script src="howler.min.js"></script>
   <script src="blip_core.js?v=19"></script>
-  <script src="cabinet.js?v=111"></script>
-  <script src="aisle.js?v=2"></script>
-  <script src="arcade.js?v=5"></script>
+  <script src="cabinet.js?v=115"></script>
+  <script src="aisle.js?v=3"></script>
+  <script src="arcade.js?v=7"></script>
 <i id="arcade-parsed" hidden></i>
 </body>
 </html>

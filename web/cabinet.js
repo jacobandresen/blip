@@ -373,12 +373,7 @@ function blipControlsCard(opts) {
   card.id = 'controls-card';
   card.setAttribute('role', 'dialog');
   card.setAttribute('aria-label', opts.label + ' ' + opts.name);
-  card.innerHTML = '<span class="cc-rod" aria-hidden="true"></span><span class="cc-clamp" aria-hidden="true"></span><span class="cc-punch" aria-hidden="true"></span>' +
-    '<div class="cc-paper"><p class="cc-title">' + opts.label + '</p><p class="cc-game">' + opts.name + '</p>' + opts.html +
-    '<p class="cc-foot">BLIP ARCADE &middot; OPERATOR&rsquo;S CARD</p></div>';
-  var sleeve = document.createElement('span');
-  sleeve.id = 'card-sleeve';
-  sleeve.setAttribute('aria-hidden', 'true');
+  card.innerHTML = '<div class="cc-paper"><p class="cc-title">' + opts.label + '</p><p class="cc-game">' + opts.name + '</p>' + opts.html + '</div>';
   var button = document.createElement('button');
   button.id = 'card-button';
   button.type = 'button';
@@ -388,7 +383,6 @@ function blipControlsCard(opts) {
   button.title = 'Controls card';
   button.innerHTML = '<span aria-hidden="true">?</span>';
   document.body.appendChild(card);
-  document.body.appendChild(sleeve);
   document.body.appendChild(button);
   var root = document.documentElement;
   function isOpen() { return root.hasAttribute('data-card'); }
@@ -452,31 +446,6 @@ function playManualPaper(lift) {
   }catch(e){}
 }
 
-// The coin that drops into the slot (blip.css #coin-drop-anim): a real
-// element so a class toggle can animate it, made on first use in the page's slot.
-function dropCoinAnimation() {
-  var btn = document.getElementById('kiosk-insert-btn') || document.getElementById('insert-coin-btn');
-  if (!btn) return;
-  var coinDropAnim = btn.querySelector('#coin-drop-anim');
-  if (!coinDropAnim) {
-    coinDropAnim = document.createElement('span');
-    coinDropAnim.id = 'coin-drop-anim';
-    coinDropAnim.setAttribute('aria-hidden', 'true');
-    btn.appendChild(coinDropAnim);
-  }
-  // The slot is the centre of the coin plate, padding-right plus half the
-  // plate; both change across breakpoints.
-  var padRight = parseFloat(getComputedStyle(btn).paddingRight) || 8;
-  var plateW = parseFloat(getComputedStyle(btn, '::after').width) || 18;
-  coinDropAnim.style.setProperty('--slot-x', (btn.classList.contains('deck-coin-slot')?btn.offsetWidth/2:padRight+plateW/2)+'px');
-  coinDropAnim.classList.remove('dropping');
-  void coinDropAnim.offsetWidth;
-  coinDropAnim.classList.add('dropping');
-  coinDropAnim.addEventListener('animationend', function () {
-    coinDropAnim.classList.remove('dropping');
-  }, { once: true });
-}
-
 function playNoRoom() {
   var ctx  = getKioskAudio();
   var t    = ctx.currentTime;
@@ -498,9 +467,7 @@ function insertCoin() {
   if (n < MAX_COINS) {
     saveCoins(n + 1);
     playCoinInsert();
-    dropCoinAnimation();
     updateCoinsHud();
-    updateCoinPrompt();
     if (typeof window.onCoinInserted === 'function') window.onCoinInserted();
   } else {
     playNoRoom();
@@ -515,13 +482,6 @@ function wireCoinSlot() {
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',wireCoinSlot);
 else wireCoinSlot();
 
-// Mark the coin control while the landing page has no credits.
-function updateCoinPrompt() {
-  if (!document.querySelector('.game-grid')) return;
-  var btn = document.getElementById('kiosk-insert-btn');
-  if (btn) btn.classList.toggle('needs-coin', getCoins() <= 0);
-}
-window.addEventListener('load', updateCoinPrompt);
 
 /* Poll the first gamepad and report logical button edges to games or the cabinet picker. */
 function pollGamepad(onDown, onUp) {
@@ -699,30 +659,6 @@ function playArcadeDock() {
   } catch(e) {}
 }
 
-function blipBuildCabinetStars() {
-  if (!document.body.classList.contains('cabinet-page')) return;
-  var stars = document.createElement('div');
-  stars.className = 'cabinet-stars';
-  stars.setAttribute('aria-hidden', 'true');
-  // Fixed seed keeps the cabinet's speckles in place across page navigation.
-  var seed = 1977;
-  function random() {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    return seed / 4294967296;
-  }
-  for (var i = 0; i < 120; i++) {
-    var star = document.createElement('i');
-    star.style.left = random() * 100 + '%';
-    star.style.top = random() * 100 + '%';
-    star.style.opacity = (0.12 + random() * 0.23).toFixed(2);
-    stars.appendChild(star);
-  }
-  document.body.prepend(stars);
-}
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', blipBuildCabinetStars, { once:true });
-} else blipBuildCabinetStars();
-
 /* ---- The front-end switch ---- Home Screen, on the top bar of the cabinet and of every game page:
  * beside the logo, else just left of the manual; where the bar has no room for it, centred on the
  * logo's height just after it, with the game's name made small enough to fit what is left of its sign. */
@@ -805,8 +741,7 @@ function blipManualPocket() {
   var book = document.createElement(document.getElementById('manual-overlay') ? 'button' : 'a');
   book.className = 'cabinet-manual';
   book.id = 'manual-book';
-  book.innerHTML = '<span class="manual-book-spine" aria-hidden="true"></span><span class="manual-book-copy"><img class="manual-book-plate" src="' + up +
-    'blip-logo.svg" alt=""><strong>MANUAL</strong><small>BLIP · OPERATOR’S COPY</small></span><span class="manual-page-edges" aria-hidden="true"></span>';
+  book.innerHTML = '<span class="manual-book-spine" aria-hidden="true"></span><span class="manual-book-copy"><strong>MANUAL</strong></span>';
   book.setAttribute('data-page-card', 'true');
   book.setAttribute('aria-label', 'Lift the BLIP Arcade Manual');
   book.title = 'Open the BLIP manual';

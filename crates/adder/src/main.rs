@@ -266,7 +266,7 @@ fn draw_viper(blip: &Blip, s: &arena::Snake) {
 }
 
 /// Who else is in the pit: a chip in each snake's colour and its score down the
-/// right-hand side. Player one is on the top bar, with everyone else's work.
+/// right-hand side. Player one is on the top bar.
 fn draw_standings(blip: &Blip, w: &World) {
     let mut y = arena::PIT_Y + 10.0;
     for s in &w.snakes {
@@ -287,7 +287,8 @@ fn draw_world(blip: &Blip, w: &World, pit: &Texture2D) {
 
 fn draw_play(blip: &Blip, g: &Game, pit: &Texture2D) {
     draw_world(blip, &g.world, pit);
-    draw_standings(blip, &g.world);
+    // The standings show between rounds; mid-race the pit is left to the snakes.
+    if g.world.round_wait > 0.0 || g.world.banner_t < BANNER { draw_standings(blip, &g.world); }
     if g.world.round_wait > 0.0 {
         let won = g.world.snakes.iter().any(|s| s.alive && s.human);
         if won {

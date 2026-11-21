@@ -409,7 +409,6 @@ function updateCoinLock() {
 function updateCreditsDisplay() {
   updateCoinsHud();
   updateCardDimming();
-  updateCoinPrompt();
 }
 
 updateCreditsDisplay(); // initialise dimming to match coins on page load
@@ -427,7 +426,7 @@ document.querySelectorAll('#game-grid .card').forEach(function(card){
   var instructions=document.createElement('span');instructions.className='machine-instructions';instructions.setAttribute('aria-hidden','true');instructions.textContent=(players>1?'1 OR 2 PLAYERS · ':'')+((BLIP_GAMES[slug]||{}).legend||'');screen.appendChild(instructions);
   var attract=document.createElement('span');attract.className='machine-attract';attract.setAttribute('aria-hidden','true');attract.innerHTML='<b>PRESS START</b><span class="machine-credit">CREDIT 0</span>';card.querySelector('.game-rom').appendChild(attract);
   var speaker=document.createElement('span');speaker.className='machine-speaker';speaker.setAttribute('aria-hidden','true');card.appendChild(speaker);
-  ['left','right'].forEach(function(side){var panelSide=document.createElement('span');panelSide.className='machine-side '+side;panelSide.setAttribute('aria-hidden','true');panelSide.innerHTML='<b>'+name+'</b>';card.appendChild(panelSide);});
+  ['left','right'].forEach(function(side){var panelSide=document.createElement('span');panelSide.className='machine-side '+side;panelSide.setAttribute('aria-hidden','true');card.appendChild(panelSide);});
   var controls=document.createElement('div');controls.className='machine-controls';
   controls.innerHTML='<button type="button" class="machine-start" aria-label="Start '+name+'"><span class="machine-start-cap">START</span></button>';
   // The deck is the game page's own, the same <blip-deck>, so the cabinet's controls are the ones the player will use.
@@ -447,7 +446,7 @@ document.querySelectorAll('#game-grid .card').forEach(function(card){
   card.insertBefore(controls,card.querySelector('.machine-start'));
   var coinbox=document.createElement('button');
   coinbox.type='button';coinbox.className='machine-coinbox';coinbox.setAttribute('aria-label','Insert a coin at the '+(title?title.textContent.trim():'')+' machine');
-  coinbox.innerHTML=('<span class="machine-coin-mech" aria-hidden="true"><span class="machine-coin-slot"></span><span class="machine-coin-price">25¢</span></span>').repeat(2)+'<span class="machine-coin-return" aria-hidden="true"></span>'.repeat(2)+'<span class="machine-coin-lock" aria-hidden="true"></span>';
+  coinbox.innerHTML='<span class="machine-coin-mech" aria-hidden="true"><span class="machine-coin-slot"></span><span class="machine-coin-price">25¢</span></span>';
   coinbox.addEventListener('click',function(event){
     event.preventDefault();event.stopPropagation();
     if(focusArcadeCard)focusArcadeCard(card);
@@ -1006,79 +1005,15 @@ document.getElementById('manual-book').addEventListener('click',function(event){
   var held={},walked=0,stride=0,pendingStart=false;
   // Stepped up to the faced machine: lean 0 standing in the aisle, 1 at the machine.
   var steppedUp=false,lean=0,LEAN_Z=150,LEAN_LIFT=60;
-  // The room's layers (arcade.css): the carpet nearer than the machines, the wall's joints farther.
-  function roomLayer(tag,className,layer,zone){
-    var el=document.createElement(tag);el.className=className;el.setAttribute('aria-hidden','true');
-    el.dataset.roomLayer=layer;el.dataset.zone=zone;return el;
-  }
-  var wall=roomLayer('i','aisle-wall','wall','wall'),trim=roomLayer('i','aisle-trim','trim','trim'),carpet=roomLayer('i','aisle-carpet','carpet','floor');
-  grid.insertBefore(carpet,grid.firstChild);grid.insertBefore(trim,carpet);grid.insertBefore(wall,trim);
-  var tiles=document.getElementById('room-tiles').content.firstElementChild.cloneNode(true);
-  tiles.dataset.roomLayer='tiles';tiles.dataset.zone='wall';grid.insertBefore(tiles,trim);
-  var stepEdge=roomLayer('i','aisle-step','step','floor');grid.insertBefore(stepEdge,carpet);
-  var signs=document.getElementById('room-signs').content.cloneNode(true);
-  var roomSignEls=[['.aisle-neon','neon'],['.aisle-open','open']].map(function(sign){
-    var el=signs.querySelector(sign[0]);el.dataset.roomLayer=sign[1];el.dataset.zone='sign';
-    grid.insertBefore(el,carpet);return el;
-  });
-  // How far the room has scrolled, in machines. The aisle's own position wraps round the loop when it
-  // settles; this keeps counting, so the room never jumps between the last machine and the first.
+  // How far the walk has gone, in machines. The aisle's own position wraps round the loop when it settles;
+  // this keeps counting (tests and captures read it).
   var roomTravel=aisle.pos,roomFrom=aisle.pos;
-  // Round each machine: its shadow on the wall behind, its power cord to a socket in the gap beside it, and
-  // whatever visitors left behind (a can on Defender, a sweet's wrapper by Serpent).
-  var dressing=document.getElementById('room-dressing').content;
-  function dressCabinet(c) {
-    c.appendChild(roomLayer('span','card-backlight','shadow','wall'));
-    powerCord(c);
-    var props=[];
-    if(c.dataset.machine==='defender')props.push(['.room-can','prop','wall'],['.room-can-shadow','prop','wall']);
-    if(c.dataset.machine==='serpent')props.push(['.room-wrapper','prop','floor']);
-    props.forEach(function(prop){
-      var el=dressing.querySelector(prop[0]).cloneNode(true);
-      el.dataset.roomLayer=prop[1];el.dataset.zone=prop[2];c.appendChild(el);
-    });
-  }
-  // Each machine's cord, laid its own way: out of a small junction box on the cabinet's right side by the deck,
-  // down the side to the floor, slack across the floor of the gap and back to the wall's foot, then up into a
-  // socket. The machine's name seeds the shape, so a cabinet keeps its cord. Each piece lies on its own plane
-  // (arcade.css): the drop 52px behind the front, the floor seen from above (0 the cabinets' fronts, 215 the
-  // wall, x 0 at 92% of the cabinet's width) and the wall (0 the floor); they meet where one ends.
-  function powerCord(c) {
-    var seed=0,name=c.dataset.machine||'';
-    for(var i=0;i<name.length;i++)seed=(seed*31+name.charCodeAt(i))>>>0;
-    function rand(){seed=(seed+0x6D2B79F5)>>>0;var t=seed;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;}
-    function between(a,b){return a+(b-a)*rand();}
-    var startX=36,startZ=52,socketX=between(52,96),socketUp=between(30,46),reach=between(26,60);
-    var bendX=startX+between(10,30),loop=rand()<.25;
-    var p=[[startX,startZ],[bendX,reach+between(-8,8)],[(bendX+socketX)/2+between(-12,12),reach+between(30,80)],[socketX+between(-6,6),between(198,207)],[socketX,214]];
-    if(loop)p.splice(2,0,[bendX+between(10,18),reach-between(4,10)],[bendX+between(-4,4),reach-between(12,18)]);
-    var d='M'+p[0][0].toFixed(1)+' '+p[0][1].toFixed(1);
-    for(var k=0;k<p.length-1;k++){
-      var a=p[k-1]||p[k],b=p[k],e=p[k+1],f=p[k+2]||e;
-      d+='C'+(b[0]+(e[0]-a[0])/6).toFixed(1)+' '+(b[1]+(e[1]-a[1])/6).toFixed(1)+' '+(e[0]-(f[0]-b[0])/6).toFixed(1)+' '+(e[1]-(f[1]-b[1])/6).toFixed(1)+' '+e[0].toFixed(1)+' '+e[1].toFixed(1);
-    }
-    var floor=document.createElementNS('http://www.w3.org/2000/svg','svg');
-    floor.setAttribute('viewBox','0 0 168 215');floor.setAttribute('class','cord-floor');floor.setAttribute('aria-hidden','true');
-    floor.innerHTML='<path class="cord-shadow" d="'+d+'" transform="translate(1.5 3)"/><path class="cord-wire" d="'+d+'"/><path class="cord-shine" d="'+d+'" transform="translate(-.6 -.8)"/>';
-    var bow=between(-7,7),up='M'+socketX.toFixed(1)+' 100C'+(socketX+bow).toFixed(1)+' '+(100-socketUp*.35).toFixed(1)+' '+(socketX+bow*.4).toFixed(1)+' '+(100-socketUp*.8).toFixed(1)+' '+socketX.toFixed(1)+' '+(100-socketUp+6).toFixed(1);
-    var wallPiece=document.createElementNS('http://www.w3.org/2000/svg','svg');
-    wallPiece.setAttribute('viewBox','0 0 168 100');wallPiece.setAttribute('class','cord-wall');wallPiece.setAttribute('aria-hidden','true');
-    var sy=100-socketUp;
-    wallPiece.innerHTML='<g class="cord-socket" transform="translate('+socketX.toFixed(1)+' '+sy.toFixed(1)+')"><rect class="socket-shadow" x="-8" y="-9" width="18" height="21" rx="2.6"/><rect x="-9" y="-11" width="18" height="21" rx="2.6"/><circle cx="-3" cy="-2" r="1.5"/><circle cx="3" cy="-2" r="1.5"/></g>'+
-      '<path class="cord-shadow" d="'+up+'" transform="translate(2.5 1.5)"/><path class="cord-wire" d="'+up+'"/><path class="cord-shine" d="'+up+'" transform="translate(-.8 0)"/>'+
-      '<rect class="cord-plug-shadow" x="'+(socketX-3.5).toFixed(1)+'" y="'+(sy-3).toFixed(1)+'" width="9" height="13" rx="1.8"/><rect class="cord-plug" x="'+(socketX-4.5).toFixed(1)+'" y="'+(sy-5).toFixed(1)+'" width="9" height="13" rx="1.8"/>';
-    var sway=between(3,9),drop=document.createElementNS('http://www.w3.org/2000/svg','svg');
-    drop.setAttribute('viewBox','0 0 24 262');drop.setAttribute('class','cord-drop');drop.setAttribute('aria-hidden','true');
-    var hang='M6 0C'+(6+sway).toFixed(1)+' 70 '+(12+sway).toFixed(1)+' 170 12 262';
-    drop.innerHTML='<path class="cord-wire" d="'+hang+'"/><path class="cord-shine" d="'+hang+'" transform="translate(-.7 0)"/>';
-    var box=document.createElement('span');box.className='cord-box';
-    var boxFront=document.createElement('span');boxFront.className='cord-box-front';
-    [[box,'wall'],[boxFront,'wall'],[drop,'wall'],[floor,'floor'],[wallPiece,'wall']].forEach(function(piece){
-      piece[0].setAttribute('aria-hidden','true');piece[0].dataset.roomLayer='cord';piece[0].dataset.zone=piece[1];c.appendChild(piece[0]);
-    });
+  // Each machine's shadow on the wall behind it (arcade.css).
+  function shadow(c){
+    var el=document.createElement('span');el.className='card-backlight';el.setAttribute('aria-hidden','true');c.appendChild(el);
   }
   // Living screens: a machine within two plays a few seconds of its game (tools/make_attract_strips.mjs, 12 frames),
-  // farther ones show their still; each casts a pool of its colour on the carpet, brighter as you come near.
+  // farther ones show their still.
   var LOOP_NEAR=2;
   var screens=cards.map(function(c){
     var rom=c.querySelector('.game-rom');
@@ -1112,10 +1047,9 @@ document.getElementById('manual-book').addEventListener('click',function(event){
     picture.appendChild(source);picture.appendChild(strip);frame.appendChild(picture);box.appendChild(frame);
     var still=rom.querySelector('.card-shot');
     rom.insertBefore(box,still?still.nextSibling:rom.firstChild);
-    var pool=roomLayer('span','card-pool','pool','floor');c.appendChild(pool);
-    dressCabinet(c);
+    shadow(c);
     var slug=(c.getAttribute('data-game-url')||'').split('/')[0];
-    return {strip:strip,source:source,pool:pool,near:false,glow:'',src:slug+'/attract.webp',fallback:slug+'/attract.png'};
+    return {strip:strip,source:source,near:false,src:slug+'/attract.webp',fallback:slug+'/attract.png'};
   });
   // Room between the machines for two players at each.
   function aisleSpacing(room) {
@@ -1131,51 +1065,21 @@ document.getElementById('manual-book').addEventListener('click',function(event){
     var close=w>h*1.4&&h<520;
     track.toggleAttribute('data-close',close);
     // Start sits 459 authored pixels down, with a minimum 30.4px touch target.
-    var css=getComputedStyle(track),closeScale=Math.min(h*.95/510,(h*.97-32)/459);
+    var closeScale=Math.min(h*.95/510,(h*.97-32)/459);
     var scale=Math.max(.3,Math.min(close?closeScale:h*.78/660,(w-56)/300));
-    var trimHeight=Math.max(parseFloat(css.getPropertyValue('--room-trim-min'))||24,
-      Math.min(h*(parseFloat(css.getPropertyValue('--room-trim-bottom'))-parseFloat(css.getPropertyValue('--room-trim-top')))/100,
-        parseFloat(css.getPropertyValue('--room-trim-max'))||96));
-    var depth=roomGeometry(track,w,h,scale,close,trimHeight);
-    // An integer number of mosaic repeats per circuit keeps both wall and aisle wraps seamless.
-    var wallLap=cards.length*aisleSpacing({scale:scale})*depth.rate;
-    var tileSize=Math.max(14,Math.min(32,300*scale*.08));
-    var tilesPeriod=wallLap/Math.max(1,Math.round(wallLap/(32*tileSize)));
-    track.style.setProperty('--room-tiles-period',tilesPeriod+'px');
-    track.style.setProperty('--room-tile-size',tilesPeriod/32+'px');
-    var tileCopies=Math.ceil(w/tilesPeriod)+2;
-    while(tiles.children.length<tileCopies){
-      var copy=tiles.firstElementChild.cloneNode(true),suffix='-'+tiles.children.length;
-      copy.querySelectorAll('[id]').forEach(function(def){
-        var id=def.id;def.id=id+suffix;
-        copy.querySelectorAll('[fill="url(#'+id+')"]').forEach(function(shape){shape.setAttribute('fill','url(#'+def.id+')');});
-      });
-      tiles.appendChild(copy);
-    }
-    while(tiles.children.length>tileCopies)tiles.lastElementChild.remove();
-    return {width:w,scale:scale,wallRate:depth.rate,wallZ:depth.z,tilesPeriod:tilesPeriod,
-      wallPeriod:parseFloat(css.getPropertyValue('--room-wall-period'))||120,
-      carpetPeriod:parseFloat(css.getPropertyValue('--room-carpet-period'))||86};
-  }
-  // The room in depth: the machines' fronts stand at the grid's plane and the wall 215px behind them (a cabinet
-  // is 200 deep), seen through #game-grid's perspective, 1100px from 38% of its height. The wall therefore
-  // scrolls at wallRate of the machines' pace, and its foot, where the floor meets it, is --room-floor-y.
-  var WALL_BACK=215;
-  function roomGeometry(track,w,h,scale,close,trimHeight) {
-    var feet=close?h*.03+660*scale:h*.97,top=feet-660*scale,wallZ=WALL_BACK*scale,wallRate=1100/(1100+wallZ),origin=h*.38;
-    var place={'--room-cab-w':Math.round(300*scale)+'px','--room-cab-top':Math.round(top)+'px','--room-side-top':Math.round(top)+'px',
-      '--room-trim-px':trimHeight+'px','--room-headroom-px':Math.max(0,top-trimHeight)+'px',
-      '--room-feet-y':Math.round(feet)+'px','--room-wall-z':Math.round(wallZ)+'px','--room-floor-y':Math.round(origin+(feet-origin)*wallRate)+'px'};
-    for(var name in place)if(track.style.getPropertyValue(name)!==place[name])track.style.setProperty(name,place[name]);
-    track.dataset.wallRate=wallRate.toFixed(4);
-    return {rate:wallRate,z:Math.round(wallZ)};
+    // The wall stands 215px behind the machines' fronts (a cabinet is 200 deep), seen through #game-grid's
+    // perspective, 1100px from 38% of its height: --room-floor-y is where the floor meets it.
+    var feet=close?h*.03+660*scale:h*.97,origin=h*.38,rate=1100/(1100+215*scale);
+    var floorY=Math.round(origin+(feet-origin)*rate)+'px';
+    if(track.style.getPropertyValue('--room-floor-y')!==floorY)track.style.setProperty('--room-floor-y',floorY);
+    return {width:w,scale:scale};
   }
   function aisleOffset(index) {
     return BlipAisle.offset(index,aisle.pos,cards.length);
   }
   // Every machine stands where the walk has got to. Transform and opacity only: this runs every frame.
   function poseCards(room,bob) {
-    var spacing=aisleSpacing(room),closer=lean*LEAN_Z,lift=-lean*LEAN_LIFT*room.scale;
+    var closer=lean*LEAN_Z,lift=-lean*LEAN_LIFT*room.scale;
     cards.forEach(function(c,i){
       if(!c.classList.contains('card'))return;
       var offset=aisleOffset(i),pose=cardPose(c,offset,room),distance=Math.abs(offset);
@@ -1197,25 +1101,8 @@ document.getElementById('manual-book').addEventListener('click',function(event){
         }
         c.toggleAttribute('data-loop',near);
       }
-      var glow=BlipAisle.machineLevel(distance).toFixed(2);
-      if(screen.glow!==glow){screen.glow=glow;screen.pool.style.opacity=glow;}
     });
     roomTravel+=BlipAisle.offset(aisle.pos,roomFrom,cards.length);roomFrom=aisle.pos;
-    // The floor lies from the wall's foot towards you and moves with the machines; the perspective makes its
-    // near side sweep past faster than its far one.
-    var carpetX=BlipAisle.layerOffset(roomTravel,spacing,1,room.carpetPeriod),wallX=BlipAisle.layerOffset(roomTravel,spacing,room.wallRate,room.wallPeriod);
-    carpet.style.transform='translateZ(-'+room.wallZ+'px) rotateX(90deg) translate('+carpetX.toFixed(1)+'px,0px)';
-    wall.style.transform='translate('+wallX.toFixed(1)+'px,'+((bob||0)*.4).toFixed(2)+'px)';
-    // The signs hang on the wall, so they scroll with it, coming round once a lap of the aisle: never more
-    // than half a lap from where they hang beside the first machine, so the wrap happens out of sight.
-    var lap=cards.length*spacing*room.wallRate,signX=BlipAisle.layerOffset(roomTravel,spacing,room.wallRate,lap);
-    if(signX<-lap/2)signX+=lap;
-    var signMove='translate('+signX.toFixed(1)+'px,'+((bob||0)*.4).toFixed(2)+'px)';
-    roomSignEls.forEach(function(el){el.style.transform=signMove;});
-    var tileX=BlipAisle.layerOffset(roomTravel,spacing,room.wallRate,room.tilesPeriod);
-    // Avoid rounding a completed repeat onto a different subpixel raster position.
-    if(Math.abs(tileX)<.1||Math.abs(tileX+room.tilesPeriod)<.1)tileX=0;
-    tiles.style.transform='translate('+tileX.toFixed(1)+'px,'+((bob||0)*.4).toFixed(2)+'px)';
     grid.dataset.aislePos=(((aisle.pos%cards.length)+cards.length)%cards.length).toFixed(2);
     grid.dataset.roomTravel=roomTravel.toFixed(3);
     blipArcadeSound.place(aisle.pos);

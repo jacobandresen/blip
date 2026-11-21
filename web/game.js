@@ -162,15 +162,11 @@ function returnToCabinet(event) {
   sign.dataset.title = game.name.charAt(0) + game.name.slice(1).toLowerCase();
   showBest(sign);
   // An app's launch screen shows its icon while the game loads.
-  document.documentElement.style.setProperty('--app-icon', 'url("' + new URL('icon-512.png?v=22', location.href).href + '")');
+  document.documentElement.style.setProperty('--app-icon', 'url("' + new URL('icon-512.png?v=23', location.href).href + '")');
   // The cabinet's own marquee (blip.css), as it stands in the arcade: the same machine.
   sign.classList.add('machine-marquee');
   sign.appendChild(Object.assign(document.createElement('b'), { className: 'machine-marquee-name', textContent: game.name }));
-  bar.append(
-    Object.assign(document.createElement('span'), { className: 'marquee-bulbs' }),
-    sign,
-    Object.assign(document.createElement('span'), { className: 'marquee-bulbs' })
-  );
+  bar.append(sign);
   document.body.insertBefore(bar, document.body.firstChild);
   rememberGame(game);
   sign.addEventListener('click', returnToCabinet);
@@ -325,7 +321,6 @@ function coinIn() {
   saveCoins(n);
   updateCoinsHud();
   playCoinInsert();
-  dropCoinAnimation();
   if (coinsOwed <= 0) overlay.classList.remove('visible');
 }
 
@@ -421,7 +416,7 @@ function showInstallSheet() {
   var body = blipIOS()
     ? '<ol class="install-steps"><li>Tap ' + share + ' <b>Share</b> in Safari\'s toolbar.</li><li>Choose <b>Add to Home Screen</b>.</li></ol>'
     : '<p class="install-wait">Use your browser\'s menu: <b>Install app</b> or <b>Add to Home screen</b>.</p>';
-  sheet.innerHTML = '<div class="install-card"><img class="install-icon" src="icon-180.png?v=22" alt="">' +
+  sheet.innerHTML = '<div class="install-card"><img class="install-icon" src="icon-180.png?v=23" alt="">' +
     '<h2 id="install-title">Add ' + name + ' to your Home Screen</h2>' +
     '<p class="install-lede">Its icon opens ' + name + ' straight away, full screen, free to play.</p>' + body +
     '<div class="install-actions"><button type="button" class="install-go" hidden>INSTALL</button><button type="button" class="install-close">NOT NOW</button></div></div>';
@@ -1573,7 +1568,6 @@ window.addEventListener('keydown', function (e) {
     return e;
   }
   try {root.toggleAttribute('data-credit',Number(sessionStorage.getItem('blip-coins'))>0);}catch(e){}
-  coin.style.display='none';
   var lamp=el('span','deck-credit-lamp','P1',{'aria-label':'Player one credit'});
   var lamp2=el('span','deck-second-lamp','P2',{'aria-label':'Player two station'});
   var bar=panel.parentElement;panel.append(lamp,lamp2);
