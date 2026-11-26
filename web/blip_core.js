@@ -171,6 +171,12 @@ var BLIP_GAMES = {
                          stick: { engage: 10, release: 6, maxR: 54, hyst: 10 } }
 };
 
+// Two can play: a second station, or a key for the second player (Rally's dials share one).
+function blipTwoPlayer(slug) {
+  var g = BLIP_GAMES[slug];
+  return g.players === 2 || /2(ND)? PLAYER/.test(JSON.stringify(g.controls || []));
+}
+
 // Pick out the game slug from a shell-page URL, e.g. "/blip/serpent/index.html"
 // or "/serpent/" both resolve to "serpent". Returns null off the game pages.
 function blipGameFromPath(pathname) {

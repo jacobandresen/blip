@@ -28,7 +28,7 @@ async fn main() {
         g.update(blip.delta_time, &eat);   // seconds since the last frame, at most 0.1
         blip.clear(BLIP_BLACK);
         g.draw(&blip);
-        blip.next_frame(60).await;
+        blip.next_frame().await;
     }
 }
 ```
@@ -100,10 +100,4 @@ ball-top stick or a d-pad and the game's buttons. Blip's pages set it up from `B
 <blip-deck seats="2" solo buttons='["FIRE","HYPER"]' controls="stick"></blip-deck>
 ```
 
-## Build and run
-
-```sh
-cargo run --release -p serpent   # native window
-npm run build:web                # every game to web/<game>/index.wasm
-node tools/serve_web.mjs         # serve web/
-```
+Building and running are in the [README](../README.md#build).

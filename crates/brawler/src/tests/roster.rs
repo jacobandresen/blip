@@ -66,8 +66,8 @@ pub(crate) fn nobody_strikes_over_the_head_of_a_smaller_opponent() {
     // of every fighter, thrown from just inside its range, touches every
     // other standing fighter, however small.
     let mut bad = vec![];
-    for a in 0..FIGHTERS.len() {
-        for d in 0..FIGHTERS.len() {
+    for (a, fa) in FIGHTERS.iter().enumerate() {
+        for (d, fd) in FIGHTERS.iter().enumerate() {
             for mv in [MoveId::LowPunch, MoveId::HighPunch, MoveId::LowKick, MoveId::HighKick,
                        MoveId::Sweep, MoveId::Throw, MoveId::Hook, MoveId::Roundhouse] {
                 let mut p = [at(a, 200.0, 1.0), at(d, 300.0, -1.0)];
@@ -77,7 +77,7 @@ pub(crate) fn nobody_strikes_over_the_head_of_a_smaller_opponent() {
                 let [atk, def] = &mut p;
                 let (dmg, _, _) = resolve_hit(atk, def, Input::default());
                 if dmg == 0 {
-                    bad.push(format!("{}'s {mv:?} misses {}", FIGHTERS[a].name, FIGHTERS[d].name));
+                    bad.push(format!("{}'s {mv:?} misses {}", fa.name, fd.name));
                 }
             }
         }
@@ -89,17 +89,17 @@ pub(crate) fn nobody_strikes_over_the_head_of_a_smaller_opponent() {
 pub(crate) fn a_throw_is_offered_only_where_it_reaches() {
     // "Close enough to throw" is each fighter's own distance: a turtle has
     // to be nearer than a giant does.
-    for a in 0..FIGHTERS.len() {
-        for d in 0..FIGHTERS.len() {
+    for (a, fa) in FIGHTERS.iter().enumerate() {
+        for (d, fd) in FIGHTERS.iter().enumerate() {
             let mut p = [at(a, 200.0, 1.0), at(d, 300.0, -1.0)];
             face_off(&mut p);
             p[1].x = p[0].x + throw_range(&p[0]) - 0.5;
             assert!(face_off(&mut p)[0]);
             assert!(throw_range(&p[0]) < attack_range(&p[0], MoveId::Throw),
-                "{} is offered a throw that cannot reach {}", FIGHTERS[a].name, FIGHTERS[d].name);
+                "{} is offered a throw that cannot reach {}", fa.name, fd.name);
             // And it is a distance the two can actually stand at.
             assert!(throw_range(&p[0]) > (p[0].width() + p[1].width()) / 2.0 * 0.82,
-                "{} can never get close enough to throw {}", FIGHTERS[a].name, FIGHTERS[d].name);
+                "{} can never get close enough to throw {}", fa.name, fd.name);
         }
     }
     let (small, big) = (at(3, 0.0, 1.0), at(8, 0.0, 1.0));

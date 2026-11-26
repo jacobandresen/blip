@@ -584,8 +584,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
     }
     expire_enemy_bullets(g);
     if g.ship_alive && g.invuln_t <= 0.0 {
-        for ai in 0..MAX_ASTEROIDS {
-            if !asteroids_before[ai] || !g.asteroids[ai].active { continue; }
+        // `ai` pairs the asteroid slot with whether it was active at frame start.
+        for (ai, was) in asteroids_before.iter().enumerate() {
+            if !*was || !g.asteroids[ai].active { continue; }
             let r = g.asteroids[ai].size.radius();
             if wrapped_motion_overlap(
                 (g.ship.x, g.ship.y),
@@ -710,8 +711,8 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     // ---- collisions: player bullets vs asteroids ----
     for bi in 0..MAX_BULLETS {
         if !g.bullets[bi].active || !g.bullets[bi].from_player { continue; }
-        for ai in 0..MAX_ASTEROIDS {
-            if !asteroids_at_frame_start[ai] || !g.asteroids[ai].active { continue; }
+        for (ai, was) in asteroids_at_frame_start.iter().enumerate() {
+            if !*was || !g.asteroids[ai].active { continue; }
             let r = g.asteroids[ai].size.radius();
             if wrapped_motion_overlap(
                 (g.bullets[bi].x, g.bullets[bi].y),
@@ -749,9 +750,10 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     // ---- player bullets vs saucer ----
     if g.saucer.active {
-        for bi in 0..MAX_BULLETS {
+        // `bi` pairs the bullet slot with its swept start.
+        for (bi, s0) in bullet_starts.iter().enumerate() {
             if !g.bullets[bi].active || !g.bullets[bi].from_player { continue; }
-            let from = bullet_starts[bi];
+            let from = *s0;
             let to = (from.0 + g.bullets[bi].vx * dt, from.1 + g.bullets[bi].vy * dt);
             let r = saucer_radius(g.saucer.big);
             let hit = if saucer_was_active {

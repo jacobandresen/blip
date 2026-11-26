@@ -14,7 +14,7 @@ wrappers. Do not publish or push unless asked.
 | Game page | `web/game.html` (copied to each `web/<game>/index.html`), `web/game.js` |
 | Styles shared by the arcade, game pages and decks | `web/blip.css` |
 | The arcade room and its manual | `web/index.html`, `web/arcade.css`, `web/arcade.js`, `web/aisle.js`, `web/cabinet.js` |
-| The control deck (stick, pad, buttons) | `<blip-deck>` from jsDelivr (the blip-deck repo); `blipBuildDeck` in `web/blip_core.js`, its keys in `web/controller.js`, what is around it in `web/blip.css` ("Around the control deck"), `web/machine-deck.html` |
+| The control deck (stick, pad, buttons) | `<blip-deck>` from jsDelivr (below), `web/controller.js`, `web/machine-deck.html` |
 | Home Screen and Guide | `web/home.*`, `web/guide.*` |
 | Manual pages | `web/controls.html`, `history.html`, `about.html` (read by both the arcade's manual and the Guide; `data-guide="cabinet"` or `"app"` marks copy for one) |
 | Tests | `test/*.mjs` (`node:test`), helpers in `test/lib/` |
@@ -22,14 +22,14 @@ wrappers. Do not publish or push unless asked.
 
 ## The shared deck
 
-The deck is the `<blip-deck>` element of the separate blip-deck repository (breadbin uses it too). It draws itself
-and reports presses as `blip-input` events; how it looks and answers a thumb is tested there, not here. Change it
-there and tag a release; `game.html`, `machine-deck.html` and `sw.js` (`DECK`) load `dist/blip-deck.js` from
-jsDelivr at that tag, and the service worker caches it. To try an untagged build, run the tests with
-`BLIP_DECK=../blip-deck/dist/blip-deck.js`. Blip's own parts stay here: `blipBuildDeck` sets the deck's attributes
-from `BLIP_GAMES` and adds the touch strip, `web/controller.js` turns its events (and the keyboard, a gamepad and
-Rally's dials) into the game's keys, and `web/blip.css` ("Around the control deck") styles what is around it: the
-bar, housing, dials, touch strip and lamps, and the deck's panel through its custom properties and `::part()`.
+The deck is the `<blip-deck>` element of the separate blip-deck repository (breadbin uses it too): it draws itself,
+reports presses as `blip-input` events and is tested there. Change it there and tag a release; `game.html`,
+`machine-deck.html` and `sw.js` (`DECK`) load `dist/blip-deck.js` from jsDelivr at that tag, and the service worker
+caches it. To try an untagged build, run the tests with `BLIP_DECK=../blip-deck/dist/blip-deck.js`. Blip keeps the
+rest: `blipBuildDeck` (`web/blip_core.js`) sets the deck up from `BLIP_GAMES` and adds the touch strip,
+`web/controller.js` turns its events (and the keyboard, a gamepad and Rally's dials) into the game's keys, and
+`web/blip.css` ("Around the control deck") styles what is around it and the deck's panel, through its custom
+properties and `::part()`.
 
 ## Generated files
 
@@ -69,6 +69,7 @@ npm run test:web                 # browser suites, two lanes
 npm run test:visual              # every game starts and responds (BLIP_VISUAL_GAME=BRAWLER for one)
 npm run test:playthrough         # every bot playthrough (BLIP_PLAYTHROUGH_GAME=serpent for one)
 node tools/fun_report.mjs [game] # fun score per game; CI fails a PR that lowers one (crates/blip/src/bot/FUN.md)
+node tools/bot_bench.mjs <game>  # mean RESULT stats over seeds, to measure a bot change
 ```
 
 Run the narrowest check while working, then the wider ones for shared code. `blip::testing` holds what the Rust tests
@@ -89,17 +90,14 @@ settings and goals on the bot's stats; a run ends when its goals are met. Runs a
 `Session` records `score`, `deaths` and `level`, and `web::report_score` ends a run (call
 `blip::bot::finish("won")` first on a win).
 
-Natively: `BLIP_BOT=1` plays and prints a `RESULT` line; `BLIP_BOT_LEVEL=<n>` starts at level n,
-`BLIP_BOT_SHOTS=<dir>` saves frames, `BLIP_BOT_FUZZ=<seed>` sends random input, and a game's own switches
-are `BLIP_BOT_<NAME>`. A refactor that must not change play: the same `BLIP_BOT=1 BLIP_BOT_SEED=n` run prints the same `RESULT` line
+Natively, `BLIP_BOT=1` plays and prints a `RESULT` line; the other `BLIP_BOT_*` switches (start level, frames, random
+input, reaction time, near-miss frames, …) are listed atop `crates/blip/src/bot/mod.rs`. A refactor that must not change play: the same `BLIP_BOT=1 BLIP_BOT_SEED=n` run prints the same `RESULT` line
 before and after, and one that must not change the picture saves the same `BLIP_BOT_SHOTS` frames (a bot run
 animates by its own clock). `node tools/playtest_levels.mjs [game ...]` plays every level and fails on a panic
 or a level the bot cannot start.
 
 Every bot run also reports fun measures (`fun_*`; [FUN.md](crates/blip/src/bot/FUN.md)): a game whose player can be hit
-gives its bot a `blip::bot::near` hook with the hit boxes its collision code tests (one named source for both). Bot
-runs draw one frame in 30 (`BLIP_BOT_DRAW=1` draws all); `BLIP_BOT_NEAR=<dir>` saves near misses and hits with their
-boxes drawn, and `BLIP_BOT_REACT=<ms>` plays at a person's reaction time. A mechanic tweak carries a brief comment with
+gives its bot a `blip::bot::near` hook with the hit boxes its collision code tests (one named source for both). A mechanic tweak carries a brief comment with
 the measured reason; [FUN-LOG.md](crates/blip/src/bot/FUN-LOG.md) keeps the early takeaways and is not maintained.
 
 ## Conventions

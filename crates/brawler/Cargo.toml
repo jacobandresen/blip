@@ -16,5 +16,3 @@ blip = { workspace = true }
 [build-dependencies]
 blip = { path = "../blip", default-features = false }
 
-[dev-dependencies]
-png.workspace = true

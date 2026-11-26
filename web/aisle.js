@@ -102,7 +102,7 @@ var BlipAisle = (function () {
   function machinePan(off) { return Math.max(-1, Math.min(1, off / 2)); }
 
   return {
-    HOLD: HOLD, create: create, press: press, step: step,
+    create: create, press: press, step: step,
     dragStart: dragStart, dragTo: dragTo, dragEnd: dragEnd,
     offset: offset, index: index, machineLevel: machineLevel, machinePan: machinePan
   };

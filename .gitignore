@@ -1,32 +1,12 @@
-# CMake build output
-build/
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-Makefile
-
-# In-source CMake artifacts
-**/CMakeFiles/
-**/cmake_install.cmake
-**/Makefile
-
-# Compiled binaries and libraries
-lib/libblip.a
-games/*/bouncer
-games/*/serpent
-games/*/defender
-games/*/gen_assets
-games/*/assets.stamp
-
-# Claude Code
-.claude/
-**/.claude/
-
 # Rust
 target/
 
 # Node
 node_modules/
+
+# Claude Code
+.claude/
+**/.claude/
 
 # Local secrets / env
 .env

@@ -9,7 +9,12 @@
 
 use super::*;
 use crate::magic::{Kind, Magic};
+use blip::math::hash;
 use blip::macroquad::color::Color;
+
+/// The seed art.rs hashes its cells with: `hash(x, y, ART_SEED)` gives the
+/// values its duplicated `hash(x, y, ART_SEED)` gave, bitwise.
+const ART_SEED: u32 = 1_427_579_731;
 use blip::macroquad::material::{gl_use_default_material, gl_use_material, load_material, Material, MaterialParams};
 use blip::macroquad::math::{vec2, Rect};
 use blip::macroquad::miniquad::{BlendFactor, BlendState, BlendValue, Equation, PipelineParams, ShaderSource};
@@ -290,7 +295,7 @@ impl Art {
                     continue;
                 }
                 let spaced = self.banners.iter().all(|b| (b.c - cc).abs() + (b.r - r).abs() >= 4);
-                if spaced && hash2(cc + salt, r * 3) > 0.62 {
+                if spaced && hash(cc + salt, r * 3, ART_SEED) > 0.62 {
                     self.banners.push(cl);
                 }
             }
@@ -304,7 +309,7 @@ impl Art {
                 }
                 let walls = [(-1, 0), (1, 0), (0, -1), (0, 1)].iter().filter(|&&(dc, dr)| g.walls.get(cc + dc, r + dr)).count();
                 let spaced = self.candles.iter().all(|b| (b.c - cc).abs() + (b.r - r).abs() >= 5);
-                if walls >= 2 && spaced && self.candles.len() < 4 && hash2(cc * 5, r + salt) > 0.45 {
+                if walls >= 2 && spaced && self.candles.len() < 4 && hash(cc * 5, r + salt, ART_SEED) > 0.45 {
                     self.candles.push(cl);
                 }
             }
@@ -313,8 +318,8 @@ impl Art {
         'find: for r in (1..ROWS as i32 - 1).rev() {
             for cc in 1..COLS as i32 - 2 {
                 let (a, b) = (Cell { c: cc, r }, Cell { c: cc + 1, r });
-                if free(a) && free(b) && g.walls.get(cc, r + 1) && g.walls.get(cc + 1, r + 1) && !self.candles.contains(&a) && !self.candles.contains(&b) && hash2(cc + salt, r) > 0.55 {
-                    self.skull = Some((a, hash2(r, cc) > 0.5));
+                if free(a) && free(b) && g.walls.get(cc, r + 1) && g.walls.get(cc + 1, r + 1) && !self.candles.contains(&a) && !self.candles.contains(&b) && hash(cc + salt, r, ART_SEED) > 0.55 {
+                    self.skull = Some((a, hash(r, cc, ART_SEED) > 0.5));
                     break 'find;
                 }
             }
@@ -511,7 +516,7 @@ impl Art {
             for cc in 0..COLS as i32 {
                 let x = (cc * CELL) as f32;
                 let y = (HUD_H + r * CELL) as f32;
-                let h = hash2(cc, r);
+                let h = hash(cc, r, ART_SEED);
                 if wall(cc, r) {
                     let cap = [0u32, 1, 2, 6][(h * 4.0) as usize % 4];
                     self.tile(cap, 1, x, y);
@@ -1055,8 +1060,8 @@ impl Art {
                 let mut px = x;
                 let mut py = y;
                 for s in 0..4 {
-                    let nx = px + (hash2(seed + k * 7, s) - 0.5) * 16.0 - fx * 6.0;
-                    let ny = py + (hash2(s, seed + k * 13) - 0.5) * 16.0 - fy * 6.0;
+                    let nx = px + (hash(seed + k * 7, s, ART_SEED) - 0.5) * 16.0 - fx * 6.0;
+                    let ny = py + (hash(s, seed + k * 13, ART_SEED) - 0.5) * 16.0 - fy * 6.0;
                     draw_line(px, py, nx, ny, 1.2, c(0.75, 0.9, 1.0, 0.9 - s as f32 * 0.2));
                     px = nx;
                     py = ny;
@@ -1315,20 +1320,20 @@ impl Art {
             for k in 0..5 {
                 self.glow(k as f32 * 70.0, 120.0, 150.0, c(0.45, 0.5, 0.8, 0.16 * flash));
             }
-            self.glow(60.0 + hash2(cycle as i32, 1) * 220.0, 120.0, 200.0, c(0.6, 0.65, 0.95, 0.3 * flash));
-            let mut x = 30.0 + hash2(cycle as i32, 1) * 240.0;
+            self.glow(60.0 + hash(cycle as i32, 1, ART_SEED) * 220.0, 120.0, 200.0, c(0.6, 0.65, 0.95, 0.3 * flash));
+            let mut x = 30.0 + hash(cycle as i32, 1, ART_SEED) * 240.0;
             let mut y = 80.0;
             let mut k = 0;
             while y < 196.0 {
-                let nx = x + (hash2(cycle as i32 * 31 + k, 7) - 0.5) * 34.0;
-                let ny = y + 10.0 + hash2(k, cycle as i32 + 3) * 16.0;
+                let nx = x + (hash(cycle as i32 * 31 + k, 7, ART_SEED) - 0.5) * 34.0;
+                let ny = y + 10.0 + hash(k, cycle as i32 + 3, ART_SEED) * 16.0;
                 draw_line(x, y, nx, ny, 2.0, c(0.85, 0.9, 1.0, flash));
                 self.streak((x + nx) / 2.0, (y + ny) / 2.0, 30.0, 10.0, (ny - y).atan2(nx - x), c(0.5, 0.6, 1.0, 0.4 * flash));
                 if k % 3 == 1 {
                     // a fork that dies away
                     let (mut fx, mut fy) = (nx, ny);
                     for j in 0..3 {
-                        let gx = fx + (hash2(k * 7 + j, cycle as i32) - 0.3) * 26.0;
+                        let gx = fx + (hash(k * 7 + j, cycle as i32, ART_SEED) - 0.3) * 26.0;
                         let gy = fy + 9.0;
                         draw_line(fx, fy, gx, gy, 1.0, c(0.7, 0.8, 1.0, flash * (0.7 - j as f32 * 0.2)));
                         fx = gx;
@@ -1423,7 +1428,7 @@ impl Art {
         for k in 0..18 {
             let life = 3.0;
             let p = ((t + k as f32 * 0.61) / life).fract();
-            let a = hash2(k, (t / life + k as f32 * 0.61 / life).floor() as i32) * TAU;
+            let a = hash(k, (t / life + k as f32 * 0.61 / life).floor() as i32, ART_SEED) * TAU;
             let x = cx + a.cos() * rx * 0.9 + (p * 9.0 + k as f32).sin() * 4.0;
             let y = cy + a.sin() * ry * 0.9 - p * 90.0;
             self.glow(x, y, 2.5 + (1.0 - p) * 2.0, c(0.75, 0.4, 1.0, (1.0 - p) * 0.9));
@@ -1489,8 +1494,8 @@ impl Art {
                     let (mut x, mut y) = (fx, fy);
                     for k in 1..=4 {
                         let q = k as f32 / 4.0;
-                        let nx = fx + (ex - fx) * q + (hash2(seed + strand * 9, k) - 0.5) * 8.0 * (1.0 - q * 0.5);
-                        let ny = fy + (ey - fy) * q + (hash2(k, seed + strand * 5) - 0.5) * 10.0;
+                        let nx = fx + (ex - fx) * q + (hash(seed + strand * 9, k, ART_SEED) - 0.5) * 8.0 * (1.0 - q * 0.5);
+                        let ny = fy + (ey - fy) * q + (hash(k, seed + strand * 5, ART_SEED) - 0.5) * 10.0;
                         draw_line(x, y, nx, ny, 1.2, col);
                         x = nx;
                         y = ny;
@@ -1500,8 +1505,8 @@ impl Art {
             self.glow(mx, my, 30.0, c(0.9, 0.8, 1.0, 0.55));
             self.glow(mx, my, 8.0, c(1.0, 1.0, 1.0, 1.0));
             for k in 0..6 {
-                let a = hash2(seed, k) * TAU;
-                let r = 6.0 + hash2(k, seed) * 14.0;
+                let a = hash(seed, k, ART_SEED) * TAU;
+                let r = 6.0 + hash(k, seed, ART_SEED) * 14.0;
                 self.glow(mx + a.cos() * r, my + a.sin() * r, 1.8, c(1.0, 0.9, 1.0, 0.9));
             }
         }
@@ -1539,7 +1544,7 @@ impl Art {
         for k in 0..16 {
             let life = 1.4;
             let p = ((t + k as f32 * 0.29) / life).fract();
-            let x = WIN_W as f32 / 2.0 - 140.0 + hash2(k, (t / life + k as f32 * 0.29 / life).floor() as i32) * 280.0;
+            let x = WIN_W as f32 / 2.0 - 140.0 + hash(k, (t / life + k as f32 * 0.29 / life).floor() as i32, ART_SEED) * 280.0;
             let y = ty0 + 8.0 - p * 26.0;
             self.glow(x + (p * 7.0 + k as f32).sin() * 3.0, y, 4.0 * (1.0 - p) + 1.0, c(0.7, 0.35, 1.0, (1.0 - p) * 0.7));
         }
@@ -1620,13 +1625,6 @@ fn potion_color(k: PotionKind) -> Color {
 // ---- helpers shared with the game -------------------------------------------------
 
 use std::f32::consts::TAU;
-
-pub fn hash2(x: i32, y: i32) -> f32 {
-    let mut h = (x as u32).wrapping_mul(374_761_393) ^ (y as u32).wrapping_mul(668_265_263) ^ 0x5bd1_e995;
-    h = (h ^ (h >> 13)).wrapping_mul(1_274_126_177);
-    h ^= h >> 16;
-    (h & 0xffff) as f32 / 65535.0
-}
 
 /// Where a torch's flame burns: on the face of its wall, above the floor below.
 pub fn torch_flame(tc: Cell) -> (f32, f32) {

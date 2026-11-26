@@ -1,8 +1,8 @@
 # Fun log
 
 What was tried to make the games more fun, what the measures said (`node tools/fun_report.mjs`, six seeds of 60 s
-unless noted), and whether it stayed. The method is in [FUN.md](FUN.md). Trim it now and then: fold settled rows
-into the takeaways.
+unless noted), and whether it stayed. The method is in [FUN.md](FUN.md). It is no longer kept up: a change's
+measured reason goes in a comment beside the code.
 
 ## Takeaways
 

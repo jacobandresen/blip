@@ -1793,9 +1793,10 @@ fn hit_with_bullets(g: &mut Game, sfx: &Sounds, bullet_starts: &[(f32, f32); MAX
 
 /// A power-up the plane flew through this frame: one more weapon level, or a bonus at the top.
 fn catch_powerups(g: &mut Game, player_before: (f32, f32), starts: &[Option<(f32, f32)>], sfx: &Sounds) {
-    for i in 0..MAX_POWERUPS {
+    // `i` pairs the power-up slot with the swept start recorded for it this frame.
+    for (i, start) in starts.iter().enumerate().take(MAX_POWERUPS) {
         if !g.powerups[i].active { continue; }
-        let (from_x, from_y) = blip::swept_from(starts[i], (g.powerups[i].x, g.powerups[i].y));
+        let (from_x, from_y) = blip::swept_from(*start, (g.powerups[i].x, g.powerups[i].y));
         if caught(g, player_before, (from_x, from_y), (g.powerups[i].x, g.powerups[i].y), POW_W, POW_H) {
             g.powerups[i].active = false;
             blip::bot::add("powerups", 1.0);
@@ -1820,9 +1821,10 @@ fn catch_powerups(g: &mut Game, player_before: (f32, f32), starts: &[Option<(f32
 
 /// A health pickup the plane flew through this frame.
 fn catch_health(g: &mut Game, player_before: (f32, f32), starts: &[Option<(f32, f32)>], sfx: &Sounds) {
-    for i in 0..MAX_HEALTH_PICKUPS {
+    // `i` pairs the pickup slot with the swept start recorded for it this frame.
+    for (i, start) in starts.iter().enumerate().take(MAX_HEALTH_PICKUPS) {
         if !g.health_pickups[i].active { continue; }
-        let (from_x, from_y) = blip::swept_from(starts[i], (g.health_pickups[i].x, g.health_pickups[i].y));
+        let (from_x, from_y) = blip::swept_from(*start, (g.health_pickups[i].x, g.health_pickups[i].y));
         if caught(g, player_before, (from_x, from_y), (g.health_pickups[i].x, g.health_pickups[i].y), HEALTH_W, HEALTH_H) {
             g.health_pickups[i].active = false;
             let (cx, cy) = (g.health_pickups[i].x + HEALTH_W / 2.0, g.health_pickups[i].y + HEALTH_H / 2.0);
@@ -1964,11 +1966,12 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 hit = true;
             }
         }
-        for i in 0..MAX_ENEMIES {
+        // `i` pairs the enemy slot with the swept start recorded for it this frame.
+        for (i, start0) in enemy_starts.iter().enumerate().take(MAX_ENEMIES) {
             if !g.enemies[i].active { continue; }
             let (ew, eh) = (ENEMY_W as f32 * 0.6, ENEMY_H as f32 * 0.6);
             let (ex, ey) = (g.enemies[i].x, g.enemies[i].y);
-            let (ex0, ey0) = blip::swept_from(enemy_starts[i], (ex, ey));
+            let (ex0, ey0) = blip::swept_from(*start0, (ex, ey));
             let (ox, oy) = (ENEMY_W as f32 * 0.2, ENEMY_H as f32 * 0.2);
             if blip::sweep_hits((hx0, hy0), (hx, hy), (ex0 + ox, ey0 + oy), (ex + ox, ey + oy), (-hw, -hh, ew + hw, eh + hh)) {
                 g.spawn_explosion(g.enemies[i].x, g.enemies[i].y, 1.0, EXPLOSION_ORANGE);
@@ -2213,10 +2216,15 @@ fn hurt_plane(g: &mut Game, px: f32, py: f32, sfx: &Sounds) {
     } else {
         g.spawn_player_death(px + PLAYER_W as f32 / 2.0, py + PLAYER_H as f32 / 2.0);
         play_take(&sfx.player_explode, 1.0);
-        match g.sess.lose_life() {
-            LifeResult::StillAlive => { g.dead_timer.start(DEAD_PAUSE); g.state = State::Dead; }
-            LifeResult::GameOver   => { g.cont.start(CONTINUE_SECS); g.state = State::Over; }
-        }
+        lose_plane(g);
+    }
+}
+
+/// The plane is down: the pause before the next, or the continue offer.
+fn lose_plane(g: &mut Game) {
+    match g.sess.lose_life() {
+        LifeResult::StillAlive => { g.dead_timer.start(DEAD_PAUSE); g.state = State::Dead; }
+        LifeResult::GameOver   => { g.cont.start(CONTINUE_SECS); g.state = State::Over; }
     }
 }
 
@@ -2407,10 +2415,7 @@ fn update_stall(g: &mut Game, dt: f32, sfx: &Sounds) {
         play_take(&sfx.player_explode, 1.0);
         g.health = 0;
         blip::bot::add("death_stall", 1.0);
-        match g.sess.lose_life() {
-            LifeResult::StillAlive => { g.dead_timer.start(DEAD_PAUSE); g.state = State::Dead; }
-            LifeResult::GameOver   => { g.cont.start(CONTINUE_SECS); g.state = State::Over; }
-        }
+        lose_plane(g);
     }
 }
 
@@ -2868,11 +2873,7 @@ fn draw_play(
     for e in pool_iter(&g.enemies) {
         let (ecx, ecy) = (e.x + ENEMY_W as f32 / 2.0, e.y + ENEMY_H as f32 / 2.0);
         if e.can_hide && point_in_any_cloud(g, ecx, ecy) { continue; }
-        let tex = match e.kind {
-            EnemyKind::Grunt  => &enemy_tex[0],
-            EnemyKind::Weaver => &enemy_tex[1],
-            EnemyKind::Ace    => &enemy_tex[2],
-        };
+        let tex = &enemy_tex[e.kind as usize];
         draw_shadow(tex, e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, -e.heading);
     }
     if g.boss.active {
@@ -2910,11 +2911,7 @@ fn draw_play(
         let s = 1.0 - 0.55 * k;
         let (ww, wh) = (ENEMY_W as f32 * s, ENEMY_H as f32 * s);
         let (x, y) = (w.x + (ENEMY_W as f32 - ww) / 2.0, w.y + (ENEMY_H as f32 - wh) / 2.0);
-        let tex = match w.kind {
-            EnemyKind::Grunt  => &enemy_tex[0],
-            EnemyKind::Weaver => &enemy_tex[1],
-            EnemyKind::Ace    => &enemy_tex[2],
-        };
+        let tex = &enemy_tex[w.kind as usize];
         draw_texture_ex(tex, x + PLANE_SHADOW_DX * (1.0 - k), y + PLANE_SHADOW_DY * (1.0 - k),
             BlipColor::new(0.0, 0.0, 0.0, 0.3), DrawTextureParams {
                 dest_size: Some(vec2(ww, wh)), rotation: -w.heading, ..Default::default()
@@ -2936,11 +2933,7 @@ fn draw_play(
         // they keep flying, firing and can be hit.
         let (ecx, ecy) = (e.x + ENEMY_W as f32 / 2.0, e.y + ENEMY_H as f32 / 2.0);
         if e.can_hide && point_in_any_cloud(g, ecx, ecy) { continue; }
-        let tex = match e.kind {
-            EnemyKind::Grunt  => &enemy_tex[0],
-            EnemyKind::Weaver => &enemy_tex[1],
-            EnemyKind::Ace    => &enemy_tex[2],
-        };
+        let tex = &enemy_tex[e.kind as usize];
         draw_plane(tex, e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, e.heading, e.bank, BLIP_WHITE);
     }
 

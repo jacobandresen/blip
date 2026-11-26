@@ -6,7 +6,7 @@
 //! light, deep crimson and old gold accents.
 
 use blip::image::Image;
-use blip::math::{bounds, in_polygon};
+use blip::math::{bounds, hash, in_polygon};
 use blip::Asset;
 
 /// One sprite or tile cell, in pixels.
@@ -30,13 +30,6 @@ const fn rgba(hex: u32, a: u8) -> C {
 const INK: C = rgb(0x07070b);
 
 // ---- painting helpers -------------------------------------------------------
-
-fn hash(x: i32, y: i32, s: u32) -> f32 {
-    let mut h = (x as u32).wrapping_mul(374_761_393) ^ (y as u32).wrapping_mul(668_265_263) ^ s.wrapping_mul(2_246_822_519);
-    h = (h ^ (h >> 13)).wrapping_mul(1_274_126_177);
-    h ^= h >> 16;
-    (h & 0xffff) as f32 / 65535.0
-}
 
 fn shade(c: C, k: f32) -> C {
     let f = |v: u8| (v as f32 * k).clamp(0.0, 255.0) as u8;

@@ -14,59 +14,42 @@ fn paddle() -> Vec<u8> {
     let mut img = Image::new(w as u32, h as u32);
     let r = 9.0f32;
     let cap = PADDLE_CAP as f32;
-    const N: i32 = 3;
-    for py in 0..h {
-        for px in 0..w {
-            let (mut cr, mut cg, mut cb, mut cov) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
-            for sy in 0..N {
-                for sx in 0..N {
-                    let x = px as f32 + (sx as f32 + 0.5) / N as f32;
-                    let y = py as f32 + (sy as f32 + 0.5) / N as f32;
-                    // Rounded-rectangle distance (negative inside).
-                    let qx = (x - w as f32 / 2.0).abs() - (w as f32 / 2.0 - r);
-                    let qy = (y - h as f32 / 2.0).abs() - (h as f32 / 2.0 - r);
-                    let d = qx.max(0.0).hypot(qy.max(0.0)) + qx.max(qy).min(0.0) - r;
-                    if d > 0.0 {
-                        continue;
-                    }
-                    let t = y / h as f32;
-                    let end = x < cap || x > w as f32 - cap;
-                    let mut c = if end {
-                        // Rubber: near-black with a soft top sheen.
-                        let v = 0.16 - 0.08 * t + 0.14 * (1.0 - (t * 3.0).min(1.0));
-                        (v, v, v * 1.1)
-                    } else if t < 0.5 {
-                        // Lit top face: light steel-blue fading to mid blue.
-                        let k = t / 0.5;
-                        (0.62 - 0.4 * k, 0.86 - 0.36 * k, 1.0 - 0.18 * k)
-                    } else {
-                        // Rounded underside: darkening navy.
-                        let k = (t - 0.5) / 0.5;
-                        (0.22 - 0.17 * k, 0.5 - 0.36 * k, 0.82 - 0.5 * k)
-                    };
-                    // Specular line just under the top edge, on the body only.
-                    if !end && (2.2..4.2).contains(&y) {
-                        c = (c.0 + (1.0 - c.0) * 0.7, c.1 + (1.0 - c.1) * 0.7, c.2 + (1.0 - c.2) * 0.7);
-                    }
-                    // Seam where the bumper meets the bar.
-                    if (x - cap).abs() < 0.9 || (x - (w as f32 - cap)).abs() < 0.9 {
-                        c = (c.0 * 0.35, c.1 * 0.35, c.2 * 0.35);
-                    }
-                    if d > -1.3 {
-                        c = (0.05, 0.07, 0.12);
-                    }
-                    cr += c.0;
-                    cg += c.1;
-                    cb += c.2;
-                    cov += 1.0;
-                }
-            }
-            if cov > 0.0 {
-                let k = |v: f32| (v / cov * 255.0).clamp(0.0, 255.0) as u8;
-                img.set_rgba(px, py, k(cr), k(cg), k(cb), (cov / (N * N) as f32 * 255.0) as u8);
-            }
+    img.supersample(|x, y| {
+        // Rounded-rectangle distance (negative inside).
+        let qx = (x - w as f32 / 2.0).abs() - (w as f32 / 2.0 - r);
+        let qy = (y - h as f32 / 2.0).abs() - (h as f32 / 2.0 - r);
+        let d = qx.max(0.0).hypot(qy.max(0.0)) + qx.max(qy).min(0.0) - r;
+        if d > 0.0 {
+            return None;
         }
-    }
+        let t = y / h as f32;
+        let end = x < cap || x > w as f32 - cap;
+        let mut c = if end {
+            // Rubber: near-black with a soft top sheen.
+            let v = 0.16 - 0.08 * t + 0.14 * (1.0 - (t * 3.0).min(1.0));
+            (v, v, v * 1.1)
+        } else if t < 0.5 {
+            // Lit top face: light steel-blue fading to mid blue.
+            let k = t / 0.5;
+            (0.62 - 0.4 * k, 0.86 - 0.36 * k, 1.0 - 0.18 * k)
+        } else {
+            // Rounded underside: darkening navy.
+            let k = (t - 0.5) / 0.5;
+            (0.22 - 0.17 * k, 0.5 - 0.36 * k, 0.82 - 0.5 * k)
+        };
+        // Specular line just under the top edge, on the body only.
+        if !end && (2.2..4.2).contains(&y) {
+            c = (c.0 + (1.0 - c.0) * 0.7, c.1 + (1.0 - c.1) * 0.7, c.2 + (1.0 - c.2) * 0.7);
+        }
+        // Seam where the bumper meets the bar.
+        if (x - cap).abs() < 0.9 || (x - (w as f32 - cap)).abs() < 0.9 {
+            c = (c.0 * 0.35, c.1 * 0.35, c.2 * 0.35);
+        }
+        if d > -1.3 {
+            c = (0.05, 0.07, 0.12);
+        }
+        Some(c)
+    });
     img.encode_png()
 }
 
@@ -303,54 +286,37 @@ fn pickup(kind: Pickup) -> Vec<u8> {
         Pickup::Narrow => ((1.0, 0.4, 0.35), (0.6, 0.03, 0.05)),
         Pickup::Multi => ((0.85, 0.6, 1.0), (0.42, 0.12, 0.72)),
     };
-    const N: i32 = 3;
-    for py in 0..h {
-        for px in 0..w {
-            let (mut cr, mut cg, mut cb, mut cov) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
-            for sy in 0..N {
-                for sx in 0..N {
-                    let x = px as f32 + (sx as f32 + 0.5) / N as f32;
-                    let y = py as f32 + (sy as f32 + 0.5) / N as f32;
-                    // Distance to the capsule's core segment.
-                    let nx = x.clamp(r + 1.0, w as f32 - r - 1.0);
-                    let d = (x - nx).hypot(y - cy) - r;
-                    if d > 0.0 {
-                        continue;
-                    }
-                    let t = ((y - (cy - r)) / (2.0 * r)).clamp(0.0, 1.0);
-                    let mut c = (top.0 + (bot.0 - top.0) * t, top.1 + (bot.1 - top.1) * t, top.2 + (bot.2 - top.2) * t);
-                    if kind == Pickup::Narrow && ((x + y) / 7.0).floor() as i32 % 2 == 0 {
-                        c = (c.0 * 0.28, c.1 * 0.28, c.2 * 0.28);
-                    }
-                    // Gloss strip along the top edge, fading toward the ends.
-                    let inner = (x - cx).abs() / (w as f32 / 2.0 - r);
-                    if (y - cy + r) > 3.0 && (y - cy + r) < 9.5 && inner < 1.0 {
-                        let k = 0.4 * (1.0 - inner * inner);
-                        c = (c.0 + (1.0 - c.0) * k, c.1 + (1.0 - c.1) * k, c.2 + (1.0 - c.2) * k);
-                    }
-                    if d > -1.8 {
-                        c = (c.0 * 0.35, c.1 * 0.35, c.2 * 0.35);
-                    }
-                    let p = (x - cx, y - cy);
-                    let sh = (p.0 - 1.4, p.1 - 1.6);
-                    if pickup_icon(kind, sh) {
-                        c = (c.0 * 0.35, c.1 * 0.35, c.2 * 0.35);
-                    }
-                    if pickup_icon(kind, p) {
-                        c = if kind == Pickup::Life { (0.85, 0.08, 0.15) } else { (1.0, 1.0, 1.0) };
-                    }
-                    cr += c.0;
-                    cg += c.1;
-                    cb += c.2;
-                    cov += 1.0;
-                }
-            }
-            if cov > 0.0 {
-                let k = |v: f32| (v / cov * 255.0).min(255.0) as u8;
-                img.set_rgba(px, py, k(cr), k(cg), k(cb), (cov / (N * N) as f32 * 255.0) as u8);
-            }
+    img.supersample(|x, y| {
+        // Distance to the capsule's core segment.
+        let nx = x.clamp(r + 1.0, w as f32 - r - 1.0);
+        let d = (x - nx).hypot(y - cy) - r;
+        if d > 0.0 {
+            return None;
         }
-    }
+        let t = ((y - (cy - r)) / (2.0 * r)).clamp(0.0, 1.0);
+        let mut c = (top.0 + (bot.0 - top.0) * t, top.1 + (bot.1 - top.1) * t, top.2 + (bot.2 - top.2) * t);
+        if kind == Pickup::Narrow && ((x + y) / 7.0).floor() as i32 % 2 == 0 {
+            c = (c.0 * 0.28, c.1 * 0.28, c.2 * 0.28);
+        }
+        // Gloss strip along the top edge, fading toward the ends.
+        let inner = (x - cx).abs() / (w as f32 / 2.0 - r);
+        if (y - cy + r) > 3.0 && (y - cy + r) < 9.5 && inner < 1.0 {
+            let k = 0.4 * (1.0 - inner * inner);
+            c = (c.0 + (1.0 - c.0) * k, c.1 + (1.0 - c.1) * k, c.2 + (1.0 - c.2) * k);
+        }
+        if d > -1.8 {
+            c = (c.0 * 0.35, c.1 * 0.35, c.2 * 0.35);
+        }
+        let p = (x - cx, y - cy);
+        let sh = (p.0 - 1.4, p.1 - 1.6);
+        if pickup_icon(kind, sh) {
+            c = (c.0 * 0.35, c.1 * 0.35, c.2 * 0.35);
+        }
+        if pickup_icon(kind, p) {
+            c = if kind == Pickup::Life { (0.85, 0.08, 0.15) } else { (1.0, 1.0, 1.0) };
+        }
+        Some(c)
+    });
     img.encode_png()
 }
 

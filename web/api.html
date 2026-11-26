@@ -124,7 +124,7 @@ async fn main() {
         game.update(dt);
         blip.clear(BLIP_BLACK);
         game.draw(&blip);
-        blip.next_frame(60).await;
+        blip.next_frame().await;
     }
 }</code></pre>
           <div class="links"><a href="serpent/index.html?from=api">Play Serpent ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/serpent/src/main.rs">See its loop in Rust ↗</a></div>
@@ -204,8 +204,8 @@ web::report_score(session.score);</code></pre><span class="pill">blip::web</span
             <li>Change one mechanic or tuning value, then repeat the same runs.</li>
             <li>Compare outcomes and relevant counters; keep the change only if the evidence supports it.</li>
           </ol>
-          <p>Bouncer records lost lives, the speed at each loss, and level clear times. Add <code>BLIP_BOT_SHOTS</code> to save frames for visual review too. The bot runs only in native builds.</p>
-          <div class="links"><a href="bouncer/index.html?from=api">Play Bouncer ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/bouncer/src/bot.rs">Read its bot ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/blip/src/bot.rs">Read bot playtesting API ↗</a></div>
+          <p>Bouncer records deaths, the ball’s speed at each loss, and the level reached. Add <code>BLIP_BOT_SHOTS</code> to save frames for visual review too. The bot runs only in native builds.</p>
+          <div class="links"><a href="bouncer/index.html?from=api">Play Bouncer ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/bouncer/src/bot.rs">Read its bot ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/blip/src/bot/mod.rs">Read bot playtesting API ↗</a></div>
         </div>
         <pre><code>cargo build --release -p bouncer
 BLIP_BOT=1 BLIP_BOT_MAXT=300 \
@@ -220,7 +220,7 @@ BLIP_BOT=1 BLIP_BOT_SHOTS=/tmp/bouncer-shots \
         <p>Give your coding agent a focused experiment. For example:</p>
         <pre><code>Read AGENTS.md, crates/bouncer/src/bot.rs, and the Bouncer
 RESULT stats. Run five baseline bot playthroughs and summarize
-lives_lost, lost_at_speed*, and t_clear*.
+deaths, lost_at_speed*, and level.
 
 Tune only the ball's top speed to make late rallies tense but
 recoverable. After each change, rebuild and run the same five
@@ -250,7 +250,7 @@ Do not edit generated files under web/.</code></pre>
     <p class="foot">Blip is built on <a href="https://macroquad.rs/">Macroquad</a>. Games run natively during development and can be compiled to WebAssembly for this arcade.</p>
   </main>
 
-  <script src="blip_core.js?v=17"></script>
+  <script src="blip_core.js?v=18"></script>
   <script>
     if (new URLSearchParams(location.search).get('from') === 'guide') {
       var back = document.querySelector('.api-bar a');

@@ -14,11 +14,7 @@ export async function loadRally(cdp) {
   await cdp.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/rally/index.html` });
   await waitFor(cdp, "document.readyState === 'complete'", 15000);
   await waitFor(cdp, "typeof window.BlipController === 'object'", 15000);
-  // Game controls stay gated until a real credit is inserted.
-  if (await evaluate(cdp, "document.getElementById('need-coin-overlay').classList.contains('visible')")) {
-    await insertCoins(cdp.page);
-    await waitFor(cdp, "!document.getElementById('need-coin-overlay').classList.contains('visible')");
-  }
+  await creditIfNeeded(cdp);
 }
 
 /** Wait for the game's first frame. A minute: a game boots slowly while the other test lane loads the machine.
@@ -52,6 +48,14 @@ export async function gotoPage(page, url, opts) {
   } catch (error) {
     if (!/WebKit encountered an internal error/.test(error.message)) throw error;
     return page.goto(url, opts);
+  }
+}
+
+/** Game controls stay gated until a credit enters through the coin button: drop one if the page asks. */
+export async function creditIfNeeded(cdp) {
+  if (await evaluate(cdp, "document.getElementById('need-coin-overlay').classList.contains('visible')")) {
+    await insertCoins(cdp.page);
+    await waitFor(cdp, "!document.getElementById('need-coin-overlay').classList.contains('visible')");
   }
 }
 

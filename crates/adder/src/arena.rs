@@ -463,8 +463,9 @@ impl World {
                 }
             }
         }
-        for i in 0..moves.len() {
-            let Some((_, to, hit)) = moves[i] else {
+        // `i` pairs each move with its slot: the eliminations are indexed by it too.
+        for (i, mv) in moves.iter().copied().enumerate() {
+            let Some((_, to, hit)) = mv else {
                 continue;
             };
             match hit {

@@ -1,7 +1,7 @@
 // Compiled by build.rs, and by the game only for its tests: much goes unused in each.
 #![allow(dead_code)]
 
-use blip::image::{coverage, Image};
+use blip::image::{coverage, mix_rgb as mix, Image};
 use blip::Asset;
 
 // One texture per letter preserves the title's individual bobbing motion.
@@ -102,15 +102,6 @@ fn title_sky() -> Vec<u8> {
     image.encode_png()
 }
 
-fn line(img: &mut Image, x0: i32, y0: i32, x1: i32, y1: i32, color: (u8, u8, u8)) {
-    let steps = (x1 - x0).abs().max((y1 - y0).abs()).max(1);
-    for i in 0..=steps {
-        let x = x0 + (x1 - x0) * i / steps;
-        let y = y0 + (y1 - y0) * i / steps;
-        img.set(x, y, color.0, color.1, color.2);
-    }
-}
-
 type Rgb = (u8, u8, u8);
 
 // ---- kawaii sprites --------------------------------------------------------
@@ -148,11 +139,6 @@ fn rgba(c: Rgb, a: u8) -> [u8; 4] {
 fn mul(c: Rgb, k: f32) -> Rgb {
     let f = |v: u8| (v as f32 * k).min(255.0) as u8;
     (f(c.0), f(c.1), f(c.2))
-}
-
-fn mix(a: Rgb, b: Rgb, t: f32) -> Rgb {
-    let f = |p: u8, q: u8| (p as f32 + (q as f32 - p as f32) * t) as u8;
-    (f(a.0, b.0), f(a.1, b.1), f(a.2, b.2))
 }
 
 /// A smooth, squeezable silicone ball (a squishy toy), lit like a sphere from
@@ -484,9 +470,7 @@ mod tests {
         assert_eq!(assets.len(), 62);
         for (path, bytes) in assets {
             assert!(path.starts_with("images/"));
-            let mut reader = png::Decoder::new(bytes.as_slice()).read_info().unwrap();
-            let mut pixels = vec![0; reader.output_buffer_size()];
-            let info = reader.next_frame(&mut pixels).unwrap();
+            let img = Image::from_png(&bytes);
             let is_tile = path.contains("TILE_") || path.contains("BORDER_");
             let expected_size = if path.contains("TITLE_LETTER_") {
                 (68, 74)
@@ -501,8 +485,8 @@ mod tests {
             } else {
                 (64, 72)
             };
-            assert_eq!((info.width, info.height), expected_size, "{path}");
-            let mut alpha = pixels[..info.buffer_size()].chunks_exact(4).map(|px| px[3]);
+            assert_eq!((img.w, img.h), expected_size, "{path}");
+            let mut alpha = img.px.chunks_exact(4).map(|px| px[3]);
             assert!(alpha.clone().any(|a| a > 0), "{path}");
             if path.contains("TITLE_SKY") {
                 assert!(alpha.all(|a| a == 255), "{path}");

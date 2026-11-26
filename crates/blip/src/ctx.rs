@@ -943,7 +943,7 @@ impl Blip {
     }
 
     /// A line in place of the game-over screen's prompt (a continue's count, say), drawn with `ready` false.
-    pub fn draw_game_over_prompt(&self, text: &str, color: Color) {
+    fn draw_game_over_prompt(&self, text: &str, color: Color) {
         let h = self.height as f32;
         self.draw_centered(text, Self::game_over_prompt_y(h), 3.0, color);
     }
@@ -961,7 +961,7 @@ impl Blip {
     /// Centred end-of-game line: `NEW BEST!` in `new_color` when this run beat
     /// (or tied) the best, otherwise `BEST 12345` in grey; nothing while no
     /// best is known.
-    pub fn draw_best(&self, score: i32, hi: i32, y: f32, new_color: Color) {
+    fn draw_best(&self, score: i32, hi: i32, y: f32, new_color: Color) {
         if hi > 0 && score >= hi {
             // It flashes (its colour and white, four times a second): the moment a player most wants to see.
             let lit = crate::blink(4.0);

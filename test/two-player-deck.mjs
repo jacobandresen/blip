@@ -5,7 +5,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage, HTTP_PORT, evaluate, waitFor, sleep, gameReady, insertCoins } from './lib/harness.mjs';
+import { openPage, HTTP_PORT, evaluate, waitFor, sleep, gameReady, insertCoins, creditIfNeeded } from './lib/harness.mjs';
 
 // The deck's documented parts, as '<station> <part> [n]': '2 station', '1 stick', '1 dpad', '2 buttons', '1 button 2'.
 const PART = `window.deckPart = function (spec) {
@@ -26,11 +26,7 @@ async function loadGame(cdp, slug, controls, { real = false } = {}) {
   await waitFor(cdp, "document.readyState === 'complete'", 15000);
   await waitFor(cdp, "typeof window.BlipController === 'object' && !!customElements.get('blip-deck')", 15000);
   await evaluate(cdp, PART);
-  // Controls stay gated until a credit enters through the coin button.
-  if (await evaluate(cdp, "document.getElementById('need-coin-overlay').classList.contains('visible')")) {
-    await insertCoins(cdp.page);
-    await waitFor(cdp, "!document.getElementById('need-coin-overlay').classList.contains('visible')");
-  }
+  await creditIfNeeded(cdp);
   if (real) await gameReady(cdp.page);
   await sleep(real ? 150 : 40);
 }

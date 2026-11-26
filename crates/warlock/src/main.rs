@@ -2058,6 +2058,20 @@ async fn main() {
 mod tests {
     use super::*;
 
+    /// Room 2 with its runes cleansed and every monster slain: the moment a whelp may come.
+    fn cleared_room_two() -> Game {
+        let mut g = Game::new();
+        g.sess.level = 2;
+        g.load_room();
+        for r in &mut g.runes {
+            r.cleansed = true;
+        }
+        for i in 0..g.enemies.len() {
+            g.kill_enemy(i);
+        }
+        g
+    }
+
     #[test]
     fn leaving_the_spell_circle_returns_to_play() {
         let mut g = Game::new();
@@ -2385,16 +2399,7 @@ mod tests {
 
     #[test]
     fn the_last_monster_brings_a_whelp_that_holds_the_stairs() {
-        let mut g = Game::new();
-        g.sess.level = 2;
-        g.load_room();
-        for r in &mut g.runes {
-            r.cleansed = true;
-        }
-        let n = g.enemies.len();
-        for i in 0..n {
-            g.kill_enemy(i);
-        }
+        let mut g = cleared_room_two();
         assert!(g.whelp.is_some(), "clearing a chamber from room 2 on should call a whelp");
         assert!(!g.exit_open, "the stairs wait while the whelp is loose");
         // left alone, it flies off and the stairs open
@@ -2408,16 +2413,7 @@ mod tests {
 
     #[test]
     fn striking_the_whelp_doubles_the_next_chamber() {
-        let mut g = Game::new();
-        g.sess.level = 2;
-        g.load_room();
-        for r in &mut g.runes {
-            r.cleansed = true;
-        }
-        let n = g.enemies.len();
-        for i in 0..n {
-            g.kill_enemy(i);
-        }
+        let mut g = cleared_room_two();
         g.strike_whelp();
         assert!(g.whelp.is_none());
         assert!(g.exit_open);

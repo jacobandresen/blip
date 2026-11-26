@@ -22,8 +22,8 @@ pub(crate) enum Cue { Step, Confirm }
 /// Both players' stick and button as menu moves, with key repeat.
 pub(crate) fn read_menu(g: &mut Game) -> [MenuIn; 2] {
     let mut out = [MenuIn::default(); 2];
-    for who in 0..2 {
-        out[who] = MenuIn {
+    for (who, slot) in out.iter_mut().enumerate() {
+        *slot = MenuIn {
             back: menu_step(g, who, true),
             fwd: menu_step(g, who, false),
             fire: menu_fire(g, who),
@@ -74,13 +74,13 @@ pub(crate) fn update_menus(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
             let versus = g.mode == Mode::Versus;
             let players = if versus { 2 } else { 1 };
             let mut cue = None;
-            for who in 0..players {
+            for (who, min) in m.iter().enumerate().take(players) {
                 if g.locked[who] { continue; }
                 let n = FIGHTERS.len();
                 // A cursor steps over a fighter the other player has
                 // already taken rather than stopping on one it is not
                 // allowed to confirm.
-                for (step, moved) in [(n - 1, m[who].back), (1, m[who].fwd)] {
+                for (step, moved) in [(n - 1, min.back), (1, min.fwd)] {
                     if !moved { continue; }
                     let mut at = g.picked(who);
                     for _ in 0..n {
@@ -90,9 +90,9 @@ pub(crate) fn update_menus(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
                     g.set_pick(who, at);
                     cue = Some(Cue::Step);
                 }
-                if m[who].fire && !g.taken_by_other(who, g.picked(who)) {
+                if min.fire && !g.taken_by_other(who, g.picked(who)) {
                     g.locked[who] = true;
-                    g.costume[who] = m[who].alt;
+                    g.costume[who] = min.alt;
                     // Move the other player's cursor off a fighter now taken,
                     // so it is never parked on something it cannot confirm.
                     let other = 1 - who;

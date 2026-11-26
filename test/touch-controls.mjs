@@ -12,7 +12,7 @@ for (const engine of ['webkit', 'chromium']) {
     assert.equal(await page.locator('blip-deck [part~="stick"]').first().isVisible(), false, 'no arcade stick');
     assert.equal(await page.locator('blip-deck [part~="dpad"]').first().isVisible(), false, 'no duplicate pad behind the strip');
 
-    // Exercise the shared first-paint policy over every game, front end and legacy override.
+    // Exercise the shared first-paint policy over every game, front end and `?controls=` override.
     const policies = await page.evaluate(() => {
       const results = [];
       for (const frontend of ['home', 'cabinet']) {

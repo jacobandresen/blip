@@ -656,7 +656,7 @@ fn player_dust(g: &mut Game, x: f32, y: f32, speed: (f32, f32), lift: (f32, f32)
 }
 
 fn move_players(g: &mut Game, inp: [Input; 2], dt: f32, sfx: &Sounds) {
-    for i in 0..2 {
+    for (i, k) in inp.iter().enumerate() {
         if !g.p[i].joined {
             continue;
         }
@@ -678,7 +678,6 @@ fn move_players(g: &mut Game, inp: [Input; 2], dt: f32, sfx: &Sounds) {
         if !g.p[i].alive {
             continue;
         }
-        let k = inp[i];
         let (mut x, mut y, mut vx, mut vy) = (g.p[i].x, g.p[i].y, g.p[i].vx, g.p[i].vy);
         let dir = k.right as i32 as f32 - k.left as i32 as f32;
         vx += (dir * RUN - vx) * (18.0 * dt).min(1.0);
@@ -1247,14 +1246,14 @@ fn move_candies(g: &mut Game, dt: f32, sfx: &Sounds, player_starts: [(f32, f32);
         } else if !g.floor_at(f.x, f.x + 16.0, f.y + 16.0) {
             f.on_ground = false;
         }
-        for pi in 0..2 {
+        for (pi, start) in player_starts.iter().enumerate() {
             let p = &g.p[pi];
             if !p.joined || !p.alive || p.dead_t > 0.0 || f.t < 0.35 {
                 continue;
             }
             if segment_rect_overlap(
-                player_starts[pi].0 - fruit_from.0,
-                player_starts[pi].1 - fruit_from.1,
+                start.0 - fruit_from.0,
+                start.1 - fruit_from.1,
                 p.cx() - (f.x + 8.0),
                 p.cy() - (f.y + 8.0),
                 -16.0,

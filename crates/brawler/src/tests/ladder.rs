@@ -7,27 +7,27 @@ use super::*;
 #[test]
 pub(crate) fn the_ladder_is_everybody_else_once() {
     let boss = FIGHTERS.iter().position(|a| a.boss).unwrap();
-    for pick in 0..FIGHTERS.len() {
+    for (pick, fp) in FIGHTERS.iter().enumerate() {
         let ladder = Game { pick, ..Game::new() }.build_ladder();
         assert_eq!(ladder.len(), FIGHTERS.len() - 1);
         let mut met = ladder.to_vec();
         met.sort();
         met.dedup();
-        assert_eq!(met.len(), ladder.len(), "{} meets somebody twice", FIGHTERS[pick].name);
-        assert!(!ladder.contains(&pick), "{} fights themself", FIGHTERS[pick].name);
+        assert_eq!(met.len(), ladder.len(), "{} meets somebody twice", fp.name);
+        assert!(!ladder.contains(&pick), "{} fights themself", fp.name);
         // The OVERPOWERED boss is last, the giant is before him, and neither
         // appears in the opening fights.
         let giant = FIGHTERS.iter().position(|a| a.build == Build::Giant).unwrap();
         let ends: Vec<usize> = [giant, boss].into_iter().filter(|&w| w != pick).collect();
         assert_eq!(&ladder[RUNGS - ends.len()..], &ends[..],
-            "{}'s ladder does not end with the giant and the boss", FIGHTERS[pick].name);
+            "{}'s ladder does not end with the giant and the boss", fp.name);
     }
 }
 
 #[test]
 pub(crate) fn every_fight_is_at_the_opponents_home_and_every_stage_is_somebodys() {
     // No ladder has two fights running in one place, whoever climbs it.
-    for pick in 0..FIGHTERS.len() {
+    for (pick, fp) in FIGHTERS.iter().enumerate() {
         let mut g = Game { pick, ..Game::new() };
         let ladder = g.build_ladder();
         let mut seen = vec![];
@@ -38,11 +38,11 @@ pub(crate) fn every_fight_is_at_the_opponents_home_and_every_stage_is_somebodys(
             seen.push(g.stage);
         }
         assert!(seen.windows(2).all(|w| w[0] != w[1]),
-            "{} fights twice running in one place: {seen:?}", FIGHTERS[pick].name);
+            "{} fights twice running in one place: {seen:?}", fp.name);
     }
-    for stage in 0..STAGES {
+    for (stage, stage_name) in STAGE_NAMES.iter().enumerate() {
         assert!((0..FIGHTERS.len()).any(|who| home_of(who) == stage),
-            "nobody lives at {}", STAGE_NAMES[stage]);
+            "nobody lives at {}", stage_name);
     }
     // Two players meet at player two's.
     let mut g = Game { pick: 0, pick2: 8, ..Game::new() };

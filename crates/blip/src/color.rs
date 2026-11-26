@@ -24,7 +24,6 @@ pub const BLIP_DARKGRAY: Color = rgb(50, 50, 50); // separator lines, shadows
 // Use sparingly against BLIP_BLACK: a neon-outlined player ship, a synthwave horizon line,
 // a title-screen highlight. Pair with `Blip::draw_glow_line` / `fill_glow_circle` for the halo.
 pub const NEON_CYAN: Color = rgb(0, 255, 255); // player craft, glow trails
-pub const NEON_MAGENTA: Color = rgb(255, 0, 220); // hostiles, danger accents
 pub const NEON_PINK: Color = rgb(255, 20, 147); // hit flashes, UI highlights
 pub const NEON_PURPLE: Color = rgb(170, 60, 255); // horizon grids, background accents
 pub const NEON_GREEN: Color = rgb(140, 255, 60); // pickups, go signals
