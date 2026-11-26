@@ -32,13 +32,13 @@ pub(crate) fn timed_cpu(g: &mut Game) -> Input {
 
 /// One frame of both fighters moving on `ins`: each faces the other, steps, and stays inside the walls and apart.
 pub(crate) fn move_both(g: &mut Game, ins: [Input; 2]) {
-    for i in 0..2 {
+    for (i, inp) in ins.iter().enumerate() {
         let other = g.p[1 - i].x;
         if g.p[i].free() && !g.p[i].airborne() {
             g.p[i].facing = if other >= g.p[i].x { 1.0 } else { -1.0 };
         }
         let close = face_off(&mut g.p)[i];
-        apply_input(&mut g.p[i], ins[i], close, F);
+        apply_input(&mut g.p[i], *inp, close, F);
         advance(&mut g.p[i], F);
         g.p[i].x = clamp(g.p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
     }

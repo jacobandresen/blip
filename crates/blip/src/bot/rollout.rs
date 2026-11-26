@@ -88,16 +88,6 @@ impl Rollout {
         let r = self.halo_reach.max(1.0);
         self.halo * (-(ox * ox + oy * oy) / (r * r)).exp()
     }
-
-    /// Would the bot following `path` touch any mover that matters (weight above zero)?
-    pub fn collides(&self, path: &[(f32, f32)], movers: &[Mover]) -> bool {
-        path.iter().enumerate().any(|(k, &(px, py))| {
-            let t = (k + 1) as f32 * self.dt;
-            movers.iter().filter(|m| m.weight > 0.0).any(|m| m.at(t).is_some_and(|(x, y)| {
-                (x - px).abs() < m.hw + self.me.0 && (y - py).abs() < m.hh + self.me.1
-            }))
-        })
-    }
 }
 
 /// A path along one axis: from `at` toward `to` at up to `speed` per second, `steps` points `dt` apart, while
@@ -124,7 +114,6 @@ mod tests {
         let past = glide(40.0, 40.0, 100.0, 0.0, 100.0, 0.1, 3);
         assert!(look.risk(&into, &wall) >= look.hit);
         assert!(look.risk(&past, &wall) < 0.5);
-        assert!(look.collides(&into, &wall) && !look.collides(&past, &wall));
     }
 
     #[test]

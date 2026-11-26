@@ -1,6 +1,6 @@
 # Blip Arcade
 
-Ten arcade games in the browser, written in Rust on the small `blip` engine and compiled to WebAssembly.
+Eleven arcade games in the browser, written in Rust on the small `blip` engine and compiled to WebAssembly.
 
 **[Play →](https://jacobandresen.github.io/blip/)** · [Home Screen](https://jacobandresen.github.io/blip/home.html) · [API](https://jacobandresen.github.io/blip/api.html)
 
@@ -39,13 +39,11 @@ node tools/serve_web.mjs                  # serve web/ locally
 ## Test
 
 ```sh
-cargo test --release      # Rust rules and engine
-npm test                  # fast unit tests
-npm run test:web          # browser suites (headless Chromium and WebKit)
-npm run test:visual       # every game starts and responds to input
-npm run test:playthrough  # the playtest bots play every game
-node tools/fun_report.mjs # how much fun each game is; CI fails a PR that lowers it (crates/blip/src/bot/FUN.md)
+cargo test --release   # Rust rules and engine
+npm test               # fast unit tests
 ```
+
+The browser suites, the bots' playthroughs and the fun report are in [AGENTS.md](AGENTS.md#tests).
 
 ## Deploy
 

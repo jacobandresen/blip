@@ -1,3 +1,4 @@
+use blip::image::mix_rgb as mix;
 use blip::macroquad::texture::Texture2D;
 use blip::{Blip, BlipColor};
 
@@ -212,7 +213,3 @@ const TOY_COLOURS: [[((u8, u8, u8), (u8, u8, u8)); 2]; 3] = [
     [((246, 244, 250), (70, 62, 80)), ((255, 200, 222), (70, 62, 80))],
 ];
 
-fn mix(a: (u8, u8, u8), b: (u8, u8, u8), t: f32) -> (u8, u8, u8) {
-    let f = |p: u8, q: u8| (p as f32 + (q as f32 - p as f32) * t) as u8;
-    (f(a.0, b.0), f(a.1, b.1), f(a.2, b.2))
-}

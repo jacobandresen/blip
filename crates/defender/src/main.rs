@@ -534,18 +534,7 @@ fn fire_laser(g: &mut Game) -> bool {
         g.streak.miss();
         let px = g.player_x;
         g.spawn_player_death(px, (GROUND_Y - 28) as f32);
-        match g.sess.lose_life() {
-            LifeResult::StillAlive => {
-                g.bullets.iter_mut().for_each(|b| b.active = false);
-                g.dead_timer.start(DEAD_PAUSE);
-                g.dead_pause_total = DEAD_PAUSE;
-                g.state = State::Dead;
-            }
-            LifeResult::GameOver => {
-                g.dead_timer.start(GAME_OVER_MIN_WAIT);
-                g.state = State::Over;
-            }
-        }
+        if lose_cannon(g) { g.bullets.iter_mut().for_each(|b| b.active = false); }
     }
     player_hit
 }
@@ -661,11 +650,12 @@ fn update_ufo(
 
     // Player bullet vs UFO — not while it's mid-beam (too late by then).
     if g.ufo_mode != UfoMode::Firing {
-        for bi in 0..MAX_PLAYER_BULLETS {
+        // `bi` pairs the bullet slot with its swept start; the bomb slot below rules out iterating `g.bullets` directly.
+        for (bi, start) in bullet_starts.iter().enumerate().take(MAX_PLAYER_BULLETS) {
             if !g.bullets[bi].active { continue; }
             let start_x = if ufo_was_active { ufo_start_x } else { g.ufo_x };
             if bullet_hits_moving_rect(
-                bullet_starts[bi],
+                *start,
                 (g.bullets[bi].x, g.bullets[bi].y),
                 (start_x, UFO_Y),
                 (g.ufo_x, UFO_Y),
@@ -833,10 +823,11 @@ fn update_boss(g: &mut Game, dt: f32, sfx: &Sounds) {
 fn hit_boss(g: &mut Game, sfx: &Sounds, bullet_starts: &[(f32, f32); N_BULLETS]) {
     if !g.boss_active { return; }
     let (bx, by) = (g.boss_x, g.boss_y());
-    for i in 0..MAX_PLAYER_BULLETS {
+    // `i` pairs the bullet slot with its swept start (the player slots head the array).
+    for (i, start) in bullet_starts.iter().enumerate().take(MAX_PLAYER_BULLETS) {
         if !g.bullets[i].active { continue; }
         let (x, y) = (g.bullets[i].x, g.bullets[i].y);
-        if !bullet_hits_rect(bullet_starts[i], (x, y), bx, by, BOSS_W, BOSS_H) { continue; }
+        if !bullet_hits_rect(*start, (x, y), bx, by, BOSS_W, BOSS_H) { continue; }
         g.bullets[i].active = false;
         g.boss_hp -= 1;
         g.boss_flash = BOSS_FLASH;
@@ -927,6 +918,23 @@ fn expire_ground_bombs(g: &mut Game, reached_ground: &[bool; N_BULLETS]) {
     }
 }
 
+/// A cannon lost: the pause before the next, or the game-over wait. True while cannons are left.
+fn lose_cannon(g: &mut Game) -> bool {
+    match g.sess.lose_life() {
+        LifeResult::StillAlive => {
+            g.dead_timer.start(DEAD_PAUSE);
+            g.dead_pause_total = DEAD_PAUSE;
+            g.state = State::Dead;
+            true
+        }
+        LifeResult::GameOver => {
+            g.dead_timer.start(GAME_OVER_MIN_WAIT);
+            g.state = State::Over;
+            false
+        }
+    }
+}
+
 /// The ship is hit: the explosion, a life gone, and the pause or the end.
 fn lose_ship(g: &mut Game, sfx: &Sounds, why: &str) {
     let px = g.player_x;
@@ -937,20 +945,7 @@ fn lose_ship(g: &mut Game, sfx: &Sounds, why: &str) {
     g.streak.miss();
     g.dive_pick = None;
     g.diver = None;
-    match g.sess.lose_life() {
-        LifeResult::StillAlive => {
-            for k in MAX_PLAYER_BULLETS..N_BULLETS {
-                g.bullets[k].active = false;
-            }
-            g.dead_timer.start(DEAD_PAUSE);
-            g.dead_pause_total = DEAD_PAUSE;
-            g.state = State::Dead;
-        }
-        LifeResult::GameOver => {
-            g.dead_timer.start(GAME_OVER_MIN_WAIT);
-            g.state = State::Over;
-        }
-    }
+    if lose_cannon(g) { g.bullets[MAX_PLAYER_BULLETS..].iter_mut().for_each(|b| b.active = false); }
     // The UFO stops updating once we leave State::Play, so its siren
     // loop would otherwise keep wailing through the Dead/Over screen.
     stop_ufo(g);
@@ -974,7 +969,7 @@ fn update_diver(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
         for sh in g.shields.iter_mut() {
             for r in 0..SHIELD_ROWS {
                 for c in 0..SHIELD_COLS {
-                    let (bx, by) = (sh.x + (c as i32 * SHIELD_BLOCK) as f32, sh.y + (r as i32 * SHIELD_BLOCK) as f32);
+                    let (bx, by) = shield_block_xy(sh, r, c);
                     if sh.alive[r][c] && rects_overlap(d.x + 6.0, d.y + 6.0, ALIEN_W as f32 - 12.0, ALIEN_H as f32 - 12.0,
                         bx, by, SHIELD_BLOCK as f32, SHIELD_BLOCK as f32) {
                         sh.alive[r][c] = false;
@@ -1152,13 +1147,14 @@ fn shield_block_xy(shield: &Shield, r: usize, c: usize) -> (f32, f32) {
 
 /// Player bullets against the formation: the lowest alien in a bullet's path falls, for points that grow with a streak.
 fn shoot_aliens(g: &mut Game, bullet_starts: &[(f32, f32); N_BULLETS], sfx: &Sounds) {
-    for bi in 0..MAX_PLAYER_BULLETS {
+    // `bi` pairs the bullet slot with its swept start (the player slots head the array).
+    for (bi, start) in bullet_starts.iter().enumerate().take(MAX_PLAYER_BULLETS) {
         if !g.bullets[bi].active { continue; }
         'rows: for row in (0..g.active_rows).rev() {
             for col in 0..g.active_cols {
                 let ai = (row * g.active_cols + col) as usize;
                 if !g.aliens[ai].alive { continue; }
-                if !bullet_hits_rect(bullet_starts[bi], (g.bullets[bi].x, g.bullets[bi].y),
+                if !bullet_hits_rect(*start, (g.bullets[bi].x, g.bullets[bi].y),
                                      g.aliens[ai].x, g.aliens[ai].y,
                                      ALIEN_W as f32, ALIEN_H as f32) {
                     continue;
@@ -1236,9 +1232,10 @@ fn draw_chips(blip: &Blip, g: &Game) {
 /// Player bullets against the diver: double points.
 fn shoot_diver(g: &mut Game, bullet_starts: &[(f32, f32); N_BULLETS], sfx: &Sounds) {
     if let Some(d) = g.diver {
-        for bi in 0..MAX_PLAYER_BULLETS {
+        // `bi` pairs the bullet slot with its swept start (the player slots head the array).
+        for (bi, start) in bullet_starts.iter().enumerate().take(MAX_PLAYER_BULLETS) {
             if !g.bullets[bi].active { continue; }
-            if bullet_hits_rect(bullet_starts[bi], (g.bullets[bi].x, g.bullets[bi].y),
+            if bullet_hits_rect(*start, (g.bullets[bi].x, g.bullets[bi].y),
                                 d.x, d.y, ALIEN_W as f32, ALIEN_H as f32) {
                 g.bullets[bi].active = false;
                 g.diver = None;
@@ -1541,12 +1538,8 @@ fn draw_play(blip: &Blip, g: &Game,
         for r in 0..SHIELD_ROWS {
             for c in 0..SHIELD_COLS {
                 if !g.shields[s].alive[r][c] { continue; }
-                blip.draw_texture(
-                    shield,
-                    g.shields[s].x + (c as i32 * SHIELD_BLOCK) as f32,
-                    g.shields[s].y + (r as i32 * SHIELD_BLOCK) as f32,
-                    SHIELD_BLOCK as f32, SHIELD_BLOCK as f32,
-                );
+                let (bx, by) = shield_block_xy(&g.shields[s], r, c);
+                blip.draw_texture(shield, bx, by, SHIELD_BLOCK as f32, SHIELD_BLOCK as f32);
             }
         }
     }

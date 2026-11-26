@@ -977,7 +977,7 @@ fn explosion_sfx(b: Blast) -> Vec<i16> {
     let mut rng = Rng(b.seed | 1);
     let mut buf = vec![0.0f32; n + (0.3 * SR) as usize];
     let (mut lp1, mut lp2, mut phase, mut turb, mut turb_lp) = (0.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32);
-    for i in 0..n {
+    for (i, slot) in buf.iter_mut().enumerate().take(n) {
         let t = i as f32 / SR;
         let k = t / b.secs;
         let attack = (t / 0.002).min(1.0);
@@ -996,7 +996,7 @@ fn explosion_sfx(b: Blast) -> Vec<i16> {
         let boom = ((2.0 * PI * phase).sin() * 3.0).tanh() * (-t / (b.secs * 0.22)).exp();
         // the blast front: a hard crack of bright noise in the first ms
         let front = w * (-t / 0.0025).exp() * 1.4 + lp1 * (-t / 0.015).exp() * 1.2;
-        buf[i] += (roar * decay + boom * 0.8 * decay + front) * attack * b.amp;
+        *slot += (roar * decay + boom * 0.8 * decay + front) * attack * b.amp;
     }
     // secondary explosions: smaller, later, each its own crack and thump
     for _ in 0..b.secondaries {
@@ -1115,7 +1115,7 @@ fn engine_start_sfx() -> Vec<u8> {
     let n = ms_to_samples(dur_s * 1000.0);
     let mut rng = Lcg(0x0E17_0011);
     let mut s = vec![0f32; n];
-    for i in 0..n {
+    for (i, slot) in s.iter_mut().enumerate() {
         let t = i as f32 / SR;
         let k = i as f32 / n as f32;
 
@@ -1149,7 +1149,7 @@ fn engine_start_sfx() -> Vec<u8> {
             }
         }
 
-        s[i] = starter + engine + chug * 0.55;
+        *slot = starter + engine + chug * 0.55;
     }
     let f = ms_to_samples(8.0);
     for i in 0..f {

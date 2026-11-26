@@ -584,7 +584,6 @@ function bareScreen() {
   document.addEventListener('touchstart', function () { if (!touched && root.hasAttribute('data-bare')) { touched = true; update(); } }, { passive: true, capture: true });
 }());
 
-var lastFit = '';
 function fillCanvas() {
   blipApplyLayout();
   var tb = document.getElementById('topbar');
@@ -667,16 +666,6 @@ function syncBuffer() {
   });
 }
 
-/** Re-fit only when inputs change; deck observation and `--topbar-h` writes otherwise form a resize loop. */
-function refit() {
-  var key = [window.innerWidth, window.innerHeight, TOPBAR_H, MARQUEE_H,
-             canvas.style.width, canvas.style.height].join('|');
-  fillCanvas();
-  var now = [window.innerWidth, window.innerHeight, TOPBAR_H, MARQUEE_H,
-             canvas.style.width, canvas.style.height].join('|');
-  if (now === key) return;
-  lastFit = now;
-}
 // A machine started from the arcade zooms into its screen; the game page opens on that same picture, where the
 // game will draw, and lets the first frame come up through it (blip-cabinet-launch, set by the arcade).
 var cabinetTransition = null;
@@ -754,7 +743,7 @@ if (!launchFrame) {
 // Re-fit whenever the deck changes shape (marquee injected, caps added,
 // controller switched) instead of at guessed moments.
 if (typeof ResizeObserver === 'function') {
-  var deckWatch = new ResizeObserver(function () { refit(); });
+  var deckWatch = new ResizeObserver(function () { fillCanvas(); });
   // The deck sizes itself (it is as tall as its controls), so watching it
   // catches a controller switch or a resize that moves its top edge.
   ['#topbar', '#marquee-bar', 'blip-deck'].forEach(function (sel) {
@@ -825,35 +814,27 @@ window.blipCanvasReady=function(){
   fillCanvas();
   requestAnimationFrame(function(){requestAnimationFrame(function(){
     document.documentElement.setAttribute('data-game-ready','');hideLoader();
-    if(!blipAppMode()) {
-      var slug=blipGameFromPath(location.pathname)?.slug;
-      var cabinetStart=false;
-      try {
-        cabinetStart=sessionStorage.getItem('blip-cabinet-start')===slug;
-        sessionStorage.removeItem('blip-cabinet-start');
-      } catch(e) {}
-      // A game that shows its title at the cabinet waits there for the player's own Fire.
-      if(GAME && GAME.cabinetTitle) cabinetStart=false;
-      if(!(cabinetStart && getCoins()>0)) dropLaunchFrame();
-      if(cabinetStart && getCoins()>0) {
-        function pressStart() {
-          canvas.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,cancelable:true,key:' ',code:'Space'}));
-          setTimeout(function(){canvas.dispatchEvent(new KeyboardEvent('keyup',{bubbles:true,cancelable:true,key:' ',code:'Space'}));},80);
-        }
-        function beginCabinetPlay() {
-          if(document.hidden) {
-            document.addEventListener('visibilitychange',beginCabinetPlay,{once:true});
-            return;
-          }
-          if(getCoins()<=0){dropLaunchFrame();return;}
-          canvas.focus({preventScroll:true});
-          // One press, past the title: a game with a fighter select opens on it, so the player picks their own.
-          pressStart();
-          setTimeout(dropLaunchFrame,400);
-        }
-        setTimeout(beginCabinetPlay,180);
+    if(blipAppMode()) return;
+    var slug=blipGameFromPath(location.pathname)?.slug, cabinetStart=false;
+    try {
+      cabinetStart=sessionStorage.getItem('blip-cabinet-start')===slug;
+      sessionStorage.removeItem('blip-cabinet-start');
+    } catch(e) {}
+    // A game that shows its title at the cabinet waits there for the player's own Fire.
+    if(!cabinetStart || (GAME && GAME.cabinetTitle) || getCoins()<=0) { dropLaunchFrame(); return; }
+    function beginCabinetPlay() {
+      if(document.hidden) {
+        document.addEventListener('visibilitychange',beginCabinetPlay,{once:true});
+        return;
       }
+      if(getCoins()<=0){dropLaunchFrame();return;}
+      canvas.focus({preventScroll:true});
+      // One press, past the title: a game with a fighter select opens on it, so the player picks their own.
+      canvas.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,cancelable:true,key:' ',code:'Space'}));
+      setTimeout(function(){canvas.dispatchEvent(new KeyboardEvent('keyup',{bubbles:true,cancelable:true,key:' ',code:'Space'}));},80);
+      setTimeout(dropLaunchFrame,400);
     }
+    setTimeout(beginCabinetPlay,180);
   });});
 };
 

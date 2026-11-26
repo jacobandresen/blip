@@ -1,13 +1,13 @@
-# How much fun is a game? Three measures for blip
+# How much fun is a game? Measures for blip
 
 blip's games are played by bots in tests already. This report asks what those bots can tell us about how much fun
-a game is, picks three measures from the research on player enjoyment, builds them into `blip::bot` (`fun.rs`,
+a game is, picks measures from the research on player enjoyment, builds them into `blip::bot` (`fun.rs`,
 beside this file) and `tools/fun_report.mjs`, uses them on every game, and turns them into a CI check that fails a
 pull request which makes a game less fun.
 
 **In short.** The research agrees on three things a bot can measure. Ranked: **skill pays** (good play beats random
-play), **close calls** (dangers come near and can be dodged) and **busy** (little time with nothing to do). Each
-game gets a fun score from 0 to 100 from them. CI plays every changed game before and after a pull request and fails
+play), **close calls** (dangers come near and can be dodged) and **busy** (little time with nothing to do); variety,
+calm and difficulty were added later at a lower weight. Each game gets a fun score from 0 to 100 from them. CI plays every changed game before and after a pull request and fails
 it when the score, or the raw signal under any measure, gets significantly worse. On its first use the near-miss
 meter found Raider charging the player for **phantom hits** from bullets on the far side of the screen: fixing it
 cut hits from 8.5 to 2.8 a minute and lives lost from 0.33 to 0 per run, on the same six seeds, and the gate
@@ -145,7 +145,7 @@ it separated nothing; **variety** (entropy of control combinations) measured the
 **difficulty spikes** (deadliest level over the run's death rate) never had enough deaths per level in a run to
 compute; **drama** (lead changes and close time, after Browne) needs a contest and was 0 to 0.6 by luck of the seed.
 **Warning time** before a hit mostly measured how fast a hazard closes the last 16 px. Each is a reasonable idea with
-more data; none earned a place among three.
+more data; none earned a place.
 
 ### Comparing the approaches
 
@@ -197,7 +197,7 @@ passed; it is the check to require in the branch protection rule. Measuring base
 stored baseline to go stale or edit. A change meant to alter a game's feel that loses points says why in its
 description and is merged by an admin past the check.
 
-**Does it work?** Three tests, on runs saved by the tool (`--from` scores saved runs again without playing):
+**Does it work?** Four tests, on runs saved by the tool (`--from` scores saved runs again without playing):
 
 | Pull request | Fun score | Gate |
 |---|---|---|
@@ -231,33 +231,7 @@ direction, not the first step's tile, so a hunting or lunging monster glided acr
 move. Path finding is now shared (`blip::grid`) and monsters walk one tile at a time; all seven Warlock
 playthroughs pass.
 
-**Later changes, each measured** (all in [FUN-LOG.md](FUN-LOG.md), with what was tried and dropped):
-
-| Game | Change | Measured |
-|---|---|---|
-| Raider | Flak guns hold fire inside 110 px (a shell's 0.46 s flight leaves time to dodge) | hits 2.8 → 1.2 a minute, near misses 3.3 → 4.3, fun +5.8 ± 2.1 |
-| Raider | Holding fire hurries the take-off, which plays before every level | busy 0.80 → 0.90 |
-| Raider | A no-damage streak: every five kills without a hit raise the score multiple, up to x4 | skill 0.14 → 0.27, fun +6.4 ± 0.5: the bot's score doubles, random play's barely moves |
-| Meteors | An accuracy streak: every five hits without a wasted shot raise the multiple, up to x4 | bot +3 to +19 %, random play unchanged; fun +1.6 ± 0.4 |
-| Warlock | Fireballs burn by drawn position, like monsters (they hit from a cell away) | a fairness fix; no measurable change |
-| Warlock | The bot steps away from a monster beside it, as a player would | close calls 0.08 → 0.51: a game of near escapes, now seen |
-| Bubbler, Raider, Warlock, Rounds, Bouncer | A continue at game over (shared `blip::Continue`): the same room, level, chamber, day or bricks, fresh lives, the run's best reported | playthroughs and unit tests; time after a game over, so outside the three measures. Not in the score-attack games, whose originals end a run there |
-| Warlock | Monsters are drawn over their whole step (they slid one cell a second and jumped the rest), and a bolt hits the cell a monster is leaving too | bolts had passed through imps stepping toward the wizard: lives lost 2.2 → 0.5 a run, fun +9.2 ± 6 |
-| Defender | The march stops speeding up at level 5 (it went on to twice as fast by level 8) | full formations of levels 6, 7, 11 and 12 landed in 7 of 12 runs, now 2: one shot at a time could not clear 50-60 invaders in time |
-| Defender | A lost cannon pauses play 2.4 s, not 3.6 | at a person's 250 ms reaction (`BLIP_BOT_REACT`) the pauses were a quarter of the run |
-| Bubbler | Round 5 has 13 toys, eight walkers (was 15 and ten) | the bot lost five hearts there in 35 s; rounds 4 and 6 cost one |
-| Defender | The three-row formation is ten wide, not eleven | at 446 of 480 px it met an edge every third step; wave 8 ended the run on 2 of 4 seeds, now 1 |
-| Rounds | After a crash at Frederik V the bike restarts beside the pedestal | it restarted on it: three lives in 3.3 s on Tuesday (unit test) |
-| Meteors | A hyperspace jump lands clear of the saucer and its shots, as of rocks | a fairness fix; the bot's scores are unchanged |
-| Bubbler | The last round has 9 toys, two ghosts and four walkers (was 11, three and five) | the bot lost 2 hearts there on average (0 to 3), now 0.5 |
-| Brawler | Zenith's laser stare lasts 24 frames, not 11 | the bot, caught mid-kick, lost both rounds to it in 4 of 4 fights; now one |
-| Brawler | Regent, Aurelia and Gamma hit less hard (Regent and Aurelia have less health too) | on fight 8 they took 6 of 6 rounds from the bot; Gamma now loses one now and then |
-| Brawler | Bot and CPU fight each round to a plan (`plan.rs`): pressure, spacing, zoning or jumping in | the bot took 7 of 14 rounds from Jade on fight 8 (1 of 9); the CPU plays the plans as hard as its fight's difficulty, so fight 1 stays 17-4; fun -1.7 ± 1.7 |
-
-What did not work is as useful: grazing in Raider (random play grazes by blundering, so skill fell), monsters
-pausing to "say hello" in Bubbler (a slow player died sooner), evening out Brawler's fighters with the difficulty
-dial (its difficulty is in matchups, and Giotto's weakness is his moves), and a CPU sight ramp in Adder (no change in
-rounds won).
+Later changes, each with its measured reason, are in [FUN-LOG.md](FUN-LOG.md) and in the comments beside the code.
 
 **Shared building blocks the bots exposed.** Writing the bots' hit boxes meant reading every game's collision code,
 and it showed the same three steps written five times (Raider, Defender, Bubbler, Rally, Meteors): record where each
@@ -329,7 +303,7 @@ What the table points at:
 
 ## 6. Limits and next steps
 
-- Fun is more than these three measures. Calm, simplicity and nostalgia matter and are not measured; a low score is
+- Fun is more than these measures. Simplicity and nostalgia matter and are not measured; a low score is
   never a reason to change a game, only a falling one is a reason to look.
 - A bot is not a person. The measures say where a person is likely to be bored or cheated; the frames and `IDLE` lines
   say where to look. Roohi et al. found an agent's best runs track people better than its average, worth trying.

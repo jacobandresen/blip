@@ -19,7 +19,7 @@ pub fn text_width(text: &str, sz: f32) -> f32 {
 
 impl Blip {
     /// Draw a single character at pixel position (`x`, `y`). Unknown characters are silently skipped.
-    pub fn draw_char(&self, c: char, x: f32, y: f32, sz: f32, color: Color) {
+    fn draw_char(&self, c: char, x: f32, y: f32, sz: f32, color: Color) {
         let Some(idx) = glyph_index(c) else { return };
         for (row, bits) in FONT[idx].iter().enumerate() {
             for col in 0..5 {

@@ -126,12 +126,12 @@ engine! {
     pub mod web;
 
     pub use audio::{
-        play_alert, play_ambient, play_music_volume, play_sfx, play_sfx_volume, stop_alert, stop_ambient,
-        stop_music, BlipSound, Jukebox,
+        play_alert, play_ambient, play_sfx, play_sfx_volume, stop_alert, stop_ambient,
+        BlipSound, Jukebox,
     };
     pub use color::{
         blend, hsv, shade, BLIP_BLACK, BLIP_BLUE, BLIP_CYAN, BLIP_DARKGRAY, BLIP_GRAY, BLIP_GREEN, BLIP_MAGENTA,
-        BLIP_ORANGE, BLIP_RED, BLIP_WHITE, BLIP_YELLOW, NEON_CYAN, NEON_GREEN, NEON_MAGENTA, NEON_ORANGE, NEON_PINK,
+        BLIP_ORANGE, BLIP_RED, BLIP_WHITE, BLIP_YELLOW, NEON_CYAN, NEON_GREEN, NEON_ORANGE, NEON_PINK,
         NEON_PURPLE, NEON_YELLOW,
     };
     pub use ctx::{window_conf, Blip};
@@ -143,7 +143,7 @@ engine! {
         swept_from, wrap,
     };
     pub use pool::{pool_iter, pool_iter_mut, pool_spawn, Pooled};
-    pub use session::{Continue, LifeResult, Session, Streak, CONTINUE_GRACE, GAME_OVER_MIN_WAIT};
+    pub use session::{Continue, LifeResult, Session, Streak, GAME_OVER_MIN_WAIT};
     pub use timer::{blink, now, Timer};
 
     /// macroquad's colour, as the games name it.

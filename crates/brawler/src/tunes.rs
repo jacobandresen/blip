@@ -1127,7 +1127,7 @@ fn gi_snap(seed: u32) -> Vec<i16> {
     for (at_ms, gain) in [(0.0f32, 1.0f32), (62.0, 0.38)] {
         let from = ms_to_samples(at_ms);
         let (mut lp, mut prev) = (0.0f32, 0.0f32);
-        for i in from..n {
+        for (i, slot) in buf.iter_mut().enumerate().skip(from) {
             let d = (i - from) as f32 / per_ms;
             let noise = rng.next_f32() * 2.0 - 1.0;
             // The band opens as the slack runs out.
@@ -1137,7 +1137,7 @@ fn gi_snap(seed: u32) -> Vec<i16> {
             prev = lp;
             // Almost all attack: up in two milliseconds, gone in fifty.
             let e = (d / 2.5).min(1.0) * (-d * 0.062).exp();
-            buf[i] += bright * e * gain * 19000.0;
+            *slot += bright * e * gain * 19000.0;
         }
     }
     soft_limit_to_pcm16(&buf, MIX_KNEE)

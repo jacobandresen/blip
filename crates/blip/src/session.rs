@@ -70,7 +70,7 @@ pub struct Continue {
 }
 
 /// Seconds a continue is offered before a press counts.
-pub const CONTINUE_GRACE: f32 = 0.8;
+const CONTINUE_GRACE: f32 = 0.8;
 
 impl Continue {
     /// Offer a continue for `secs`. A bot run not set to take one (`bot::may_continue`) ends here, at game over, as

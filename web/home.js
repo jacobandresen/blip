@@ -17,12 +17,6 @@ var DOCK_GAMES = 1;   // beside the arcade, the Guide and Settings: four in a ph
 // Being here is the choice: a game played from here comes back here.
 blipSetFrontend('home');
 
-// Two can play: a second station, or a key for the second player (Rally's dials share one).
-function twoPlayer(slug) {
-  var g = BLIP_GAMES[slug];
-  return g.players === 2 || /2(ND)? PLAYER/.test(JSON.stringify(g.controls || []));
-}
-
 function recent() {
   try {
     var list = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
@@ -43,10 +37,10 @@ function gameApp(slug, inDock) {
   button.type = 'button';
   button.className = 'app-button';
   button.dataset.slug = slug;
-  button.setAttribute('aria-label', name + (twoPlayer(slug) ? ', 1 or 2 players' : ''));
+  button.setAttribute('aria-label', name + (blipTwoPlayer(slug) ? ', 1 or 2 players' : ''));
   button.innerHTML = '<span class="app-icon"><img src="' + slug + '/icon-192.png?v=23" alt="" draggable="false"></span>' +
     '<span class="app-label">' + name + '</span>';
-  if (twoPlayer(slug) && !inDock) {
+  if (blipTwoPlayer(slug) && !inDock) {
     var badge = document.createElement('span');
     badge.className = 'app-badge';
     badge.textContent = '2P';
@@ -280,7 +274,7 @@ function launchFrames(slug, button) {
   zoom.style.width = W + 'px';
   zoom.style.height = H + 'px';
   zoom.hidden = false;
-  return { img: img, clipIcon: clipIcon, clipFull: clipFull, atIcon: atIcon, atMiddle: atMiddle, radius: (24 * s) + 'px' };
+  return { img: img, clipIcon: clipIcon, clipFull: clipFull, atIcon: atIcon, atMiddle: atMiddle };
 }
 var leaving = false;
 function launch(slug, from, url) {
@@ -358,7 +352,7 @@ function openActions(slug, from) {
   actionSlug = slug; actionFrom = from;
   if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) {}
   var game = BLIP_GAMES[slug];
-  document.getElementById('action-title').textContent = blipTitleCase(game.name) + ' \u00b7 ' + (twoPlayer(slug) ? '1 or 2 players' : '1 player');
+  document.getElementById('action-title').textContent = blipTitleCase(game.name) + ' \u00b7 ' + (blipTwoPlayer(slug) ? '1 or 2 players' : '1 player');
   var icon = from.querySelector('.app-icon').getBoundingClientRect();
   lift.querySelector('img').src = slug + '/icon-192.png?v=23';
   Object.assign(lift.style, { left: icon.left + 'px', top: icon.top + 'px', width: icon.width + 'px', height: icon.height + 'px' });
@@ -490,7 +484,7 @@ document.addEventListener('keydown', function (e) {
 var searchSheet = document.getElementById('search-sheet');
 var searchInput = document.getElementById('search-input');
 var searchResults = document.getElementById('search-results');
-function genreOf(slug) { return twoPlayer(slug) ? '1 or 2 players' : '1 player'; }
+function genreOf(slug) { return blipTwoPlayer(slug) ? '1 or 2 players' : '1 player'; }
 function renderSearch() {
   var q = searchInput.value.trim().toLowerCase();
   var hits = Object.keys(BLIP_GAMES).filter(function (slug) {

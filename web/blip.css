@@ -136,7 +136,7 @@ body.cabinet-page .deck-housing {
   box-shadow:0 3px 5px #0006;
 }
 :root[data-layout="upright"] body.cabinet-page .deck-housing::after {
-  content:'';position:absolute;right:9px;top:13px;bottom:0;width:calc(var(--coin-width) + 10px);
+  content:'';position:absolute;right:9px;top:13px;bottom:0;
   border-left:1px solid #b8966429;border-radius:5px 7px 0 0;pointer-events:none;z-index:-1;
   background:linear-gradient(90deg,#08070899,#17121066 12%,#35292133 85%,#08070866);
   box-shadow:inset 3px 0 5px #0006,inset 0 2px 5px #0008;
@@ -377,9 +377,9 @@ body.cabinet-page .deck-housing {
 }
 /* Two players sideways: a trackpad in each gutter, P1 left and P2 right,
    the picture fitted between them (fillCanvas measures .ts-half). Below the
-   station lamps. */
-:root[data-touch="paddles"][data-layout="landscape"] #touch-strip,
-:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] #touch-strip {
+   station lamps. Paddles alone, or any touch control but the action pad with
+   a second player. */
+:root[data-layout="landscape"]:is([data-touch="paddles"], [data-touch]:not([data-touch="action"])[data-versus]) #touch-strip {
   display: block;
   position: fixed;
   inset: 0;
@@ -387,10 +387,8 @@ body.cabinet-page .deck-housing {
   background: none;
   pointer-events: none;
 }
-:root[data-touch="paddles"][data-layout="landscape"] .ts-glass,
-:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-glass { display: contents; }
-:root[data-touch="paddles"][data-layout="landscape"] .ts-half,
-:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-half {
+:root[data-layout="landscape"]:is([data-touch="paddles"], [data-touch]:not([data-touch="action"])[data-versus]) .ts-glass { display: contents; }
+:root[data-layout="landscape"]:is([data-touch="paddles"], [data-touch]:not([data-touch="action"])[data-versus]) .ts-half {
   display: block;
   position: fixed;
   top: 140px;
@@ -407,12 +405,10 @@ body.cabinet-page .deck-housing {
     0 4px 14px rgba(0, 0, 0, 0.5);
   pointer-events: auto;
 }
-:root[data-touch="paddles"][data-layout="landscape"] .ts-half:first-child,
-:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-half:first-child {
+:root[data-layout="landscape"]:is([data-touch="paddles"], [data-touch]:not([data-touch="action"])[data-versus]) .ts-half:first-child {
   left: max(12px, calc(env(safe-area-inset-left, 0px) + 6px));
 }
-:root[data-touch="paddles"][data-layout="landscape"] .ts-half + .ts-half,
-:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-half + .ts-half {
+:root[data-layout="landscape"]:is([data-touch="paddles"], [data-touch]:not([data-touch="action"])[data-versus]) .ts-half + .ts-half {
   right: max(12px, calc(env(safe-area-inset-right, 0px) + 6px));
 }
 :root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-half.held {
@@ -650,8 +646,9 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
 :root[data-dials][data-layout="landscape"] :is(#paddle-dial, #paddle-dial-p2) {
   bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
 }
-:root[data-touch="paddles"][data-layout="landscape"] :is(.ts-tag, .ts-hint, .ts-thumb, .ts-demo, .ts-arrow),
-:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] :is(.ts-tag, .ts-hint, .ts-thumb, .ts-demo, .ts-arrow) { display: none; }
+:root[data-layout="landscape"]:is([data-touch="paddles"], [data-touch]:not([data-touch="action"])[data-versus]) :is(.ts-tag, .ts-hint, .ts-thumb, .ts-demo, .ts-arrow) {
+  display: none;
+}
 body.cabinet-page :is(.ts-tag,.ts-hint) {color:#c2b49c;font-family:'Courier New',monospace;}
 :root:not([data-appstyle]) :is(.deck-credit-lamp,.deck-second-lamp) {
   width:34px;height:20px;padding:0;border:0;border-radius:4px;
@@ -828,13 +825,6 @@ html {
   transform:translateX(-50%);
 }
 
-.top-marquee-bar { --marquee-side-gap:77px; }
-#marquee-bar { --marquee-side-gap:77px; }
-
-@media (max-width:520px) {
-  .top-marquee-bar,#marquee-bar { --marquee-side-gap:57px; }
-}
-
 /* Raised title glass. */
 .top-marquee-bar,
 #marquee-bar.jukebox-marquee {
@@ -862,7 +852,7 @@ html {
   #marquee-name {visibility:hidden!important}
 }
 
-:root {   --cabinet-width:960px;--dock-clearance:82px }
+:root {   --cabinet-width:960px }
 /* The fascia casts onto the recessed mechanisms without enlarging the bar. */
 .top-marquee-bar::before,#marquee-bar.jukebox-marquee::before {
   content:'';position:absolute;left:0;right:0;bottom:0;height:6px;pointer-events:none;
@@ -973,15 +963,10 @@ body.cabinet-page::after {
 .jukebox-game-screen > .cabinet-glass { position:absolute; inset:0; }
 
 @media(max-width:620px) {
-  :root { --dock-clearance:75px; --title-left:126px; }
   #marquee-bar.jukebox-marquee #marquee-name {
     visibility:visible!important;
   }
 }
-@media(max-width:480px) {
-  :root {--title-right:128px;}
-}
-@media(min-width:601px) and (max-width:620px) {:root {--title-left:158px;}}
 
 /* The title window. */
 #marquee-bar.jukebox-marquee #marquee-name {

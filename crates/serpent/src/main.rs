@@ -195,8 +195,7 @@ impl Game {
                 let f = Cell { c, r };
                 if !self.cell_is_free(f) { continue; }
                 item_cells.push(f);
-                if !(self.bonus_active() && f == self.bonus)
-                    && !(self.shears_active() && f == self.shears) {
+                if !(self.bonus_active() && f == self.bonus || self.shears_active() && f == self.shears) {
                     free.push(f);
                 }
             }

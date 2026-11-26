@@ -165,6 +165,15 @@ pub fn scatter(k: usize, salt: u32) -> f32 {
     (h % 1024) as f32 / 1024.0
 }
 
+/// Repeatable hash of a grid cell in `[0, 1)`, for per-cell look without
+/// storing it: the same value for the same cell and seed on every frame.
+pub fn hash(x: i32, y: i32, s: u32) -> f32 {
+    let mut h = (x as u32).wrapping_mul(374_761_393) ^ (y as u32).wrapping_mul(668_265_263) ^ s.wrapping_mul(2_246_822_519);
+    h = (h ^ (h >> 13)).wrapping_mul(1_274_126_177);
+    h ^= h >> 16;
+    (h & 0xffff) as f32 / 65535.0
+}
+
 /// Whether (x, y) is inside the polygon `pts` (even-odd rule).
 pub fn in_polygon(pts: &[(f32, f32)], x: f32, y: f32) -> bool {
     let mut inside = false;

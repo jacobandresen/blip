@@ -13,7 +13,7 @@ const MIME = {
   '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
   '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2',
 };
-const mime = (file, fallback = 'application/octet-stream') => MIME[path.extname(file).toLowerCase()] || fallback;
+const mime = (file) => MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
 
 /** Start a server and resolve once it is listening. A bare `server.listen(port, r)` never settles when the port
  * is taken, and under `node --test` that is a suite that prints nothing and hangs. */
@@ -34,9 +34,9 @@ export function listenOn(server, port, host) {
   });
 }
 
-/** Serve web/ (under `basePath`, as GitHub Pages serves it under /blip). `overrides` maps a path to a body, or a
- * function returning one, in place of the file. A folder redirects to its slash and serves its index.html. */
-export function createFileServer({ overrides = {}, basePath = '/' } = {}) {
+/** Serve web/ (under `basePath`, as GitHub Pages serves it under /blip). A folder redirects to its slash and
+ * serves its index.html. */
+export function createFileServer({ basePath = '/' } = {}) {
   return createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://localhost');
@@ -44,12 +44,6 @@ export function createFileServer({ overrides = {}, basePath = '/' } = {}) {
       if (basePath !== '/') {
         if (p !== basePath && !p.startsWith(`${basePath}/`)) { res.writeHead(404); res.end(); return; }
         p = p.slice(basePath.length) || '/';
-      }
-      if (Object.hasOwn(overrides, p)) {
-        const value = overrides[p];
-        res.writeHead(200, { 'Content-Type': mime(p, 'text/javascript; charset=utf-8') });
-        res.end(typeof value === 'function' ? await value() : value);
-        return;
       }
       let full = path.resolve(WEB_DIR, `.${p}`);
       if (full !== WEB_DIR && !full.startsWith(`${WEB_DIR}${path.sep}`)) { res.writeHead(403); res.end(); return; }

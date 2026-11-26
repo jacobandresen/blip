@@ -13,6 +13,12 @@ pub fn coverage(x: i32, y: i32, inside: impl Fn(f32, f32) -> bool) -> u32 {
     n
 }
 
+/// A whole RGB tune between two pixel colours (0..1), as `(u8,u8,u8)` canvas art works in.
+pub fn mix_rgb(a: (u8, u8, u8), b: (u8, u8, u8), t: f32) -> (u8, u8, u8) {
+    let f = |p: u8, q: u8| (p as f32 + (q as f32 - p as f32) * t) as u8;
+    (f(a.0, b.0), f(a.1, b.1), f(a.2, b.2))
+}
+
 /// An RGBA8 image canvas. Origin is top-left; `(0,0,0,0)` background.
 pub struct Image {
     pub w: u32,
@@ -50,6 +56,30 @@ impl Image {
     }
 
     /// Composite an unpremultiplied color over the existing pixel.
+    /// Paints every pixel from 3x3 samples of `colour` (RGB 0..1, `None` outside the shape): their mean, with the
+    /// share inside as alpha, for antialiased edges.
+    pub fn supersample(&mut self, colour: impl Fn(f32, f32) -> Option<(f32, f32, f32)>) {
+        for py in 0..self.h as i32 {
+            for px in 0..self.w as i32 {
+                let (mut r, mut g, mut b, mut n) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+                for sy in 0..3 {
+                    for sx in 0..3 {
+                        if let Some(c) = colour(px as f32 + (sx as f32 + 0.5) / 3.0, py as f32 + (sy as f32 + 0.5) / 3.0) {
+                            r += c.0;
+                            g += c.1;
+                            b += c.2;
+                            n += 1.0;
+                        }
+                    }
+                }
+                if n > 0.0 {
+                    let k = |v: f32| (v / n * 255.0) as u8;
+                    self.set_rgba(px, py, k(r), k(g), k(b), (n / 9.0 * 255.0) as u8);
+                }
+            }
+        }
+    }
+
     pub fn blend(&mut self, x: i32, y: i32, color: [u8; 4]) {
         if x < 0 || y < 0 || x as u32 >= self.w || y as u32 >= self.h { return; }
         let offset = (y as usize * self.w as usize + x as usize) * 4;
@@ -201,10 +231,8 @@ mod tests {
         let png = img.encode_png();
         assert!(png.len() < img.px.len() / 8, "{} bytes for {} of pixels", png.len(), img.px.len());
 
-        let mut reader = png::Decoder::new(&png[..]).read_info().expect("header");
-        let mut out = vec![0u8; reader.output_buffer_size()];
-        let info = reader.next_frame(&mut out).expect("frame");
-        assert_eq!((info.width, info.height), (128, 128));
-        assert_eq!(&out[..info.buffer_size()], &img.px[..]);
+        let back = Image::from_png(&png);
+        assert_eq!((back.w, back.h), (128, 128));
+        assert_eq!(back.px, img.px);
     }
 }

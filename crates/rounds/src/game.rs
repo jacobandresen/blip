@@ -1776,63 +1776,58 @@ mod tests {
         }
     }
 
-    #[test]
-    fn buses_and_cars_never_drive_into_each_other() {
+    /// Every day of the week ridden for `secs`, the bike kept safe and steered round the turn; `look` sees each frame.
+    fn ride_every_day(secs: usize, mut look: impl FnMut(&Game, usize, usize)) {
         for day in 0..7 {
             let (_rng, mut g) = playing();
             g.day = day;
             g.begin_day();
             g.state = State::Play;
-            for frame in 0..(60 * 50) {
+            for frame in 0..(60 * secs) {
                 g.state = State::Play;
                 let steer = if g.in_junction() && g.bike_d > JD - 30.0 && g.heading < 1.5 { -1.0 } else { 0.0 };
                 g.ride(steer, 0.0, 1.0 / 60.0);
                 g.safe = 5.0;
                 g.update_play(1.0 / 60.0);
                 if g.state != State::Play { break; }
-                let cars: Vec<&Hazard> = g.hazards.iter().filter(|h| !h.gone && h.solid() && matches!(h.kind, Hz::Car | Hz::Bus | Hz::Van | Hz::CrossCar)).collect();
-                for (i, a) in cars.iter().enumerate() {
-                    for b in &cars[i + 1..] {
-                        if a.seg != b.seg { continue; }
-                        let ((aw, al), (bw, bl)) = (a.size(), b.size());
-                        let over = (a.x - b.x).abs() < aw + bw - 3.0 && (a.d - b.d).abs() < al + bl - 3.0;
-                        assert!(!over, "day {day} frame {frame}: {:?} p{} held {} at ({:.0},{:.0}) runs into {:?} p{} held {} at ({:.0},{:.0})",
-                            a.kind, a.phase, a.held, a.x, a.d, b.kind, b.phase, b.held, b.x, b.d);
-                    }
-                }
+                look(&g, day, frame);
             }
         }
     }
 
     #[test]
+    fn buses_and_cars_never_drive_into_each_other() {
+        ride_every_day(50, |g, day, frame| {
+            let cars: Vec<&Hazard> = g.hazards.iter().filter(|h| !h.gone && h.solid() && matches!(h.kind, Hz::Car | Hz::Bus | Hz::Van | Hz::CrossCar)).collect();
+            for (i, a) in cars.iter().enumerate() {
+                for b in &cars[i + 1..] {
+                    if a.seg != b.seg { continue; }
+                    let ((aw, al), (bw, bl)) = (a.size(), b.size());
+                    let over = (a.x - b.x).abs() < aw + bw - 3.0 && (a.d - b.d).abs() < al + bl - 3.0;
+                    assert!(!over, "day {day} frame {frame}: {:?} p{} held {} at ({:.0},{:.0}) runs into {:?} p{} held {} at ({:.0},{:.0})",
+                        a.kind, a.phase, a.held, a.x, a.d, b.kind, b.phase, b.held, b.x, b.d);
+                }
+            }
+        });
+    }
+
+    #[test]
     fn riders_never_ride_through_cars_dogs_or_buses() {
         let mut found = Vec::new();
-        for day in 0..7 {
-            let (_rng, mut g) = playing();
-            g.day = day;
-            g.begin_day();
-            g.state = State::Play;
-            for frame in 0..(60 * 100) {
-                g.state = State::Play;
-                let steer = if g.in_junction() && g.bike_d > JD - 30.0 && g.heading < 1.5 { -1.0 } else { 0.0 };
-                g.ride(steer, 0.0, 1.0 / 60.0);
-                g.safe = 5.0;
-                g.update_play(1.0 / 60.0);
-                if g.state != State::Play { break; }
-                let riders: Vec<&Hazard> = g.hazards.iter().filter(|h| !h.gone && matches!(h.kind, Hz::Cyclist | Hz::Tourist | Hz::Blader)).collect();
-                let others: Vec<&Hazard> = g.hazards.iter().filter(|h| !h.gone && h.solid() && matches!(h.kind, Hz::Car | Hz::Bus | Hz::Van | Hz::CrossCar | Hz::Dog)).collect();
-                for a in &riders {
-                    for b in &others {
-                        if a.seg != b.seg { continue; }
-                        let ((aw, al), (bw, bl)) = (a.size(), b.size());
-                        if (a.x - b.x).abs() < aw + bw - 3.0 && (a.d - b.d).abs() < al + bl - 3.0 && found.len() < 12 {
-                            found.push(format!("day {day} frame {frame}: {:?} p{} held {} at ({:.0},{:.0}) through {:?} p{} at ({:.0},{:.0})",
-                                a.kind, a.phase, a.held, a.x, a.d, b.kind, b.phase, b.x, b.d));
-                        }
+        ride_every_day(100, |g, day, frame| {
+            let riders: Vec<&Hazard> = g.hazards.iter().filter(|h| !h.gone && matches!(h.kind, Hz::Cyclist | Hz::Tourist | Hz::Blader)).collect();
+            let others: Vec<&Hazard> = g.hazards.iter().filter(|h| !h.gone && h.solid() && matches!(h.kind, Hz::Car | Hz::Bus | Hz::Van | Hz::CrossCar | Hz::Dog)).collect();
+            for a in &riders {
+                for b in &others {
+                    if a.seg != b.seg { continue; }
+                    let ((aw, al), (bw, bl)) = (a.size(), b.size());
+                    if (a.x - b.x).abs() < aw + bw - 3.0 && (a.d - b.d).abs() < al + bl - 3.0 && found.len() < 12 {
+                        found.push(format!("day {day} frame {frame}: {:?} p{} held {} at ({:.0},{:.0}) through {:?} p{} at ({:.0},{:.0})",
+                            a.kind, a.phase, a.held, a.x, a.d, b.kind, b.phase, b.x, b.d));
                     }
                 }
             }
-        }
+        });
         assert!(found.is_empty(), "{}", found.join("\n"));
     }
 

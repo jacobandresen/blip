@@ -93,6 +93,21 @@ test('the Guide can open the API and return to its source chapter', async (t) =>
     'a Guide sheet keeps its game open when visiting the API');
 });
 
+// The guide builds its Games chapters from the manual spreads; their meta line
+// says who can play, from blipTwoPlayer.
+test('the Guide says who can play a game, one or two, in its chapter', async (t) => {
+  const { page, origin } = await phone(t);
+  await page.goto(`${origin}/guide.html?embed#/t/game-brawler`);
+  await page.locator('#guide[data-ready]').waitFor();
+  const meta = page.locator('#pane-detail .hero-meta .row-sub');
+  await meta.waitFor();
+  assert.match(await meta.textContent(), /1 or 2 players/);
+  await page.goto(`${origin}/guide.html?embed#/t/game-serpent`);
+  await page.locator('#guide[data-ready]').waitFor();
+  await meta.waitFor();
+  assert.match(await meta.textContent(), /^1 player$/);
+});
+
 test('Search finds a game by name, and Enter opens it', async (t) => {
   const { page, origin } = await phone(t);
   await page.goto(`${origin}/home.html`);

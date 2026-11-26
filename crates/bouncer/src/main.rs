@@ -679,10 +679,12 @@ fn roll_ball(g: &mut Game, dt: f32) {
     for i in 0..3 {
         for j in 0..i {
             let dot: f32 = (0..3).map(|k| m[i][k] * m[j][k]).sum();
-            for k in 0..3 { m[i][k] -= dot * m[j][k]; }
+            // `k` walks two rows at once (mi and mj); the rows are split apart for the borrow checker.
+            let (past, current) = m.split_at_mut(i);
+            for (mi, mj) in current[0].iter_mut().zip(&past[j]) { *mi -= dot * *mj; }
         }
         let len = m[i].iter().map(|v| v * v).sum::<f32>().sqrt();
-        for k in 0..3 { m[i][k] /= len; }
+        for v in m[i].iter_mut() { *v /= len; }
     }
 }
 

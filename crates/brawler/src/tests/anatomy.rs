@@ -14,7 +14,7 @@ pub(crate) fn every_pose() -> Vec<(String, Fighter)> {
     let moves = [MoveId::LowPunch, MoveId::LowKick, MoveId::HighKick,
                  MoveId::HighPunch, MoveId::Sweep, MoveId::Uppercut, MoveId::JumpPunch, MoveId::JumpKick,
                  MoveId::FlyingKick, MoveId::Special, MoveId::Throw];
-    for who in 0..FIGHTERS.len() {
+    for (who, fi) in FIGHTERS.iter().enumerate() {
         // Put down by a sweep, and by a throw: their falls are their own.
         for step in 0..12 {
             for by in [MoveId::Sweep, MoveId::Throw, MoveId::Uppercut] {
@@ -22,7 +22,7 @@ pub(crate) fn every_pose() -> Vec<(String, Fighter)> {
                 f.act = Act::Knockdown;
                 f.downed_by = by;
                 f.t = step as f32 / 11.0 * 0.3;
-                out.push((format!("{} downed by {by:?} t={:.2}", FIGHTERS[who].name, f.t), f));
+                out.push((format!("{} downed by {by:?} t={:.2}", fi.name, f.t), f));
             }
         }
         for act in [Act::Idle, Act::Walk, Act::Crouch, Act::Block, Act::Hitstun,
@@ -37,58 +37,58 @@ pub(crate) fn every_pose() -> Vec<(String, Fighter)> {
                     _ => step as f32 / 11.0,
                 };
                 if act == Act::Walk { f.x = 300.0 + step as f32 * 7.0; }
-                out.push((format!("{} {:?} t={:.2}", FIGHTERS[who].name, act, f.t), f));
+                out.push((format!("{} {:?} t={:.2}", fi.name, act, f.t), f));
                 // DRAKE's two guards, whichever his roll picks.
                 if act == Act::Block && formless(who) {
                     let mut v = f;
                     v.stumble_roll = 1;
-                    out.push((format!("{} Block roll 1 t={:.2}", FIGHTERS[who].name, v.t), v));
+                    out.push((format!("{} Block roll 1 t={:.2}", fi.name, v.t), v));
                 }
                 // DRAKE's two openers, whichever his roll picks.
                 if act == Act::Bow && formless(who) {
                     let mut v = f;
                     v.stumble_roll = 1;
-                    out.push((format!("{} Bow roll 1 t={:.2}", FIGHTERS[who].name, v.t), v));
+                    out.push((format!("{} Bow roll 1 t={:.2}", fi.name, v.t), v));
                 }
                 // DRAKE's three wins, whichever his roll picks.
                 if act == Act::Victory && formless(who) {
                     for roll in 0..4u8 {
                         let mut v = f;
                         v.stumble_roll = roll;
-                        out.push((format!("{} Victory roll {roll} t={:.2}", FIGHTERS[who].name, v.t), v));
+                        out.push((format!("{} Victory roll {roll} t={:.2}", fi.name, v.t), v));
                     }
                 }
                 // DRAKE's taunt over a fallen opponent, the whole of it.
                 if act == Act::Idle && formless(who) {
                     let mut t = f;
                     t.taunt = 1.4 * (1.0 - step as f32 / 11.0);
-                    out.push((format!("{} taunt left={:.2}", FIGHTERS[who].name, t.taunt), t));
+                    out.push((format!("{} taunt left={:.2}", fi.name, t.taunt), t));
                     let mut twirl = t;
                     twirl.stumble_roll = 1;
-                    out.push((format!("{} twirl left={:.2}", FIGHTERS[who].name, twirl.taunt), twirl));
+                    out.push((format!("{} twirl left={:.2}", fi.name, twirl.taunt), twirl));
                     let mut torn = t;
                     torn.health = 3;
-                    out.push((format!("{} torn taunt left={:.2}", FIGHTERS[who].name, torn.taunt), torn));
+                    out.push((format!("{} torn taunt left={:.2}", fi.name, torn.taunt), torn));
                 }
                 // Nearly out of health: the enraged guard.
                 if matches!(act, Act::Idle | Act::Walk | Act::Block) {
                     let mut w = f;
                     w.health = 3;
-                    out.push((format!("{} {:?} nearly out t={:.2}", FIGHTERS[who].name, act, w.t), w));
+                    out.push((format!("{} {:?} nearly out t={:.2}", fi.name, act, w.t), w));
                 }
                 // Struck in the body, hard: folded over the blow instead of snapped back.
                 if act == Act::Hitstun {
                     let mut b = f;
                     (b.struck_body, b.struck_force) = (true, 1.4);
-                    out.push((format!("{} body blow t={:.2}", FIGHTERS[who].name, b.t), b));
+                    out.push((format!("{} body blow t={:.2}", fi.name, b.t), b));
                     let mut s = f;
                     (s.struck_legs, s.struck_force) = (true, 1.4);
-                    out.push((format!("{} shin kick t={:.2}", FIGHTERS[who].name, s.t), s));
+                    out.push((format!("{} shin kick t={:.2}", fi.name, s.t), s));
                 }
                 if act == Act::Block {
                     let mut c = f;
                     c.crouch_block = true;
-                    out.push((format!("{} crouch-block t={:.2}", FIGHTERS[who].name, c.t), c));
+                    out.push((format!("{} crouch-block t={:.2}", fi.name, c.t), c));
                 }
                 // The knees giving under a landing is drawn on top of
                 // whatever the fighter does next, so it has to satisfy
@@ -98,7 +98,7 @@ pub(crate) fn every_pose() -> Vec<(String, Fighter)> {
                     l.land = LAND_ABSORB * (1.0 - step as f32 / 11.0);
                     l.land_force = 1.0;
                     out.push((format!("{} {:?} landing land={:.3}",
-                        FIGHTERS[who].name, act, l.land), l));
+                        fi.name, act, l.land), l));
                 }
             }
         }
@@ -112,13 +112,13 @@ pub(crate) fn every_pose() -> Vec<(String, Fighter)> {
             f.vy = JUMP_VY * (1.0 - 2.0 * k);
             f.y = FLOOR_Y - 120.0 * (1.0 - (1.0 - 2.0 * k).powi(2)).max(0.02);
             f.t = k * 0.7;
-            out.push((format!("{} Air vy={:.0}", FIGHTERS[who].name, f.vy), f));
+            out.push((format!("{} Air vy={:.0}", fi.name, f.vy), f));
             // A jump forward or back: the light ones somersault through it.
             for vx in [AIR_DRIFT, -AIR_DRIFT] {
                 let mut j = f;
-                j.vy = JUMP_VY * FIGHTERS[who].jump_scale * (1.0 - 2.0 * k);
+                j.vy = JUMP_VY * fi.jump_scale * (1.0 - 2.0 * k);
                 j.vx = vx;
-                out.push((format!("{} jump vx={vx:.0} vy={:.0}", FIGHTERS[who].name, j.vy), j));
+                out.push((format!("{} jump vx={vx:.0} vy={:.0}", fi.name, j.vy), j));
             }
         }
         for mv in moves {
@@ -131,7 +131,7 @@ pub(crate) fn every_pose() -> Vec<(String, Fighter)> {
                 let m = f.scaled(move_data(mv));
                 let total = (m.startup + m.active + m.recovery) * F;
                 f.t = step as f32 / 15.0 * total;
-                out.push((format!("{} {:?} t={:.3}", FIGHTERS[who].name, mv, f.t), f));
+                out.push((format!("{} {:?} t={:.3}", fi.name, mv, f.t), f));
                 // DRAKE's technique (and special) comes off his per-attack roll: every one of them.
                 if formless(who) {
                     for roll in 0..6u8 {
@@ -139,14 +139,14 @@ pub(crate) fn every_pose() -> Vec<(String, Fighter)> {
                         v.stumble_roll = roll;
                         let m = v.scaled(move_data(mv));
                         v.t = step as f32 / 15.0 * (m.startup + m.active + m.recovery) * F;
-                        out.push((format!("{} {:?} roll {roll} t={:.3}", FIGHTERS[who].name, mv, v.t), v));
+                        out.push((format!("{} {:?} roll {roll} t={:.3}", fi.name, mv, v.t), v));
                     }
                 }
                 // A throw that caught someone is a different picture: the hoist.
                 if mv == MoveId::Throw {
                     let mut c = f;
                     c.hit_clean = true;
-                    out.push((format!("{} landed throw t={:.3}", FIGHTERS[who].name, c.t), c));
+                    out.push((format!("{} landed throw t={:.3}", fi.name, c.t), c));
                 }
             }
         }
@@ -255,7 +255,7 @@ pub(crate) fn what_you_see_is_what_can_hit_you() {
     // (Stretching bones to reach broke the support leg; refusing left the
     // foot short.)
     let mut bad = vec![];
-    for who in 0..FIGHTERS.len() {
+    for (who, fi) in FIGHTERS.iter().enumerate() {
         for mv in [MoveId::LowPunch, MoveId::LowKick, MoveId::HighKick,
                    MoveId::HighPunch, MoveId::Sweep, MoveId::Throw, MoveId::Hook, MoveId::Roundhouse] {
             let mut f = Fighter::new(who, 300.0, 1.0);
@@ -272,7 +272,7 @@ pub(crate) fn what_you_see_is_what_can_hit_you() {
                 // The tip is the end of the foot or the front of the fist,
                 // scaled with the fighter like the drawing.
                 let size = f.size();
-                let bulk = FIGHTERS[who].bulk * size;
+                let bulk = fi.bulk * size;
                 let tip = if leg {
                     // The roundhouse comes off the back leg.
                     let (knee, ankle) = if mv == MoveId::Roundhouse { (k.knee_rear, k.ankle_rear) } else { (k.knee_lead, k.ankle_lead) };
@@ -285,12 +285,12 @@ pub(crate) fn what_you_see_is_what_can_hit_you() {
                 let short = far - tip;
                 if short > 14.0 * size {
                     bad.push(format!("{} {:?}: reaches {:.0}px short of its own hitbox",
-                        FIGHTERS[who].name, mv, short));
+                        fi.name, mv, short));
                     break;
                 }
                 if tip > far + 6.0 * size {
                     bad.push(format!("{} {:?}: drawn {:.0}px past its own hitbox",
-                        FIGHTERS[who].name, mv, tip - far));
+                        fi.name, mv, tip - far));
                     break;
                 }
             }
@@ -393,7 +393,7 @@ pub(crate) fn nothing_teleports_between_one_frame_and_the_next() {
     ];
     let mut worst = (0.0f32, String::new());
     let mut over: Vec<String> = vec![];
-    for who in 0..FIGHTERS.len() {
+    for (who, fi) in FIGHTERS.iter().enumerate() {
         let mut f = Fighter::new(who, 300.0, 1.0);
         let mut last: Option<[(&'static str, draw::V); 10]> = None;
         for (act, mv, secs) in script {
@@ -416,7 +416,7 @@ pub(crate) fn nothing_teleports_between_one_frame_and_the_next() {
                 // advance() ends an action when its clock runs out, so hold
                 // both or the test restarts actions itself. A jump may end by
                 // landing: the touchdown is part of what is watched.
-                if f.act != act && !(act == Act::Air && !f.airborne()) {
+                if f.act != act && (act != Act::Air || f.airborne()) {
                     f.act = act;
                     f.t = held;
                     f.shown = act;
@@ -450,12 +450,12 @@ pub(crate) fn nothing_teleports_between_one_frame_and_the_next() {
                         if d > limit {
                             over.push(format!(
                                 "{} {} moved {d:.0}px in one frame during {:?} (limit {limit:.0})",
-                                FIGHTERS[who].name, now[i].0, act));
+                                fi.name, now[i].0, act));
                         }
                         if d > worst.0 {
                             worst = (d, format!(
                                 "{} {} moved {d:.0}px in one frame during {:?} at t={:.3} blend={:.2}",
-                                FIGHTERS[who].name, now[i].0, act, f.t, f.blend));
+                                fi.name, now[i].0, act, f.t, f.blend));
                         }
                     }
                 }
@@ -477,7 +477,7 @@ pub(crate) fn a_waiting_fighter_has_their_knees_bent() {
     // from the ankles clamped both legs straight while every other rule
     // passed.
     let mut bad = vec![];
-    for who in 0..FIGHTERS.len() {
+    for (who, fi) in FIGHTERS.iter().enumerate() {
         for act in [Act::Idle, Act::Walk, Act::Block] {
             let mut f = Fighter::new(who, 300.0, 1.0);
             f.act = act;
@@ -495,7 +495,7 @@ pub(crate) fn a_waiting_fighter_has_their_knees_bent() {
                 let bend = 180.0 - ang.to_degrees();
                 if bend < 20.0 {
                     bad.push(format!("{} {:?}: {name} knee bent only {bend:.0} degrees",
-                        FIGHTERS[who].name, act));
+                        fi.name, act));
                 }
             }
         }
@@ -779,12 +779,12 @@ pub(crate) fn the_cpu_throws_the_flying_kick_too() {
                 // The player holds their ground and does nothing, so
                 // the CPU keeps having to solve the same problem.
                 let ins = [Input::default(), c_in];
-                for i in 0..2 {
+                for (i, inp) in ins.iter().enumerate() {
                     let other = g.p[1 - i].x;
                     if g.p[i].free() && !g.p[i].airborne() {
                         g.p[i].facing = if other >= g.p[i].x { 1.0 } else { -1.0 };
                     }
-                    apply_input(&mut g.p[i], ins[i], false, F);
+                    apply_input(&mut g.p[i], *inp, false, F);
                     advance(&mut g.p[i], F);
                     g.p[i].x = clamp(g.p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
                 }
@@ -970,7 +970,7 @@ pub(crate) fn what_you_see_is_what_can_hit_you_in_the_air_too() {
     // Air moves' feet against the boxes that do their damage, flown for real
     // because the pose is read off vertical speed.
     let mut bad = vec![];
-    for who in 0..FIGHTERS.len() {
+    for (who, fi) in FIGHTERS.iter().enumerate() {
         for mv in [MoveId::FlyingKick, MoveId::JumpKick, MoveId::JumpPunch] {
             let mut f = at(who, 200.0, 1.0);
             if mv != MoveId::FlyingKick {
@@ -987,7 +987,7 @@ pub(crate) fn what_you_see_is_what_can_hit_you_in_the_air_too() {
                 let Some((hx, hy, hw, hh)) = f.hit_box() else { continue };
                 let k = drawn(&f);
                 let size = f.size();
-                let bulk = FIGHTERS[who].bulk * size;
+                let bulk = fi.bulk * size;
                 let (joint, tip) = if leg {
                     // The toes point the way the foot is drawn.
                     let (dx, _, _) = draw::foot_dir(k.knee_lead, k.ankle_lead, f.facing, f.y, size);
@@ -998,19 +998,19 @@ pub(crate) fn what_you_see_is_what_can_hit_you_in_the_air_too() {
                 let far = hx + hw;
                 if far - tip > 15.0 * size {
                     bad.push(format!("{} {mv:?}: reaches {:.0}px short of its hitbox",
-                        FIGHTERS[who].name, far - tip));
+                        fi.name, far - tip));
                     break;
                 }
                 if tip > far + 8.0 * size {
                     bad.push(format!("{} {mv:?}: drawn {:.0}px past its hitbox",
-                        FIGHTERS[who].name, tip - far));
+                        fi.name, tip - far));
                     break;
                 }
                 // And the right height: a box the limb is nowhere near
                 // is a box that hits things the picture never touched.
                 if joint.1 < hy - 26.0 * size || joint.1 > hy + hh + 26.0 * size {
                     bad.push(format!("{} {mv:?}: the limb is {:.0}px off the height its \
-                        hitbox is at", FIGHTERS[who].name, (joint.1 - (hy + hh / 2.0)).abs()));
+                        hitbox is at", fi.name, (joint.1 - (hy + hh / 2.0)).abs()));
                     break;
                 }
             }

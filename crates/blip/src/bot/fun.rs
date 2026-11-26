@@ -190,6 +190,7 @@ impl Meter {
     }
 
     /// The frame just drawn, when one was asked for.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     pub(crate) fn captured(&mut self, img: Image) {
         self.capture = false;
         self.boxes.clear();

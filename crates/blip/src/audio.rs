@@ -62,11 +62,11 @@ fn stop_loop(current: &Mutex<Option<Sound>>) {
 }
 
 /// Start looping music at a specific volume, replacing the current track.
-pub fn play_music_volume(s: &BlipSound, volume: f32) {
+fn play_music_volume(s: &BlipSound, volume: f32) {
     play_loop(&CURRENT_MUSIC, s, volume.clamp(0.0, 1.0));
 }
 
-pub fn stop_music() { stop_loop(&CURRENT_MUSIC); }
+fn stop_music() { stop_loop(&CURRENT_MUSIC); }
 
 /// Start looping ambient sound at volume 0.18.
 pub fn play_ambient(s: &BlipSound) {

@@ -148,7 +148,7 @@ pub fn draw_world(blip: &Blip, g: &Game, t: f32) {
     let near_turn = (g.bike_d - JD).abs() < 700.0;
     let mut bike_at = (g.bike_x, BIKE_Y);
     for seg in [0u8, 1] {
-        if seg == 0 && g.turned && !near_turn || seg == 1 && !g.turned && !near_turn { continue; }
+        if !near_turn && (seg == 0 && g.turned || seg == 1 && !g.turned) { continue; }
         let (ax, ad, ang) = if seg == 0 { (cx, cd, ca) } else {
             let (x, d) = world_to_new_street(cx, cd);
             (x, d, ca - std::f32::consts::FRAC_PI_2)
@@ -186,8 +186,7 @@ pub fn draw_street(blip: &Blip, g: &Game, t: f32, seg: u8) {
     for &r in &visible { draw_ground(blip, g, r); }
     for &r in &visible { for s in 0..2 { draw_lot(blip, g, s, r, t); } }
     for &r in &visible {
-        if !matches!(g.houses[0][r].lot, Lot::Bridge | Lot::Cross | Lot::Palace)
-            && !(r > 0 && g.houses[0][r - 1].lot == Lot::Palace) { draw_furniture(blip, g, r, sy((r + 1) as f32 * LOT)); }
+        if !(matches!(g.houses[0][r].lot, Lot::Bridge | Lot::Cross | Lot::Palace) || r > 0 && g.houses[0][r - 1].lot == Lot::Palace) { draw_furniture(blip, g, r, sy((r + 1) as f32 * LOT)); }
     }
     if seg == 0 && (visible.contains(&TURN_ROW) || visible.contains(&(TURN_ROW + 1))) { mouth(blip); }
     let flat = |h: &&Hazard| matches!(h.kind, Hz::Puddle(_) | Hz::Sprinkler);
@@ -923,8 +922,7 @@ fn draw_ground(blip: &Blip, g: &Game, r: usize) {
     for k in 0..3 { blip.fill_rect(239.0, y + k as f32 * 38.0 + 6.0, 3.0, 20.0, rgba([240, 236, 220], 0.7)); }
     // a bike painted in each lane now and then
     if r % 3 == 1 {
-        for s in 0..2 {
-            let cx = BIKE_LANE[s];
+        for cx in BIKE_LANE {
             let cy = y + LOT / 2.0;
             let c = rgba([236, 232, 220], 0.55);
             blip.draw_circle(cx, cy - 6.0, 3.5, 1.0, c);
@@ -1296,7 +1294,7 @@ fn draw_building(blip: &Blip, g: &Game, s: usize, r: usize, t: f32) {
     let flap = if h.flap < 0.35 { 1.0 - h.flap / 0.35 } else { 0.0 };
     let slot = if h.sub { GOLD } else { [120, 110, 96] };
     quad(face(dy - SLOT_HALF, 9.0 - flap * 2.0), face(dy + SLOT_HALF, 9.0 - flap * 2.0), face(dy + SLOT_HALF, 11.0), face(dy - SLOT_HALF, 11.0), rgb(slot));
-    if lit(g, s, r) && h.sub || h.sub && g.weather() == Weather::Fog {
+    if h.sub && lit(g, s, r) {
         let (lx, ly) = face(dy - 13.0, 16.0);
         blip.fill_glow_circle(lx, ly, 4.0, rgba(LAMP, 0.9));
     }

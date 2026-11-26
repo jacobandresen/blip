@@ -48,28 +48,19 @@ pub(crate) fn fruit_step(g: &mut Game, dt: f32) -> Option<usize> {
 /// Two bolts thrown at each other meet and cancel. A laser is not a thing
 /// that can be knocked out of the air: it burns through and carries on.
 pub(crate) fn clash_bolts(g: &mut Game) -> Option<(f32, f32)> {
-    for i in 0..g.bolts.len() {
-        for j in i + 1..g.bolts.len() {
-            let (a, b) = (g.bolts[i], g.bolts[j]);
-            if !a.active || !b.active || a.owner == b.owner { continue; }
-            if g.p[a.owner].arch().special == Special::LaserVision
-                && g.p[b.owner].arch().special == Special::LaserVision
-            { continue; }
-            if !rects_overlap(a.x - 10.0, a.y - 8.0, 20.0, 16.0, b.x - 10.0, b.y - 8.0, 20.0, 16.0) {
-                continue;
-            }
-            for k in [i, j] {
-                if g.p[g.bolts[k].owner].arch().special != Special::LaserVision {
-                    g.bolts[k].active = false;
-                }
-            }
-            return Some(((a.x + b.x) / 2.0, (a.y + b.y) / 2.0));
-        }
-    }
-    None
+    clash_bolts_when(g, |_, _, a, b| rects_overlap(a.x - 10.0, a.y - 8.0, 20.0, 16.0, b.x - 10.0, b.y - 8.0, 20.0, 16.0))
 }
 
+/// As [`clash_bolts`], for bolts that moved from `starts` this frame: their paths, not only where they ended.
 fn clash_bolts_swept(g: &mut Game, starts: &[(f32, f32); 4]) -> Option<(f32, f32)> {
+    clash_bolts_when(g, |i, j, a, b| segment_rect_overlap(
+        starts[i].0 - starts[j].0, starts[i].1 - starts[j].1,
+        a.x - b.x, a.y - b.y,
+        -20.0, -16.0, 40.0, 32.0,
+    ))
+}
+
+fn clash_bolts_when(g: &mut Game, meet: impl Fn(usize, usize, &Bolt, &Bolt) -> bool) -> Option<(f32, f32)> {
     for i in 0..g.bolts.len() {
         for j in i + 1..g.bolts.len() {
             let (a, b) = (g.bolts[i], g.bolts[j]);
@@ -77,11 +68,7 @@ fn clash_bolts_swept(g: &mut Game, starts: &[(f32, f32); 4]) -> Option<(f32, f32
             if g.p[a.owner].arch().special == Special::LaserVision
                 && g.p[b.owner].arch().special == Special::LaserVision
             { continue; }
-            if !segment_rect_overlap(
-                starts[i].0 - starts[j].0, starts[i].1 - starts[j].1,
-                a.x - b.x, a.y - b.y,
-                -20.0, -16.0, 40.0, 32.0,
-            ) { continue; }
+            if !meet(i, j, &a, &b) { continue; }
             for k in [i, j] {
                 if g.p[g.bolts[k].owner].arch().special != Special::LaserVision {
                     g.bolts[k].active = false;
@@ -194,8 +181,8 @@ pub(crate) fn step_fight(g: &mut Game, dt: f32, p_in: Input, c_in: Input) {
     advance(&mut g.p[1], dt);
     // Boots on boards: the touchdown is how a player hears they are on
     // the ground again.
-    for i in 0..2 {
-        if was_air[i] && !g.p[i].airborne() {
+    for (i, was) in was_air.iter().enumerate() {
+        if *was && !g.p[i].airborne() {
             g.snd_at(Sfx::Land, 0.35 + 0.5 * g.p[i].land_force);
             if land_quake(g, i) { g.snd(Sfx::Quake); g.snd(Sfx::Crunch); }
         }
@@ -513,7 +500,8 @@ fn fly_bolts(g: &mut Game, dt: f32, holds: [Input; 2]) {
         g.spark(x, y, false, true);
         g.snd(Sfx::Parry);
     }
-    for i in 0..g.bolts.len() {
+    // At the end of an enthusiastic blur: each bolt is measured from where it started.
+    for (i, start) in starts.iter().enumerate() {
         if !g.bolts[i].active { continue; }
         // Off the side of the stage, or into the boards.
         let left_stage = g.bolts[i].x < -20.0 || g.bolts[i].x > WIN_W as f32 + 20.0 || g.bolts[i].y > FLOOR_Y;
@@ -522,7 +510,7 @@ fn fly_bolts(g: &mut Game, dt: f32, holds: [Input; 2]) {
         // A beam is thinner than a ball of chi.
         let tall = if g.p[1 - d].arch().special == Special::LaserVision { LASER_THICK } else { 16.0 };
         if !segment_rect_overlap(
-            starts[i].0, starts[i].1, g.bolts[i].x, g.bolts[i].y,
+            start.0, start.1, g.bolts[i].x, g.bolts[i].y,
             dx - 10.0, dy - tall / 2.0, dw + 20.0, dh + tall,
         ) {
             if left_stage { g.bolts[i].active = false; }

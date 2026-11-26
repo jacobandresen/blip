@@ -296,8 +296,8 @@ pub fn tower() -> Vec<u8> {
     let mut rng = Rng(0x70_e2);
     let roots = [38, 38, 34, 36, 38, 38, 41, 40, 38, 38, 34, 36, 31, 33, 38, 37];
     let pat = [0, 0, 12, 0, 7, 0, 12, 0, 0, 0, 12, 0, 3, 0, 7, 12];
-    for b in 0..bars {
-        let root = roots[b];
+    for (b, bass) in roots.iter().enumerate().take(bars) {
+        let root = *bass;
         let t0 = b as f32 * bar;
         for (k, iv) in pat.iter().enumerate() {
             let acc = if k % 4 == 0 { 1.0 } else { 0.6 };
@@ -530,8 +530,8 @@ pub fn depths() -> Vec<u8> {
     let mut rng = Rng(0xde_e9);
     // two bars on D, one on Eb, one back on D; the turn falls to C and Bb
     let roots = [38, 38, 39, 38, 38, 38, 36, 34, 38, 38, 39, 38, 41, 39, 37, 38];
-    for b in 0..bars {
-        let root = roots[b];
+    for (b, bass) in roots.iter().enumerate().take(bars) {
+        let root = *bass;
         let t0 = b as f32 * bar;
         // the pulse: triplet eighths, root and the half step, accent every third
         for k in 0..12 {
