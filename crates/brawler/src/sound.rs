@@ -78,8 +78,6 @@ blip::sounds!(
             [blip::sound!("kiai4_0"), blip::sound!("kiai4_1"), blip::sound!("kiai4_2")],
             [blip::sound!("kiai5_0"), blip::sound!("kiai5_1"), blip::sound!("kiai5_2")],
         ],
-        /// DRAKE shouts behind nearly everything, so two more takes of his.
-        keen_more: [blip::BlipSound; 2] = [blip::sound!("kiai4_3"), blip::sound!("kiai4_4")],
         cry: [blip::BlipSound; 6] = [blip::sound!("cry0"), blip::sound!("cry1"), blip::sound!("cry2"), blip::sound!("cry3"),
             blip::sound!("cry4"), blip::sound!("cry5")],
         dice: std::cell::Cell<u32> = std::cell::Cell::new(0),
@@ -142,7 +140,6 @@ impl Sounds {
             Sfx::Block if roll & 2 != 0 => &self.block_again,
             Sfx::HitKick(heavy) => &self.kick[heavy as usize * 2 + (roll & 1) as usize],
             Sfx::Hurt(who, heavy) => &self.hurt[who.min(5)][if heavy { 2 } else { (roll & 1) as usize }],
-            Sfx::Kiai(4) if roll % 5 >= 3 => &self.keen_more[(roll % 5 - 3) as usize],
             Sfx::Kiai(who) => &self.kiai[who.min(5)][(roll % 3) as usize],
             Sfx::Cry(who) => &self.cry[who.min(5)],
             Sfx::HitLight(_) | Sfx::HitHeavy => {

@@ -875,9 +875,14 @@ async function openMachine(card,machineSlug) {
   // over: the same machine, near (a cross-document transition's crossfade, or straight on without one).
   // The machine's monitor onto the game page's.
   prerender(gameCardUrl(card));
-  arcadeWalk(card,gameMachine().monitor,cardMonitor,WALK_MS,false).then(function(){window.location.href=gameCardUrl(card);});
+  // Where the game page's canvas is known, the walk ends with the cabinet's picture on its picture; else monitor on monitor.
+  var machine=gameMachine(),shotEl=card.querySelector('.card-shot'),aspect=shotEl&&shotEl.naturalWidth?shotEl.naturalWidth/shotEl.naturalHeight:0;
+  var walk=machine.box&&aspect?[pictureBox(machine.box,aspect),function(c){return cardPicture(c,aspect);}]:[machine.monitor,cardMonitor];
+  arcadeWalk(card,walk[0],walk[1],WALK_MS,false).then(function(){window.location.href=gameCardUrl(card);});
 }
-var WALK_MS=1400;
+function pictureBox(box,a){var r=containIn({left:box.x,top:box.y,width:box.w,height:box.h},a);return {x:r.left,y:r.top,w:r.width,h:r.height};}
+// 1.8 s: at 1.4 the middle of the walk read as a rush on a phone (user, 2026-11-27).
+var WALK_MS=1800;
 window.addEventListener('pageswap',function(event){
   if(!event.viewTransition)return;
   if(!document.querySelector('#game-grid .card-launching'))event.viewTransition.skipTransition();
@@ -891,11 +896,16 @@ window.addEventListener('pagereveal',function(event){
   if(!card){document.documentElement.removeAttribute('data-machine-return');event.viewTransition.skipTransition();return;}
   card.classList.add('card-launching');
   // Stand where the game page's screen was, in front of the machine, then walk back from it into the aisle.
-  if(back.screen&&typeof arcadeWalk==='function')arcadeWalk(card,back.screen,cardMonitor,WALK_MS,true);
+  // Picture on picture where the game page sent its canvas (and the frame drawn on it), else monitor on monitor.
+  var frameAspect=back.picture&&back.picture.w/back.picture.h,walked=Promise.resolve();
+  if(typeof arcadeWalk==='function'&&(back.picture||back.screen))
+    walked=arcadeWalk(card,back.picture||back.screen,back.picture?function(c){return cardPicture(c,frameAspect);}:cardMonitor,WALK_MS,true);
   var shot=card.querySelector('.card-shot');
   if(shot&&/^data:image\/png;base64,/.test(back.frame||'')){shot.dataset.still=shot.getAttribute('src');shot.src=back.frame;}
-  event.viewTransition.finished.catch(function(){}).then(function(){
-    document.documentElement.removeAttribute('data-machine-return');
+  var faded=event.viewTransition.finished.catch(function(){});
+  faded.then(function(){document.documentElement.removeAttribute('data-machine-return');});
+  // The screen keeps the game's frame until the walk is over: switching mid-walk was the one jump on the way back.
+  Promise.all([faded,walked]).then(function(){
     card.classList.remove('card-launching');
     if(shot&&shot.dataset.still){shot.src=shot.dataset.still;delete shot.dataset.still;}
   });
@@ -916,7 +926,8 @@ function gameMachine() {
   var saved=null;
   try { saved=JSON.parse(localStorage.getItem('blip-screen-box')||'null'); } catch(e) {}
   if(saved&&saved.w===innerWidth&&saved.h===innerHeight&&saved.monitor&&saved.panel)
-    return {monitor:{x:saved.monitor[0],y:saved.monitor[1],w:saved.monitor[2],h:saved.monitor[3]},panel:{x:saved.panel[0],y:saved.panel[1],w:saved.panel[2],h:saved.panel[3]}};
+    return {monitor:{x:saved.monitor[0],y:saved.monitor[1],w:saved.monitor[2],h:saved.monitor[3]},panel:{x:saved.panel[0],y:saved.panel[1],w:saved.panel[2],h:saved.panel[3]},
+      box:saved.box&&{x:saved.box[0],y:saved.box[1],w:saved.box[2],h:saved.box[3]}};
   // A deck depth that could not be the page's (a stale record) is not taken.
   var wide=innerWidth>=1017,deck=saved&&saved.deck>=100&&saved.deck<=innerHeight*.4?saved.deck:(wide?180:150);
   var top=78,h=innerHeight-top-deck,w=wide?blipCabinetWidth(h):innerWidth-32,x=(innerWidth-w)/2;
@@ -924,6 +935,13 @@ function gameMachine() {
 }
 // A cabinet's monitor where it is drawn now: what the walks in and back measure.
 function cardMonitor(card) {return card.querySelector('.card-shot-wrap').getBoundingClientRect();}
+// The picture on a cabinet's screen where it is drawn now: its image (of aspect a, or its own) contained in the tube.
+// The walks end with it over the game page's picture, so the cross-fade lays one picture on the same picture.
+function cardPicture(card,a) {
+  var shot=card.querySelector('.card-shot'),r=(card.querySelector('.game-rom')||card.querySelector('.card-shot-wrap')).getBoundingClientRect();
+  return containIn(r,a||(shot&&shot.naturalWidth?shot.naturalWidth/shot.naturalHeight:r.width/r.height));
+}
+function containIn(r,a) {var w=Math.min(r.width,r.height*a),h=w/a;return {left:r.left+(r.width-w)/2,top:r.top+(r.height-h)/2,width:w,height:h};}
 // Back from a game through the browser's page cache: stand back from the machine.
 window.addEventListener('pageshow',function(event){
   if(!event.persisted)return;
@@ -995,7 +1013,8 @@ document.getElementById('manual-book').addEventListener('click',function(event){
   var aisle=BlipAisle.create(cards.length,idx),aisleFrame=0,aisleLast=0,aisleRoomNow=null;
   var held={},walked=0,stride=0,pendingStart=false;
   // Stepped up to the faced machine: lean 0 standing in the aisle, 1 at the machine.
-  var steppedUp=false,lean=0,LEAN_Z=150,LEAN_LIFT=60;
+  // leanP is the step's progress, eased into lean (smoothstep over LEAN_S): an exponential set off at full speed.
+  var steppedUp=false,lean=0,leanP=0,LEAN_Z=150,LEAN_LIFT=60,LEAN_S=.45;
   // #game-grid's eye, 1100px in front of the room (arcade.css perspective), and the wall 215 behind the machines'
   // fronts (room.js WALL).
   var EYE=1100,WALL_BACK=-BlipRoom.WALL;
@@ -1258,8 +1277,8 @@ document.getElementById('manual-book').addEventListener('click',function(event){
     }
     var bob=-2.5*Math.min(1,Math.abs(aisle.v))*Math.abs(Math.sin(stride*2*Math.PI));
     var leanTo=steppedUp?1:0;
-    lean+=(leanTo-lean)*(1-Math.exp(-dt/.12));
-    if(Math.abs(leanTo-lean)<.003)lean=leanTo;
+    leanP=leanTo>leanP?Math.min(leanTo,leanP+dt/LEAN_S):Math.max(leanTo,leanP-dt/LEAN_S);
+    lean=leanP*leanP*(3-2*leanP);
     poseCards(aisleRoomNow,bob);
     if(aisle.settled&&!aisle.drag&&!heldNow().dir&&lean===leanTo){arriveAisle();return;}
     aisleFrame=requestAnimationFrame(aisleTick);
@@ -1288,6 +1307,7 @@ document.getElementById('manual-book').addEventListener('click',function(event){
     if(stepWalk.matches){idx=index;aisle=BlipAisle.create(cards.length,idx);navActive=true;highlight(true);return;}
     var base=aisle.target!=null?aisle.target:Math.round(aisle.pos);
     aisle.target=base+Math.round(BlipAisle.offset(index,base,cards.length));
+    if(aisle.lead==null)aisle.lead=aisle.pos;
     aisle.settled=false;
     wakeAisle();
   }
@@ -1356,7 +1376,8 @@ document.getElementById('manual-book').addEventListener('click',function(event){
   arcadeWalk=function(card,to,pick,ms,back){
     var end=walkTarget(card,to,pick),start={x:cam.x,y:cam.y,z:cam.z};
     walkMarqueeFor(card);
-    return back?walkCam(end,start,ms,true):walkCam(start,end,ms,false);
+    // Back: stand at the machine while the game page fades (blip.css, 900 ms), then walk.
+    return back?walkCam(end,start,ms,true,350):walkCam(start,end,ms,false,0);
   };
   // Nearing the machine, the controls printed on its bezel fade (the game page has none) and the top bar takes its
   // marquee, title and all: set up once a walk (walkMarqueeFor), then only the two opacities change frame by frame.
@@ -1368,8 +1389,31 @@ document.getElementById('manual-book').addEventListener('click',function(event){
       (document.querySelector('.top-marquee-bar')||document.body).appendChild(walkMarquee);
     }
     walkWords=card.querySelector('.machine-instructions');
-    walkMarquee.firstChild.textContent=(card.querySelector('.machine-marquee-name')||{}).textContent||'';
+    var name=(card.querySelector('.machine-marquee-name')||{}).textContent||'',words=walkMarquee.firstChild;
+    words.textContent=name;
+    placeWalkName(words,name);
     walkMarquee.style.background=getComputedStyle(card).getPropertyValue('--machine-marquee');
+  }
+  // The name as large and where the game page draws it (cabinet.js fitName remembers it), so the hand-over keeps its
+  // size. Before that page has been seen at this width: a phone's name fits between the home switch and the game
+  // page's ? button (32px left of the manual), in whole pixels, 16px at most, centred on the 60px fascia; wider screens centre it at 20px.
+  function placeWalkName(words,name){
+    words.removeAttribute('style');
+    var bar=walkMarquee.getBoundingClientRect(),fit=null;
+    try{fit=JSON.parse(sessionStorage.getItem('blip-marquee-fit')||'{}')[name];}catch(e){}
+    if(!(fit&&fit.w===innerWidth)){
+      // A phone on its side has no name on the game page's bar (blip.css).
+      if(matchMedia('(pointer:coarse) and (min-width:621px) and (max-width:950px) and (max-height:520px)').matches){words.style.visibility='hidden';return;}
+      var logo=document.querySelector('.blip-logo'),home=document.getElementById('home-switch-btn'),manual=document.querySelector('.manual-pocket');
+      if(innerWidth>520||!logo||!home||!manual)return;
+      // The game page squeezes the switch 12px right of the logo and pads the name 4px past it, 4px inside each end.
+      var from=logo.getBoundingClientRect().right+12+home.offsetWidth+10,to=manual.getBoundingClientRect().left-38,size=16;
+      words.style.fontSize=size+'px';
+      while(size>7&&words.scrollWidth>to-from-4){size--;words.style.fontSize=size+'px';}
+      fit={x:from+(to-from-words.scrollWidth)/2,y:bar.bottom-30-size/2,size:size,hidden:words.scrollWidth>to-from-3};
+    }
+    words.classList.toggle('walk-name-small',fit.size<14);
+    words.style.cssText='position:absolute;left:'+(fit.x-bar.left)+'px;top:'+(fit.y-bar.top)+'px;font-size:'+fit.size+'px;line-height:1'+(fit.hidden?';visibility:hidden':'');
   }
   function nearing(near){
     if(!walkMarquee)return;
@@ -1378,7 +1422,7 @@ document.getElementById('manual-book').addEventListener('click',function(event){
   }
   // Back to where the player stood in the aisle, from wherever the eye is (a page restored from the cache).
   arcadeWalkOut=function(){return walkCam({x:cam.x,y:cam.y,z:cam.z},{x:0,y:0,z:0},WALK_MS,true);};
-  function walkCam(start,end,ms,back){
+  function walkCam(start,end,ms,back,hold){
     var room=aisleRoomNow||aisleRoom();
     cam=start;
     walking=true;grid.setAttribute('data-walking','');
@@ -1389,7 +1433,7 @@ document.getElementById('manual-book').addEventListener('click',function(event){
     var steps=Math.max(2,Math.round(Math.abs(end.z-start.z)/260)),t0=performance.now(),heard=0;
     return new Promise(function(done){
       function frame(now){
-        var t=Math.min(1,(now-t0)/ms),e=t*t*(3-2*t);
+        var t=Math.max(0,Math.min(1,(now-t0-(hold||0))/ms)),e=t*t*(3-2*t);
         // Each step lowers the head and raises it again smoothly (sin², no corner where steps meet).
         var dip=-3.5*room.scale*Math.pow(Math.sin(Math.PI*steps*e),2)*(1-Math.abs(2*t-1)*.5);
         cam={x:start.x+(end.x-start.x)*e,y:start.y+(end.y-start.y)*e+dip,z:start.z+(end.z-start.z)*e};
@@ -1397,7 +1441,7 @@ document.getElementById('manual-book').addEventListener('click',function(event){
         nearing(near());
         var step=Math.floor(e*steps+.5);
         if(step>heard&&step<=steps){heard=step;playMachineStep(back?-1:1,1);}
-        if(t<1)requestAnimationFrame(frame);
+        if(t<1||now-t0<(hold||0))requestAnimationFrame(frame);
         else{arrive();done();}
       }
       poseCards(room);
@@ -1408,7 +1452,7 @@ document.getElementById('manual-book').addEventListener('click',function(event){
     steppedUp=on;
     grid.toggleAttribute('data-stepped-up',on);
     blipArcadeSound.duck(on);
-    if(stepWalk.matches){lean=on?1:0;poseCards(aisleRoomNow||aisleRoom());return;}
+    if(stepWalk.matches){lean=leanP=on?1:0;poseCards(aisleRoomNow||aisleRoom());return;}
     wakeAisle();
   }
 

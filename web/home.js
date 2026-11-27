@@ -38,7 +38,7 @@ function gameApp(slug, inDock) {
   button.className = 'app-button';
   button.dataset.slug = slug;
   button.setAttribute('aria-label', name + (blipTwoPlayer(slug) ? ', 1 or 2 players' : ''));
-  button.innerHTML = '<span class="app-icon"><img src="' + slug + '/icon-192.png?v=27" alt="" draggable="false"></span>' +
+  button.innerHTML = '<span class="app-icon"><img src="' + slug + '/icon-192.png?v=27" alt="" draggable="false" decoding="sync"></span>' +
     '<span class="app-label">' + name + '</span>';
   if (blipTwoPlayer(slug) && !inDock) {
     var badge = document.createElement('span');
@@ -184,7 +184,7 @@ function placeApp(app, ref) {
   apps.forEach(function (a, i) {
     if (a === app || REDUCED) return;
     var now = a.getBoundingClientRect(), dx = before[i].left - now.left, dy = before[i].top - now.top;
-    if (dx || dy) a.animate([{ translate: dx + 'px ' + dy + 'px' }, { translate: '0 0' }], { duration: 260, easing: 'cubic-bezier(.32,.72,0,1)' });
+    if (dx || dy) a.animate([{ translate: dx + 'px ' + dy + 'px' }, { translate: '0 0' }], { duration: 340, easing: 'cubic-bezier(.25,.8,.25,1)' });
   });
 }
 
@@ -228,7 +228,7 @@ grid.addEventListener('pointerdown', function (e) {
     var from = dx + 'px ' + dy + 'px';
     app.style.translate = '';
     app.classList.remove('dragging');
-    if (!REDUCED) app.animate([{ translate: from }, { translate: '0 0' }], { duration: 220, easing: 'cubic-bezier(.32,.72,0,1)' });
+    if (!REDUCED) app.animate([{ translate: from }, { translate: '0 0' }], { duration: 300, easing: 'cubic-bezier(.25,.8,.25,1)' });
     saveOrder();
   }
   button.addEventListener('pointermove', move);
@@ -286,7 +286,8 @@ function launch(slug, from, url) {
   tick();
   if (REDUCED || !from || !zoom.animate) { location.href = target; return; }
   var f = launchFrames(slug, from);
-  var timing = { duration: 380, easing: 'cubic-bezier(.32,.72,0,1)', fill: 'forwards' };
+  // Calm: 520 ms easing in and out (380 ms on iOS's sharp curve read as a snap, user 2026-11-27).
+  var timing = { duration: 520, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'forwards' };
   zoom.animate([{ clipPath: f.clipIcon }, { clipPath: f.clipFull }], timing);
   f.img.animate([{ transform: f.atIcon }, { transform: f.atMiddle }], timing)
     .onfinish = function () { location.href = target; };
@@ -305,7 +306,7 @@ function arrive() {
   button.focus({ preventScroll: true });
   if (REDUCED || !zoom.animate) return;
   var f = launchFrames(back.slug, button);
-  var timing = { duration: 340, easing: 'cubic-bezier(.32,.72,0,1)', fill: 'forwards' };
+  var timing = { duration: 480, easing: 'cubic-bezier(.45,0,.25,1)', fill: 'forwards' };
   zoom.animate([{ clipPath: f.clipFull }, { clipPath: f.clipIcon }], timing);
   f.img.animate([{ transform: f.atMiddle }, { transform: f.atIcon }], timing)
     .onfinish = function () { zoom.hidden = true; zoom.getAnimations({ subtree: true }).forEach(function (a) { a.cancel(); }); };

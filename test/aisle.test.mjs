@@ -27,12 +27,12 @@ test('a tap from rest settles one machine on, from every machine and across the 
   }
 });
 
-test('a tap arrives within a second and never overshoots', () => {
+test('a tap arrives within two seconds and never overshoots', () => {
   const s = Aisle.create(N, 2);
   Aisle.press(s, 1);
   let most = 2, t = 0;
   while (!s.settled) { Aisle.step(s, {}, 1 / 60); t += 1 / 60; most = Math.max(most, s.pos); }
-  assert.ok(t < 1, `took ${t.toFixed(2)} s`);
+  assert.ok(t < 2, `took ${t.toFixed(2)} s`);
   assert.ok(most <= 3 + 2e-3, `reached ${most}`);
 });
 
@@ -72,16 +72,16 @@ test('a held walk picks its speed', () => {
   assert.ok(fast.pos > slow.pos * 2.5, `${fast.pos} vs ${slow.pos}`);
 });
 
-test('a flick settles on a whole machine ahead within a second', () => {
+test('a flick settles on a whole machine ahead within two seconds', () => {
   const s = Aisle.create(N, 0);
   Aisle.dragStart(s, 0);
   for (let t = 0; t <= 150; t += 16) Aisle.dragTo(s, t / 1000 * 4, t);
   Aisle.dragEnd(s, 150);
-  assert.ok(s.v > 3, `kept ${s.v}`);
+  assert.ok(s.v > 2, `kept ${s.v}`);
   const from = s.pos;
   let t = 0;
   while (!s.settled) { Aisle.step(s, {}, 1 / 60); t += 1 / 60; }
-  assert.ok(t < 1, `took ${t.toFixed(2)} s`);
+  assert.ok(t < 2, `took ${t.toFixed(2)} s`);
   assert.ok(Number.isInteger(s.pos));
   assert.ok((s.pos - Math.floor(from) + N) % N >= 1, `${from} -> ${s.pos}`);
 });

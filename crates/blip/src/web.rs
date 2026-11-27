@@ -109,14 +109,6 @@ impl Controls {
     }
 }
 
-/// The prompt to press on, for what the player holds: `fire_prompt("TO START")`
-/// is PRESS START TO START on a keyboard (its Space is the machine's Start) and on a deck (its Start presses the
-/// game's first button), TAP TO START on a touch screen: what the arcade's cabinets print over their screens too.
-pub fn fire_prompt(then: &str) -> String {
-    let press = controls().pick("PRESS START", "PRESS START", "TAP");
-    if then.is_empty() { press.to_string() } else { format!("{press} {then}") }
-}
-
 /// What the player holds: the page's deck or touch surface on the web, `BLIP_CONTROLS` natively.
 pub fn controls() -> Controls {
     #[cfg(target_arch = "wasm32")]

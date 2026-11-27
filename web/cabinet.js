@@ -703,6 +703,12 @@ function playArcadeDock() {
         name.style.fontSize = (size - 1) + 'px';
       // Smaller than 7px cannot be read: a name that still does not fit gives way; the logo leads back.
       if (sign.scrollWidth > sign.clientWidth + 1) sign.style.setProperty('visibility', 'hidden', 'important');
+      // The arcade's walk-in draws the name where and as large as it lands here (arcade.js walkMarqueeFor).
+      try {
+        var r = name.getBoundingClientRect(), fits = JSON.parse(sessionStorage.getItem('blip-marquee-fit') || '{}');
+        fits[name.textContent] = { w: innerWidth, x: Math.round(r.left), y: Math.round(r.top), size: parseFloat(getComputedStyle(name).fontSize), hidden: sign.style.visibility === 'hidden' };
+        sessionStorage.setItem('blip-marquee-fit', JSON.stringify(fits));
+      } catch (e) {}
     }
     function place() {
       // Measure the sign where it stands unsqueezed and shown: squeezed by the last run, it would free its own space for the
@@ -718,7 +724,7 @@ function playArcadeDock() {
       var free = function (x) { return x > logo.right + 4 && x + size < innerWidth - 8 && !blockers.some(function (b) { return x < b.right + 8 && x + size > b.left - 8; }); };
       var left = [logo.right + 10, manual ? manual.left - 10 - size : -1].filter(free)[0];
       var squeezed = left === undefined;
-      if (squeezed) left = logo.right + 30;   // well clear of the logo
+      if (squeezed) left = logo.right + 12;   // clear of the logo, leaving the name what room there is
       button.style.left = Math.round(left) + 'px';
       button.style.top = squeezed ? Math.round((logo.top + logo.bottom - size) / 2) + 'px' : '';
       fitName(squeezed ? Math.round(left + size + 6) : 0);
