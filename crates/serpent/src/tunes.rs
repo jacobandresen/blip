@@ -3,249 +3,159 @@
 
 use blip::song::{Groove, Song, H, R};
 
-// ---- music: themes everyone knows, our own arrangements --------------------------------------------------------
-// Public-domain classics, so a player hums along from the first bar, one for the title and one for each stretch of
-// levels, rising in pace with the snake (main.rs, TUNE_FROM): Für Elise on a music box over the title, Grieg's
-// Morning Mood, his Hall of the Mountain King, Beethoven's Ode to Joy, Mozart's Turkish March and Offenbach's
-// Can-can. Synthesised on the device (see `song`).
+// ---- music: our own tunes ----------------------------------------------------------------------------------------
+// Original melodies only (user, 2026-11-27), short and hummable: one for the title and one for each stretch of levels,
+// rising in pace with the snake (main.rs, TUNE_FROM). Each is a hook of eight bars, looped: the tune on one instrument
+// over a plain bass and light drums, no arpeggio, fills or doubling voice. Synthesised on the device (see `song`).
 use blip::cosy::{self, Voice, H as HOLD};
 use blip::Asset;
-use blip::song::chords::{AM, B, C, CSM, DM, E, EM, FS, G, GSM};
+use blip::song::chords::{AM, C, DM, E, F, G};
 
-/// Für Elise (Beethoven, 1810): the opening, a step a sixteenth, on a music box, the way a jewellery box plays it.
-pub fn elise_song() -> Song<'static> {
+/// What every Serpent tune leaves out, so the melody carries it.
+const PLAIN: Song<'static> = Song { arp: false, fills: false, harmony: None, echo: 0.15, ..Song::DEFAULT };
+
+/// Meadow, over the title: a music-box lullaby in C, the snake asleep in the grass.
+pub fn meadow_song() -> Song<'static> {
     Song {
-        bpm: 168.0,
+        bpm: 112.0,
         melody: &[
-            [76, 75, 76, 75, 76, 71, 74, 72],
-            [69, H, 60, 64, 69, 71, H, 64],
-            [68, 71, 72, H, 64, 76, 75, 76],
-            [75, 76, 71, 74, 72, 69, H, 60],
-            [64, 69, 71, H, 64, 72, 71, 69],
-            [H, H, H, R, R, R, R, R],
-            [76, 75, 76, 75, 76, 71, 74, 72],
-            [69, H, 60, 64, 69, 71, H, 64],
-            [68, 71, 72, H, 64, 76, 75, 76],
-            [75, 76, 71, 74, 72, 69, H, 60],
-            [64, 69, 71, H, 64, 72, 71, 69],
-            [H, H, H, R, R, R, R, R],
+            [72, H, 76, 79, 77, H, 76, 74],
+            [72, H, 74, 76, 74, H, H, R],
+            [72, H, 76, 79, 81, H, 79, 77],
+            [76, 74, 72, 74, 72, H, H, R],
+            [79, H, 77, 76, 77, H, 76, 74],
+            [76, H, 74, 72, 74, H, H, R],
+            [72, H, 76, 79, 81, H, 83, 84],
+            [79, H, 74, 76, 72, H, H, R],
         ],
-        chords: &[
-            [AM, AM], [AM, E], [E, AM], [E, AM], [E, AM], [AM, AM],
-            [AM, AM], [AM, E], [E, AM], [E, AM], [E, AM], [AM, AM],
-        ],
+        chords: &[[C, C], [C, G], [F, F], [G, C], [C, C], [F, G], [F, F], [G, C]],
         lead: Voice::Glock,
         lead_vol: 0.5,
         bass: [0, R, R, R],
-        arp: false,
         groove: Groove::None,
-        fills: false,
         echo: 0.25,
         seed: 0xE115_0000,
-        ..Song::DEFAULT
+        ..PLAIN
     }
 }
 
-/// Morning Mood (Grieg, 1875): the flute's sunrise, sol-mi-re-do-re-mi, on marimba and glockenspiel. E major
-/// pentatonic, rising; the middle phrase turns to the minor and back.
-pub fn morning_song() -> Song<'static> {
+/// Stroll, levels 1–2: an easy hop up the scale and a step back, on marimba with a soft beat. C major.
+pub fn stroll_song() -> Song<'static> {
     Song {
-        bpm: 104.0,
+        bpm: 120.0,
         melody: &[
-            [83, H, 80, 78, 76, 78, 80, H],
-            [83, H, 80, 78, 76, 78, 80, H],
-            [78, 80, 83, 80, 83, 85, 80, 85],
-            [83, H, 80, H, 78, H, 76, H],
-            [83, H, 80, 78, 76, 78, 80, H],
-            [83, H, 80, 78, 76, 78, 80, H],
-            [78, 80, 83, 80, 83, 85, 80, 85],
-            [88, H, H, H, R, R, R, R],
-            [80, H, 76, 75, 73, 75, 76, H],
-            [80, H, 76, 75, 73, 75, 76, H],
-            [75, 76, 80, 76, 80, 81, 76, 81],
-            [80, H, 76, H, 75, H, 73, H],
-            [83, H, 80, 78, 76, 78, 80, H],
-            [83, H, 80, 78, 76, 78, 80, H],
-            [78, 80, 83, 80, 83, 85, 80, 85],
-            [83, H, 80, H, 76, H, H, H],
+            [67, 72, H, 72, 74, 76, H, 72],
+            [74, H, 72, H, 69, H, 67, R],
+            [67, 72, H, 72, 74, 76, H, 79],
+            [77, H, 76, H, 74, H, H, R],
+            [67, 72, H, 72, 74, 76, H, 72],
+            [74, H, 72, H, 69, H, 67, H],
+            [69, H, 72, H, 74, H, 76, 74],
+            [72, H, H, H, R, R, R, R],
         ],
-        chords: &[
-            [E, E], [E, E], [E, CSM], [B, E],
-            [E, E], [E, E], [E, CSM], [E, E],
-            [GSM, GSM], [GSM, GSM], [GSM, CSM], [GSM, GSM],
-            [E, E], [E, E], [E, CSM], [B, E],
-        ],
+        chords: &[[C, C], [F, C], [C, C], [G, G], [C, C], [F, C], [F, G], [C, C]],
         lead: Voice::Marimba,
         lead_vol: 0.6,
-        harmony: Some((Voice::Glock, -12)),
         bass: [0, R, 7, R],
         groove: Groove::Brush,
-        echo: 0.3,
         seed: 0x5111_7000,
-        ..Song::DEFAULT
+        ..PLAIN
     }
 }
 
-/// In the Hall of the Mountain King (Grieg, 1875): the trolls creeping, plucked, a backbeat under them. In A minor,
-/// the second half the same theme a fifth up, as Grieg has it.
-pub fn mountain_song() -> Song<'static> {
+/// Burrow, levels 3–4: a sneaky plucked figure in A minor over a backbeat, asking twice and answering.
+pub fn burrow_song() -> Song<'static> {
     Song {
         bpm: 128.0,
         melody: &[
-            [69, 71, 72, 74, 76, 72, 76, H],
-            [75, 71, 75, H, 74, 70, 74, H],
-            [69, 71, 72, 74, 76, 72, 76, 81],
-            [79, 76, 72, 76, 79, H, H, R],
-            [69, 71, 72, 74, 76, 72, 76, H],
-            [75, 71, 75, H, 74, 70, 74, H],
-            [69, 71, 72, 74, 76, 72, 76, 81],
-            [79, 76, 72, 76, 79, H, H, R],
-            [76, 78, 79, 81, 83, 79, 83, H],
-            [82, 78, 82, H, 81, 77, 81, H],
-            [76, 78, 79, 81, 83, 79, 83, 88],
-            [86, 83, 79, 83, 86, H, H, R],
-            [69, 71, 72, 74, 76, 72, 76, H],
-            [75, 71, 75, H, 74, 70, 74, H],
-            [69, 71, 72, 74, 76, 72, 76, 81],
-            [76, H, 72, H, 69, H, R, R],
+            [69, H, 72, 69, 76, H, 74, 72],
+            [71, H, 74, 71, 76, H, H, R],
+            [69, H, 72, 69, 76, H, 79, 77],
+            [76, 74, 72, 71, 69, H, H, R],
+            [69, H, 72, 69, 76, H, 74, 72],
+            [71, H, 74, 71, 76, H, H, R],
+            [77, 76, 74, 72, 71, 72, 74, H],
+            [69, H, H, H, R, R, R, R],
         ],
-        chords: &[
-            [AM, AM], [E, DM], [AM, AM], [C, C],
-            [AM, AM], [E, DM], [AM, AM], [C, C],
-            [EM, EM], [FS, DM], [EM, EM], [G, G],
-            [AM, AM], [E, DM], [AM, AM], [E, AM],
-        ],
+        chords: &[[AM, AM], [E, E], [AM, AM], [E, AM], [AM, AM], [E, E], [DM, E], [AM, AM]],
         lead: Voice::Pluck,
-        lead_vol: 0.55,
-        harmony: Some((Voice::Marimba, -12)),
-        bass: [0, 7, 12, 7],
+        lead_vol: 0.6,
+        bass: [0, R, 7, R],
         groove: Groove::Backbeat,
         seed: 0x9A01_3000,
-        ..Song::DEFAULT
+        ..PLAIN
     }
 }
 
-/// Ode to Joy (Beethoven's Ninth, 1824): the tune everyone can whistle, marching, on a bright lead with a backbeat.
-/// C major: the theme, its answer, the middle phrase and the theme again.
-pub fn ode_song() -> Song<'static> {
+/// Picnic, levels 5–6: a bright marching tune in C that climbs a step each phrase.
+pub fn picnic_song() -> Song<'static> {
     Song {
-        bpm: 136.0,
+        bpm: 140.0,
         melody: &[
-            [76, H, 76, H, 77, H, 79, H],
-            [79, H, 77, H, 76, H, 74, H],
-            [72, H, 72, H, 74, H, 76, H],
-            [76, H, H, 74, 74, H, H, H],
-            [76, H, 76, H, 77, H, 79, H],
-            [79, H, 77, H, 76, H, 74, H],
-            [72, H, 72, H, 74, H, 76, H],
-            [74, H, H, 72, 72, H, H, H],
-            [74, H, 74, H, 76, H, 72, H],
-            [74, H, 76, 77, 76, H, 72, H],
-            [74, H, 76, 77, 76, H, 74, H],
-            [72, H, 74, H, 67, H, H, H],
-            [76, H, 76, H, 77, H, 79, H],
-            [79, H, 77, H, 76, H, 74, H],
-            [72, H, 72, H, 74, H, 76, H],
-            [74, H, H, 72, 72, H, H, H],
+            [72, H, 76, 74, 72, H, 79, H],
+            [77, H, 76, 74, 76, H, H, R],
+            [74, H, 77, 76, 74, H, 81, H],
+            [79, H, 77, 76, 77, H, H, R],
+            [76, H, 79, 77, 76, H, 84, H],
+            [83, H, 81, 79, 81, H, 79, H],
+            [77, 76, 74, 76, 72, H, 71, H],
+            [72, H, H, H, R, R, R, R],
         ],
-        chords: &[
-            [C, C], [G, C], [C, C], [G, G],
-            [C, C], [G, C], [C, C], [G, C],
-            [G, C], [G, C], [G, C], [C, G],
-            [C, C], [G, C], [C, C], [G, C],
-        ],
+        chords: &[[C, C], [F, C], [DM, DM], [G, G], [C, C], [AM, G], [F, G], [C, C]],
         lead: Voice::Lead,
         lead_vol: 0.34,
-        harmony: Some((Voice::Marimba, -12)),
         bass: [0, 7, 0, 7],
         groove: Groove::Backbeat,
         seed: 0x0DE0_9000,
-        ..Song::DEFAULT
+        ..PLAIN
     }
 }
 
-/// The Turkish March (Mozart's Rondo alla Turca, 1783): its running opening, a step a sixteenth, quick and bright,
-/// on the bell with a kick on every beat, twice over (the harmony joins the second time). A minor.
-pub fn march_song() -> Song<'static> {
+/// Scamper, levels 7–8: quick running arpeggios on the bell, a step a sixteenth. A minor.
+pub fn scamper_song() -> Song<'static> {
     Song {
-        bpm: 228.0,
+        bpm: 176.0,
         melody: &[
-            [71, 69, 68, 69, 72, H, H, H],
-            [74, 72, 71, 72, 76, H, H, H],
-            [77, 76, 75, 76, 83, 81, 80, 81],
-            [83, 81, 80, 81, 84, H, H, H],
-            [81, 83, 84, 83, 81, 80, 81, 76],
-            [77, 74, 72, 71, 69, H, H, R],
-            [71, 69, 68, 69, 72, H, H, H],
-            [74, 72, 71, 72, 76, H, H, H],
-            [77, 76, 75, 76, 83, 81, 80, 81],
-            [83, 81, 80, 81, 84, H, H, H],
-            [81, 83, 84, 83, 81, 80, 81, 76],
-            [77, 74, 72, 71, 69, H, R, R],
-            [71, 69, 68, 69, 72, H, H, H],
-            [74, 72, 71, 72, 76, H, H, H],
-            [77, 76, 75, 76, 83, 81, 80, 81],
-            [83, 81, 80, 81, 84, H, H, H],
-            [81, 83, 84, 83, 81, 80, 81, 76],
-            [77, 74, 72, 71, 69, H, H, R],
-            [71, 69, 68, 69, 72, H, H, H],
-            [74, 72, 71, 72, 76, H, H, H],
-            [77, 76, 75, 76, 83, 81, 80, 81],
-            [83, 81, 80, 81, 84, H, H, H],
-            [81, 83, 84, 83, 81, 80, 81, 76],
-            [77, 74, 72, 71, 69, H, R, R],
+            [69, 72, 76, 72, 69, 72, 76, 79],
+            [77, 76, 74, 72, 74, H, H, R],
+            [69, 72, 76, 72, 69, 72, 76, 81],
+            [79, 77, 76, 74, 76, H, H, R],
+            [72, 76, 79, 76, 72, 76, 79, 84],
+            [83, 81, 79, 77, 79, H, H, R],
+            [77, 76, 74, 72, 71, 72, 74, 71],
+            [69, H, H, H, R, R, R, R],
         ],
-        chords: &[
-            [AM, AM], [AM, C], [E, AM], [E, AM], [AM, E], [DM, AM],
-            [AM, AM], [AM, C], [E, AM], [E, AM], [AM, E], [DM, AM],
-            [AM, AM], [AM, C], [E, AM], [E, AM], [AM, E], [DM, AM],
-            [AM, AM], [AM, C], [E, AM], [E, AM], [AM, E], [DM, AM],
-        ],
+        chords: &[[AM, AM], [DM, G], [AM, AM], [E, E], [C, C], [G, G], [DM, E], [AM, AM]],
         lead: Voice::Bell,
-        lead_vol: 0.36,
-        harmony: Some((Voice::Marimba, -12)),
-        bass: [0, 12, 0, 12],
-        groove: Groove::FourFloor,
+        lead_vol: 0.4,
+        bass: [0, R, 7, R],
+        groove: Groove::Backbeat,
         seed: 0x7A2C_0000,
-        ..Song::DEFAULT
+        ..PLAIN
     }
 }
 
-/// The Can-can (Offenbach's Galop infernal, 1858): high kicks on the accordion, a kick on every beat. C major.
-pub fn cancan_song() -> Song<'static> {
+/// Finale, level 9 on: a galloping see-saw on the accordion, a kick on every beat. C major.
+pub fn finale_song() -> Song<'static> {
     Song {
         bpm: 150.0,
         melody: &[
-            [72, H, H, H, 74, 77, 76, 74],
-            [79, H, 79, H, 79, 81, 76, 77],
-            [74, H, 74, H, 74, 77, 76, 74],
-            [72, 84, 83, 81, 79, 77, 76, 74],
-            [72, H, H, H, 74, 77, 76, 74],
-            [79, H, 79, H, 79, 81, 76, 77],
-            [74, H, 74, H, 74, 77, 76, 74],
-            [72, 79, 74, 76, 72, H, R, R],
-            [72, H, H, H, 74, 77, 76, 74],
-            [79, H, 79, H, 79, 81, 76, 77],
-            [74, H, 74, H, 74, 77, 76, 74],
-            [72, 84, 83, 81, 79, 77, 76, 74],
-            [72, H, H, H, 74, 77, 76, 74],
-            [79, H, 79, H, 79, 81, 76, 77],
-            [74, H, 74, H, 74, 77, 76, 74],
-            [72, 79, 74, 76, 72, H, R, R],
+            [79, H, 76, H, 79, H, 76, H],
+            [77, 76, 74, 76, 77, H, 74, H],
+            [77, H, 74, H, 77, H, 74, H],
+            [76, 74, 72, 74, 76, H, H, R],
+            [79, H, 76, H, 79, H, 84, H],
+            [83, 81, 79, 81, 83, H, 79, H],
+            [81, 79, 77, 76, 74, 76, 77, 74],
+            [72, H, H, H, R, R, R, R],
         ],
-        chords: &[
-            [C, C], [C, C], [G, G], [C, G],
-            [C, C], [C, C], [G, G], [G, C],
-            [C, C], [C, C], [G, G], [C, G],
-            [C, C], [C, C], [G, G], [G, C],
-        ],
+        chords: &[[C, C], [G, G], [G, G], [C, C], [C, C], [G, G], [F, G], [C, C]],
         lead: Voice::Accordion,
-        lead_vol: 0.42,
-        harmony: Some((Voice::Bell, -12)),
+        lead_vol: 0.45,
         bass: [0, 12, 0, 12],
         groove: Groove::FourFloor,
         seed: 0xF6E2_9000,
-        ..Song::DEFAULT
+        ..PLAIN
     }
 }
 
@@ -314,11 +224,11 @@ pub fn sounds() -> Vec<Asset> {
 /// The music: each tune as a WAV to play.
 pub fn music() -> Vec<(String, Vec<u8>)> {
     blip::wav::tunes(&[
-        ("ELISE", &|| elise_song().render()),
-        ("MORNING", &|| morning_song().render()),
-        ("MOUNTAIN", &|| mountain_song().render()),
-        ("ODE", &|| ode_song().render()),
-        ("MARCH", &|| march_song().render()),
-        ("CANCAN", &|| cancan_song().render()),
+        ("MEADOW", &|| meadow_song().render()),
+        ("STROLL", &|| stroll_song().render()),
+        ("BURROW", &|| burrow_song().render()),
+        ("PICNIC", &|| picnic_song().render()),
+        ("SCAMPER", &|| scamper_song().render()),
+        ("FINALE", &|| finale_song().render()),
     ])
 }

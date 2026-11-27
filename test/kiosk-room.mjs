@@ -67,3 +67,26 @@ test('a kiosk keeps fullscreen through a real Start and a simulated two-minute i
   await page.keyboard.press('ArrowRight');
   await page.waitForFunction(() => !!document.fullscreenElement);
 });
+
+test('on a PC the corner toggle takes a game fullscreen, alone on the screen, and back', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: DESKTOP });
+  await page.goto(`${origin}/serpent/index.html`);
+  await gameReady(page);
+  const toggle = page.locator('#fs-toggle');
+  // Beside the picture's top-right corner, never over it (the game's hearts are there).
+  const clear = () => page.evaluate(() => {
+    const b = document.getElementById('fs-toggle').getBoundingClientRect(), c = document.getElementById('glcanvas').getBoundingClientRect();
+    const p = window.blipPicture, a = p && p.h ? p.w / p.h : c.width / c.height, w = Math.min(c.width, c.height * a);
+    return b.left >= c.left + (c.width + w) / 2 || b.bottom <= c.top + (c.height - w / a) / 2;
+  });
+  assert.equal(await clear(), true, 'the toggle stands clear of the picture');
+  await toggle.click();
+  await page.waitForFunction(() => !!document.fullscreenElement);
+  assert.equal(await page.locator('#marquee-bar').isVisible(), false, 'no top bar');
+  assert.equal(await page.locator('#topbar').isVisible(), false, 'no deck');
+  assert.deepEqual(await page.evaluate(() => { const r = document.getElementById('glcanvas').getBoundingClientRect(); return [r.top, r.height]; }), [0, DESKTOP.height]);
+  await page.mouse.move(10, 10);
+  await toggle.click();
+  await page.waitForFunction(() => !document.fullscreenElement && !document.documentElement.hasAttribute('data-fullscreen'));
+  assert.equal(await page.locator('#marquee-bar').isVisible(), true, 'the top bar is back');
+});

@@ -995,7 +995,7 @@ async fn main() {
     let wood = load_png(blip::png!("wood"));
 
     let sfx = Sounds::load().await;
-    let mut music = Jukebox::new("serpent", &["ELISE", "MORNING", "MOUNTAIN", "ODE", "MARCH", "CANCAN"]);
+    let mut music = Jukebox::new("serpent", &["MEADOW", "STROLL", "BURROW", "PICNIC", "SCAMPER", "FINALE"]);
 
     if blip.screenshot_mode {
         g.start_game();

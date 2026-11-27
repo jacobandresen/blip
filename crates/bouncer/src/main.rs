@@ -154,12 +154,13 @@ struct Shard { x: f32, y: f32, vx: f32, vy: f32, turn: f32, spin: f32, pts: Vec<
 /// The shards' own random numbers, so breaking a brick never moves the game's.
 use blip::wav::Rng as ShardRng;
 
-/// Crack a brick at `(bx, by)` from the impact point `hit` into 3 to 7 shards: cuts run out from the impact at
+/// Crack a brick at `(bx, by)` from the impact point `hit` into 3 to 5 shards: cuts run out from the impact at
 /// uneven angles, and each shard is the piece of the rectangle between two cuts. Shards fly out from the impact,
 /// pushed along the ball's travel.
 fn shatter(bx: f32, by: f32, hit: (f32, f32), push: (f32, f32), base: BlipColor, rng: &mut ShardRng) -> Vec<Shard> {
     let (w, h) = (BRICK_W as f32, BRICK_H as f32);
-    let n = 3 + (rng.next_f32() * 5.0) as usize;
+    // 3 to 5 pieces, drifting rather than flung: 3 to 7 flung at up to 140 px/s, spinning, read as too busy (user, 2026-11-27).
+    let n = 3 + (rng.next_f32() * 3.0) as usize;
     // Cuts jitter within the middle of their share of the circle: wider jitter left slivers that read as lines.
     let mut cuts: Vec<f32> = (0..n).map(|k| (k as f32 + 0.35 + rng.next_f32() * 0.3) / n as f32 * std::f32::consts::TAU).collect();
     cuts.sort_by(f32::total_cmp);
@@ -191,12 +192,12 @@ fn shatter(bx: f32, by: f32, hit: (f32, f32), push: (f32, f32), base: BlipColor,
         let (cx, cy) = poly.iter().fold((0.0, 0.0), |s, p| (s.0 + p.0, s.1 + p.1));
         let (cx, cy) = (cx / poly.len() as f32, cy / poly.len() as f32);
         let mid = (a0 + a1) / 2.0;
-        let fling = 50.0 + rng.next_f32() * 90.0;
+        let fling = 25.0 + rng.next_f32() * 35.0;
         let light = 0.75 + rng.next_f32() * 0.4;
         out.push(Shard {
             x: cx, y: cy,
-            vx: mid.cos() * fling + push.0 * 0.15, vy: mid.sin() * fling + push.1 * 0.15 - 60.0,
-            turn: 0.0, spin: (rng.next_f32() - 0.5) * 14.0,
+            vx: mid.cos() * fling + push.0 * 0.06, vy: mid.sin() * fling + push.1 * 0.06 - 20.0,
+            turn: 0.0, spin: (rng.next_f32() - 0.5) * 6.0,
             pts: poly.iter().map(|p| (p.0 - cx, p.1 - cy)).collect(),
             color: BlipColor { r: (base.r * light).min(1.0), g: (base.g * light).min(1.0), b: (base.b * light).min(1.0), a: 1.0 },
         });
@@ -1032,7 +1033,7 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
         if !g.bricks[i].alive { continue; }
         let w = g.bricks[i].wobble;
         let (bx, by0) = brick_rect(i);
-        let by = by0 + (w * 22.0).sin() * w * 2.5;
+        let by = by0 + (w * 22.0).sin() * w * 1.0;
         blip.draw_texture(&brick[g.bricks[i].kind], bx, by, BRICK_W as f32, BRICK_H as f32);
     }
     for s in &g.shards { draw_shard(blip, s); }
@@ -1258,13 +1259,13 @@ mod tests {
     }
 
     #[test]
-    fn a_shattered_brick_is_three_to_seven_shards_that_make_up_the_whole_brick() {
+    fn a_shattered_brick_is_three_to_five_shards_that_make_up_the_whole_brick() {
         for seed in 1..40u32 {
             let mut rng = ShardRng(seed.wrapping_mul(2654435761) | 1);
             let hit = (100.0 + (seed % 7) as f32 * 6.0, 50.0 + (seed % 3) as f32 * 6.0);
             let pieces = shatter(100.0, 50.0, hit, (0.0, -200.0), BLIP_RED, &mut rng);
             let shards: Vec<&Shard> = pieces.iter().collect();
-            assert!((3..=7).contains(&shards.len()), "seed {seed}: {} shards", shards.len());
+            assert!((3..=5).contains(&shards.len()), "seed {seed}: {} shards", shards.len());
             let total: f32 = shards.iter().map(|s| area(&s.pts)).sum();
             let brick = (BRICK_W * BRICK_H) as f32;
             assert!((total - brick).abs() < brick * 0.01, "seed {seed}: shards cover {total} of {brick}");

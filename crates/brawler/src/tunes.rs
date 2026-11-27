@@ -766,7 +766,7 @@ fn blow(thud: f32, weight: f32, shin: bool, seed: u32) -> Vec<i16> {
 }
 
 /// Who is shouting: the pitch of the voice and how far up its vowels sit
-/// (a shorter throat lifts them). A man, a deep voice, a woman, a turtle, and DRAKE's high, keening one.
+/// (a shorter throat lifts them). A man, a deep voice, a woman, a turtle, and DRAKE's light tenor.
 #[derive(Copy, Clone)]
 pub struct Throat { pub f0: f32, pub size: f32 }
 pub const THROATS: [Throat; 6] = [
@@ -777,62 +777,7 @@ pub const THROATS: [Throat; 6] = [
     Throat { f0: 105.0, size: 0.94 },
 ];
 
-/// A falsetto cry built from its harmonics, to the measure of three reference yells (20 ms frames): a short low
-/// burst from the chest (the 2nd and 3rd harmonics as strong as the 1st, with breath), then a leap into falsetto,
-/// nearly a pure tone: the 2nd harmonic 25 dB down, the 3rd 32, the 4th 40, breath 40. `contour` is points of
-/// (0..1 through the note, multiple of the throat's f0, loudness in dB, how open: 0 pure to 1 `BRIGHT`); `chest` is how much of the note the burst
-/// takes. (Formant filters on a buzz, which this replaced, put the 2nd harmonic at -3 dB and breath at -22: a hen.)
-fn wail(buf: &mut [f32], at: f32, dur: f32, t: Throat, contour: &[(f32, f32, f32, f32)], chest: f32, rng: &mut Rng) {
-    const CHEST: [f32; 6] = [0.0, 3.0, 2.0, -6.0, -8.0, -12.0];
-    const HEAD: [f32; 6] = [0.0, -25.0, -32.0, -40.0, -46.0, -52.0];
-    // The open "aah" a cry can flip into before it thins (the long reference: its 2nd harmonic 8 to 10 dB over the
-    // 1st just after the flip, falling to -20 by three quarters through).
-    const BRIGHT: [f32; 6] = [0.0, 8.0, -12.0, -16.0, -20.0, -26.0];
-    let off = (at * SR) as usize;
-    let n = (dur * SR) as usize;
-    let mut ph = 0.0f32;
-    let (mut wander, mut swell) = (0.0f32, 0.0f32);
-    for i in 0..n.min(buf.len().saturating_sub(off)) {
-        let k = i as f32 / n as f32;
-        let j = contour.iter().rposition(|p| p.0 <= k).unwrap_or(0);
-        let (a, b) = (contour[j], contour[(j + 1).min(contour.len() - 1)]);
-        let u = if b.0 > a.0 { (k - a.0) / (b.0 - a.0) } else { 0.0 };
-        let u = u * u * (3.0 - 2.0 * u);
-        // A wander of about two per cent: the reference holds drift that much frame to frame, no faster vibrato.
-        wander += ((rng.next_f32() * 2.0 - 1.0) - wander) * 0.0015;
-        let f = t.f0 * (a.1 + (b.1 - a.1) * u) * (1.0 + 0.02 * wander);
-        let gain = 10f32.powf((a.2 + (b.2 - a.2) * u) / 20.0);
-        let open = a.3 + (b.3 - a.3) * u;
-        ph += f / SR;
-        let head = ((k - chest) / 0.02).clamp(0.0, 1.0);
-        let mut src = 0.0f32;
-        for h in 0..6 {
-            if f * (h + 1) as f32 > 7000.0 { break; }
-            let d = HEAD[h] + (BRIGHT[h] - HEAD[h]) * open;
-            src += 10f32.powf((CHEST[h] + (d - CHEST[h]) * head) / 20.0) * (std::f32::consts::TAU * ph * (h + 1) as f32).sin();
-        }
-        // Breath under the falsetto at about -55 dB, and the loudness wandering a couple of dB, as the reference's does.
-        let breath = (rng.next_f32() * 2.0 - 1.0) * (0.15 * (1.0 - head) + 0.05);
-        swell += ((rng.next_f32() * 2.0 - 1.0) - swell) * 0.002;
-        let gain = gain * (1.0 + 0.25 * swell);
-        let e = (k / 0.02).min(1.0) * ((1.0 - k) / 0.08).min(1.0);
-        buf[off + i] += (src + breath) * gain * e * 0.5;
-    }
-}
 
-/// DRAKE struck: a short falsetto yelp, or with `heavy` the cry falling away (the reference's at 49 s, quick).
-fn yelp(t: Throat, take: u32, heavy: bool) -> Vec<i16> {
-    let mut rng = Rng(0x7E1 ^ take.wrapping_mul(7_919));
-    let mut buf = vec![0.0f32; (0.6 * SR) as usize];
-    if heavy {
-        wail(&mut buf, 0.0, 0.42, t, &[(0.0, 1.6, -4.0, 0.0), (0.12, 1.7, -2.0, 0.0), (0.16, 3.9, 0.0, 0.4), (0.4, 3.6, -2.0, 0.0), (1.0, 2.2, -14.0, 0.0)], 0.14, &mut rng);
-    } else {
-        let top = if take == 0 { 3.6 } else { 3.3 };
-        wail(&mut buf, 0.0, 0.16, t, &[(0.0, 1.7, -4.0, 0.0), (0.3, 1.8, -2.0, 0.0), (0.38, top, 0.0, 0.5), (1.0, top - 0.7, -8.0, 0.0)], 0.36, &mut rng);
-    }
-    hall(&mut buf, 0.25, 0.4);
-    render(buf, 5_200.0)
-}
 
 /// The Colosseum's kitten, to the measure of a recorded kitten (20 ms frames): one tone that rises from 1250 Hz to
 /// 1550 in the first tenth of a second and glides down to 650, bright at the start (the 2nd to 4th harmonics as loud
@@ -874,14 +819,6 @@ fn meow() -> Vec<i16> {
     render(buf, 9_000.0)
 }
 
-/// DRAKE knocked out: the long falsetto cry, held and falling away to nothing.
-fn keen_down(t: Throat) -> Vec<i16> {
-    let mut rng = Rng(0xD0E);
-    let mut buf = vec![0.0f32; (1.0 * SR) as usize];
-    wail(&mut buf, 0.0, 0.85, t, &[(0.0, 1.6, -4.0, 0.0), (0.08, 1.7, -2.0, 0.0), (0.1, 4.1, 0.0, 0.6), (0.35, 4.0, 0.0, 0.2), (0.7, 2.8, -6.0, 0.0), (1.0, 1.9, -18.0, 0.0)], 0.09, &mut rng);
-    hall(&mut buf, 0.35, 0.7);
-    render(buf, 5_200.0)
-}
 
 /// A hall's tail: four feedback combs into an allpass, `secs` to die away 60 dB, mixed in at `wet`. The reference
 /// yells (dubbed in a studio) carry one: their floor between harmonics is 20 to 40 dB down, where a dry voice is 60.
@@ -910,33 +847,6 @@ fn hall(buf: &mut Vec<f32>, wet: f32, secs: f32) {
     }
 }
 
-/// DRAKE's shout: a high falsetto cry, modelled on reference yells measured for this (pitches for his 165 Hz
-/// throat): "ha-AAAH" climbing, 590 to 740 Hz over most of a second; "wa-TAAH", a leap from a low burst to 580,
-/// rising to 640, a catch, then up to 770; "AAAOOOH", held at 660 and falling away to 340 as it fades; a short
-/// "HAH"; and a held cry that ends on a clipped second.
-fn keen(t: Throat, take: u32) -> Vec<i16> {
-    let mut rng = Rng(0xD7A ^ take.wrapping_mul(7_919));
-    let mut buf = vec![0.0f32; (1.05 * SR) as usize];
-    match take % 5 {
-        // "HAH!": a burst and a short high hold, open, falling.
-        3 => wail(&mut buf, 0.0, 0.34, t, &[(0.0, 1.6, -6.0, 0.0), (0.14, 1.7, -3.0, 0.0), (0.18, 3.6, 0.0, 0.6), (0.6, 3.8, 0.0, 0.3), (1.0, 3.2, -6.0, 0.0)], 0.16, &mut rng),
-        // "AAAOOOH" (the reference at 49 s): held pure at 660, then falling away to 340 as it fades.
-        4 => wail(&mut buf, 0.0, 0.70, t, &[(0.0, 3.7, -2.0, 0.1), (0.1, 4.05, 0.0, 0.0), (0.35, 3.95, 0.0, 0.0), (0.6, 3.0, -5.0, 0.0), (1.0, 2.05, -15.0, 0.0)], 0.0, &mut rng),
-        // "ha-AAAH" (at 55 s): flips open at 595 Hz, steps up to 680 and climbs to 740, thinning to pure.
-        0 => wail(&mut buf, 0.0, 1.0, t, &[(0.0, 3.3, -6.0, 0.0), (0.18, 3.35, -4.0, 0.0), (0.21, 3.6, 0.0, 1.0), (0.45, 3.62, 0.0, 0.75), (0.5, 4.1, 0.0, 0.65), (0.68, 4.25, 0.0, 0.6), (0.76, 4.4, 0.0, 0.0), (0.88, 4.45, 0.0, 0.0), (1.0, 4.35, -4.0, 0.0)], 0.2, &mut rng),
-        // "wa-TAAH" (at 25 s): burst, leap, rise, catch, up again; nearly pure.
-        1 => wail(&mut buf, 0.0, 0.62, t, &[(0.0, 1.6, -6.0, 0.0), (0.08, 1.65, -3.0, 0.0), (0.11, 3.0, 0.0, 0.3), (0.2, 3.5, 0.0, 0.2), (0.5, 3.9, 0.0, 0.1), (0.6, 3.75, -4.0, 0.1), (0.72, 4.55, 0.0, 0.1), (1.0, 4.7, -3.0, 0.0)], 0.1, &mut rng),
-        // A held cry, then a clipped second, lower.
-        _ => {
-            wail(&mut buf, 0.0, 0.48, t, &[(0.0, 1.6, -6.0, 0.0), (0.1, 1.7, -3.0, 0.0), (0.13, 3.7, 0.0, 0.7), (1.0, 4.1, -2.0, 0.0)], 0.12, &mut rng);
-            wail(&mut buf, 0.52, 0.26, t, &[(0.0, 3.8, -3.0, 0.4), (0.4, 3.9, -3.0, 0.2), (1.0, 3.2, -9.0, 0.0)], 0.0, &mut rng);
-        }
-    }
-    hall(&mut buf, 0.35, 0.7);
-    // (5,200: at 11,000, as the other voices are rendered, the pure falsetto sat 10 dB over the other fighters' shouts,
-    // -14 dB mean against -25, and pierced; now about 6 dB over, still the loudest voice in the fight.)
-    render(buf, 5_200.0)
-}
 const EH: (f32, f32, f32) = (530.0, 1840.0, 2480.0);
 const EE: (f32, f32, f32) = (300.0, 2200.0, 2950.0);
 
@@ -1521,15 +1431,15 @@ pub fn sounds() -> Vec<Asset> {
         ("sounds/cry1.wav", encode_pcm16_half(&trimmed(ko_cry(THROATS[1])))),
         ("sounds/cry2.wav", encode_pcm16_half(&trimmed(ko_cry(THROATS[2])))),
         ("sounds/cry3.wav", encode_pcm16_half(&trimmed(ko_cry(THROATS[3])))),
-        ("sounds/hurt4_0.wav", encode_pcm16_half(&trimmed(yelp(THROATS[4], 0, false)))),
-        ("sounds/hurt4_1.wav", encode_pcm16_half(&trimmed(yelp(THROATS[4], 1, false)))),
-        ("sounds/hurt4_2.wav", encode_pcm16_half(&trimmed(yelp(THROATS[4], 0, true)))),
-        ("sounds/kiai4_0.wav", encode_pcm16_half(&trimmed(keen(THROATS[4], 0)))),
-        ("sounds/kiai4_1.wav", encode_pcm16_half(&trimmed(keen(THROATS[4], 1)))),
-        ("sounds/kiai4_2.wav", encode_pcm16_half(&trimmed(keen(THROATS[4], 2)))),
-        ("sounds/kiai4_3.wav", encode_pcm16_half(&trimmed(keen(THROATS[4], 3)))),
-        ("sounds/kiai4_4.wav", encode_pcm16_half(&trimmed(keen(THROATS[4], 4)))),
-        ("sounds/cry4.wav", encode_pcm16_half(&trimmed(keen_down(THROATS[4])))),
+        // DRAKE in the shared shouting voice, a light tenor: his synthesised falsetto read first as a chicken, then,
+        // made pure, as a cat (user, 2026-11-27).
+        ("sounds/hurt4_0.wav", encode_pcm16_half(&trimmed(hurt(THROATS[4], 0, false)))),
+        ("sounds/hurt4_1.wav", encode_pcm16_half(&trimmed(hurt(THROATS[4], 1, false)))),
+        ("sounds/hurt4_2.wav", encode_pcm16_half(&trimmed(hurt(THROATS[4], 0, true)))),
+        ("sounds/kiai4_0.wav", encode_pcm16_half(&trimmed(kiai(THROATS[4], 0)))),
+        ("sounds/kiai4_1.wav", encode_pcm16_half(&trimmed(kiai(THROATS[4], 1)))),
+        ("sounds/kiai4_2.wav", encode_pcm16_half(&trimmed(kiai(THROATS[4], 2)))),
+        ("sounds/cry4.wav", encode_pcm16_half(&trimmed(ko_cry(THROATS[4])))),
         // The crowd, and the four stages' ambience under the music.
         ("sounds/cheer.wav", crowd_wav(false)),
         ("sounds/roar.wav", crowd_wav(true)),

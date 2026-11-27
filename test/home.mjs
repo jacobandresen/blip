@@ -180,7 +180,8 @@ test('a tap on an icon starts the game on free play, and the logo brings it back
   assert.equal(await coinWall(page), false);
   assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-appstyle')), true, 'an app\'s look, not the cabinet\'s');
   assert.equal(await page.locator('.blip-logo').isVisible(), false);
-  assert.equal(await page.locator('#marquee-name').evaluate((el) => getComputedStyle(el, '::after').content), '"Serpent"');
+  // The title bar wears the arcade's marquee: the name in pixel letters.
+  assert.equal(await page.locator('#marquee-name .machine-marquee-name').evaluate((el) => getComputedStyle(el).display !== 'none' && el.textContent), 'SERPENT');
   await page.locator('.app-back').click();
   await arrivedAt(page, `${origin}/home.html`);
   assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-cabinet-return')), null, 'no handoff to the cabinet');

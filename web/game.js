@@ -132,10 +132,22 @@ function returnToCabinet(event) {
     // The game's own app has nowhere else to go: back to its title.
   } else if (blipFrontend() === 'home' && document.documentElement.hasAttribute('data-appstyle')) {
     try { sessionStorage.setItem('blip-home-return', JSON.stringify(departure)); } catch (e) {}
+    // The page fades to its launch screen first, where the Home Screen's window picks it up and closes into the icon:
+    // a cut straight to that black window was the one jump on the way home.
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      var shade = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'launch-fade leave-fade' }));
+      var gone = false, go = function () { if (!gone) { gone = true; location.href = blipFrontendUrl(); } };
+      shade.addEventListener('animationend', go, { once: true });
+      setTimeout(go, 600);
+      return;
+    }
   } else {
     try { departure.frame = canvas.toDataURL('image/png'); } catch (e) {}
     var screen = document.getElementById('arcade-bezel').getBoundingClientRect();
     departure.screen = { x:screen.left, y:screen.top, w:screen.width, h:screen.height };
+    // The canvas the frame was taken from: the arcade's walk back starts with that picture on it.
+    var drawn = canvas.getBoundingClientRect();
+    departure.picture = { x:drawn.left, y:drawn.top, w:drawn.width, h:drawn.height };
     departure.native = blipNativePageTransitions();
     try { sessionStorage.setItem('blip-cabinet-return', JSON.stringify(departure)); } catch (e) {}
   }
@@ -478,7 +490,7 @@ window.addEventListener('message', function (e) {
     sheet.remove();
     if (!document.documentElement.hasAttribute('data-card')) window.blipPause(false);
     try { canvas.focus({ preventScroll: true }); } catch (err) {}
-  }, 260);
+  }, 360);
 });
 if (new URLSearchParams(location.search).has('install')) showInstallSheet();
 
@@ -562,6 +574,9 @@ function deckCover(bar) {
 
 /** Fullscreen on a PC: no deck and no cabinet frame, so the picture runs to
  * the edges under the top bar (see #fullscreen-btn in shell.css). */
+function fullscreenPC() {
+  return document.documentElement.hasAttribute('data-fullscreen') && !blipHasTouch();
+}
 function bareScreen() {
   var root = document.documentElement;
   return root.hasAttribute('data-bare') || (root.hasAttribute('data-fullscreen') && !blipHasTouch());
@@ -598,7 +613,8 @@ function fillCanvas() {
   // Sideways the deck sits in the gutters. Upright, reserve its full panel.
   TOPBAR_H = bare || blipLandscape() ? 0 : (tb ? Math.max(deckCover(tb), 56) : 56);
   var mb = document.getElementById('marquee-bar');
-  if (mb) {
+  // Fullscreen on a PC has no top bar: the picture takes the whole screen (blip.css).
+  if (mb && !fullscreenPC()) {
     MARQUEE_H = Math.max(mb.offsetHeight, 28);
   } else MARQUEE_H = 0;
   // Sideways the controls stand in the two gutters; keep the picture out
@@ -676,6 +692,37 @@ function fillCanvas() {
       monitor: box(monitor), panel: box(deck) })); } catch (e) {}
   }
   syncBuffer();
+  placeFullscreenToggle();
+}
+
+// Fullscreen on a PC: a faint corner button by the picture's top-right corner, never over the game's hearts there:
+// beside the picture where its screen (the monitor, or the whole screen when bare) has room, else above it, else inside
+// it below the HUD (a tenth down).
+var fsToggle = null;
+function placeFullscreenToggle() {
+  if (!fsToggle) {
+    fsToggle = document.createElement('button');
+    fsToggle.type = 'button'; fsToggle.id = 'fs-toggle';
+    fsToggle.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path class="fs-on" d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/><path class="fs-off" d="M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4"/></svg>';
+    fsToggle.addEventListener('click', function () {
+      blipSetFullscreen(!document.documentElement.hasAttribute('data-fullscreen'));
+      try { canvas.focus({ preventScroll: true }); } catch (e) {}
+    });
+    document.body.appendChild(fsToggle);
+    window.addEventListener('blip-picture', placeFullscreenToggle);
+  }
+  var on = document.documentElement.hasAttribute('data-fullscreen');
+  fsToggle.title = on ? 'Leave fullscreen' : 'Fullscreen';
+  fsToggle.setAttribute('aria-label', fsToggle.title);
+  var cr = canvas.getBoundingClientRect(), pic = window.blipPicture, a = pic && pic.h ? pic.w / pic.h : cr.width / cr.height;
+  var pw = Math.min(cr.width, cr.height * a), ph = pw / a, pl = cr.left + (cr.width - pw) / 2, pt = cr.top + (cr.height - ph) / 2, pr = pl + pw;
+  var monitor = !bareScreen() && document.getElementById('arcade-bezel'), mr = monitor && monitor.getBoundingClientRect();
+  var right = mr && mr.width ? mr.right - FRAME_PAD : innerWidth, top = mr && mr.width ? mr.top + FRAME_PAD : 0;
+  var size = 26, gap = 8, x, y;
+  if (right - pr >= size + gap * 2) { x = pr + gap; y = pt + gap; }
+  else if (pt - top >= size + gap * 2) { x = pr - size; y = pt - size - gap; }
+  else { x = pr - size - gap; y = pt + ph * 0.1 + gap; }
+  fsToggle.style.left = Math.round(x) + 'px'; fsToggle.style.top = Math.round(y) + 'px';
 }
 
 /** The macroquad runtime sizes the drawing buffer on window resize only

@@ -320,7 +320,12 @@ if (blipMuted()) {
     try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) {}
     apply(on);
   }
-  window.blipSetFullscreen = set;
+  // From a button: into the browser's fullscreen at once (this click is the gesture it needs), or out of it.
+  window.blipSetFullscreen = function (on) {
+    set(on);
+    if (on) request();
+    else if (inBrowserFullscreen()) { var exit = document.exitFullscreen || document.webkitExitFullscreen; try { var p = exit && exit.call(document); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
+  };
   // Before first paint where this script is in <head>.
   if (wanted()) root.setAttribute('data-fullscreen', '');
 

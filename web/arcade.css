@@ -1099,11 +1099,12 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
   filter:none!important;opacity:1;clip-path:none;
   transition:none;
 }
-/* Safari can paint coplanar front details behind the cabinet background. */
+/* Safari can paint coplanar front details behind the cabinet background (on iPhone it hid Start, the coin door and
+   the deck), so everything on the front stands 1px or more proud of it. */
 #game-grid .card > :is(.card-title,.machine-speaker,.card-shot-wrap) {transform:translateZ(1px)}
 /* The screen being stepped into shows the game's picture, which the game page opens on. */
 #game-grid .card.card-launching[data-loop] .card-loop {visibility:hidden}
-#game-grid .card.card-launching :is(.machine-attract,.machine-instructions) {opacity:0;transition:opacity .25s}
+#game-grid .card.card-launching :is(.machine-attract,.machine-instructions) {opacity:0;transition:opacity .45s}
 
 /* A phone on its side: the player stands close, the coin door below the frame. */
 #game-grid[data-close] .card,#game-grid[data-close] .card:is(:hover,.card-focused,.card-active,.no-credit) {top:3%;bottom:auto;transform-origin:50% 0}
@@ -1171,14 +1172,15 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
   align-items:center;
   gap:7px;
   opacity:0;
-  transition:opacity .3s;
+  transition:opacity .5s;
 }
 .card-focused .machine-attract {opacity:1}
 /* In the games' message box (.blip-box's look, scaled to the small screen). */
 .machine-attract b {padding:8px 10px 7px;background:var(--blip-ink);box-shadow:inset 0 0 0 1px var(--blip-ink),inset 0 0 0 3px var(--blip-cream);border-radius:2px;
   color:var(--blip-cream);font:400 11px/1 var(--blip-pixel);letter-spacing:.04em;white-space:nowrap}
-.card-focused .machine-attract b {animation:machine-blink 1.1s steps(1) infinite}
-@keyframes machine-blink {60% {visibility:hidden}}
+/* A slow glow rather than an on-off blink: easier on the eye (user, 2026-11-27). */
+.card-focused .machine-attract b {animation:machine-blink 1.8s ease-in-out infinite}
+@keyframes machine-blink {50% {opacity:.35}}
 .machine-credit {position:static;transform:none;min-width:0;padding:3px 5px 2px;border:0;border-radius:0;background:var(--blip-ink);box-shadow:none;
   color:var(--blip-gold);font:400 7px/1 var(--blip-pixel);letter-spacing:.06em;text-shadow:none;white-space:nowrap}
 
@@ -1198,7 +1200,7 @@ body.cabinet-page .screen-bezel {bottom:0!important}
    shows it (a 1000 × 800 page), scaled to the cabinet's width, so it keeps the game page's proportions, and its tilt:
    it is drawn sloping as the game page draws it, so it slopes the same from across the room as up close. */
 .machine-controls {position:absolute;z-index:5;left:var(--deck-x,-4%);width:var(--deck-w,108%);top:var(--deck-y,48%);height:calc(var(--deck-height,42px) + 10px);border:0;border-radius:0;clip-path:none;
-  background:none;box-shadow:none;transform-style:preserve-3d;transform-origin:50% 0;transform:scaleX(var(--deck-squeeze,.98));}
+  background:none;box-shadow:none;transform-style:preserve-3d;transform-origin:50% 0;transform:translateZ(2px) scaleX(var(--deck-squeeze,.98));}
 .machine-controls::before {content:'';position:absolute;left:0;right:0;top:0;height:var(--deck-height,42px);border-radius:7px 7px 0 0;
   background:#1b181b;box-shadow:0 -3px 5px #000b,inset 1px 0 #fff3,inset -1px 0 #000b;transform:translateZ(-1px)}
 .machine-controls::after {content:'';position:absolute;left:0;right:0;top:var(--deck-height,42px);height:10px;transform-origin:50% 0;border-radius:0 0 4px 4px;
@@ -1214,7 +1216,7 @@ body.cabinet-page .screen-bezel {bottom:0!important}
 .machine-deck-cheek.right {left:100%;background:linear-gradient(90deg,#211c24,#0b090e 80%)}
 /* A vinyl sticker on the cabinet's front, put on by hand just above and right of Start: askew, die-cut with a
    white edge, a sheen, one corner peeling, lit as dimly as the cabinet around it. */
-.machine-sticker {position:absolute;z-index:5;left:calc(50% + 14px);top:calc(69.5% - 30px);transform:rotate(-13deg) skewX(-3deg);
+.machine-sticker {position:absolute;z-index:5;left:calc(50% + 14px);top:calc(69.5% - 30px);transform:translateZ(1px) rotate(-13deg) skewX(-3deg);
   filter:brightness(.82) saturate(.92) drop-shadow(0 1px .5px #000a);}
 .machine-sticker b {display:block;padding:5px 8px 4px;border:2.5px solid #fbf6ee;border-radius:11px;
   font:900 11px/1 'Hiragino Maru Gothic ProN','M PLUS Rounded 1c','Noto Sans CJK JP','Noto Sans JP','Noto Sans CJK TC',sans-serif;letter-spacing:.02em;
@@ -1226,7 +1228,7 @@ body.cabinet-page .screen-bezel {bottom:0!important}
   background:linear-gradient(225deg,transparent 50%,#d9d2c8 50%,#fbf8f2 85%);box-shadow:-1px 1px 1px #0005}
 /* On a small screen the cabinet shrinks but Start does not: it stays a thumb wide (30px tall at least). */
 .card {--start-grow:max(1,calc(.76 / var(--arc-scale,1)))}
-.machine-start {appearance:none;position:absolute;z-index:5;left:50%;top:69.5%;bottom:auto;min-width:84px;height:40px;padding:0 8px;transform:translateX(-50%) scale(var(--start-grow));transform-origin:50% 0;
+.machine-start {appearance:none;position:absolute;z-index:5;left:50%;top:69.5%;bottom:auto;min-width:84px;height:40px;padding:0 8px;transform:translateX(-50%) translateZ(1px) scale(var(--start-grow));transform-origin:50% 0;
   border:1px solid #060608;border-radius:7px;background:linear-gradient(135deg,#55525a,#26242b 25%,#141317 70%,#36333b);color:#392507;
   font:400 10px/1 'Press Start 2P','Courier New',monospace;letter-spacing:.04em;text-shadow:0 1px #fff9;
   box-shadow:inset 0 1px #ffffff40,0 2px 0 #050407,1px 5px 6px #000c}
@@ -1241,7 +1243,7 @@ body.cabinet-page .screen-bezel {bottom:0!important}
 .machine-start:active .machine-start-cap {transform:translateY(2px);box-shadow:inset 0 1px 3px #9b691b88,0 1px 0 #9d6810;animation:none}
 
 /* Coin door: one coin entry, lit red with its price. */
-.machine-coinbox {appearance:none;position:absolute;z-index:5;left:50%;top:79%;bottom:auto;width:30%;height:11%;min-height:0;padding:0;transform:translateX(-50%);
+.machine-coinbox {appearance:none;position:absolute;z-index:5;left:50%;top:79%;bottom:auto;width:30%;height:11%;min-height:0;padding:0;transform:translateX(-50%) translateZ(1px);
   border:2px solid #050506;border-radius:5px;background:linear-gradient(115deg,#ffffff14,transparent 35%),linear-gradient(#38373e,#24232a 45%,#16151b);
   box-shadow:inset 0 0 0 1px #959198,inset 0 0 0 3px #424047,inset 0 -4px 6px #0008,2px 5px 6px #000b;filter:none}
 /* The coin entry: a chrome rim round a red lamp, the slot in its middle. */
@@ -1305,5 +1307,6 @@ body.cabinet-page .screen-bezel {bottom:0!important}
 
 /* Walking up to a machine, the top bar takes its marquee as the game page shows it (arcade.js nearing). */
 .walk-marquee {position:absolute;inset:0;z-index:0;opacity:0;pointer-events:none;display:flex;align-items:center;justify-content:center}
-.walk-marquee b {font:400 20px/20px 'Press Start 2P','Courier New',monospace;color:#fff7d6;
+.walk-marquee b {font:400 20px/20px 'Press Start 2P','Courier New',monospace;letter-spacing:.02em;white-space:nowrap;color:#fff7d6;
   text-shadow:-2px -2px 0 var(--blip-ink),2px -2px 0 var(--blip-ink),-2px 2px 0 var(--blip-ink),2px 2px 0 var(--blip-ink)}
+.walk-marquee b.walk-name-small {text-shadow:-1px -1px var(--blip-ink),1px -1px var(--blip-ink),-1px 1px var(--blip-ink),1px 1px var(--blip-ink),0 2px var(--blip-ink)}

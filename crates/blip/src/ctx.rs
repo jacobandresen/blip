@@ -936,12 +936,12 @@ impl Blip {
         self.draw_hi(lo + (avail - head_w) / 2.0, ty, hi);
     }
 
-    /// The title screen's start prompt, the same in every game: PRESS START TO
-    /// START or TAP TO START, white at size 3, outlined so
+    /// The title screen's start prompt, the same in every game: PRESS START (a keyboard's Space and the deck's red
+    /// button are labelled START; "PRESS START TO START" said it twice) or TAP TO START, white at size 3, outlined so
     /// it reads over artwork too.
     pub fn draw_start_prompt(&self, y: f32) {
-        let prompt = crate::web::fire_prompt("TO START");
-        self.draw_centered_outlined(&prompt, self.width as f32 / 2.0, y, 3.0, BLIP_WHITE, BLIP_BLACK);
+        let prompt = crate::web::controls().pick("PRESS START", "PRESS START", "TAP TO START");
+        self.draw_centered_outlined(prompt, self.width as f32 / 2.0, y, 3.0, BLIP_WHITE, BLIP_BLACK);
     }
 
     /// Draw the shared game-over screen over the game's chosen backdrop.

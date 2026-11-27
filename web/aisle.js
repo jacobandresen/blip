@@ -1,7 +1,9 @@
 /* Walking the arcade's aisle: where you stand (a decimal, in machines), how fast you walk, where you
  * stop, and how loud each machine is from there. No DOM, so test/aisle.test.mjs runs it in node. */
 var BlipAisle = (function () {
-  var W = 9;        // the settling spring: a tap from rest arrives in about 0.8 s and never overshoots
+  var W = 6;        // the settling spring, after the lead below: a tap from rest arrives in about 1.9 s, never overshooting
+  var LEAD = 0.25;  // a tap's goal eases to the next machine over this (s), so the walk sets off gently: top speed at
+                    // 0.38 s instead of 0.22 s and 17% lower than the bare spring (W 4.5), which read as a lurch (user, 2026-11-27)
   var RAMP = 0.13;  // a held key reaches walking speed in about 0.4 s
   var HOLD = 0.2;   // a press held this long (s) walks; a shorter one is a tap
   var STEP = 1 / 120, MAX_DT = 0.25;
@@ -10,7 +12,7 @@ var BlipAisle = (function () {
 
   function create(n, pos) {
     pos = pos || 0;
-    return { n: n, pos: pos, v: 0, target: pos, settled: true, drag: null };
+    return { n: n, pos: pos, v: 0, target: pos, lead: null, settled: true, drag: null };
   }
 
   // The machine a coasting walk stops at: the nearest one ahead that it can reach without overshooting.
@@ -25,6 +27,7 @@ var BlipAisle = (function () {
     var base = s.target != null ? s.target : Math.round(s.pos);
     var next = base + (dir < 0 ? -1 : 1);
     if (Math.abs(next - Math.round(s.pos)) <= s.n) s.target = next;
+    if (s.lead == null) s.lead = s.pos;
     s.settled = false;
   }
 
@@ -32,13 +35,15 @@ var BlipAisle = (function () {
     var dir = input.dir || 0;
     // While a key is down the walk speeds up evenly; whether it was a tap is known only when it is let go.
     if (dir) {
-      if ((input.heldFor || 0) >= HOLD) s.target = null;
+      if ((input.heldFor || 0) >= HOLD) { s.target = null; s.lead = null; }
       s.v += (dir * (input.speed || 1) - s.v) * (1 - Math.exp(-h / RAMP));
       s.pos += s.v * h;
       return;
     }
     if (s.target == null) s.target = coastTarget(s);
-    s.v += (-W * W * (s.pos - s.target) - 2 * W * s.v) * h;
+    var goal = s.target;
+    if (s.lead != null) { s.lead += (s.target - s.lead) * (1 - Math.exp(-h / LEAD)); goal = s.lead; }
+    s.v += (-W * W * (s.pos - goal) - 2 * W * s.v) * h;
     s.pos += s.v * h;
   }
 
@@ -55,6 +60,7 @@ var BlipAisle = (function () {
       s.target = mod(s.target, s.n);
       s.pos = s.target;
       s.v = 0;
+      s.lead = null;
       s.settled = true;
     } else {
       s.settled = false;
@@ -66,6 +72,7 @@ var BlipAisle = (function () {
   function dragStart(s, now) {
     s.drag = { from: s.pos, samples: [[now, s.pos]] };
     s.target = null;
+    s.lead = null;
     s.v = 0;
     s.settled = false;
   }
@@ -82,7 +89,7 @@ var BlipAisle = (function () {
     var samples = s.drag.samples, first = samples[0], last = samples[samples.length - 1];
     var from = Math.round(s.drag.from), span = (last[0] - first[0]) / 1000;
     s.drag = null;
-    s.v = span > 0.008 && now - last[0] < 100 ? Math.max(-6, Math.min(6, (last[1] - first[1]) / span)) : 0;
+    s.v = span > 0.008 && now - last[0] < 100 ? Math.max(-2.5, Math.min(2.5, (last[1] - first[1]) / span)) : 0;
     if (snapBack) { s.v = 0; s.target = from; return; }
     s.target = coastTarget(s);
     var dir = Math.sign(s.pos - from);

@@ -268,14 +268,14 @@ fn swing_sounds(g: &mut Game, dt: f32) {
             let big = matches!(f.mv, MoveId::Sweep | MoveId::HighKick | MoveId::HighPunch | MoveId::Uppercut
                 | MoveId::FlyingKick | MoveId::JumpKick);
             let often = (g.now * 60.0) as u32 % 3 != 1;
-            // DRAKE cries out on every big blow and one quick one in three, his signature.
-            let cries = formless(f.who) && (big || ((g.now * 60.0) as u32).is_multiple_of(3));
-            // One cry at a time: his run 0.3 to 1 s, and a cry on every jab (four a second) piled up into a
-            // henhouse. A new one waits until the last has had 0.7 s.
+            // DRAKE cries out on every big blow, his signature (not on quick ones too: that ran almost without a
+            // break and sounded odd to play, user 2026-11-27).
+            let cries = formless(f.who) && big;
+            // One cry at a time: a cry on every jab (four a second) piled up into a henhouse. A new one waits 0.7 s.
             let free = g.now - g.yelled[i] > 0.7;
             if free && !f.stomp && (f.mv == MoveId::Special || (big && often) || cries) {
                 g.yelled[i] = g.now;
-                g.snd_at(Sfx::Kiai(throat_of(f.who)), if cries && !big { 0.6 } else { 0.85 });
+                g.snd_at(Sfx::Kiai(throat_of(f.who)), 0.85);
             }
         }
     }
