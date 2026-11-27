@@ -1,6 +1,5 @@
 //! Pong against the CPU.
 
-
 use blip::color::*;
 use blip::input::{
     any_key_pressed, btn1_pressed, key_active, key_pressed, Stick, BLIP_KEY_DOWN, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
@@ -155,7 +154,6 @@ fn update_title(g: &mut Game) {
         g.start_game();
     }
 }
-
 
 fn update_serve(g: &mut Game, dt: f32) {
     move_paddles(g, dt);
@@ -336,7 +334,6 @@ fn draw_over(blip: &Blip, g: &Game) {
 fn conf() -> blip::macroquad::window::Conf {
     window_conf("RALLY", WIN_W, WIN_H)
 }
-
 
 #[blip::macroquad::main(conf)]
 async fn main() {

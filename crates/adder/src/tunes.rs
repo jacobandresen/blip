@@ -11,7 +11,6 @@ use blip::cosy::{self, Tone, Voice, H as HOLD};
 use blip::Asset;
 use blip::song::chords::{AM, C, DM, EM, F, G};
 
-
 /// The slow tune: a coiled figure, hypnotic, the way a charmer's line hangs.
 pub fn coil_song() -> Song<'static> {
     Song {

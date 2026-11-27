@@ -4,7 +4,6 @@
 use std::f32::consts::PI;
 use crate::cosy::SR;
 
-
 use crate::wav::{env, mix_into_f32, ms_to_samples, tame, Rng, SAMPLE_RATE};
 
 /// Select a hook note; every fourth bar answers the phrase backwards, a diatonic fifth higher.

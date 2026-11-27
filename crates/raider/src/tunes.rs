@@ -692,7 +692,6 @@ pub fn loop2_wav() -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
-
 // ---------------------------------------------------------------------- //
 // Tone / noise helpers (self-contained, same idiom as the other games)     //
 // ---------------------------------------------------------------------- //

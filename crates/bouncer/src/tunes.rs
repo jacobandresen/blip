@@ -10,7 +10,6 @@ use blip::cosy::{self, Tone, Voice};
 use blip::Asset;
 use blip::song::chords::{C, D, DM, F, G, AM, EM};
 
-
 /// Odd levels: C major, bouncing up the octave and skipping back down.
 pub fn bounce_song() -> Song<'static> {
     Song {

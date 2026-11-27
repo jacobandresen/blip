@@ -18,6 +18,16 @@ use blip::{
 mod tunes;
 mod bot;
 mod levels;
+mod draw;
+mod ufo;
+mod boss;
+mod invaders;
+mod shields;
+use boss::*;
+use invaders::*;
+use shields::*;
+use ufo::*;
+use draw::*;
 
 use levels::*;
 
@@ -142,6 +152,10 @@ struct Shield {
     x: f32, y: f32,
     alive: [[bool; SHIELD_COLS]; SHIELD_ROWS],
 }
+
+/// A square piece of a shot alien.
+struct Chip { x: f32, y: f32, vx: f32, vy: f32, turn: f32, spin: f32, ttl: f32, c: BlipColor }
+const CHIP_SECS: f32 = 0.8;
 
 struct Game {
     aliens: [Alien; ALIEN_TOTAL],
@@ -444,40 +458,6 @@ impl Game {
         self.state = State::Play;
     }
 
-    fn is_boss_level(&self) -> bool { self.sess.level % BOSS_EVERY == 0 }
-
-    /// How many motherships deep this run is — the first is 1.
-    fn boss_number(&self) -> i32 { (self.sess.level / BOSS_EVERY).max(1) }
-
-    fn start_boss(&mut self) {
-        let n = self.boss_number();
-        self.boss_hp_max = BOSS_HP_BASE + BOSS_HP_STEP * (n - 1);
-        self.boss_hp = self.boss_hp_max;
-        self.boss_dir = if (rand() & 1) == 0 { 1 } else { -1 };
-        self.boss_x = if self.boss_dir == 1 { -BOSS_W } else { WIN_W as f32 };
-        self.boss_phase = 0.0;
-        self.boss_active = true;
-        // Comes in shooting, but not instantly: the player has just
-        // cleared a formation and needs the moment it takes to read what
-        // has arrived before the first volley lands.
-        self.boss_fire.start(1.4);
-    }
-
-    fn boss_speed(&self) -> f32 {
-        BOSS_SPEED_BASE + BOSS_SPEED_STEP * (self.boss_number() - 1) as f32
-    }
-
-    fn boss_volley_gap(&self) -> f32 {
-        let gap = BOSS_VOLLEY_MIN - BOSS_VOLLEY_STEP * (self.boss_number() - 1) as f32;
-        if gap < BOSS_VOLLEY_FLOOR { BOSS_VOLLEY_FLOOR } else { gap }
-    }
-
-    fn boss_y(&self) -> f32 {
-        // Rides a slow sine as it crosses, so its bombs do not all start
-        // from the same height and the silhouette never sits still.
-        BOSS_Y + (self.boss_phase.sin()) * BOSS_SWAY
-    }
-
     fn start_game(&mut self) {
         self.sess.reset(LIVES_START);
         self.start_wave();
@@ -493,282 +473,6 @@ blip::sounds!(Sounds {
 
 const UFO_Y: f32 = (PLAY_Y + 8) as f32;
 
-/// Detonate the laser: kill every alien, shield block, and (if it's standing
-/// in the way) the player under the beam's column, with a cascade of
-/// explosions down its length. Returns `true` if the player was killed.
-fn fire_laser(g: &mut Game) -> bool {
-    let bx0 = g.ufo_laser_x + UFO_W / 2.0 - LASER_HIT_W / 2.0;
-    let bx1 = bx0 + LASER_HIT_W;
-
-    for a in g.aliens.iter_mut() {
-        if !a.alive { continue; }
-        if a.x < bx1 && a.x + ALIEN_W as f32 > bx0 {
-            a.alive = false;
-            let pts = match a.kind { 0 => 30, 1 => 20, _ => 10 };
-            g.sess.add_score(pts * g.sess.level);
-        }
-    }
-    // A dense cascade of explosions straight down the beam's path, for a
-    // "very dramatic" wipe (covers the vaporized aliens too).
-    let mut y = UFO_Y;
-    while y < GROUND_Y as f32 {
-        g.spawn_explosion(bx0 + LASER_HIT_W / 2.0 - ALIEN_W as f32 / 2.0, y);
-        y += 26.0;
-    }
-
-    for s in g.shields.iter_mut() {
-        for r in 0..SHIELD_ROWS {
-            for c in 0..SHIELD_COLS {
-                if !s.alive[r][c] { continue; }
-                let sx = s.x + (c as i32 * SHIELD_BLOCK) as f32;
-                if sx < bx1 && sx + SHIELD_BLOCK as f32 > bx0 {
-                    s.alive[r][c] = false;
-                }
-            }
-        }
-    }
-
-    let player_hit = g.player_x < bx1 && g.player_x + ALIEN_W as f32 > bx0;
-    if player_hit {
-        blip::bot::add("death_laser", 1.0);
-        // Losing the cannon breaks the run of hits too: the multiple is for shooting well and staying alive.
-        g.streak.miss();
-        let px = g.player_x;
-        g.spawn_player_death(px, (GROUND_Y - 28) as f32);
-        if lose_cannon(g) { g.bullets.iter_mut().for_each(|b| b.active = false); }
-    }
-    player_hit
-}
-
-/// Returns `true` if the laser just killed the player this frame — the
-/// caller should stop processing the round immediately when that happens.
-fn update_ufo(
-    g: &mut Game,
-    dt: f32,
-    sfx: &Sounds,
-    bullet_starts: &[(f32, f32); N_BULLETS],
-    ufo_start_x: f32,
-    ufo_was_active: bool,
-) -> bool {
-    g.ufo_score_timer.tick(dt);
-
-    if !g.ufo_active {
-        if g.ufo_timer.tick(dt) && g.aliens_alive() > 0 {
-            g.ufo_dir = if (rand() & 1) == 0 { 1 } else { -1 };
-            g.ufo_x = if g.ufo_dir == 1 { -UFO_W } else { WIN_W as f32 };
-            g.ufo_active = true;
-            g.ufo_frame = 0;
-            g.ufo_spin_timer = 0.0;
-            g.bullets[UFO_BOMB_IDX].active = false;
-            blip::play_alert(&sfx.ufo_siren);
-
-            let roll = (rand() as f32) / (u32::MAX as f32);
-            if !g.laser_used_this_level && roll < UFO_LASER_CHANCE {
-                g.laser_used_this_level = true;
-                g.ufo_mode = UfoMode::Tracking;
-                g.ufo_track_timer.start(UFO_TRACK_MAX_SECS);
-            } else {
-                g.ufo_mode = UfoMode::Flying;
-                g.ufo_bomb_timer.start(3.0);
-            }
-        }
-        return false;
-    }
-
-    match g.ufo_mode {
-        UfoMode::Flying => {
-            g.ufo_x += 80.0 * g.ufo_dir as f32 * dt;
-            g.spin_lights(dt);
-
-            if g.ufo_x > WIN_W as f32 || g.ufo_x + UFO_W < 0.0 {
-                g.ufo_active = false;
-                g.bullets[UFO_BOMB_IDX].active = false;
-                g.ufo_timer.start(rand_int(UFO_SPAWN_MIN, UFO_SPAWN_MAX) as f32);
-                blip::stop_alert();
-                return false;
-            }
-
-            // Only one bomb per pass — timer stays inactive after first fire.
-            if g.ufo_bomb_timer.tick(dt) && !g.bullets[UFO_BOMB_IDX].active {
-                g.bullets[UFO_BOMB_IDX] = Bullet {
-                    x: g.ufo_x + UFO_W / 2.0 - 2.0,
-                    y: UFO_Y + UFO_H * 0.6,
-                    active: true,
-                    player: false,
-                };
-            }
-        }
-        UfoMode::Tracking => {
-            // Stalk the player's x before charging, a hunted beat that warns
-            // before the charge sound. Faster than the player, it commits
-            // only once they hold still (locked on) or its time runs out.
-            let target = (g.player_x + ALIEN_W as f32 / 2.0 - UFO_W / 2.0)
-                .clamp(0.0, WIN_W as f32 - UFO_W);
-            let step = UFO_TRACK_SPEED * dt;
-            g.ufo_x += (target - g.ufo_x).clamp(-step, step);
-
-            g.spin_lights(dt);
-
-            let expired = g.ufo_track_timer.tick(dt);
-            let elapsed = UFO_TRACK_MAX_SECS - g.ufo_track_timer.remaining();
-            let locked_on = (g.ufo_x - target).abs() < UFO_LOCK_DIST;
-            let player_still = g.player_still_secs >= UFO_STILL_SECS;
-            if expired || (elapsed >= UFO_TRACK_MIN_SECS && locked_on && player_still) {
-                g.ufo_mode = UfoMode::Charging;
-                g.ufo_charge_timer.start(UFO_CHARGE_SECS);
-                blip::stop_alert();
-                play_sfx(&sfx.laser_charge);
-            }
-        }
-        UfoMode::Charging => {
-            // Frantic chase-light flicker while it powers up.
-            g.ufo_spin_timer += dt * 1000.0;
-            if g.ufo_spin_timer >= UFO_SPIN_STEP_MS * 0.25 {
-                g.ufo_spin_timer = 0.0;
-                g.ufo_frame = (g.ufo_frame + 1) % UFO_N_LIGHTS;
-            }
-            if g.ufo_charge_timer.tick(dt) {
-                g.ufo_mode = UfoMode::Firing;
-                g.ufo_fire_timer.start(UFO_FIRE_SECS);
-                g.ufo_laser_x = g.ufo_x;
-                play_sfx(&sfx.laser_blast);
-                if fire_laser(g) {
-                    return true;
-                }
-            }
-        }
-        UfoMode::Firing => {
-            if g.ufo_fire_timer.tick(dt) {
-                // The beam burns the UFO itself out.
-                g.spawn_explosion(g.ufo_x, UFO_Y);
-                play_sfx(&sfx.explosion);
-                g.ufo_active = false;
-                g.ufo_mode = UfoMode::Flying;
-                g.ufo_timer.start(rand_int(UFO_SPAWN_MIN, UFO_SPAWN_MAX) as f32);
-            }
-        }
-    }
-
-    // Player bullet vs UFO — not while it's mid-beam (too late by then).
-    if g.ufo_mode != UfoMode::Firing {
-        // `bi` pairs the bullet slot with its swept start; the bomb slot below rules out iterating `g.bullets` directly.
-        for (bi, start) in bullet_starts.iter().enumerate().take(MAX_PLAYER_BULLETS) {
-            if !g.bullets[bi].active { continue; }
-            let start_x = if ufo_was_active { ufo_start_x } else { g.ufo_x };
-            if bullet_hits_moving_rect(
-                *start,
-                (g.bullets[bi].x, g.bullets[bi].y),
-                (start_x, UFO_Y),
-                (g.ufo_x, UFO_Y),
-                UFO_W,
-                UFO_H,
-            ) {
-                play_sfx(&sfx.explosion);
-                let kill_x = g.ufo_x;
-                g.spawn_explosion(kill_x, UFO_Y);
-                g.bullets[bi].active = false;
-                g.bullets[UFO_BOMB_IDX].active = false;
-                blip::bot::add("saucers", 1.0);
-                let bonus = rand_int(1, 6) * 50;
-                g.sess.add_score(bonus);
-                g.ufo_score = bonus;
-                g.ufo_score_timer.start(1.5);
-                g.ufo_active = false;
-                g.ufo_mode = UfoMode::Flying;
-                g.ufo_timer.start(rand_int(UFO_SPAWN_MIN, UFO_SPAWN_MAX) as f32);
-                blip::stop_alert();
-                return false;
-            }
-        }
-    }
-
-    false
-}
-
-/// The saucer at `x`,`y`, `w` by `h`: its body, then its rim lights, yellow and
-/// white by turns, turned `frame` steps round the disc.
-#[allow(clippy::too_many_arguments)]
-fn draw_saucer(blip: &Blip, saucer: &Texture2D, x: f32, y: f32, w: f32, h: f32, frame: usize, tint: BlipColor) {
-    blip.draw_texture_tinted(saucer, x, y, w, h, tint);
-    let (sx, sy) = (w / UFO_W, h / UFO_H);
-    let (cx, cy, rx, ry) = (UFO_W / 2.0, UFO_H * 0.62, (UFO_W / 2.0 - 1.0) * 0.88, UFO_H * 0.30 * 0.88);
-    for i in 0..UFO_N_LIGHTS {
-        let k = i + frame;
-        let a = k as f32 / UFO_N_LIGHTS as f32 * std::f32::consts::TAU;
-        let (lx, ly) = ((cx + a.cos() * rx).round(), (cy + a.sin() * ry).round());
-        let light = if k.is_multiple_of(2) { BlipColor::new(1.0, 0.9, 0.24, tint.a) } else { BlipColor::new(1.0, 1.0, 1.0, tint.a) };
-        blip.fill_rect(x + lx * sx, y + (ly - 1.0) * sy, sx, 2.0 * sy, light);
-    }
-}
-
-fn draw_ufo(blip: &Blip, g: &Game, saucer: &Texture2D) {
-    if g.ufo_active {
-        match g.ufo_mode {
-            UfoMode::Flying => {
-                draw_saucer(blip, saucer, g.ufo_x, UFO_Y, UFO_W, UFO_H, g.ufo_frame, BLIP_WHITE);
-            }
-            UfoMode::Tracking => {
-                draw_saucer(blip, saucer, g.ufo_x, UFO_Y, UFO_W, UFO_H, g.ufo_frame, BLIP_WHITE);
-                // A faint lock-on reticle down toward the player — a quiet
-                // "it's noticed you" tell, well before the loud charge-up.
-                let cx = g.ufo_x + UFO_W / 2.0;
-                let cy = UFO_Y + UFO_H;
-                let px = g.player_x + ALIEN_W as f32 / 2.0;
-                let py = (GROUND_Y - 28) as f32;
-                blip.draw_line(cx, cy, px, py, BlipColor { r: 1.0, g: 0.3, b: 0.3, a: 0.18 });
-            }
-            UfoMode::Charging => {
-                // The whole ship shakes as it powers up.
-                let jx = (rand() % 5) as f32 - 2.0;
-                let jy = (rand() % 3) as f32 - 1.0;
-                draw_saucer(blip, saucer, g.ufo_x + jx, UFO_Y + jy, UFO_W, UFO_H, g.ufo_frame, BLIP_WHITE);
-
-                let progress = 1.0 - (g.ufo_charge_timer.remaining() / UFO_CHARGE_SECS).max(0.0);
-                let cx = g.ufo_x + UFO_W / 2.0;
-                let cy = UFO_Y + UFO_H;
-
-                // Growing charge glow beneath it, brightening as it nears firing.
-                let glow_r = 8.0 + progress * 16.0;
-                let glow_c = BlipColor {
-                    r: 1.0, g: 0.25 + progress * 0.5, b: 0.15, a: 0.6 + progress * 0.4,
-                };
-                blip.fill_glow_circle(cx, cy, glow_r, glow_c);
-
-                // Warning line down to where the beam will land: always
-                // visible, pulsing faster and brighter as it nears firing.
-                let pulse_rate = 3.0 + progress * 10.0;
-                let pulse = 0.5 + 0.5 * (progress * pulse_rate * std::f32::consts::TAU).sin();
-                let warn_c = BlipColor {
-                    r: 1.0, g: 0.2, b: 0.2, a: 0.5 + progress * 0.4 + pulse * 0.15,
-                };
-                blip.draw_glow_line(cx, cy, cx, GROUND_Y as f32, warn_c);
-            }
-            UfoMode::Firing => {
-                let cx = g.ufo_laser_x + UFO_W / 2.0;
-                let fade = (g.ufo_fire_timer.remaining() / UFO_FIRE_SECS).clamp(0.0, 1.0);
-                // Full-width flash for the first instant — the dramatic hit.
-                if fade > 0.7 {
-                    blip.fill_rect(
-                        0.0, PLAY_Y as f32, WIN_W as f32, (GROUND_Y - PLAY_Y) as f32,
-                        BlipColor { r: 1.0, g: 1.0, b: 1.0, a: (fade - 0.7) * 0.6 },
-                    );
-                }
-                // The beam: a wide hot core inside a wider red-hot glow.
-                let beam_c = BlipColor { r: 1.0, g: 0.3 + fade * 0.4, b: 0.3, a: 1.0 };
-                for off in [-10.0_f32, -5.0, 0.0, 5.0, 10.0] {
-                    blip.draw_glow_line(cx + off, UFO_Y, cx + off, GROUND_Y as f32, beam_c);
-                }
-                blip.draw_line_ex(cx - 3.0, UFO_Y, cx - 3.0, GROUND_Y as f32, 6.0, BLIP_WHITE);
-                blip.draw_line_ex(cx + 3.0, UFO_Y, cx + 3.0, GROUND_Y as f32, 6.0, BLIP_WHITE);
-            }
-        }
-    }
-    if g.ufo_score_timer.active() {
-        let text = format!("{} PTS", g.ufo_score);
-        blip.draw_centered_outlined(&text, (WIN_W / 2) as f32, UFO_Y, 2.0, BLIP_GOLD, BLIP_INK);
-    }
-}
-
 fn update_title(g: &mut Game) {
     if coin_start() { g.start_game(); }
 }
@@ -780,76 +484,6 @@ fn alien_color(kind: usize) -> BlipColor {
         0 => BlipColor { r: 0.93, g: 0.42, b: 0.86, a: 1.0 }, // squid   — 30 points
         1 => BLIP_SEA,                                       // crab    — 20 points
         _ => BLIP_LEAF,                                      // octopus — 10 points
-    }
-}
-
-/// The mothership: cross, sway, drop volleys. Its bombs use the alien bomb
-/// pool, free by then, so they are the bombs the player already knows, with
-/// the existing collisions.
-fn update_boss(g: &mut Game, dt: f32, sfx: &Sounds) {
-    if !g.boss_active { return; }
-
-    if g.boss_flash > 0.0 {
-        g.boss_flash -= dt;
-        if g.boss_flash < 0.0 { g.boss_flash = 0.0; }
-    }
-
-    g.boss_phase += dt * 1.6;
-    g.boss_x += g.boss_speed() * g.boss_dir as f32 * dt;
-    // Turns at the walls rather than flying off: this one does not get to
-    // leave. The ordinary UFO is a bonus that passes by; the mothership is
-    // the level.
-    if g.boss_x < 0.0 { g.boss_x = 0.0; g.boss_dir = 1; }
-    if g.boss_x + BOSS_W > WIN_W as f32 { g.boss_x = WIN_W as f32 - BOSS_W; g.boss_dir = -1; }
-
-    g.spin_lights(dt);
-
-    if g.boss_fire.tick(dt) {
-        // Three bombs: one under each wingtip and one under the middle.
-        // Fired from where the ship actually is, so its sway is something
-        // the player can read the volley off rather than noise.
-        let y = g.boss_y() + BOSS_H;
-        let xs = [g.boss_x + BOSS_W * 0.18, g.boss_x + BOSS_W * 0.5, g.boss_x + BOSS_W * 0.82];
-        for x in xs {
-            if let Some(i) = g.free_bullet(false) {
-                g.bullets[i] = Bullet { x, y, active: true, player: false };
-            }
-        }
-        play_sfx(&sfx.shoot);
-        g.boss_fire.start(g.boss_volley_gap());
-    }
-}
-
-/// Player shots against the mothership: only the player's slots, which
-/// free_bullet() hands out from the front of the array (bombs from the back).
-fn hit_boss(g: &mut Game, sfx: &Sounds, bullet_starts: &[(f32, f32); N_BULLETS]) {
-    if !g.boss_active { return; }
-    let (bx, by) = (g.boss_x, g.boss_y());
-    // `i` pairs the bullet slot with its swept start (the player slots head the array).
-    for (i, start) in bullet_starts.iter().enumerate().take(MAX_PLAYER_BULLETS) {
-        if !g.bullets[i].active { continue; }
-        let (x, y) = (g.bullets[i].x, g.bullets[i].y);
-        if !bullet_hits_rect(*start, (x, y), bx, by, BOSS_W, BOSS_H) { continue; }
-        g.bullets[i].active = false;
-        g.boss_hp -= 1;
-        g.boss_flash = BOSS_FLASH;
-        g.sess.add_score(BOSS_HIT_SCORE);
-        // The puff goes where the shot landed, not at the centre: it is
-        // the only feedback saying a hit registered at all, and a boss
-        // that swallows shots silently reads as invulnerable.
-        g.spawn_explosion_ex(x - 8.0, y - 8.0, EXPLOSION_TTL * 0.7, 1.0);
-        play_sfx(&sfx.explosion);
-        if g.boss_hp <= 0 {
-            g.boss_active = false;
-            g.boss_done = true;
-            blip::bot::add("motherships", 1.0);
-            g.sess.add_score(BOSS_KILL_SCORE * g.sess.level);
-            g.spawn_player_death(bx + BOSS_W / 2.0 - ALIEN_W as f32 / 2.0, by + BOSS_H / 2.0);
-            g.spawn_explosion_ex(bx + BOSS_W * 0.2, by, EXPLOSION_TTL * 2.0, 2.2);
-            g.spawn_explosion_ex(bx + BOSS_W * 0.8, by + BOSS_H * 0.5, EXPLOSION_TTL * 2.2, 2.4);
-            blip::stop_alert();
-            return;
-        }
     }
 }
 
@@ -953,76 +587,6 @@ fn lose_ship(g: &mut Game, sfx: &Sounds, why: &str) {
     stop_ufo(g);
 }
 
-fn stop_ufo(g: &mut Game) {
-    if g.ufo_active {
-        g.ufo_active = false;
-        blip::stop_alert();
-    }
-}
-
-/// Pick, shake and fly the diver. Returns true when it has hit the ship.
-fn update_diver(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
-    if let Some(mut d) = g.diver {
-        d.t += dt;
-        d.y += DIVE_SPEED * dt;
-        let aim = g.player_x - d.x;
-        d.x += aim.clamp(-DIVE_STEER * dt, DIVE_STEER * dt);
-        // Through a shield, not round it.
-        for sh in g.shields.iter_mut() {
-            for r in 0..SHIELD_ROWS {
-                for c in 0..SHIELD_COLS {
-                    let (bx, by) = shield_block_xy(sh, r, c);
-                    if sh.alive[r][c] && rects_overlap(d.x + 6.0, d.y + 6.0, ALIEN_W as f32 - 12.0, ALIEN_H as f32 - 12.0,
-                        bx, by, SHIELD_BLOCK as f32, SHIELD_BLOCK as f32) {
-                        sh.alive[r][c] = false;
-                        g.fx.burst(bx + 6.0, by + 6.0, 4, 60.0, BLIP_GREEN);
-                    }
-                }
-            }
-        }
-        let ship_top = (GROUND_Y - 24) as f32;
-        if rects_overlap(d.x + 6.0, d.y + 6.0, ALIEN_W as f32 - 12.0, ALIEN_H as f32 - 12.0,
-            g.player_x + 5.0, ship_top, ALIEN_W as f32 - 10.0, 24.0) {
-            g.diver = None;
-            return true;
-        }
-        if d.y + ALIEN_H as f32 >= GROUND_Y as f32 {
-            // Missed: it ploughs into the ground and is gone.
-            g.fx.burst(d.x + ALIEN_W as f32 / 2.0, GROUND_Y as f32 - 4.0, 12, 110.0, alien_color(d.kind));
-            play_sfx(&sfx.explosion);
-            g.diver = None;
-        } else {
-            g.diver = Some(d);
-        }
-        return false;
-    }
-    if let Some((idx, left)) = g.dive_pick {
-        if !g.aliens[idx].alive {
-            g.dive_pick = None;
-        } else if left <= dt {
-            let a = g.aliens[idx];
-            g.aliens[idx].alive = false;
-            g.dive_pick = None;
-            g.diver = Some(Diver { x: a.x, y: a.y, kind: a.kind, t: 0.0 });
-            play_sfx(&sfx.dive);
-        } else {
-            g.dive_pick = Some((idx, left - dt));
-        }
-        return false;
-    }
-    if g.sess.level < DIVE_LEVEL || g.boss_active { return false; }
-    g.dive_cd -= dt;
-    if g.dive_cd > 0.0 || g.aliens_alive() < DIVE_MIN_ALIENS { return false; }
-    g.dive_cd = rand_int(DIVE_EVERY.0, DIVE_EVERY.1) as f32;
-    // The lowest alien of a random column.
-    let col = rand_int(0, g.active_cols - 1);
-    let pick = (0..g.active_rows).rev()
-        .map(|r| (r * g.active_cols + col) as usize)
-        .find(|&i| g.aliens[i].alive);
-    if let Some(idx) = pick { g.dive_pick = Some((idx, DIVE_TELL)); }
-    false
-}
-
 fn update_explosions(g: &mut Game, dt: f32) {
     for e in &mut g.explosions {
         if e.active {
@@ -1077,236 +641,6 @@ fn fire(g: &mut Game, sfx: &Sounds) {
     }
 }
 
-/// The formation steps on the beat, and drops a row at the edge.
-fn march(g: &mut Game, dt: f32, sfx: &Sounds) {
-    g.march_timer += dt * 1000.0;
-    if g.march_timer >= g.march_interval() {
-        g.march_timer = 0.0;
-        if g.aliens_alive() > 0 {
-            play_sfx(&sfx.march[g.march_step]);
-            g.march_step = (g.march_step + 1) % 4;
-        }
-        if g.march_drop_next {
-            let drop = lerp(MARCH_DROP_FIRST, MARCH_DROP, ((g.sess.level - 1) as f32 / 3.0).min(1.0));
-            for a in g.aliens.iter_mut() {
-                if a.alive { a.y += drop; }
-            }
-            g.march_dir = -g.march_dir;
-            g.march_drop_next = false;
-        } else {
-            let step = (ALIEN_W / 3) as f32;
-            let mut hit_edge = false;
-            for a in g.aliens.iter_mut() {
-                if !a.alive { continue; }
-                a.x += step * g.march_dir as f32;
-                a.anim ^= 1;
-                if a.x < 2.0 || a.x + ALIEN_W as f32 > (WIN_W - 2) as f32 {
-                    hit_edge = true;
-                }
-            }
-            if hit_edge { g.march_drop_next = true; }
-        }
-    }
-}
-
-/// Every so often the lowest alien of a random column lets a bomb go.
-fn drop_bombs(g: &mut Game, dt: f32) {
-    if g.bomb_timer.tick(dt) {
-        let r01 = (rand() as f32) / (u32::MAX as f32);
-        let (lo, hi) = g.bomb_interval_range;
-        g.bomb_timer.start(lerp(lo, hi, r01));
-        let mut candidates = [0usize; ALIEN_COLS as usize];
-        let mut nc = 0usize;
-        for c in 0..g.active_cols {
-            for r in (0..g.active_rows).rev() {
-                let idx = (r * g.active_cols + c) as usize;
-                if g.aliens[idx].alive {
-                    candidates[nc] = idx;
-                    nc += 1;
-                    break;
-                }
-            }
-        }
-        if nc > 0 {
-            if let Some(bi) = g.free_bullet(false) {
-                let idx = candidates[rand_int(0, nc as i32 - 1) as usize];
-                let a = g.aliens[idx];
-                g.bullets[bi] = Bullet {
-                    x: a.x + (ALIEN_W / 2 - 4) as f32,
-                    y: a.y + ALIEN_H as f32,
-                    active: true,
-                    player: false,
-                };
-            }
-        }
-    }
-}
-
-/// The top left of shield block `r`, `c`.
-fn shield_block_xy(shield: &Shield, r: usize, c: usize) -> (f32, f32) {
-    (shield.x + (c as i32 * SHIELD_BLOCK) as f32, shield.y + (r as i32 * SHIELD_BLOCK) as f32)
-}
-
-/// Player bullets against the formation: the lowest alien in a bullet's path falls, for points that grow with a streak.
-fn shoot_aliens(g: &mut Game, bullet_starts: &[(f32, f32); N_BULLETS], sfx: &Sounds) {
-    // `bi` pairs the bullet slot with its swept start (the player slots head the array).
-    for (bi, start) in bullet_starts.iter().enumerate().take(MAX_PLAYER_BULLETS) {
-        if !g.bullets[bi].active { continue; }
-        'rows: for row in (0..g.active_rows).rev() {
-            for col in 0..g.active_cols {
-                let ai = (row * g.active_cols + col) as usize;
-                if !g.aliens[ai].alive { continue; }
-                if !bullet_hits_rect(*start, (g.bullets[bi].x, g.bullets[bi].y),
-                                     g.aliens[ai].x, g.aliens[ai].y,
-                                     ALIEN_W as f32, ALIEN_H as f32) {
-                    continue;
-                }
-                play_sfx(&sfx.explosion);
-                let (ax, ay, kind) = (g.aliens[ai].x, g.aliens[ai].y, g.aliens[ai].kind);
-                g.spawn_explosion(ax, ay);
-                g.aliens[ai].alive = false;
-                g.bullets[bi].active = false;
-                blip::bot::add("invaders", 1.0);
-                let times = g.streak.hit();
-                let pts = match kind { 0 => 30, 1 => 20, _ => 10 } * g.sess.level * times;
-                g.sess.add_score(pts);
-                let (cx, cy) = (ax + ALIEN_W as f32 / 2.0, ay + ALIEN_H as f32 / 2.0);
-                g.fx.burst(cx, cy, 10, 110.0, alien_color(kind));
-                break_alien(g, ax, ay, kind, g.bullets[bi].x);
-                if times > 1 {
-                    g.fx.popup(cx, cy - 6.0, &format!("{pts} X{times}"), BLIP_YELLOW);
-                } else {
-                    g.fx.popup(cx, cy - 6.0, &format!("{pts}"), alien_color(kind));
-                }
-                break 'rows;
-            }
-        }
-    }
-}
-
-/// A square piece of a shot alien.
-struct Chip { x: f32, y: f32, vx: f32, vy: f32, turn: f32, spin: f32, ttl: f32, c: BlipColor }
-const CHIP_SECS: f32 = 0.8;
-
-/// A shot alien bursts into a grid of chips in its colour, thrown out from where the shot struck. Their scatter comes
-/// from a hash of where it happened, so the game's random numbers are untouched.
-fn break_alien(g: &mut Game, ax: f32, ay: f32, kind: usize, shot_x: f32) {
-    let c = alien_color(kind);
-    let (cols, rows) = (4, 3);
-    let (cw, ch) = (ALIEN_W as f32 / cols as f32, ALIEN_H as f32 / rows as f32);
-    let seed = (ax as u32).wrapping_mul(73_856_093) ^ (ay as u32).wrapping_mul(19_349_663) ^ shot_x.to_bits();
-    for r in 0..rows {
-        for k in 0..cols {
-            let h = hash(seed ^ (r * cols + k) as u32);
-            let (x, y) = (ax + (k as f32 + 0.5) * cw, ay + (r as f32 + 0.5) * ch);
-            let (dx, dy) = (x - shot_x, y - (ay + ALIEN_H as f32));
-            let len = dx.hypot(dy).max(1.0);
-            let v = 60.0 + (h % 90) as f32;
-            g.chips.push(Chip {
-                x, y, vx: dx / len * v, vy: dy / len * v - 30.0,
-                turn: 0.0, spin: ((h >> 8) % 13) as f32 - 6.0, ttl: CHIP_SECS, c,
-            });
-        }
-    }
-}
-
-fn update_chips(g: &mut Game, dt: f32) {
-    for c in g.chips.iter_mut() {
-        c.vy += 380.0 * dt;
-        c.x += c.vx * dt;
-        c.y += c.vy * dt;
-        c.turn += c.spin * dt;
-        c.ttl -= dt;
-    }
-    g.chips.retain(|c| c.ttl > 0.0);
-}
-
-fn draw_chips(blip: &Blip, g: &Game) {
-    for c in &g.chips {
-        let a = (c.ttl / CHIP_SECS).min(1.0);
-        let s = 2.0 + 2.0 * a;
-        let (sn, cs) = c.turn.sin_cos();
-        let p = |u: f32, v: f32| (c.x + u * cs - v * sn, c.y + u * sn + v * cs);
-        blip.fill_quad(p(-s, -s), p(s, -s), p(s, s), p(-s, s), BlipColor { a, ..c.c });
-    }
-}
-
-/// Player bullets against the diver: double points.
-fn shoot_diver(g: &mut Game, bullet_starts: &[(f32, f32); N_BULLETS], sfx: &Sounds) {
-    if let Some(d) = g.diver {
-        // `bi` pairs the bullet slot with its swept start (the player slots head the array).
-        for (bi, start) in bullet_starts.iter().enumerate().take(MAX_PLAYER_BULLETS) {
-            if !g.bullets[bi].active { continue; }
-            if bullet_hits_rect(*start, (g.bullets[bi].x, g.bullets[bi].y),
-                                d.x, d.y, ALIEN_W as f32, ALIEN_H as f32) {
-                g.bullets[bi].active = false;
-                g.diver = None;
-                blip::bot::add("divers", 1.0);
-                play_sfx(&sfx.explosion);
-                g.spawn_explosion(d.x, d.y);
-                g.streak.hit();
-                let pts = match d.kind { 0 => 30, 1 => 20, _ => 10 } * g.sess.level * 2;
-                g.sess.add_score(pts);
-                let (cx, cy) = (d.x + ALIEN_W as f32 / 2.0, d.y + ALIEN_H as f32 / 2.0);
-                g.fx.burst(cx, cy, 14, 130.0, alien_color(d.kind));
-                break_alien(g, d.x, d.y, d.kind, cx);
-                g.fx.popup(cx, cy - 6.0, &format!("DIVER {pts}"), BLIP_YELLOW);
-                break;
-            }
-        }
-    }
-}
-
-/// Any bullet against the shields: it takes out one block.
-fn hit_shields(g: &mut Game, bullet_starts: &[(f32, f32); N_BULLETS], bullet_was_active: &[bool; N_BULLETS]) {
-    for bi in 0..N_BULLETS {
-        if !g.bullets[bi].active { continue; }
-        'outer: for s in 0..SHIELDS {
-            for r in 0..SHIELD_ROWS {
-                for c in 0..SHIELD_COLS {
-                    if !g.shields[s].alive[r][c] { continue; }
-                    let (bx, by) = shield_block_xy(&g.shields[s], r, c);
-                    let end = (g.bullets[bi].x, g.bullets[bi].y);
-                    let hit = if bullet_was_active[bi] {
-                        bullet_hits_rect(bullet_starts[bi], end, bx, by,
-                            SHIELD_BLOCK as f32, SHIELD_BLOCK as f32)
-                    } else {
-                        rects_overlap(end.0, end.1, 8.0, 16.0, bx, by,
-                            SHIELD_BLOCK as f32, SHIELD_BLOCK as f32)
-                    };
-                    if hit {
-                        g.shields[s].alive[r][c] = false;
-                        g.bullets[bi].active = false;
-                        g.fx.burst(bx + SHIELD_BLOCK as f32 / 2.0, by + SHIELD_BLOCK as f32 / 2.0, 5, 50.0, BLIP_GREEN);
-                        break 'outer;
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// The formation plows through any shield blocks in its path as it marches down, as in the classic game.
-fn plow_shields(g: &mut Game) {
-    for a in g.aliens.iter() {
-        if !a.alive { continue; }
-        for s in 0..SHIELDS {
-            for r in 0..SHIELD_ROWS {
-                for c in 0..SHIELD_COLS {
-                    if !g.shields[s].alive[r][c] { continue; }
-                    let (bx, by) = shield_block_xy(&g.shields[s], r, c);
-                    if rects_overlap(
-                        a.x, a.y, ALIEN_W as f32, ALIEN_H as f32,
-                        bx, by, SHIELD_BLOCK as f32, SHIELD_BLOCK as f32,
-                    ) {
-                        g.shields[s].alive[r][c] = false;
-                    }
-                }
-            }
-        }
-    }
-}
-
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     let player_x_before = g.player_x;
     let ufo_start_x = g.ufo_x;
@@ -1317,117 +651,108 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     move_ship(g, dt);
     fire(g, sfx);
 
-    let bullet_starts: [(f32, f32); N_BULLETS] =
-        std::array::from_fn(|i| (g.bullets[i].x, g.bullets[i].y));
-    let bullet_was_active: [bool; N_BULLETS] =
-        std::array::from_fn(|i| g.bullets[i].active);
-    let mut player_shot_went_over_top = [false; MAX_PLAYER_BULLETS];
-    let mut bomb_reached_ground = [false; N_BULLETS];
-    for (i, b) in g.bullets.iter_mut().enumerate() {
-        if !b.active { continue; }
-        b.y += if b.player { -BULLET_SPEED } else { g.bomb_speed } * dt;
-        if b.y < PLAY_Y as f32 {
-            if b.player {
-                player_shot_went_over_top[i] = true;
-            } else {
-                b.active = false;
-            }
-        }
-        // A bomb that misses bursts on the ground line.
-        if !b.player && b.y + 12.0 > GROUND_Y as f32 {
-            bomb_reached_ground[i] = true;
-        }
-    }
+    let bullet_starts: [(f32, f32); N_BULLETS] = std::array::from_fn(|i| (g.bullets[i].x, g.bullets[i].y));
+    let bullet_was_active: [bool; N_BULLETS] = std::array::from_fn(|i| g.bullets[i].active);
+    let (over_top, landed) = move_shots(g, dt);
     g.fx.update(dt);
-
     march(g, dt, sfx);
-
     drop_bombs(g, dt);
-
     shoot_aliens(g, &bullet_starts, sfx);
     shoot_diver(g, &bullet_starts, sfx);
     hit_shields(g, &bullet_starts, &bullet_was_active);
     plow_shields(g);
 
-    // Bombs vs player
-    for bi in MAX_PLAYER_BULLETS..N_BULLETS {
-        if !g.bullets[bi].active { continue; }
-        let from = if bullet_was_active[bi] {
-            bullet_starts[bi]
-        } else {
-            (g.bullets[bi].x, g.bullets[bi].y)
-        };
-        let player_from = if bullet_was_active[bi] { player_x_before } else { g.player_x };
-        if bomb_hits_ship_swept(
-            from,
-            (g.bullets[bi].x, g.bullets[bi].y),
-            player_from,
-            g.player_x,
-        ) {
-            g.bullets[bi].active = false;
-            lose_ship(g, sfx, if bi == UFO_BOMB_IDX { "death_ufo_bomb" } else { "death_bomb" });
-            expire_player_shots(g, &player_shot_went_over_top);
-            expire_ground_bombs(g, &bomb_reached_ground);
-            return;
-        }
+    if let Some(death) = bombed(g, &bullet_starts, &bullet_was_active, player_x_before) {
+        lose_ship(g, sfx, death);
+        expire_player_shots(g, &over_top);
+        expire_ground_bombs(g, &landed);
+        return;
     }
-    expire_ground_bombs(g, &bomb_reached_ground);
+    expire_ground_bombs(g, &landed);
 
     if update_diver(g, dt, sfx) {
         lose_ship(g, sfx, "death_diver");
-        expire_player_shots(g, &player_shot_went_over_top);
+        expire_player_shots(g, &over_top);
         return;
     }
-
-    for a in g.aliens.iter() {
-        if a.alive && a.y + ALIEN_H as f32 >= GROUND_Y as f32 {
-            // The invasion landing ends the game outright, but as a real
-            // death explosion, and skips the respawn.
-            blip::bot::add("death_landing", 1.0);
-            let px = g.player_x;
-            g.spawn_player_death(px, (GROUND_Y - 28) as f32);
-            play_sfx(&sfx.explosion);
-            g.sess.lives = 0;
-            g.bullets.iter_mut().for_each(|b| b.active = false);
-            g.dead_timer.start(DEATH_EXPLOSION_PHASE);
-            g.dead_pause_total = DEATH_EXPLOSION_PHASE;
-            g.state = State::Dead;
-            stop_ufo(g);
-            return;
-        }
+    if g.aliens.iter().any(|a| a.alive && a.y + ALIEN_H as f32 >= GROUND_Y as f32) {
+        invaded(g, sfx);
+        return;
     }
-
     if update_ufo(g, dt, sfx, &bullet_starts, ufo_start_x, ufo_was_active) {
-        expire_player_shots(g, &player_shot_went_over_top);
+        expire_player_shots(g, &over_top);
         return; // the laser just killed the player this frame
     }
 
     update_boss(g, dt, sfx);
     hit_boss(g, sfx, &bullet_starts);
-
-    expire_player_shots(g, &player_shot_went_over_top);
-
-    if g.aliens_alive() == 0 && !g.boss_active && g.diver.is_none() {
-        // Whichever way this goes the ordinary UFO's pass is over: the
-        // level has ended, or a mothership is taking the sky and two
-        // sirens and two saucers at once is a fight nobody can read.
-        stop_ufo(g);
-
-        // On a boss level the formation is the doorway, not the level.
-        if g.is_boss_level() && !g.boss_done {
-            g.bullets[UFO_BOMB_IDX].active = false;
-            g.start_boss();
-            blip::play_alert(&sfx.ufo_siren);
-        } else {
-            play_sfx(&sfx.level_clear);
-            g.sess.next_level();
-            g.dead_timer.start(1.5);
-            g.state = State::Win;
-        }
-    }
-
+    expire_player_shots(g, &over_top);
+    if g.aliens_alive() == 0 && !g.boss_active && g.diver.is_none() { formation_cleared(g, sfx); }
     update_explosions(g, dt);
     update_chips(g, dt);
+}
+
+/// The ship's shots climb and the bombs fall; which shots went over the top and which bombs reached the ground (both
+/// stay live until the hit tests have had them; a bomb over the top just goes).
+fn move_shots(g: &mut Game, dt: f32) -> ([bool; MAX_PLAYER_BULLETS], [bool; N_BULLETS]) {
+    let mut over_top = [false; MAX_PLAYER_BULLETS];
+    let mut landed = [false; N_BULLETS];
+    for (i, b) in g.bullets.iter_mut().enumerate() {
+        if !b.active { continue; }
+        b.y += if b.player { -BULLET_SPEED } else { g.bomb_speed } * dt;
+        if b.y < PLAY_Y as f32 {
+            if b.player { over_top[i] = true; } else { b.active = false; }
+        }
+        // A bomb that misses bursts on the ground line.
+        landed[i] = !b.player && b.y + 12.0 > GROUND_Y as f32;
+    }
+    (over_top, landed)
+}
+
+/// The first bomb to strike the ship this frame, swept with it from where both were (a bomb dropped this frame from
+/// where it is), spent; and the death it counts as.
+fn bombed(g: &mut Game, starts: &[(f32, f32); N_BULLETS], was_active: &[bool; N_BULLETS], ship_before: f32) -> Option<&'static str> {
+    for bi in MAX_PLAYER_BULLETS..N_BULLETS {
+        if !g.bullets[bi].active { continue; }
+        let now = (g.bullets[bi].x, g.bullets[bi].y);
+        let (from, ship_from) = if was_active[bi] { (starts[bi], ship_before) } else { (now, g.player_x) };
+        if bomb_hits_ship_swept(from, now, ship_from, g.player_x) {
+            g.bullets[bi].active = false;
+            return Some(if bi == UFO_BOMB_IDX { "death_ufo_bomb" } else { "death_bomb" });
+        }
+    }
+    None
+}
+
+/// The invasion landing ends the game outright, but as a real death explosion, and skips the respawn.
+fn invaded(g: &mut Game, sfx: &Sounds) {
+    blip::bot::add("death_landing", 1.0);
+    let px = g.player_x;
+    g.spawn_player_death(px, (GROUND_Y - 28) as f32);
+    play_sfx(&sfx.explosion);
+    g.sess.lives = 0;
+    g.bullets.iter_mut().for_each(|b| b.active = false);
+    g.dead_timer.start(DEATH_EXPLOSION_PHASE);
+    g.dead_pause_total = DEATH_EXPLOSION_PHASE;
+    g.state = State::Dead;
+    stop_ufo(g);
+}
+
+/// The formation is gone. Whichever way this goes the ordinary UFO's pass is over: the level has ended, or a
+/// mothership is taking the sky, and two sirens and two saucers at once is a fight nobody can read.
+fn formation_cleared(g: &mut Game, sfx: &Sounds) {
+    stop_ufo(g);
+    // On a boss level the formation is the doorway, not the level.
+    if g.is_boss_level() && !g.boss_done {
+        g.bullets[UFO_BOMB_IDX].active = false;
+        g.start_boss();
+        blip::play_alert(&sfx.ufo_siren);
+    } else {
+        play_sfx(&sfx.level_clear);
+        g.sess.next_level();
+        g.dead_timer.start(1.5);
+        g.state = State::Win;
+    }
 }
 
 fn update_dead(g: &mut Game, dt: f32) {
@@ -1456,266 +781,6 @@ fn update_over(g: &mut Game, dt: f32) {
     if play_again(&mut g.dead_timer, dt) { g.start_game(); }
 }
 
-/// The mothership and its health bar, drawn under the ship so it is in the
-/// same glance: without it, slowly winning looks like doing nothing.
-fn draw_boss(blip: &Blip, g: &Game, saucer: &Texture2D) {
-    if !g.boss_active { return; }
-    let (x, y) = (g.boss_x, g.boss_y());
-
-    // White for a moment on every hit — at this size a small puff at the
-    // impact point is easy to lose against the hull.
-    let tint = if g.boss_flash > 0.0 {
-        BlipColor { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }
-    } else {
-        // Reddens as it goes: a second reading of the same number the bar
-        // carries, for the player whose eyes are on the ship.
-        let hurt = 1.0 - (g.boss_hp as f32 / g.boss_hp_max.max(1) as f32);
-        BlipColor { r: 1.0, g: 1.0 - hurt * 0.55, b: 1.0 - hurt * 0.65, a: 1.0 }
-    };
-    draw_saucer(blip, saucer, x, y, BOSS_W, BOSS_H, g.ufo_frame, tint);
-
-    let frac = (g.boss_hp as f32 / g.boss_hp_max.max(1) as f32).clamp(0.0, 1.0);
-    let (bw, bh) = (BOSS_W, 4.0);
-    let by = y + BOSS_H + 4.0;
-    blip.fill_rect(x, by, bw, bh, BlipColor { r: 0.25, g: 0.05, b: 0.05, a: 1.0 });
-    let bar = if frac > 0.5 {
-        BlipColor { r: 0.35, g: 0.95, b: 0.4, a: 1.0 }
-    } else if frac > 0.22 {
-        BlipColor { r: 1.0, g: 0.82, b: 0.2, a: 1.0 }
-    } else {
-        BlipColor { r: 1.0, g: 0.3, b: 0.25, a: 1.0 }
-    };
-    blip.fill_rect(x, by, bw * frac, bh, bar);
-}
-
-/// A small integer hash: the same stars and buildings every frame, without touching the game's random numbers.
-fn hash(n: u32) -> u32 {
-    let mut x = n.wrapping_mul(0x9E37_79B9) ^ 0x85EB_CA6B;
-    x ^= x >> 15;
-    x = x.wrapping_mul(0x2C1B_3C6D);
-    x ^ (x >> 12)
-}
-
-/// The night the cannon defends: a deep blue sky lightening toward the horizon, twinkling stars, a cream moon and a
-/// town of rooftops lit window by window, on a strip of grass.
-fn draw_backdrop(blip: &Blip, now: f32) {
-    let (top, bottom) = (PLAY_Y as f32, GROUND_Y as f32);
-    blip.fill_bands(0.0, top, WIN_W as f32, bottom - top, 8, |k| blip::blend(BLIP_NIGHT, BLIP_DUSK, k * k));
-    for i in 0..70u32 {
-        let h = hash(i);
-        let (x, y) = ((h % WIN_W as u32) as f32, PLAY_Y as f32 + ((h >> 10) % (GROUND_Y as u32 - 90 - PLAY_Y as u32)) as f32);
-        let tw = 0.35 + 0.35 * (now * (0.8 + (h >> 20 & 7) as f32 * 0.3) + i as f32).sin();
-        let s = if h >> 24 & 3 == 0 { 2.0 } else { 1.0 };
-        blip.fill_rect(x, y, s, s, BlipColor { a: tw * 0.8, ..BLIP_CREAM });
-    }
-    // A crescent: the cream moon with the sky's colour bitten out of it.
-    blip.fill_circle(56.0, PLAY_Y as f32 + 52.0, 19.0, BLIP_INK);
-    blip.fill_circle(56.0, PLAY_Y as f32 + 52.0, 18.0, BLIP_CREAM);
-    blip.fill_circle(63.0, PLAY_Y as f32 + 47.0, 16.0, BLIP_NIGHT);
-    let mut x = 0.0;
-    let mut i = 0u32;
-    let house = blip::blend(BLIP_DUSK, BLIP_INK, 0.45);
-    while x < WIN_W as f32 {
-        let h = hash(1000 + i);
-        let (w, tall) = (18.0 + (h % 20) as f32, 14.0 + ((h >> 8) % 34) as f32);
-        let top = GROUND_Y as f32 - 1.0 - tall;
-        blip.fill_rect(x, top, w - 2.0, tall, house);
-        blip.fill_rect(x, top, w - 2.0, 2.0, blip::blend(house, BLIP_PLUM, 0.35));
-        for wy in (0..(tall as i32 - 6)).step_by(7) {
-            for wx in (3..(w as i32 - 5)).step_by(6) {
-                let lit = hash(h ^ (wy as u32 * 31 + wx as u32)).is_multiple_of(5);
-                if lit { blip.fill_rect(x + wx as f32, top + 4.0 + wy as f32, 2.0, 3.0, BlipColor { a: 0.8, ..BLIP_GOLD }); }
-            }
-        }
-        x += w;
-        i += 1;
-    }
-    // The grass the cannon rolls on, below the ground line.
-    blip.fill_rect(0.0, GROUND_Y as f32 + 1.0, WIN_W as f32, (WIN_H - GROUND_Y) as f32, blip::blend(BLIP_LEAF, BLIP_INK, 0.55));
-}
-
-#[allow(clippy::too_many_arguments)]
-fn draw_play(blip: &Blip, g: &Game,
-             player: &Texture2D, alien: &[[Texture2D; 2]; 3],
-             explosion: &Texture2D, shield: &Texture2D, bullet: &Texture2D,
-             saucer: &Texture2D) {
-    draw_backdrop(blip, blip::now());
-    // The ground line pulses red while the invaders are close to landing.
-    let lowest = g.aliens.iter().filter(|a| a.alive).map(|a| a.y + ALIEN_H as f32).fold(0.0, f32::max);
-    let ground = if g.state == State::Play && lowest > (GROUND_Y - LANDING_WARN) as f32
-        && blip::blink(4.0) { BLIP_HEART } else { BLIP_LEAF };
-    blip.fill_rect(0.0, GROUND_Y as f32 - 1.0, WIN_W as f32, 3.0, ground);
-    blip.fill_rect(0.0, GROUND_Y as f32 + 2.0, WIN_W as f32, 1.0, BLIP_INK);
-
-    for s in 0..SHIELDS {
-        for r in 0..SHIELD_ROWS {
-            for c in 0..SHIELD_COLS {
-                if !g.shields[s].alive[r][c] { continue; }
-                let (bx, by) = shield_block_xy(&g.shields[s], r, c);
-                blip.draw_texture(shield, bx, by, SHIELD_BLOCK as f32, SHIELD_BLOCK as f32);
-            }
-        }
-    }
-
-    let now = blip::now();
-    for (i, a) in g.aliens.iter().enumerate() {
-        if !a.alive { continue; }
-        // The one about to dive shakes and flashes white: the tell.
-        let (shake, tint) = match g.dive_pick {
-            Some((idx, _)) if idx == i => ((now * 60.0).sin() * 3.0,
-                if (now * 14.0) as i32 % 2 == 0 { BLIP_WHITE } else { alien_color(a.kind) }),
-            _ => (0.0, alien_color(a.kind)),
-        };
-        blip.draw_texture_tinted(
-            &alien[a.kind][a.anim as usize],
-            a.x + shake, a.y, ALIEN_W as f32, ALIEN_H as f32, tint,
-        );
-    }
-    if let Some(d) = g.diver {
-        let frame = (d.t * 12.0) as usize % 2;
-        blip.draw_texture_tinted(&alien[d.kind][frame], d.x, d.y, ALIEN_W as f32, ALIEN_H as f32, BLIP_WHITE);
-    }
-
-    draw_boss(blip, g, saucer);
-
-    // Hidden through the explosion, then fades back in for the respawn.
-    let ship_alpha = if g.state == State::Dead {
-        // dead_pause_total, not DEAD_PAUSE: the invasion death has no respawn fade.
-        let total = g.dead_pause_total;
-        let elapsed = (total - g.dead_timer.remaining()).clamp(0.0, total);
-        if elapsed <= DEATH_EXPLOSION_PHASE || total <= DEATH_EXPLOSION_PHASE {
-            0.0
-        } else {
-            ((elapsed - DEATH_EXPLOSION_PHASE) / (total - DEATH_EXPLOSION_PHASE)).clamp(0.0, 1.0)
-        }
-    } else {
-        1.0
-    };
-
-    if ship_alpha > 0.0 {
-        // Exhaust puffs trail a moving cannon.
-        let speed = (g.player_vx / PLAYER_SPEED).clamp(-1.0, 1.0);
-        if speed.abs() > 0.2 {
-            let back = if speed > 0.0 { g.player_x + 2.0 } else { g.player_x + ALIEN_W as f32 - 2.0 };
-            for k in 1..=3 {
-                let px = back - speed * k as f32 * 5.0;
-                let flick = 0.6 + 0.4 * (now * 40.0 + k as f32).sin();
-                blip.fill_circle(px, GROUND_Y as f32 - 6.0, 3.0 - k as f32 * 0.6,
-                    BlipColor { r: 1.0, g: 0.6, b: 0.2, a: 0.5 * flick * speed.abs() * ship_alpha / k as f32 });
-            }
-        }
-        blip.draw_texture_tinted(
-            player, g.player_x, (GROUND_Y - 28) as f32, ALIEN_W as f32, 28.0,
-            BlipColor { r: 1.0, g: 1.0, b: 1.0, a: ship_alpha },
-        );
-    }
-
-    for b in g.bullets.iter().filter(|b| b.active && b.player) {
-        // A fading tail under the shot, and a flash at the muzzle as it leaves.
-        for k in 1..=3 {
-            blip.fill_rect(b.x + 1.0, b.y + 12.0 + (k - 1) as f32 * 6.0, 2.0, 6.0, BlipColor { r: 0.6, g: 0.9, b: 1.0, a: 0.35 / k as f32 });
-        }
-        if b.y > (GROUND_Y - 60) as f32 {
-            blip.fill_glow_circle(b.x + 2.0, (GROUND_Y - 28) as f32, 8.0, BlipColor { r: 0.8, g: 0.95, b: 1.0, a: 0.6 });
-        }
-        blip.draw_texture_tinted(bullet, b.x, b.y, 4.0, 12.0, BLIP_CREAM);
-    }
-
-    for e in g.explosions.iter() {
-        if !e.active { continue; }
-        let alpha = (e.ttl / e.max_ttl).clamp(0.0, 1.0);
-        let tc = BlipColor { r: 1.0, g: 1.0, b: 1.0, a: alpha };
-        // (e.x, e.y) is the top-left of a plain ALIEN_W box at scale 1; grow
-        // outward from that box's centre for bigger bursts so callers don't
-        // need to know about scale.
-        let sz = ALIEN_W as f32 * e.scale;
-        let grow = (sz - ALIEN_W as f32) / 2.0;
-        blip.draw_texture_tinted(
-            explosion,
-            e.x - grow, e.y - grow, sz, sz, tc,
-        );
-    }
-
-    draw_ufo(blip, g, saucer);
-    draw_chips(blip, g);
-    g.fx.draw(blip);
-    // Bombs last, so a kill's burst and score never hide one falling from the formation.
-    for b in g.bullets.iter().filter(|b| b.active && !b.player) {
-        blip.fill_glow_circle(b.x + 2.0, b.y + 8.0, 7.0, BlipColor { r: 1.0, g: 0.5, b: 0.1, a: 0.35 });
-        blip.draw_texture_tinted(bullet, b.x, b.y, 4.0, 12.0, BLIP_ORANGE);
-    }
-    blip.draw_hud(g.sess.score, g.sess.lives);
-    if g.streak.count > 0 {
-        let label = streak_label(&g.streak);
-        let x = blip.text_cx(&label, 2) as f32;
-        blip.draw_text_outlined(&label, x, (GROUND_Y + 10) as f32, 2.0, BLIP_GOLD, BLIP_INK);
-    } else if g.lost_run.1 > 0.0 {
-        let label = format!("{} IN A ROW", g.lost_run.0);
-        let x = blip.text_cx(&label, 2) as f32;
-        blip.draw_text_outlined(&label, x, (GROUND_Y + 10) as f32, 2.0, BLIP_HEART, BLIP_INK);
-    }
-}
-
-/// How long a broken run stays shown, seconds.
-const LOST_RUN_SECS: f32 = 0.8;
-
-/// The strip under the ground line: the run of hits, the multiple it earns, and how many more raise it.
-fn streak_label(s: &blip::Streak) -> String {
-    let (n, times) = (s.count, s.multiple());
-    match s.to_next() {
-        None => format!("{n} IN A ROW  X{times}"),
-        Some(to_next) => format!("{n} IN A ROW  X{times}  {to_next} FOR X{}", times + 1),
-    }
-}
-
-fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3]) {
-    draw_backdrop(blip, blip::now());
-    blip.draw_logo("DEFENDER", (WIN_W / 2) as f32, (WIN_H / 5 + 14) as f32, 6.0, alien_color(0));
-    // The title is 6 x 7 = 42px tall: the high score clears it by a real margin.
-    blip.draw_attract_bar();
-
-    let dw = (ALIEN_W / 2) as f32;
-    let dh = (ALIEN_H / 2) as f32;
-    let ax = (blip.text_cx("30 PTS", 2) - ALIEN_W / 2 - 8) as f32;
-    let voff = ((7 * 2 - ALIEN_H / 2) / 2) as f32;
-
-    let row0 = (WIN_H / 2 - 40) as f32;
-    let row1 = (WIN_H / 2 - 20) as f32;
-    let row2 = (WIN_H / 2) as f32;
-
-    blip.draw_panel((WIN_W / 2 - 110) as f32, row0 - 16.0, 220.0, 84.0, 1.0);
-    // The invaders' two-frame shuffle, one beat every half second.
-    let beat = (blip::now() * 2.0) as i64;
-    let frame = beat.rem_euclid(2) as usize;
-    blip.draw_texture_tinted(&alien[0][frame], ax, row0 + voff, dw, dh, alien_color(0));
-    blip.draw_texture_tinted(&alien[1][frame], ax, row1 + voff, dw, dh, alien_color(1));
-    blip.draw_texture_tinted(&alien[2][frame], ax, row2 + voff, dw, dh, alien_color(2));
-
-    blip.draw_centered("30 PTS",        row0,                 2.0, alien_color(0));
-    blip.draw_centered("20 PTS",        row1,                 2.0, alien_color(1));
-    blip.draw_centered("10 PTS",        row2,                 2.0, alien_color(2));
-    blip.draw_start_prompt((WIN_H * 2 / 3) as f32);
-    // A patrol steps across the foot of the screen, a stride per beat.
-    let sweep = 5i64;
-    let pos = beat.rem_euclid(sweep * 2);
-    let step = if pos < sweep { pos } else { sweep * 2 - pos - 1 };
-    for i in 0..6i64 {
-        let kind = (i % 3) as usize;
-        let x = 90.0 + (i * 52) as f32 + step as f32 * 12.0;
-        blip.draw_texture_tinted(&alien[kind][frame], x, (WIN_H * 5 / 6) as f32, dw, dh, alien_color(kind));
-    }
-}
-
-fn draw_clear(blip: &Blip, level: i32, t: f32) {
-    // Fireworks over the town the cannon kept safe.
-    draw_backdrop(blip, blip::now());
-    blip::draw_fireworks(blip, t, (60.0, (PLAY_Y + 60) as f32, (WIN_W - 120) as f32, 220.0),
-        &[alien_color(0), BLIP_SEA, BLIP_LEAF, BLIP_GOLD]);
-    let buf = format!("LEVEL {}", level);
-    blip.draw_logo("WAVE CLEAR", (WIN_W / 2) as f32, (WIN_H / 3) as f32, 5.0, BLIP_SEA);
-    blip.draw_message(&buf, (WIN_W / 2) as f32, (WIN_H / 2 + 10) as f32, 3.0, BLIP_GOLD, 1.0);
-}
-
 fn conf() -> blip::macroquad::window::Conf {
     window_conf("DEFENDER", WIN_W, WIN_H)
 }
@@ -1726,16 +791,7 @@ async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
-    let player = load_png(blip::png!("player_ship"));
-    let alien = [
-        [load_png(blip::png!("alien_squid_a")), load_png(blip::png!("alien_squid_b"))],
-        [load_png(blip::png!("alien_crab_a")),  load_png(blip::png!("alien_crab_b"))],
-        [load_png(blip::png!("alien_octopus_a")),  load_png(blip::png!("alien_octopus_b"))],
-    ];
-    let explosion = load_png(blip::png!("explosion"));
-    let shield = load_png(blip::png!("shield_block"));
-    let bullet = load_png(blip::png!("bullet"));
-    let saucer = load_png(blip::png!("ufo_saucer"));
+    let art = Art::load();
 
     let sfx = Sounds::load().await;
     // The invasion tune, and the mothership's on boss levels.
@@ -1772,15 +828,13 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title => draw_title(&blip, &alien),
+            State::Title => draw_title(&blip, &art.alien),
             State::Win   => draw_clear(&blip, g.sess.level, 1.5 - g.dead_timer.remaining()),
             State::Over  => {
                 draw_backdrop(&blip, blip::now());
                 blip.draw_game_over(g.sess.score, web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active());
             }
-            State::Play | State::Dead => {
-                draw_play(&blip, &g, &player, &alien, &explosion, &shield, &bullet, &saucer);
-            }
+            State::Play | State::Dead => draw_play(&blip, &g, &art),
         }
 
         blip.next_frame().await;
@@ -1788,126 +842,4 @@ async fn main() {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn at_level(level: i32) -> Game {
-        let mut g = Game::new();
-        g.sess.reset(LIVES_START);
-        g.sess.level = level;
-        g
-    }
-
-    #[test]
-    fn a_mothership_ends_every_fifth_level_and_no_others() {
-        for level in 1..=20 {
-            let g = at_level(level);
-            assert_eq!(
-                g.is_boss_level(), level % 5 == 0,
-                "level {level} disagrees about whether it ends with a mothership"
-            );
-        }
-    }
-
-    /// A run of `n` hits.
-    fn run_of(n: i32) -> blip::Streak {
-        let mut s = blip::Streak::new(STREAK_PER, STREAK_MAX);
-        for _ in 0..n { s.hit(); }
-        s
-    }
-
-    #[test]
-    fn the_strip_counts_down_to_the_next_multiple() {
-        let shown: Vec<(i32, i32, String)> = [1, 3, 4, 6, 7]
-            .into_iter().map(|n| (n, run_of(n).multiple(), streak_label(&run_of(n)))).collect();
-        assert_eq!(shown[0], (1, 1, "1 IN A ROW  X1  3 FOR X2".to_string()));
-        assert_eq!(shown[1], (3, 1, "3 IN A ROW  X1  1 FOR X2".to_string()));
-        assert_eq!(shown[2], (4, 2, "4 IN A ROW  X2  3 FOR X3".to_string()));
-        assert_eq!(shown[3], (6, 2, "6 IN A ROW  X2  1 FOR X3".to_string()));
-        assert_eq!(shown[4], (7, 3, "7 IN A ROW  X3  3 FOR X4".to_string()));
-    }
-
-    #[test]
-    fn the_multiple_stops_at_its_cap() {
-        assert_eq!(run_of(STREAK_PER * STREAK_MAX * 3).multiple(), STREAK_MAX);
-        assert_eq!(streak_label(&run_of(100)), format!("100 IN A ROW  X{STREAK_MAX}"));
-    }
-
-    #[test]
-    fn each_mothership_is_tougher_than_the_last() {
-        // The point of the fight is that it is the thing a run is aiming
-        // at. If the fifth one is no harder than the first, the levels
-        // between them have not been climbing toward anything.
-        let boss = |level| { let mut g = at_level(level); g.start_boss(); g };
-        let levels = [5, 10, 15, 20, 25];
-        blip::testing::climbs("mothership health", levels, |l| boss(l).boss_hp);
-        blip::testing::climbs("mothership speed", levels, |l| boss(l).boss_speed());
-        blip::testing::never_rises("volley gap", levels, |l| boss(l).boss_volley_gap());
-    }
-
-    #[test]
-    fn the_volley_never_becomes_unsurvivable() {
-        // Deep runs must stay a fight rather than a wall: the gap between
-        // volleys has a floor, so the difficulty curve flattens instead
-        // of eventually firing every frame.
-        let mut g = at_level(500);
-        g.start_boss();
-        assert!(
-            g.boss_volley_gap() >= BOSS_VOLLEY_FLOOR,
-            "the volley gap fell through its floor at level 500 ({}s)", g.boss_volley_gap()
-        );
-    }
-
-    #[test]
-    fn a_mothership_starts_at_full_health_and_on_screen() {
-        let mut g = at_level(10);
-        g.start_boss();
-        assert!(g.boss_active);
-        assert_eq!(g.boss_hp, g.boss_hp_max);
-        // It flies in from whichever side it starts on, so it is allowed
-        // to begin off-screen — but only by its own width, or it spends
-        // the first seconds of the fight invisible.
-        assert!(
-            g.boss_x >= -BOSS_W && g.boss_x <= WIN_W as f32,
-            "the mothership started {} px out, off its own entry", g.boss_x
-        );
-    }
-
-    #[test]
-    fn a_mothership_hangs_above_the_player_not_on_top_of_them() {
-        let mut g = at_level(5);
-        g.start_boss();
-        for _ in 0..600 {
-            g.boss_phase += 0.05;
-            let y = g.boss_y();
-            assert!(y >= PLAY_Y as f32, "the mothership rode up into the HUD ({y})");
-            assert!(
-                y + BOSS_H < (GROUND_Y - 40) as f32,
-                "the mothership sank onto the player's own line ({y})"
-            );
-        }
-    }
-
-    #[test]
-    fn a_dead_mothership_does_not_come_back_on_the_same_level() {
-        // Once the mothership is down the formation-cleared check keeps
-        // passing; without boss_done the level would summon one forever.
-        let mut g = at_level(5);
-        g.start_boss();
-        g.boss_active = false;
-        g.boss_done = true;
-        assert!(g.is_boss_level() && g.boss_done,
-            "nothing records that this level's mothership has already been dealt with");
-    }
-
-    #[test]
-    fn a_new_level_forgets_the_last_mothership() {
-        let mut g = at_level(5);
-        g.start_boss();
-        g.boss_done = true;
-        g.sess.next_level();
-        g.start_wave();
-        assert!(!g.boss_active, "the old mothership survived into the next level");
-        assert!(!g.boss_done, "the next boss level would be skipped entirely");
-    }
-}
+mod tests;

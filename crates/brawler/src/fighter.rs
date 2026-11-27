@@ -202,7 +202,8 @@ impl Fighter {
             shown: Act::Idle, shown_t: 0.0, shown_mv: MoveId::LowPunch,
             shown_air: false, shown_vy: 0.0, prev_air: false, prev_vy: 0.0,
             prev_act: Act::Idle, prev_mv: MoveId::LowPunch, prev_t: 0.0, blend: 0.0,
-            blend_len: POSE_BLEND, land: 0.0, land_force: 0.0, struck_legs: false, struck_body: false, struck_force: 1.0, downed_by: MoveId::LowPunch, bows: false, taunt: 0.0, strikes: 0, shown_facing: facing, turn: 0.0,
+            blend_len: POSE_BLEND, land: 0.0, land_force: 0.0, struck_legs: false, struck_body: false, struck_force: 1.0,
+            downed_by: MoveId::LowPunch, bows: false, taunt: 0.0, strikes: 0, shown_facing: facing, turn: 0.0,
             soar: 0.0, stomp: false, parry_t: 0.0, throw_rest: 0.0,
             webbed: 0.0, web_hits: 0, web_rest: 0.0, called: false, calling: false, aim: None,
             alt_punch: false, alt_kick: false, stumble_roll: 0, stumble: 0.0, stagger: 0.0,
@@ -232,6 +233,9 @@ impl Fighter {
             || (act == Act::Attack && matches!(mv, MoveId::Sweep))
     }
     /// How big, as a multiple of a grown fighter.
+    /// Whether this fighter's clock passed `at` seconds into the current action during the last `dt`.
+    pub(crate) fn reached(&self, at: f32, dt: f32) -> bool { self.t >= at && self.t - dt < at }
+
     pub(crate) fn size(&self) -> f32 { self.arch().size }
     /// How fast a ground attack throws the body forward. Nothing for a
     /// full-size fighter; a small one has half the reach and has to leap in

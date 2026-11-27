@@ -70,47 +70,22 @@ pub fn move_ball(
         let t = (step as f32 + 0.5) / substeps as f32;
         let lpad = lpad_y - lpad_vy * dt * (1.0 - t);
         let rpad = rpad_y - rpad_vy * dt * (1.0 - t);
-        let (prev_x, prev_y) = (g.ball_x + BALL_SZ * 0.5, g.ball_y + BALL_SZ * 0.5);
+        let prev = (g.ball_x + BALL_SZ * 0.5, g.ball_y + BALL_SZ * 0.5);
         g.ball_x += g.ball_vx * sdt;
         g.ball_y += g.ball_vy * sdt;
-        let (next_x, next_y) = (g.ball_x + BALL_SZ * 0.5, g.ball_y + BALL_SZ * 0.5);
+        let next = (g.ball_x + BALL_SZ * 0.5, g.ball_y + BALL_SZ * 0.5);
 
         bounce_off_walls(g, &mut events);
-
-        if g.ball_vx < 0.0
-            && segment_rect_overlap(
-                prev_x,
-                prev_y,
-                next_x,
-                next_y,
-                LPAD_X - BALL_SZ * 0.5,
-                lpad - BALL_SZ * 0.5,
-                PAD_W + BALL_SZ,
-                PAD_H + BALL_SZ,
-            )
-        {
+        if g.ball_vx < 0.0 && meets(prev, next, LPAD_X, lpad) {
             g.ball_x = LPAD_X + PAD_W;
             bounce(g, lpad, lpad_vy, 1.0);
             events.push(Event::LeftHit);
         }
-
-        if g.ball_vx > 0.0
-            && segment_rect_overlap(
-                prev_x,
-                prev_y,
-                next_x,
-                next_y,
-                RPAD_X - BALL_SZ * 0.5,
-                rpad - BALL_SZ * 0.5,
-                PAD_W + BALL_SZ,
-                PAD_H + BALL_SZ,
-            )
-        {
+        if g.ball_vx > 0.0 && meets(prev, next, RPAD_X, rpad) {
             g.ball_x = RPAD_X - BALL_SZ;
             bounce(g, rpad, rpad_vy, -1.0);
             events.push(Event::RightHit);
         }
-
         if g.ball_x + BALL_SZ < 0.0 {
             events.push(Event::Point(false));
             return events;
@@ -121,6 +96,11 @@ pub fn move_ball(
         }
     }
     events
+}
+
+/// Whether the ball's centre, moving from `prev` to `next`, crosses the bat at (`x`, `y`) grown by the ball's half size.
+fn meets(prev: (f32, f32), next: (f32, f32), x: f32, y: f32) -> bool {
+    segment_rect_overlap(prev.0, prev.1, next.0, next.1, x - BALL_SZ * 0.5, y - BALL_SZ * 0.5, PAD_W + BALL_SZ, PAD_H + BALL_SZ)
 }
 
 /// Reflect the overshoot rather than clamp, so no speed is shaved off.

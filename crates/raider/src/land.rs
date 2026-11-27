@@ -109,12 +109,18 @@ const FIELDS: [(f32, f32, f32); 6] = [
 pub fn draw_land(blip: &Blip, g: &Game) {
     let Some(cy) = coast_y(g) else { return };
     if cy + 20.0 < 0.0 { return; }
-    let w = WIN_W as f32;
     let d_top = cy;                       // inland distance at the top edge
     let d_low = (cy - WIN_H as f32).max(0.0);
     let city = g.city_from.unwrap_or(f32::MAX);
+    draw_fields(blip, cy, d_low, d_top, city);
+    if city < d_top { draw_city(blip, cy, d_low, d_top, city); }
+    draw_shore(blip, g, cy, d_low);
+    draw_batteries(blip, g, cy);
+}
 
-    // farmland, row by row of fields
+/// Farmland, row by row of fields with hedgerows, a road every few rows, up to where the city starts.
+fn draw_fields(blip: &Blip, cy: f32, d_low: f32, d_top: f32, city: f32) {
+    let w = WIN_W as f32;
     let r0 = (d_low / FIELD) as i32;
     let r1 = (d_top / FIELD) as i32 + 1;
     for r in r0..=r1 {
@@ -139,43 +145,47 @@ pub fn draw_land(blip: &Blip, g: &Game) {
             blip.fill_rect(0.0, y0 + FIELD * 0.45, w, 4.0, BlipColor::new(0.55, 0.52, 0.46, 1.0));
         }
     }
+}
 
-    // the city
-    if city < d_top {
-        let c_low = city.max(d_low);
-        blip.fill_rect(0.0, cy - d_top, w, d_top - c_low, BlipColor::new(0.30, 0.30, 0.32, 1.0));
-        let b0 = (c_low / CITY_BLOCK) as i32;
-        let b1 = (d_top / CITY_BLOCK) as i32 + 1;
-        for r in b0..=b1 {
-            let d0 = r as f32 * CITY_BLOCK;
-            if d0 + CITY_BLOCK < city { continue; }
-            for c in 0..(w / CITY_BLOCK) as i32 + 1 {
-                let (bx, by) = (c as f32 * CITY_BLOCK + STREET / 2.0, cy - d0 - CITY_BLOCK + STREET / 2.0);
-                let inner = CITY_BLOCK - STREET;
-                if hash(r, c + 50) < 0.12 {
-                    // a park
-                    blip.fill_rect(bx, by, inner, inner, BlipColor::new(0.28, 0.42, 0.22, 1.0));
-                    continue;
-                }
-                // two to four buildings, each a roof with its shadow
-                let n = 2 + (hash(c, r + 9) * 3.0) as i32;
-                for k in 0..n {
-                    let (fx, fy) = (hash(r * 7 + k, c), hash(c * 5 + k, r));
-                    let (bw, bh) = (inner * (0.3 + 0.35 * hash(k, r + c)), inner * (0.3 + 0.35 * hash(r + c, k)));
-                    let (x, y) = (bx + fx * (inner - bw), by + fy * (inner - bh));
-                    blip.fill_rect(x + 3.0, y + 4.0, bw, bh, BlipColor::new(0.10, 0.10, 0.12, 0.6));
-                    let tone = hash(r + k, c * 3);
-                    let roof = if tone < 0.3 { BlipColor::new(0.55, 0.30, 0.24, 1.0) }
-                        else if tone < 0.7 { BlipColor::new(0.52, 0.52, 0.54, 1.0) }
-                        else { BlipColor::new(0.36, 0.34, 0.33, 1.0) };
-                    blip.fill_rect(x, y, bw, bh, roof);
-                    blip.fill_rect(x, y, bw, 1.5, BlipColor::new(1.0, 1.0, 1.0, 0.18));
-                }
+/// The city: grey streets, parks, and blocks of two to four buildings, each a roof with its shadow.
+fn draw_city(blip: &Blip, cy: f32, d_low: f32, d_top: f32, city: f32) {
+    let w = WIN_W as f32;
+    let c_low = city.max(d_low);
+    blip.fill_rect(0.0, cy - d_top, w, d_top - c_low, BlipColor::new(0.30, 0.30, 0.32, 1.0));
+    let b0 = (c_low / CITY_BLOCK) as i32;
+    let b1 = (d_top / CITY_BLOCK) as i32 + 1;
+    for r in b0..=b1 {
+        let d0 = r as f32 * CITY_BLOCK;
+        if d0 + CITY_BLOCK < city { continue; }
+        for c in 0..(w / CITY_BLOCK) as i32 + 1 {
+            let (bx, by) = (c as f32 * CITY_BLOCK + STREET / 2.0, cy - d0 - CITY_BLOCK + STREET / 2.0);
+            let inner = CITY_BLOCK - STREET;
+            if hash(r, c + 50) < 0.12 {
+                // a park
+                blip.fill_rect(bx, by, inner, inner, BlipColor::new(0.28, 0.42, 0.22, 1.0));
+                continue;
+            }
+            // two to four buildings, each a roof with its shadow
+            let n = 2 + (hash(c, r + 9) * 3.0) as i32;
+            for k in 0..n {
+                let (fx, fy) = (hash(r * 7 + k, c), hash(c * 5 + k, r));
+                let (bw, bh) = (inner * (0.3 + 0.35 * hash(k, r + c)), inner * (0.3 + 0.35 * hash(r + c, k)));
+                let (x, y) = (bx + fx * (inner - bw), by + fy * (inner - bh));
+                blip.fill_rect(x + 3.0, y + 4.0, bw, bh, BlipColor::new(0.10, 0.10, 0.12, 0.6));
+                let tone = hash(r + k, c * 3);
+                let roof = if tone < 0.3 { BlipColor::new(0.55, 0.30, 0.24, 1.0) }
+                    else if tone < 0.7 { BlipColor::new(0.52, 0.52, 0.54, 1.0) }
+                    else { BlipColor::new(0.36, 0.34, 0.33, 1.0) };
+                blip.fill_rect(x, y, bw, bh, roof);
+                blip.fill_rect(x, y, bw, 1.5, BlipColor::new(1.0, 1.0, 1.0, 0.18));
             }
         }
     }
+}
 
-    // the shore: grass down to the beach, sand, and surf on the sea side
+/// The shore: grass down to the beach, sand, and surf on the sea side.
+fn draw_shore(blip: &Blip, g: &Game, cy: f32, d_low: f32) {
+    let w = WIN_W as f32;
     let step = 6.0;
     let mut x = 0.0;
     while x < w {
@@ -188,8 +198,6 @@ pub fn draw_land(blip: &Blip, g: &Game) {
         blip.fill_rect(x, yc - 1.0, step + 0.5, 3.0, BlipColor::new(0.95, 0.97, 1.0, foam));
         x += step;
     }
-
-    draw_batteries(blip, g, cy);
 }
 
 /// Each battery: sandbags round a gun pit, the barrel on the player; a

@@ -667,261 +667,8 @@ pub(crate) fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
             q.lead_hand = q.lead_hand.to(tip, ext);
             q.twist = ext.max(0.0);
         }
-        Shape::Punch(false) => {
-            let e = ext.max(0.0);
-            let inch = f.mv == MoveId::Special;
-            // Step in and sit into it; a low one is reached by sinking at the
-            // knees, not by folding over.
-            let low = ((60.0 - tip.u) / 30.0).clamp(0.0, 1.0) * e;
-            let art = ARTS[f.who];
-            // Karate lunges into a long front stance, the back leg driven straight; Hung Gar drops into its horse.
-            let (step, brace, sit) = match art {
-                Art::Karate => (14.0, 9.0, 4.0),
-                Art::HungGar => (6.0, 4.0, 4.0),
-                Art::WingChun => (6.0, 1.0, 0.0),
-                _ => (8.0, 3.0, 0.0),
-            };
-            q.hip = p(q.hip.f + 4.0 * ext, q.hip.u - 2.0 * e - 9.0 * low - sit * e);
-            q.head.u -= 1.5 * e + 10.0 * low + sit * e;
-            q.lead_foot.f += step * ext;
-            q.rear_foot.f -= brace * ext;
-            // The shoulder goes where a straight arm puts it: the body turns
-            // and leans just far enough for the fist to land at full reach,
-            // and no further.
-            const ARM: f32 = UARM + FARM - 3.0;
-            let drop = q.hip.u + SPINE * (q.head.u - q.hip.u) - 8.5 - tip.u;
-            let shoulder = tip.f - (ARM * ARM - drop * drop).max(0.0).sqrt();
-            let lean = (q.hip.f + (shoulder - 7.0 - q.hip.f) / SPINE - q.head.f).clamp(2.0, 24.0);
-            q.head.f += lean * ext;
-            if f.alt_punch {
-                // A chain: the far fist goes straight down the middle from
-                // the shoulder that is already forward, and the near one
-                // comes back to the chest under it.
-                q.rear_hand = q.rear_hand.to(tip, ext);
-                q.lead_hand = q.lead_hand.to(p(q.head.f + 9.0, tip.u - 16.0), e.sqrt());
-                q.head.f -= lean * 0.45 * ext;
-            } else {
-                // The far fist snaps back to guard the chin, out of the way
-                // before the punch comes through where it was.
-                q.rear_hand = q.rear_hand.to(p(q.head.f + 6.0, q.head.u - 22.0), e.sqrt());
-                // The one-inch punch starts with the fist already an inch off the mark.
-                let start = if inch { p(tip.f - 9.0, tip.u) } else { q.lead_hand };
-                q.lead_hand = match punch_style(f) {
-                    // Up over the head and brought down onto the mark, the body bowing into it.
-                    PunchStyle::Hammer if f.mv != MoveId::Hook => {
-                        q.head.f += 4.0 * e;
-                        bend(start, p(start.f + 2.0, (tip.u + 30.0).max(start.u + 14.0)), tip, ext.max(0.0))
-                    }
-                    // Flicked out from the chest in a little arc, knuckles first.
-                    PunchStyle::Backfist if f.mv != MoveId::Hook =>
-                        bend(start, p(tip.f - 16.0, tip.u + 9.0), tip, ext.max(0.0)),
-                    _ => start.to(tip, ext),
-                };
-                match punch_style(f) {
-                    // The head slips down and off the line behind the jab.
-                    PunchStyle::Boxer => { q.head.u -= 5.0 * e; q.head.f -= 2.0 * e; }
-                    PunchStyle::Palm => q.open = e > 0.4,
-                    _ => {}
-                }
-                // The shoulder comes through with the hip.
-                q.twist = e;
-            }
-            // What the other hand does is most of what tells one art from another.
-            let (near, far) = if f.alt_punch { (false, true) } else { (true, false) };
-            let guard = |q: &mut Pose, to: P, open: bool| {
-                if near { q.rear_hand = q.rear_hand.to(to, e.sqrt()); } else if far { q.lead_hand = q.lead_hand.to(to, e.sqrt()); }
-                if open { q.open = e > 0.4; }
-            };
-            match art {
-                // Hikite: the other fist pulled back to the hip, knuckles down, as the punch goes out.
-                Art::Karate => guard(q, p(q.hip.f + 7.0, q.hip.u + 15.0), false),
-                // The other hand stays out on the centre line behind the punch, open (wu sau); the body stays square.
-                Art::WingChun => {
-                    guard(q, p(tip.f - 24.0, tip.u - 3.0), true);
-                    if far { q.twist = q.twist.min(0.35); }
-                }
-                // A palm strike, the other hand clawed back to the chest.
-                Art::HungGar => guard(q, p(q.head.f + 10.0, q.head.u - 30.0), true),
-                // The guard never drops: the other glove stays at the brow.
-                Art::MuayThai => guard(q, p(q.head.f + 9.0, q.head.u - 12.0), false),
-                // The straight lead: thrown from where the hand hangs, the rear hand kept at the chin.
-                Art::JeetKuneDo => guard(q, p(q.head.f + 8.0, q.head.u - 20.0), false),
-                _ => {}
-            }
-            if f.mv == MoveId::Hook || ((art == Art::Brawling || jkd_hook(f)) && !f.alt_punch) {
-                // A hook comes round, not straight: the fist swings out and
-                // up on its way in, and the body turns hard behind it.
-                let swing = (std::f32::consts::PI * e).sin();
-                q.lead_hand.u += 10.0 * swing;
-                q.lead_hand.f -= 6.0 * swing;
-                q.hip.f += 3.0 * e;
-                q.twist = 1.0f32.min(q.twist + 0.4 * e);
-            }
-            // The one-inch punch: coiled low through the startup, then legs, hips and shoulder fire in one chain
-            // (the knees snapping straight first) and only the fist's last inch shows.
-            if inch {
-                // The other hand stays home at the chest throughout, clear of the one an inch off the mark.
-                q.rear_hand = p(q.head.f + 14.0, q.head.u - 30.0);
-                let coil = 1.0 - e;
-                q.hip.u -= 6.0 * coil;
-                q.head.u -= 5.0 * coil;
-                q.head.f += 6.0 * e - 3.0 * coil;
-                q.hip.f += 4.0 * e;
-                q.twist = e;
-            }
-            // The back foot turns over onto its ball as the hip comes through.
-            q.rear_heel += 0.5 * e;
-        }
-        Shape::Kick(air, lift) => {
-            let k = KICK;
-            let e = ext.max(0.0);
-            // 0 for the low kick, 1 for the high one.
-            let high = ((lift - 0.7) / 0.55).clamp(0.0, 1.0);
-            // The higher the kick the further the shoulders go back to pay
-            // for it, and the more the standing leg straightens under it.
-            // In the air the side-kickers (and taekwondo) throw the flying side kick; everyone else a snap.
-            let style = match (air, KICKS[f.who]) {
-                (true, KickStyle::Side | KickStyle::Axe) => KickStyle::Side,
-                // LANCER's flying kick is a side kick too, the knee tucked: as a snap it sat on a chair in the air.
-                (true, _) if f.arch().build == Build::Duelist => KickStyle::Side,
-                (true, _) => KickStyle::Snap,
-                _ => kick_style(f),
-            };
-            let back = if air { k.air_lean * lift } else { 0.35 + 0.90 * high };
-            // (Halved from 0.8-1.6: laid back in one line with the leg, the body read as an arabesque. SF2's
-            // kickers stay over the standing foot and let the leg do the work.)
-            // (DRAKE's side kick lies back the furthest of anyone's, as Bruce Lee's does on film: 1.15 to 0.85.)
-            // In the air his flying side kick sits more upright than anyone's (0.6): leaned back as far, it read as
-            // sitting on a chair.
-            let side_lean = match (formless(f.who), air) { (true, false) => 1.15, (true, true) => 0.6, _ => 0.85 };
-            let back = back * match style {
-                KickStyle::Snap => 0.35, KickStyle::Round => 0.7, KickStyle::Side => side_lean,
-                KickStyle::Crescent => 0.5, KickStyle::Push => 0.25,
-                // Taekwondo and Muay Thai both lie back from a high kick, well past the others.
-                KickStyle::Axe => 1.0, KickStyle::Thai => 0.95, KickStyle::Spin => 0.7,
-            };
-            let drive = if air { k.hip_drive + 9.0 } else { k.hip_drive };
-            // The standing knee stays bent under a grounded kick: rising onto a straight leg is ballet.
-            let rise = if air { k.hip_rise } else { k.hip_rise * 0.7 };
-            q.hip = p(q.hip.f + drive * ext, q.hip.u + rise * ext);
-            // The shoulders ride forward with most of the hip's drive: left behind, the torso reclined into the
-            // kick like a chair (SF2's kickers stay stacked over the hips).
-            q.head.f += drive * ext * 0.7 - k.lean * 1.25 * ext * back;
-            q.head.u -= 1.4 * ext;
-            if !air {
-                q.rear_foot = p(-18.0 + (q.hip.f - k.plant - -18.0) * ext, 0.0);
-            } else {
-                // The other leg tucked up tight under the seat, as SF2's jump kicks are drawn; in a flying side kick
-                // the knee comes up to the chest instead, the foot under the hip.
-                q.rear_foot = if style == KickStyle::Side {
-                    // (10 forward and 22 down: nearer, the anatomy test calls the leg folded to guesswork.)
-                    p(q.hip.f + 10.0, (q.hip.u - 22.0).max(30.0))
-                } else {
-                    p(q.hip.f - 4.0, (q.hip.u - 22.0).max(30.0))
-                };
-            }
-            // The standing foot stays flat on the boards (a roundhouse pivots on its ball). The kicking foot hits
-            // with the heel or the ball, toes pulled back, never pointed like a dancer's.
-            // (A Thai kick turns right over on the ball of the standing foot.)
-            if !air { q.rear_heel = match style { KickStyle::Round => 0.15 + 0.2 * e, KickStyle::Thai => 0.15 + 0.4 * e, _ => 0.05 }; }
-            q.lead_heel = match style {
-                _ if air => -0.35 * e,
-                KickStyle::Round => -0.1 * e,
-                KickStyle::Side | KickStyle::Push | KickStyle::Spin => -0.6 * e,
-                KickStyle::Snap => -0.5 * e,
-                KickStyle::Crescent => -0.25 * e,
-                KickStyle::Axe => -0.55 * e,
-                KickStyle::Thai => 0.1 * e,
-            };
-            let chamber = p(q.hip.f + k.knee_lead,
-                if air { k.chamber_air } else { k.chamber * (0.72 + 0.28 * high) });
-            let kc = kick_curve(ext);
-            let start = q.lead_foot;
-            q.lead_foot = match style {
-                // Knee across and the foot cocked behind it, then swung round in an arc onto the mark.
-                KickStyle::Round => {
-                    let cock = p(q.hip.f + 8.0, chamber.u - 4.0);
-                    if kc < 1.0 { start.to(cock, kc) }
-                    else { bend(cock, p(toe_tip.f - 8.0, toe_tip.u + 22.0), toe_tip, kc - 1.0) }
-                }
-                // Knee to the chest, foot under the seat, then driven straight out.
-                KickStyle::Side | KickStyle::Spin => {
-                    let cock = p(q.hip.f + 18.0, chamber.u);
-                    if kc < 1.0 { start.to(cock, kc) } else { cock.to(toe_tip, kc - 1.0) }
-                }
-                // A straight leg swung up past the mark and brought down onto it.
-                KickStyle::Crescent => {
-                    let top = p(toe_tip.f - 3.0, toe_tip.u + 18.0);
-                    if kc < 1.0 { bend(start, p(start.f + 20.0, 28.0), top, kc) } else { top.to(toe_tip, kc - 1.0) }
-                }
-                // Up past the mark with the leg straight, then down onto it heel first.
-                KickStyle::Axe => {
-                    let top = p(toe_tip.f - 4.0, toe_tip.u + 16.0);
-                    if kc < 1.0 { bend(start, p(start.f + 12.0, 40.0), top, kc) } else { top.to(toe_tip, kc - 1.0) }
-                }
-                // Swung from the floor in one arc, no knee first.
-                KickStyle::Thai => {
-                    let late = p(toe_tip.f - 14.0, toe_tip.u - 8.0);
-                    if kc < 1.0 { bend(start, p(start.f + 4.0, 22.0), late, kc) } else { late.to(toe_tip, kc - 1.0) }
-                }
-                _ => if kc < 1.0 { start.to(chamber, kc) } else { chamber.to(toe_tip, kc - 1.0) },
-            };
-            // At the mark the leg is straight, as it is in every SF2 kick: the body rocks back from the foot until
-            // hip to ankle is a whole leg, rather than the knee buckling up under a target too close.
-            if !air && kc > 1.0 {
-                let leg = THIGH + SHIN - 3.0;
-                let ankle_u = q.lead_foot.u + ANKLE;
-                let rise = (ankle_u - q.hip.u).abs().min(leg);
-                let reach = q.lead_foot.f - FOOT * 0.4 - (leg * leg - rise * rise).sqrt();
-                // (A push kick is the heavies' at short reach: they rock back further, 24 px, or it lands bent.)
-                let most = if style == KickStyle::Push { 24.0 } else { 14.0 };
-                let back = ((q.hip.f - reach).max(0.0) * (kc - 1.0)).min(most);
-                q.hip.f -= back;
-                q.head.f -= back;
-            }
-            // A flying side kick lays the body back along the leg, the kick and the spine one line.
-            if air && style == KickStyle::Side {
-                q.head.f -= 12.0 * e;
-                q.head.u -= 5.0 * e;
-            }
-            if air && f.stomp {
-                // The rage jump: both fists over the head on the way down.
-                q.lead_hand = q.lead_hand.to(p(20.0, 128.0), ext);
-                q.rear_hand = q.rear_hand.to(p(-12.0, 124.0), ext);
-            } else {
-                // The far fist stays out as the guard; the near one tucks in
-                // at the ribs, in front of the body. Each kick carries its arms its own way.
-                // The far fist guards the chin in every one: arms out for balance looked like a dancer's.
-                let chin = p(q.hip.f + 20.0, q.hip.u + 40.0);
-                let (rear, lead) = match style {
-                    // The near arm driven down and back against the turn of the hip.
-                    KickStyle::Round => (chin, p(q.hip.f + 9.0, q.hip.u + 16.0)),
-                    // The near fist down along the thigh, behind the kick.
-                    KickStyle::Side | KickStyle::Spin => (chin, p(q.hip.f + 16.0, q.hip.u + 6.0)),
-                    // The near fist tucked at the ribs.
-                    KickStyle::Crescent => (chin, p(q.hip.f + 10.0, q.hip.u + 26.0)),
-                    // Both fists forward, pushing in behind the foot.
-                    KickStyle::Push => (p(q.hip.f + 20.0, q.hip.u + 34.0), p(q.hip.f + 14.0, q.hip.u + 20.0)),
-                    KickStyle::Axe => (chin, p(q.hip.f + 10.0, q.hip.u + 24.0)),
-                    // The far glove out at the face as a long guard, the near arm flung down past the hip.
-                    KickStyle::Thai => (p(q.hip.f + 28.0, q.hip.u + 44.0), p(q.hip.f + 4.0, q.hip.u - 2.0)),
-                    KickStyle::Snap if air => (p(34.0, 70.0), p(q.hip.f + 10.0, q.hip.u - 6.0)),
-                    KickStyle::Snap => (p(34.0, 70.0), p(q.hip.f + 12.0, q.hip.u + 12.0)),
-                };
-                q.rear_hand = q.rear_hand.to(rear, ext);
-                q.lead_hand = q.lead_hand.to(lead, ext);
-                // A roundhouse brings the shoulders round with the hip; the standing heel pivots right up.
-                if matches!(style, KickStyle::Round | KickStyle::Thai) { q.twist = e; }
-                if style == KickStyle::Push { q.hip.f += 4.0 * ext; }
-            }
-            // LANCER's spinning heel kick is jumped: off the floor as the heel goes out (12 px at full extension).
-            if f.mv == MoveId::Special && f.arch().build == Build::Duelist {
-                let hop = 12.0 * e;
-                for j in [&mut q.hip, &mut q.head, &mut q.lead_hand, &mut q.rear_hand, &mut q.lead_foot, &mut q.rear_foot] {
-                    j.u += hop;
-                }
-            }
-        }
+        Shape::Punch(false) => punch_pose(q, f, tip, ext),
+        Shape::Kick(air, lift) => kick_pose(q, f, toe_tip, ext, air, lift),
         // The nunchaku: through the startup the near hand whirls the sticks round the shoulder; then the arm
         // whips out level and the sticks crack out in line beyond the fist (drawn in `draw_sticks`).
         Shape::Sticks => {
@@ -1093,6 +840,266 @@ pub(crate) fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
     }
 }
 
+/// A punch thrown from the ground: the fist driven out to `tip` as the move extends (`ext`), the body stepping in behind it.
+fn punch_pose(q: &mut Pose, f: &Fighter, tip: P, ext: f32) {
+    let e = ext.max(0.0);
+    let inch = f.mv == MoveId::Special;
+    // Step in and sit into it; a low one is reached by sinking at the
+    // knees, not by folding over.
+    let low = ((60.0 - tip.u) / 30.0).clamp(0.0, 1.0) * e;
+    let art = ARTS[f.who];
+    // Karate lunges into a long front stance, the back leg driven straight; Hung Gar drops into its horse.
+    let (step, brace, sit) = match art {
+        Art::Karate => (14.0, 9.0, 4.0),
+        Art::HungGar => (6.0, 4.0, 4.0),
+        Art::WingChun => (6.0, 1.0, 0.0),
+        _ => (8.0, 3.0, 0.0),
+    };
+    q.hip = p(q.hip.f + 4.0 * ext, q.hip.u - 2.0 * e - 9.0 * low - sit * e);
+    q.head.u -= 1.5 * e + 10.0 * low + sit * e;
+    q.lead_foot.f += step * ext;
+    q.rear_foot.f -= brace * ext;
+    // The shoulder goes where a straight arm puts it: the body turns
+    // and leans just far enough for the fist to land at full reach,
+    // and no further.
+    const ARM: f32 = UARM + FARM - 3.0;
+    let drop = q.hip.u + SPINE * (q.head.u - q.hip.u) - 8.5 - tip.u;
+    let shoulder = tip.f - (ARM * ARM - drop * drop).max(0.0).sqrt();
+    let lean = (q.hip.f + (shoulder - 7.0 - q.hip.f) / SPINE - q.head.f).clamp(2.0, 24.0);
+    q.head.f += lean * ext;
+    if f.alt_punch {
+        // A chain: the far fist goes straight down the middle from
+        // the shoulder that is already forward, and the near one
+        // comes back to the chest under it.
+        q.rear_hand = q.rear_hand.to(tip, ext);
+        q.lead_hand = q.lead_hand.to(p(q.head.f + 9.0, tip.u - 16.0), e.sqrt());
+        q.head.f -= lean * 0.45 * ext;
+    } else {
+        // The far fist snaps back to guard the chin, out of the way
+        // before the punch comes through where it was.
+        q.rear_hand = q.rear_hand.to(p(q.head.f + 6.0, q.head.u - 22.0), e.sqrt());
+        // The one-inch punch starts with the fist already an inch off the mark.
+        let start = if inch { p(tip.f - 9.0, tip.u) } else { q.lead_hand };
+        q.lead_hand = match punch_style(f) {
+            // Up over the head and brought down onto the mark, the body bowing into it.
+            PunchStyle::Hammer if f.mv != MoveId::Hook => {
+                q.head.f += 4.0 * e;
+                bend(start, p(start.f + 2.0, (tip.u + 30.0).max(start.u + 14.0)), tip, ext.max(0.0))
+            }
+            // Flicked out from the chest in a little arc, knuckles first.
+            PunchStyle::Backfist if f.mv != MoveId::Hook =>
+                bend(start, p(tip.f - 16.0, tip.u + 9.0), tip, ext.max(0.0)),
+            _ => start.to(tip, ext),
+        };
+        match punch_style(f) {
+            // The head slips down and off the line behind the jab.
+            PunchStyle::Boxer => { q.head.u -= 5.0 * e; q.head.f -= 2.0 * e; }
+            PunchStyle::Palm => q.open = e > 0.4,
+            _ => {}
+        }
+        // The shoulder comes through with the hip.
+        q.twist = e;
+    }
+    // What the other hand does is most of what tells one art from another.
+    let (near, far) = if f.alt_punch { (false, true) } else { (true, false) };
+    let guard = |q: &mut Pose, to: P, open: bool| {
+        if near { q.rear_hand = q.rear_hand.to(to, e.sqrt()); } else if far { q.lead_hand = q.lead_hand.to(to, e.sqrt()); }
+        if open { q.open = e > 0.4; }
+    };
+    match art {
+        // Hikite: the other fist pulled back to the hip, knuckles down, as the punch goes out.
+        Art::Karate => guard(q, p(q.hip.f + 7.0, q.hip.u + 15.0), false),
+        // The other hand stays out on the centre line behind the punch, open (wu sau); the body stays square.
+        Art::WingChun => {
+            guard(q, p(tip.f - 24.0, tip.u - 3.0), true);
+            if far { q.twist = q.twist.min(0.35); }
+        }
+        // A palm strike, the other hand clawed back to the chest.
+        Art::HungGar => guard(q, p(q.head.f + 10.0, q.head.u - 30.0), true),
+        // The guard never drops: the other glove stays at the brow.
+        Art::MuayThai => guard(q, p(q.head.f + 9.0, q.head.u - 12.0), false),
+        // The straight lead: thrown from where the hand hangs, the rear hand kept at the chin.
+        Art::JeetKuneDo => guard(q, p(q.head.f + 8.0, q.head.u - 20.0), false),
+        _ => {}
+    }
+    if f.mv == MoveId::Hook || ((art == Art::Brawling || jkd_hook(f)) && !f.alt_punch) {
+        // A hook comes round, not straight: the fist swings out and
+        // up on its way in, and the body turns hard behind it.
+        let swing = (std::f32::consts::PI * e).sin();
+        q.lead_hand.u += 10.0 * swing;
+        q.lead_hand.f -= 6.0 * swing;
+        q.hip.f += 3.0 * e;
+        q.twist = 1.0f32.min(q.twist + 0.4 * e);
+    }
+    // The one-inch punch: coiled low through the startup, then legs, hips and shoulder fire in one chain
+    // (the knees snapping straight first) and only the fist's last inch shows.
+    if inch {
+        // The other hand stays home at the chest throughout, clear of the one an inch off the mark.
+        q.rear_hand = p(q.head.f + 14.0, q.head.u - 30.0);
+        let coil = 1.0 - e;
+        q.hip.u -= 6.0 * coil;
+        q.head.u -= 5.0 * coil;
+        q.head.f += 6.0 * e - 3.0 * coil;
+        q.hip.f += 4.0 * e;
+        q.twist = e;
+    }
+    // The back foot turns over onto its ball as the hip comes through.
+    q.rear_heel += 0.5 * e;
+}
+
+/// A kick, from the ground or in the air (`air`), at the height `lift` sets: the foot driven out to `toe_tip` as the move
+/// extends (`ext`).
+fn kick_pose(q: &mut Pose, f: &Fighter, toe_tip: P, ext: f32, air: bool, lift: f32) {
+    let k = KICK;
+    let e = ext.max(0.0);
+    // 0 for the low kick, 1 for the high one.
+    let high = ((lift - 0.7) / 0.55).clamp(0.0, 1.0);
+    // The higher the kick the further the shoulders go back to pay
+    // for it, and the more the standing leg straightens under it.
+    // In the air the side-kickers (and taekwondo) throw the flying side kick; everyone else a snap.
+    let style = match (air, KICKS[f.who]) {
+        (true, KickStyle::Side | KickStyle::Axe) => KickStyle::Side,
+        // LANCER's flying kick is a side kick too, the knee tucked: as a snap it sat on a chair in the air.
+        (true, _) if f.arch().build == Build::Duelist => KickStyle::Side,
+        (true, _) => KickStyle::Snap,
+        _ => kick_style(f),
+    };
+    let back = if air { k.air_lean * lift } else { 0.35 + 0.90 * high };
+    // (Halved from 0.8-1.6: laid back in one line with the leg, the body read as an arabesque. SF2's
+    // kickers stay over the standing foot and let the leg do the work.)
+    // (DRAKE's side kick lies back the furthest of anyone's, as Bruce Lee's does on film: 1.15 to 0.85.)
+    // In the air his flying side kick sits more upright than anyone's (0.6): leaned back as far, it read as
+    // sitting on a chair.
+    let side_lean = match (formless(f.who), air) { (true, false) => 1.15, (true, true) => 0.6, _ => 0.85 };
+    let back = back * match style {
+        KickStyle::Snap => 0.35, KickStyle::Round => 0.7, KickStyle::Side => side_lean,
+        KickStyle::Crescent => 0.5, KickStyle::Push => 0.25,
+        // Taekwondo and Muay Thai both lie back from a high kick, well past the others.
+        KickStyle::Axe => 1.0, KickStyle::Thai => 0.95, KickStyle::Spin => 0.7,
+    };
+    let drive = if air { k.hip_drive + 9.0 } else { k.hip_drive };
+    // The standing knee stays bent under a grounded kick: rising onto a straight leg is ballet.
+    let rise = if air { k.hip_rise } else { k.hip_rise * 0.7 };
+    q.hip = p(q.hip.f + drive * ext, q.hip.u + rise * ext);
+    // The shoulders ride forward with most of the hip's drive: left behind, the torso reclined into the
+    // kick like a chair (SF2's kickers stay stacked over the hips).
+    q.head.f += drive * ext * 0.7 - k.lean * 1.25 * ext * back;
+    q.head.u -= 1.4 * ext;
+    if !air {
+        q.rear_foot = p(-18.0 + (q.hip.f - k.plant - -18.0) * ext, 0.0);
+    } else {
+        // The other leg tucked up tight under the seat, as SF2's jump kicks are drawn; in a flying side kick
+        // the knee comes up to the chest instead, the foot under the hip.
+        q.rear_foot = if style == KickStyle::Side {
+            // (10 forward and 22 down: nearer, the anatomy test calls the leg folded to guesswork.)
+            p(q.hip.f + 10.0, (q.hip.u - 22.0).max(30.0))
+        } else {
+            p(q.hip.f - 4.0, (q.hip.u - 22.0).max(30.0))
+        };
+    }
+    // The standing foot stays flat on the boards (a roundhouse pivots on its ball). The kicking foot hits
+    // with the heel or the ball, toes pulled back, never pointed like a dancer's.
+    // (A Thai kick turns right over on the ball of the standing foot.)
+    if !air { q.rear_heel = match style { KickStyle::Round => 0.15 + 0.2 * e, KickStyle::Thai => 0.15 + 0.4 * e, _ => 0.05 }; }
+    q.lead_heel = match style {
+        _ if air => -0.35 * e,
+        KickStyle::Round => -0.1 * e,
+        KickStyle::Side | KickStyle::Push | KickStyle::Spin => -0.6 * e,
+        KickStyle::Snap => -0.5 * e,
+        KickStyle::Crescent => -0.25 * e,
+        KickStyle::Axe => -0.55 * e,
+        KickStyle::Thai => 0.1 * e,
+    };
+    let chamber = p(q.hip.f + k.knee_lead,
+        if air { k.chamber_air } else { k.chamber * (0.72 + 0.28 * high) });
+    let kc = kick_curve(ext);
+    let start = q.lead_foot;
+    q.lead_foot = match style {
+        // Knee across and the foot cocked behind it, then swung round in an arc onto the mark.
+        KickStyle::Round => {
+            let cock = p(q.hip.f + 8.0, chamber.u - 4.0);
+            if kc < 1.0 { start.to(cock, kc) }
+            else { bend(cock, p(toe_tip.f - 8.0, toe_tip.u + 22.0), toe_tip, kc - 1.0) }
+        }
+        // Knee to the chest, foot under the seat, then driven straight out.
+        KickStyle::Side | KickStyle::Spin => {
+            let cock = p(q.hip.f + 18.0, chamber.u);
+            if kc < 1.0 { start.to(cock, kc) } else { cock.to(toe_tip, kc - 1.0) }
+        }
+        // A straight leg swung up past the mark and brought down onto it.
+        KickStyle::Crescent => {
+            let top = p(toe_tip.f - 3.0, toe_tip.u + 18.0);
+            if kc < 1.0 { bend(start, p(start.f + 20.0, 28.0), top, kc) } else { top.to(toe_tip, kc - 1.0) }
+        }
+        // Up past the mark with the leg straight, then down onto it heel first.
+        KickStyle::Axe => {
+            let top = p(toe_tip.f - 4.0, toe_tip.u + 16.0);
+            if kc < 1.0 { bend(start, p(start.f + 12.0, 40.0), top, kc) } else { top.to(toe_tip, kc - 1.0) }
+        }
+        // Swung from the floor in one arc, no knee first.
+        KickStyle::Thai => {
+            let late = p(toe_tip.f - 14.0, toe_tip.u - 8.0);
+            if kc < 1.0 { bend(start, p(start.f + 4.0, 22.0), late, kc) } else { late.to(toe_tip, kc - 1.0) }
+        }
+        _ => if kc < 1.0 { start.to(chamber, kc) } else { chamber.to(toe_tip, kc - 1.0) },
+    };
+    // At the mark the leg is straight, as it is in every SF2 kick: the body rocks back from the foot until
+    // hip to ankle is a whole leg, rather than the knee buckling up under a target too close.
+    if !air && kc > 1.0 {
+        let leg = THIGH + SHIN - 3.0;
+        let ankle_u = q.lead_foot.u + ANKLE;
+        let rise = (ankle_u - q.hip.u).abs().min(leg);
+        let reach = q.lead_foot.f - FOOT * 0.4 - (leg * leg - rise * rise).sqrt();
+        // (A push kick is the heavies' at short reach: they rock back further, 24 px, or it lands bent.)
+        let most = if style == KickStyle::Push { 24.0 } else { 14.0 };
+        let back = ((q.hip.f - reach).max(0.0) * (kc - 1.0)).min(most);
+        q.hip.f -= back;
+        q.head.f -= back;
+    }
+    // A flying side kick lays the body back along the leg, the kick and the spine one line.
+    if air && style == KickStyle::Side {
+        q.head.f -= 12.0 * e;
+        q.head.u -= 5.0 * e;
+    }
+    if air && f.stomp {
+        // The rage jump: both fists over the head on the way down.
+        q.lead_hand = q.lead_hand.to(p(20.0, 128.0), ext);
+        q.rear_hand = q.rear_hand.to(p(-12.0, 124.0), ext);
+    } else {
+        // The far fist stays out as the guard; the near one tucks in
+        // at the ribs, in front of the body. Each kick carries its arms its own way.
+        // The far fist guards the chin in every one: arms out for balance looked like a dancer's.
+        let chin = p(q.hip.f + 20.0, q.hip.u + 40.0);
+        let (rear, lead) = match style {
+            // The near arm driven down and back against the turn of the hip.
+            KickStyle::Round => (chin, p(q.hip.f + 9.0, q.hip.u + 16.0)),
+            // The near fist down along the thigh, behind the kick.
+            KickStyle::Side | KickStyle::Spin => (chin, p(q.hip.f + 16.0, q.hip.u + 6.0)),
+            // The near fist tucked at the ribs.
+            KickStyle::Crescent => (chin, p(q.hip.f + 10.0, q.hip.u + 26.0)),
+            // Both fists forward, pushing in behind the foot.
+            KickStyle::Push => (p(q.hip.f + 20.0, q.hip.u + 34.0), p(q.hip.f + 14.0, q.hip.u + 20.0)),
+            KickStyle::Axe => (chin, p(q.hip.f + 10.0, q.hip.u + 24.0)),
+            // The far glove out at the face as a long guard, the near arm flung down past the hip.
+            KickStyle::Thai => (p(q.hip.f + 28.0, q.hip.u + 44.0), p(q.hip.f + 4.0, q.hip.u - 2.0)),
+            KickStyle::Snap if air => (p(34.0, 70.0), p(q.hip.f + 10.0, q.hip.u - 6.0)),
+            KickStyle::Snap => (p(34.0, 70.0), p(q.hip.f + 12.0, q.hip.u + 12.0)),
+        };
+        q.rear_hand = q.rear_hand.to(rear, ext);
+        q.lead_hand = q.lead_hand.to(lead, ext);
+        // A roundhouse brings the shoulders round with the hip; the standing heel pivots right up.
+        if matches!(style, KickStyle::Round | KickStyle::Thai) { q.twist = e; }
+        if style == KickStyle::Push { q.hip.f += 4.0 * ext; }
+    }
+    // LANCER's spinning heel kick is jumped: off the floor as the heel goes out (12 px at full extension).
+    if f.mv == MoveId::Special && f.arch().build == Build::Duelist {
+        let hop = 12.0 * e;
+        for j in [&mut q.hip, &mut q.head, &mut q.lead_hand, &mut q.rear_hand, &mut q.lead_foot, &mut q.rear_foot] {
+            j.u += hop;
+        }
+    }
+}
+
 /// The pose a fighter is in this frame.
 /// The pose a fighter is drawn in, including the tail of the one before it: actions change on
 /// one frame, so the hand-over is eased across four frames (the hitbox still follows the move).
@@ -1240,94 +1247,7 @@ pub(crate) fn down_time(f: &Fighter) -> Option<f32> {
 pub(crate) fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
     let bob = bounce_of(now, f.who, idx);
 
-    if let Some(t) = down_time(f) {
-        let down = floored();
-        if t < FALL {
-            let k = (t / FALL).clamp(0.0, 1.0);
-            let mut air = stance(0.0, f.who);
-            air.hip = p(-6.0, 48.0);
-            air.head = p(-40.0, 62.0);
-            air.lead_foot = p(30.0, 44.0);
-            air.rear_foot = p(22.0, 24.0);
-            air.lead_hand = p(-8.0, 82.0);
-            air.rear_hand = p(-24.0, 74.0);
-            // Swept: the feet go out forward and up, and the body drops straight down onto its back.
-            if f.downed_by == MoveId::Sweep {
-                let mut cut = stance(0.0, f.who);
-                cut.hip = p(4.0, 40.0);
-                cut.head = p(-16.0, 84.0);
-                cut.lead_foot = p(40.0, 30.0);
-                cut.rear_foot = p(30.0, 18.0);
-                cut.lead_hand = p(-4.0, 76.0);
-                cut.rear_hand = p(-22.0, 70.0);
-                return cut.to(down, k * k);
-            }
-            // Thrown, the body goes over: it starts half a turn further round and comes down flat.
-            if f.downed_by == MoveId::Throw { return spun(air.to(down, k * k), -std::f32::consts::PI * (1.0 - k) * (1.0 - k)); }
-            // Lifted off the boards and laid out flat in the air before it comes down, as SF2's knockdowns are
-            // (an uppercut throws it higher).
-            let mut q = air.to(down, k * k);
-            {
-                // Eased in over the first third, or the elbows flip in the frame the blow lands.
-                let lift = if f.downed_by == MoveId::Uppercut { 34.0 } else { 22.0 } * (std::f32::consts::PI * k).sin()
-                    * (k * 3.0).min(1.0);
-                for j in [&mut q.hip, &mut q.head, &mut q.lead_hand, &mut q.rear_hand, &mut q.lead_foot, &mut q.rear_foot] {
-                    j.u += lift;
-                }
-            }
-            return q;
-        }
-        if t > 0.85 && nimble(f) {
-            // The acrobats kip up: knees pulled over the chest, hands by the head, then the whole body
-            // springs off the boards and lands in the crouch.
-            let k = ((t - 0.85) / 0.30).clamp(0.0, 1.0);
-            let tuck = Pose {
-                hip: p(2.0, 14.0),
-                head: p(-36.0, 12.0),
-                lead_hand: p(-30.0, 26.0),
-                rear_hand: p(-22.0, 30.0),
-                // Up but still forward of the hips: over them, the knees flipped from one bend to the other.
-                lead_foot: p(24.0, 40.0),
-                rear_foot: p(16.0, 34.0),
-                open: true,
-                lead_heel: 0.6,
-                rear_heel: 0.6,
-                twist: 0.0,
-            };
-            let spring = Pose {
-                hip: p(0.0, 52.0),
-                head: p(-4.0, 100.0),
-                lead_hand: p(14.0, 74.0),
-                rear_hand: p(24.0, 82.0),
-                // (Feet well forward: the hips rising straight past an ankle flipped the knee in one frame.)
-                lead_foot: p(24.0, 16.0),
-                rear_foot: p(16.0, 12.0),
-                open: false,
-                lead_heel: 0.5,
-                rear_heel: 0.5,
-                twist: 0.0,
-            };
-            let ease = |a: f32, b: f32| { let x = ((k - a) / (b - a)).clamp(0.0, 1.0); x * x * (3.0 - 2.0 * x) };
-            return down.to(tuck, ease(0.0, 0.30)).to(spring, ease(0.30, 0.58)).to(crouched(0.0), ease(0.58, 0.78))
-                .to(stance(0.0, f.who), ease(0.78, 1.0));
-        }
-        if t > 0.85 {
-            let k = ((t - 0.85) / 0.30).clamp(0.0, 1.0);
-            let mut up = crouched(0.0);
-            up.rear_hand = p(22.0, 16.0);
-            up.lead_hand = p(28.0, 34.0);
-            up.rear_foot = p(-10.0, 0.0);
-            return down.to(up, (k * 1.8).min(1.0)).to(stance(0.0, f.who), (k - 0.55).max(0.0) / 0.45);
-        }
-        // The boards give the body back: one bounce, and a smaller one.
-        let mut down = down;
-        let b = if (FALL..FALL + 0.18).contains(&t) { 9.0 * (std::f32::consts::PI * (t - FALL) / 0.18).sin() }
-            else if (0.40..0.50).contains(&t) { 2.5 * (std::f32::consts::PI * (t - 0.40) / 0.10).sin() } else { 0.0 };
-        for j in [&mut down.hip, &mut down.head, &mut down.lead_hand, &mut down.rear_hand, &mut down.lead_foot, &mut down.rear_foot] {
-            j.u += b;
-        }
-        return down;
-    }
+    if let Some(t) = down_time(f) { return down_pose(f, t); }
 
     let low = f.crouching()
         || (f.act == Act::Hitstun && matches!(f.prev_act, Act::Crouch))
@@ -1350,510 +1270,631 @@ pub(crate) fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
         stance(bob, f.who)
     };
 
-    match f.act {
-        Act::Walk => {
-            let gait = GAITS[f.who];
-            let ph = walk_phase(f);
-            let s = ph.sin();
-            let (lift, from_lead, from_rear) = match gait {
-                // Boxers keep the stance and slide it: front foot first, the back one after.
-                Gait::Shuffle => (4.0, q.lead_foot.f, q.rear_foot.f),
-                Gait::Stomp => (15.0, WALK_MID + 2.0, WALK_MID - 2.0),
-                Gait::Prowl => (9.0, WALK_MID + 3.0, WALK_MID + 3.0),
-                Gait::Glide => (8.0, WALK_MID + 1.0, WALK_MID - 1.0),
-                Gait::Stride => (9.0, WALK_MID, WALK_MID),
-            };
-            let (lf, ll) = gait_foot(gait, ph, lift);
-            let (rf, rl) = gait_foot(gait, ph + std::f32::consts::PI, lift * 0.9);
-            // A stride is a real walk: the feet pass each other under the body, so the front leg changes with
-            // every step. A shuffle never crosses them.
-            q.lead_foot = p(from_lead + lf, ll);
-            q.rear_foot = p(from_rear + rf, rl);
-            let toes = 1.0 + 0.4 * (1.0 - (f.arch().bulk - 0.85).clamp(0.0, 0.4) / 0.4);
-            q.lead_heel = heel_cycle(ph) * toes;
-            q.rear_heel = heel_cycle(ph + std::f32::consts::PI) * toes;
-            if gait == Gait::Shuffle { q.rear_heel = q.rear_heel.max(0.45); }
-            // Up out of the stance to walk: the legs are under the body now,
-            // and nearly straight as each foot passes.
-            // (A fighter who sits low in the stance comes up most of that too.)
-            // How much the body rides each step is the fighter's weight: the heavies sink into every one,
-            // the light ones are springy on their toes.
-            let tread = (f.arch().bulk - 0.85).clamp(0.0, 0.4) / 0.4;
-            let ride = match gait {
-                Gait::Glide => 0.2,
-                Gait::Shuffle => 0.8,
-                Gait::Stomp => 2.4 + 1.2 * tread,
-                _ => 0.9 + 1.6 * tread,
-            };
-            let rise = match gait { Gait::Shuffle => 0.0, Gait::Prowl => -6.0, _ => WALK_RISE };
-            let sink = ride + ride * (2.0 * ph).cos() - rise - 0.8 * STYLES[f.who].sink;
-            q.hip.u -= sink;
-            q.head.u -= sink * 0.7;
-            // The arms swing against the legs; a heavy swings them wide, a boxer hardly at all.
-            let swing = match gait { Gait::Stomp => 2.0, Gait::Shuffle => 0.3, Gait::Glide => 0.5, _ => 1.0 };
-            q.hip.f += 1.4 * s;
-            q.head.f -= 1.0 * s * swing;
-            q.lead_hand.f -= 2.6 * s * swing;
-            q.rear_hand.f += 2.2 * s * swing;
-            q.lead_hand.u -= sink * 0.7;
-            q.rear_hand.u -= sink * 0.7;
-            // Into the advance, chin first. (Walking back is the guard, below.)
-            match gait {
-                // Low to the floor, head out and the hands down near the boards.
-                Gait::Prowl => {
-                    q.head.f += 9.0;
-                    q.head.u -= 4.0;
-                    q.lead_hand = p(q.lead_hand.f + 2.0, q.lead_hand.u - 8.0);
-                    q.rear_hand = p(q.rear_hand.f + 10.0, q.rear_hand.u - 18.0);
-                }
-                // Chest out, upright, as if the floor were optional.
-                Gait::Glide => q.head.f -= 1.0,
-                _ => q.head.f += 4.0,
-            }
-            q.hip.f += 1.5;
-        }
-        // Turtled up: weight off the front foot, forearms stacked before head or belly.
-        Act::Block => {
-            let b = bob;
-            if f.crouch_block {
-                q.lead_hand = p(12.0, 31.0 + b * 0.5);
-                q.rear_hand = p(27.0, 42.0 + b * 0.7);
-                q.head.f -= 4.0;
-            } else {
-                q.hip = p(-4.0, HIP_U - 2.0 + b * 0.6);
-                q.head = p(-8.0 - b * 0.7, HEAD_U - 2.0 + b * 0.4);
-                q.lead_hand = p(13.0 + b * 0.4, 73.0 + b * 0.6);
-                q.rear_hand = p(26.0 + b * 0.6, 88.0 + b * 0.8);
-                let ph = f.x * f.facing * STRIDE / f.size();
-                let sink = 1.0 + (2.0 * ph).cos();
-                let (lf, ll) = foot_cycle(ph, 7.0);
-                let (rf, rl) = foot_cycle(ph + std::f32::consts::PI, 6.0);
-                q.lead_foot = p(14.0 + lf, ll);
-                q.rear_foot = p(-17.0 + rf, rl);
-                q.lead_heel = heel_cycle(ph) * 0.6;
-                q.rear_heel = heel_cycle(ph + std::f32::consts::PI) * 0.6;
-                // Each art guards its own way.
-                let (near, far, open) = match ARTS[f.who] {
-                    // Soto-uke: the near forearm upright across the face, the other fist back at the hip.
-                    Art::Karate => (p(20.0, 92.0), p(q.hip.f + 7.0, q.hip.u + 15.0), false),
-                    // The shell: both gloves to the face, elbows tight to the ribs.
-                    Art::Boxing => (p(9.0, 86.0), p(25.0, 96.0), false),
-                    // Forearms up like a wall either side of the head.
-                    Art::MuayThai => (p(11.0, 90.0), p(29.0, 101.0), false),
-                    // Bong sau: the far forearm out flat across the chest, elbow up; the near hand behind it.
-                    Art::WingChun => (p(20.0, 80.0), p(31.0, 85.0), true),
-                    // The bridge: the far arm thrown out to meet the blow, the near claw at the chest.
-                    Art::HungGar => (p(16.0, 84.0), p(35.0, 81.0), true),
-                    // Pak sao: the far hand out slapping the blow aside, the near one cocked at the chin to answer;
-                    // or (his roll) the blow slipped, leaning back out of it with both hands up.
-                    Art::JeetKuneDo if f.stumble_roll % 2 == 1 => {
-                        q.hip.f -= 4.0;
-                        q.head = p(q.head.f - 10.0, q.head.u - 3.0);
-                        (p(10.0, 86.0), p(22.0, 92.0), false)
-                    }
-                    Art::JeetKuneDo => (p(14.0, 90.0), p(34.0, 86.0), true),
-                    _ => (q.lead_hand, q.rear_hand, q.open),
-                };
-                q.lead_hand = near;
-                q.rear_hand = far;
-                q.open = open;
-                q.hip.u -= sink;
-                q.head.u -= sink * 0.7;
-                q.lead_hand.u -= sink * 0.7;
-                q.rear_hand.u -= sink * 0.7;
-                // A Thai fighter checks a blow with the shin: the lead knee comes up to meet it.
-                if ARTS[f.who] == Art::MuayThai && f.stun > 0.0 {
-                    let k = (f.stun / (6.0 * F)).clamp(0.0, 1.0);
-                    q.lead_foot = q.lead_foot.to(p(18.0, 26.0), k);
-                    q.lead_heel = 0.3 * k;
-                }
-            }
-            // A blocked blow (its blockstun is running) drives the forearms back into the body, and the
-            // head with them.
-            let jolt = (f.stun / (10.0 * F)).clamp(0.0, 1.0);
-            let jolt = jolt * jolt;
-            q.lead_hand.f -= 6.0 * jolt;
-            q.rear_hand.f -= 7.0 * jolt;
-            q.head.f -= 4.0 * jolt;
-            q.hip.f -= 2.0 * jolt;
-        }
-        // Snapped back off the blow: head first, back foot skidding out.
-        Act::Hitstun => {
-            // The head goes first and furthest, and comes back last.
-            let k = (1.0 - f.t * 3.4).clamp(0.40, 1.0);
-            let drop = if low { 0.5 } else { 1.0 };
-            let force = f.struck_force;
-            let fling = ((k - 0.4) / 0.6).max(0.0);
-            if f.struck_legs && !low {
-                // Kicked in the shins: the front knee gives and the foot is swept back under, the body
-                // dropping over it and the arms out for balance.
-                // (The feet stay put: swept back, the weight went past them.)
-                let give = k * force;
-                q.hip = p(q.hip.f + 1.0 * give, q.hip.u - 6.0 * give);
-                q.head = p(q.head.f + 3.0 * give, q.head.u - 7.0 * give);
-                q.lead_foot = p(q.lead_foot.f - 3.0 * give, 0.0);
-                q.lead_heel = 0.5 * give;
-                q.lead_hand = p(q.lead_hand.f - 8.0 * fling, q.lead_hand.u - 4.0 * give);
-                q.rear_hand = p(q.rear_hand.f + 6.0 * fling, q.rear_hand.u - 8.0 * give);
-            } else if f.struck_body && !low {
-                // Winded: doubled over the blow, the hips pushed back, both hands to the gut, the knees giving.
-                let fold = k * force;
-                q.hip = p(q.hip.f - 9.0 * fold, q.hip.u - 7.0 * fold);
-                q.head = p(q.head.f + 10.0 * fold, q.head.u - 22.0 * fold);
-                // (Held further out than the belly itself: a heavy's forward lean put the far hand
-                // through his back.)
-                let belly = q.hip.f.max(q.head.f - 10.0);
-                q.lead_hand = q.lead_hand.to(p(belly + 18.0, q.hip.u + 4.0), 0.85 * k);
-                q.rear_hand = q.rear_hand.to(p(belly + 26.0, q.hip.u + 11.0), 0.85 * k);
-            } else {
-                q.hip = p(q.hip.f - 6.0 * k * force, q.hip.u - 3.0 * k);
-                q.head = p(q.head.f - 24.0 * k * drop * force, q.head.u - 1.6 + 3.0 * fling * (force - 1.0).max(0.0));
-                // The arms are thrown up and out by it, and drop back in.
-                q.lead_hand = p(q.lead_hand.f - 9.0 - 4.0 * fling * force, q.lead_hand.u - 5.0 + 9.0 * fling * force);
-                q.rear_hand = p(q.rear_hand.f - 7.0 + 6.0 * fling, q.rear_hand.u - 9.0 + 12.0 * fling * force);
-            }
-            q.lead_foot = p(q.lead_foot.f - 10.0, 0.0);
-            q.rear_foot = p(q.rear_foot.f - 6.0 * force, 0.0);
-            // Seeing stars: swaying on the spot, arms hanging.
-            if f.dizzy > 0.0 {
-                let sway = (now * 5.0).sin();
-                q.head = p(q.head.f + 6.0 * sway, q.head.u - 2.0);
-                q.hip.f += 2.0 * sway;
-                q.lead_hand = p(10.0 + 3.0 * sway, 50.0);
-                q.rear_hand = p(20.0 + 3.0 * sway, 52.0);
-            }
-            // Rocked back onto flat feet, the hands knocked open.
-            q.open = true;
-            q.lead_heel = 0.0;
-            q.rear_heel = 0.0;
-        }
+    q = match f.act {
+        Act::Walk => walk_pose(q, f),
+        Act::Block => block_pose(q, f, bob),
+        Act::Hitstun => hitstun_pose(q, f, low, now),
         Act::Attack => {
             let m = f.scaled(move_data(f.mv));
             let ext = extension(f, &m);
             attack_pose(&mut q, f, &m, ext);
+            q
         }
-        // Won: guard drops, the arm sweeps up and forward (raised straight it hides the face), then held.
-        Act::Victory => {
-            let t = f.t;
-            let settle = (t / 0.30).clamp(0.0, 1.0);
-            let raise = ((t - 0.26) / 0.34).clamp(0.0, 1.0);
-            let sweep = raise * raise * (3.0 - 2.0 * raise);
-            let bob = ((t - 0.6).max(0.0) * 2.2).sin() * 1.8;
+        Act::Victory => victory_pose(q, f),
+        Act::Bow if intro_of(f.who) != Intro::Bow && !f.bows => intro_pose(q, f),
+        Act::Bow => bow_pose(f),
+        Act::Defeat => defeat_pose(q, f),
+        _ => q,
+    };
+    finishing_touches(q, f, now, idx, low)
+}
 
-            q.head = p(-1.5 + 2.0 * settle - 2.0 * sweep,
-                       HEAD_U + 1.2 * settle + 1.5 * sweep + bob * 0.3);
-            q.hip = p(0.0, HIP_U + 1.0 * settle);
-            q.lead_foot = p(16.0 - 3.0 * settle, 0.0);
-            q.rear_foot = p(-21.0 + 4.0 * settle, 0.0);
-            q.rear_heel *= 1.0 - settle;
-            let ease = |from: f32, len: f32| {
-                let k = ((t - from) / len).clamp(0.0, 1.0);
-                k * k * (3.0 - 2.0 * k)
-            };
-            // DRAKE wins three ways, at random (his per-attack roll): the nunchaku and the thumb, the salute, or the
-            // beckon for more.
-            // Over LANCER, DRAKE always plucks the hair and blows it away, as in Way of the Dragon's Colosseum.
-            let plucks = plucking(f);
-            let win = if plucks { Win::Pluck }
-                      else if formless(f.who) { [Win::Thumb, Win::Salute, Win::Beckon, Win::Stamp][(f.stumble_roll % 4) as usize] }
-                      else { STYLES[f.who].win };
-            if win == Win::Pluck {
-                // Weight back and easy, the far fist low; the near hand comes up to the lips, pinched, at 0.3 s,
-                // and the blow is at 0.8 s (the hairs drift off in `draw_body`).
-                let up = ease(0.25, 0.25);
-                // (Held a little out from the lips: against them it read as eating.)
-                q.lead_hand = q.lead_hand.to(p(q.head.f + 18.0, q.head.u - 3.0), up);
-                q.rear_hand = q.rear_hand.to(p(30.0, 84.0), ease(0.0, 0.3));
-                q.head.f -= 2.0 * up;
-                q.open = false;
-                q.twist = 0.0;
-            } else if win == Win::Rei {
-                let bow = ease(0.3, 0.42) * (1.0 - ease(1.2, 0.42));
-                let ready = ease(1.5, 0.25);
-                let hip = p(-6.0 * bow, HIP_U + 5.5 - 1.5 * bow - 2.0 * ready);
-                let spine = HEAD_U - HIP_U + 1.0;
-                let lean = 0.62 * bow;
-                let head = p(hip.f + spine * lean.sin() + 3.0 * bow, hip.u + spine * lean.cos() - 3.0 * bow);
-                let down = |side: f32| p(side + 12.0 * bow, 45.0 - 12.0 * bow);
-                q = Pose {
-                    hip, head,
-                    // (0 and 14 apart: nearer, from the side the two hands are one.)
-                    lead_hand: down(0.0).to(p(8.0, 48.0), ready),
-                    rear_hand: down(14.0).to(p(18.0, 47.0), ready),
-                    lead_foot: p(6.0 + 4.0 * ready, 0.0),
-                    rear_foot: p(-6.0 - 4.0 * ready, 0.0),
-                    open: ready < 0.5,
-                    lead_heel: 0.0, rear_heel: 0.0, twist: 0.0,
-                };
-            } else if win == Win::Stamp {
-                // Up comes the knee, then the foot drives down at a third of a second and stays planted, the fists
-                // clenched low, the body sunk over it.
-                let up = ease(0.0, 0.2) * (1.0 - ease(0.3, 0.06));
-                let sunk = ease(0.3, 0.08);
-                q.lead_foot = p(18.0, 34.0 * up);
-                q.lead_heel = 0.2 * up;
-                q.hip.u -= 4.0 * sunk;
-                q.head = p(q.head.f + 4.0 * sunk, q.head.u - 6.0 * sunk);
-                q.lead_hand = q.lead_hand.to(p(18.0, 60.0), ease(0.0, 0.2));
-                q.rear_hand = q.rear_hand.to(p(-2.0, 62.0), ease(0.0, 0.2));
-                q.open = false;
-                q.twist = 0.0;
-            } else if win == Win::Beckon {
-                // Side on, chin up, the far hand out palm up and curling: come back for more.
-                let on = ease(0.0, 0.3);
-                let curl = ((t - 0.4).max(0.0) * 9.0).sin().max(0.0);
-                q.rear_hand = q.rear_hand.to(p(40.0 - 3.0 * curl, 84.0 + 2.0 * curl), on);
-                q.lead_hand = q.lead_hand.to(p(16.0, 80.0), on);
-                q.head.u += 1.5 * on;
-                q.open = true;
-                q.twist = 0.0;
-            } else if win == Win::Thumb && (0.9..1.6).contains(&t) {
-                // Then caught under the arm, as in Enter the Dragon: the near hand at the chest holding the sticks
-                // tucked back under the armpit, the far hand out in guard, held a moment.
-                let k = ease(0.9, 0.12);
-                q.lead_hand = q.lead_hand.to(p(q.head.f + 8.0, q.head.u - 30.0), k);
-                q.rear_hand = q.rear_hand.to(p(36.0, 84.0), k);
-                q.open = false;
-                q.twist = 0.0;
-            } else if win == Win::Thumb && t < 0.9 {
-                // First the nunchaku whirled at his side (drawn in `draw_sticks`), weight back, chin up.
-                let a = t * 24.0;
-                let sh = p(q.head.f + 2.0, q.head.u - 20.0);
-                q.lead_hand = q.lead_hand.to(p(sh.f + 20.0 + 6.0 * a.cos(), sh.u - 2.0 + 5.0 * (2.0 * a).sin()), ease(0.0, 0.2));
-                q.rear_hand = q.rear_hand.to(p(30.0, 70.0), ease(0.0, 0.3));
-                q.open = false;
-                q.twist = 0.0;
-            } else if win == Win::Thumb {
-                // Then the sticks put away, weight back, the far fist low; the near thumb brushes across the nose,
-                // twice, head tipped up.
-                let on = 1.0;
-                let flick = ((t - 1.7).max(0.0) * 10.0).sin().max(0.0) * (1.0 - ease(2.6, 0.3));
-                q.head = p(q.head.f - 2.0 * on, q.head.u + 1.5 * on);
-                // (Just in front of the face: the thumb is at the nose, the fist clear of the head.)
-                q.lead_hand = q.lead_hand.to(p(q.head.f + 16.0 + 4.0 * flick, q.head.u - 8.0), on);
-                q.rear_hand = q.rear_hand.to(p(30.0, 70.0), on);
-                q.open = false;
-                q.twist = 0.0;
-            } else if matches!(win, Win::Salute | Win::Wai) {
-                // Feet together, hands brought together, then the bow, held.
-                let join = ease(0.0, 0.35);
-                let bow = ease(0.45, 0.35);
-                q.lead_foot = p(8.0, 0.0);
-                q.rear_foot = p(-8.0, 0.0);
-                q.rear_heel = 0.0;
-                q.hip = p(0.0, HIP_U + 3.0);
-                q.head = p(1.0 + 7.0 * bow, HEAD_U + 3.0 - 5.0 * bow);
-                let at = if win == Win::Salute { p(17.0 + 4.0 * bow, 84.0 - 3.0 * bow) } else { p(19.0 + 5.0 * bow, 90.0 - 4.0 * bow) };
-                // Fist and palm, or two palms: side on, one hand just in front of the other.
-                q.lead_hand = q.lead_hand.to(p(at.f - 4.0, at.u), join);
-                q.rear_hand = q.rear_hand.to(p(at.f + 4.0, at.u + 1.0), join);
-                q.open = win == Win::Wai || join < 0.5;
-                q.twist = 0.0;
-            } else if win == Win::Flex {
-                // The crunch: hunched forward over both fists, knuckles together in front of the belly,
-                // head pushed out roaring, and squeezed again and again. (Arms up beside the head read,
-                // side on, as a punch.)
-                let lift = ease(0.0, 0.4);
-                let squeeze = ((t - 0.6).max(0.0) * 6.0).sin().abs() * lift;
-                q.hip = p(q.hip.f - 3.0 * lift, q.hip.u - 7.0 * lift - 2.0 * squeeze);
-                q.head = p(q.head.f + 12.0 * lift, q.head.u - 12.0 * lift - 3.0 * squeeze);
-                q.lead_hand = q.lead_hand.to(p(22.0 - 3.0 * squeeze, 48.0), lift);
-                q.rear_hand = q.rear_hand.to(p(36.0 - 2.0 * squeeze, 64.0), ease(0.06, 0.4));
-                q.lead_foot.f += 6.0 * lift;
-                q.rear_foot.f -= 6.0 * lift;
-                q.twist = 0.0;
-                q.open = false;
-            } else if win == Win::Pump {
-                // The fist comes down to the hip, hard, three times a second, the knees dipping with it.
-                let on = ease(0.0, 0.3);
-                let pump = ((t - 0.3).max(0.0) * 9.0).sin().max(0.0) * on;
-                q.lead_hand = q.lead_hand.to(p(30.0, 92.0 - 30.0 * pump), on);
-                q.rear_hand = q.rear_hand.to(p(10.0, 50.0), on);
-                q.hip.u -= 3.0 * pump;
-                q.head.u -= 3.0 * pump;
-                q.head.f += 3.0 * pump;
-                q.twist = 0.5 * pump;
-            } else if matches!(win, Win::Both | Win::Hop) {
-                // Both arms up, the far one first so the near one comes up
-                // outside it.
-                q.rear_hand = q.rear_hand.to(p(20.0, 126.0 - bob), ease(0.0, 0.35));
-                let lift = ease(0.12, 0.45);
-                q.lead_hand = q.lead_hand.to(p(38.0, 118.0 + bob), lift);
-                q.twist = lift;
-                if win == Win::Hop {
-                    // Bouncing on the toes, the knees giving at the bottom of each. (Off the boards, the
-                    // head left the hurtbox by 8 px.)
-                    let ph = ((t - 0.4).max(0.0) * 7.0).sin();
-                    let up = ph.max(0.0);
-                    let give = (-ph).max(0.0) * 5.0;
-                    q.hip.u -= give;
-                    q.head.u -= give * 0.8;
-                    q.lead_hand.u -= give * 0.6;
-                    q.rear_hand.u -= give * 0.6;
-                    q.lead_heel = 0.7 * up;
-                    q.rear_heel = 0.7 * up;
-                }
-            } else {
-                // One fist straight up, the shoulder coming round under it;
-                // the other waits for it to pass, then comes down to the hip.
-                let lift = ease(0.0, 0.5);
-                q.lead_hand = q.lead_hand.to(p(36.0, 120.0 + bob), lift);
-                q.rear_hand = q.rear_hand.to(p(8.0, 42.0), ease(0.14, 0.30));
-                q.twist = lift;
+/// Knocked down: the fall (swept, thrown or lifted off the boards and laid out), the bounce off the boards, and back up
+/// (the acrobats kip up), `t` seconds in.
+fn down_pose(f: &Fighter, t: f32) -> Pose {
+    let down = floored();
+    if t < FALL {
+        let k = (t / FALL).clamp(0.0, 1.0);
+        let mut air = stance(0.0, f.who);
+        air.hip = p(-6.0, 48.0);
+        air.head = p(-40.0, 62.0);
+        air.lead_foot = p(30.0, 44.0);
+        air.rear_foot = p(22.0, 24.0);
+        air.lead_hand = p(-8.0, 82.0);
+        air.rear_hand = p(-24.0, 74.0);
+        // Swept: the feet go out forward and up, and the body drops straight down onto its back.
+        if f.downed_by == MoveId::Sweep {
+            let mut cut = stance(0.0, f.who);
+            cut.hip = p(4.0, 40.0);
+            cut.head = p(-16.0, 84.0);
+            cut.lead_foot = p(40.0, 30.0);
+            cut.rear_foot = p(30.0, 18.0);
+            cut.lead_hand = p(-4.0, 76.0);
+            cut.rear_hand = p(-22.0, 70.0);
+            return cut.to(down, k * k);
+        }
+        // Thrown, the body goes over: it starts half a turn further round and comes down flat.
+        if f.downed_by == MoveId::Throw { return spun(air.to(down, k * k), -std::f32::consts::PI * (1.0 - k) * (1.0 - k)); }
+        // Lifted off the boards and laid out flat in the air before it comes down, as SF2's knockdowns are
+        // (an uppercut throws it higher).
+        let mut q = air.to(down, k * k);
+        {
+            // Eased in over the first third, or the elbows flip in the frame the blow lands.
+            let lift = if f.downed_by == MoveId::Uppercut { 34.0 } else { 22.0 } * (std::f32::consts::PI * k).sin()
+                * (k * 3.0).min(1.0);
+            for j in [&mut q.hip, &mut q.head, &mut q.lead_hand, &mut q.rear_hand, &mut q.lead_foot, &mut q.rear_foot] {
+                j.u += lift;
             }
         }
-        // Rei: heels together, open hands at thighs, bow about 30°, then blend back to Idle.
-        Act::Bow if intro_of(f.who) != Intro::Bow && !f.bows => {
-            let ease = |from: f32, len: f32| {
-                let k = ((f.t - from) / len).clamp(0.0, 1.0);
-                k * k * (3.0 - 2.0 * k)
-            };
-            let on = ease(0.15, 0.3) * (1.0 - ease(1.25, 0.3));
-            // Standing tall to start from: feet under the hips, hands down.
-            let mut tall = q;
-            tall.hip = p(0.0, HIP_U + 4.0);
-            tall.head = p(1.0, HEAD_U + 3.0);
-            tall.lead_foot = p(10.0, 0.0);
-            tall.rear_foot = p(-10.0, 0.0);
-            tall.lead_hand = p(6.0, 48.0);
-            tall.rear_hand = p(14.0, 46.0);
-            tall.lead_heel = 0.0;
-            tall.rear_heel = 0.0;
-            let mut show = tall;
-            // DRAKE opens either way, at random: the nunchaku and the beckon, or the salute.
-            let intro = intro_now(f);
-            match intro {
-                Intro::Pound => {
-                    // Two fists beaten on the chest, one after the other, the head back roaring.
-                    let beat = (f.t * 9.0).sin();
-                    show.lead_hand = p(16.0 + 9.0 * beat.max(0.0), 82.0);
-                    show.rear_hand = p(36.0 + 9.0 * (-beat).max(0.0), 92.0);
-                    show.head = p(-3.0, HEAD_U + 2.0);
-                    show.lead_foot = p(18.0, 0.0);
-                    show.rear_foot = p(-18.0, 0.0);
-                    show.hip.u -= 3.0;
-                }
-                Intro::Hips => {
-                    // Fists on the hips, chest out, and one slow nod. (Folded arms read, side on, as a guard.)
-                    let nod = (1.0 - ((f.t - 0.85) / 0.22).abs()).max(0.0);
-                    show.lead_hand = p(11.0, 50.0);
-                    show.rear_hand = p(-4.0, 54.0);
-                    show.head = p(-3.0 + 5.0 * nod, HEAD_U + 3.0 - 4.0 * nod);
-                    show.hip.f += 1.0;
-                }
-                Intro::Salute | Intro::Wai => {
-                    let nod = (1.0 - ((f.t - 0.8) / 0.25).abs()).max(0.0);
-                    let at = if intro == Intro::Salute { p(18.0, 84.0) } else { p(19.0, 90.0) };
-                    show.lead_hand = p(at.f - 4.0, at.u);
-                    show.rear_hand = p(at.f + 4.0, at.u + 1.0);
-                    show.head = p(1.0 + 6.0 * nod, HEAD_U + 3.0 - 4.0 * nod);
-                }
-                Intro::Beckon if f.t < 0.6 => {
-                    // First a flourish of the nunchaku at his side (drawn in `draw_sticks`).
-                    let a = f.t * 24.0;
-                    let sh = p(show.head.f + 2.0, show.head.u - 20.0);
-                    show.lead_hand = p(sh.f + 20.0 + 6.0 * a.cos(), sh.u - 2.0 + 5.0 * (2.0 * a).sin());
-                    show.rear_hand = p(16.0, 74.0);
-                    show.lead_foot = p(16.0, 0.0);
-                    show.rear_foot = p(-16.0, 0.0);
-                }
-                Intro::Beckon => {
-                    // Then side on, the far hand out palm up at the opponent, the fingers curling in twice.
-                    let curl = ((f.t - 0.7).max(0.0) * 9.0).sin().max(0.0) * (1.0 - ((f.t - 1.2) / 0.25).clamp(0.0, 1.0));
-                    show.rear_hand = p(40.0 - 3.0 * curl, 84.0 + 2.0 * curl);
-                    show.lead_hand = p(16.0, 80.0);
-                    show.head = p(3.0, HEAD_U);
-                    show.lead_foot = p(16.0, 0.0);
-                    show.rear_foot = p(-16.0, 0.0);
-                }
-                Intro::WarmUp => {
-                    let t = f.t;
-                    if t < 0.55 {
-                        // Palms pressed hard together before the chest, the shoulders squeezing.
-                        show.lead_hand = p(16.0, 86.0);
-                        show.rear_hand = p(23.0, 87.0);
-                        show.head = p(2.0, HEAD_U + 1.0);
-                    } else if t < 0.95 {
-                        // The neck rolled round, slow.
-                        let a = (t - 0.55) / 0.4 * std::f32::consts::TAU;
-                        show.lead_hand = p(10.0, 54.0);
-                        show.rear_hand = p(16.0, 52.0);
-                        show.head = p(2.0 + 3.0 * a.cos(), HEAD_U - 1.0 + 2.5 * a.sin());
-                    } else {
-                        // The knuckles cracked: one fist pressed into the other palm, and a twist.
-                        let crack = ((t - 0.95) * 14.0).sin().max(0.0);
-                        show.lead_hand = p(17.0 - 2.0 * crack, 82.0);
-                        show.rear_hand = p(24.0, 82.0 + 2.0 * crack);
-                        show.head = p(4.0, HEAD_U);
-                    }
-                }
-                Intro::Gloves => {
-                    // Two taps, a beat apart, then up into the guard.
-                    let tap = ((f.t - 0.3) * 8.0).sin().max(0.0) * (1.0 - ((f.t - 0.9) / 0.3).clamp(0.0, 1.0));
-                    show.lead_hand = p(20.0 - 3.0 * tap, 76.0);
-                    show.rear_hand = p(28.0 + 3.0 * tap - 10.0 * tap, 78.0);
-                    show.head = p(4.0, HEAD_U);
-                }
-                Intro::Limber | Intro::Bow => {
-                    // Shaking it out: up on the toes and down, the hands loose and flicking.
-                    let hop = (f.t * 11.0).sin();
-                    let flick = (f.t * 23.0).sin();
-                    show.hip.u -= 4.0 * hop.max(0.0);
-                    show.head.u -= 3.5 * hop.max(0.0);
-                    show.head.f += 2.0 * (f.t * 5.0).sin();
-                    show.lead_hand = p(12.0 + 6.0 * flick, 54.0 + 4.0 * flick);
-                    show.rear_hand = p(22.0 - 6.0 * flick, 52.0 - 4.0 * flick);
-                    show.lead_heel = 0.5 * (-hop).max(0.0);
-                    show.rear_heel = 0.5 * (-hop).max(0.0);
-                }
-            }
-            q = tall.to(show, on);
-            q.open = matches!(intro, Intro::Wai | Intro::Beckon) || (intro == Intro::WarmUp && f.t < 0.55);
-        }
-        Act::Bow => {
-            let ease = |from: f32, len: f32| {
-                let k = ((f.t - from) / len).clamp(0.0, 1.0);
-                k * k * (3.0 - 2.0 * k)
-            };
-            let bow = ease(0.3, 0.42) * (1.0 - ease(1.0, 0.42));
-            // standing tall: legs all but straight, the hips going back as
-            // the torso tips forward
-            let hip = p(-6.0 * bow, HIP_U + 5.5 - 1.5 * bow);
-            let spine = HEAD_U - HIP_U + 1.0;
-            let lean = 0.62 * bow; // about 35 degrees at the bottom
-            let head = p(hip.f + spine * lean.sin() + 3.0 * bow, hip.u + spine * lean.cos() - 3.0 * bow);
-            q = Pose {
-                hip,
-                head,
-                // open hands at the sides of the thighs, sliding toward the knees
-                lead_hand: p(3.0 + 12.0 * bow, 46.0 - 12.0 * bow),
-                rear_hand: p(11.0 + 12.0 * bow, 44.0 - 12.0 * bow),
-                lead_foot: p(6.0, 0.0),
-                rear_foot: p(-6.0, 0.0),
-                open: true,
-                lead_heel: 0.0,
-                rear_heel: 0.0,
-                twist: 0.0,
-            };
-        }
-        Act::Defeat => {
-            let fall = |from: f32, len: f32| {
-                let k = ((f.t - from) / len).clamp(0.0, 1.0);
-                k * k * (3.0 - 2.0 * k)
-            };
-            let (hips, slump) = (fall(0.0, 0.55), fall(0.2, 0.8));
-            let heave = (f.t * 2.4).sin() * slump;
-            q.hip = q.hip.to(p(-4.0, 30.0), hips);
-            q.head = q.head.to(p(25.0, 72.0 + heave * 0.8), slump);
-            q.lead_foot = q.lead_foot.to(p(22.0, 0.0), hips);
-            q.rear_foot = q.rear_foot.to(p(-34.0, 3.0), hips);
-            q.rear_heel = 0.9 * hips;
-            q.lead_heel = 0.0;
-            q.lead_hand = q.lead_hand.to(p(-2.0, 18.0 + heave * 0.5), slump);
-            q.rear_hand = q.rear_hand.to(p(28.0, 28.0), slump);
-        }
-        _ => {}
+        return q;
     }
+    if t > 0.85 && nimble(f) {
+        // The acrobats kip up: knees pulled over the chest, hands by the head, then the whole body
+        // springs off the boards and lands in the crouch.
+        let k = ((t - 0.85) / 0.30).clamp(0.0, 1.0);
+        let tuck = Pose {
+            hip: p(2.0, 14.0),
+            head: p(-36.0, 12.0),
+            lead_hand: p(-30.0, 26.0),
+            rear_hand: p(-22.0, 30.0),
+            // Up but still forward of the hips: over them, the knees flipped from one bend to the other.
+            lead_foot: p(24.0, 40.0),
+            rear_foot: p(16.0, 34.0),
+            open: true,
+            lead_heel: 0.6,
+            rear_heel: 0.6,
+            twist: 0.0,
+        };
+        let spring = Pose {
+            hip: p(0.0, 52.0),
+            head: p(-4.0, 100.0),
+            lead_hand: p(14.0, 74.0),
+            rear_hand: p(24.0, 82.0),
+            // (Feet well forward: the hips rising straight past an ankle flipped the knee in one frame.)
+            lead_foot: p(24.0, 16.0),
+            rear_foot: p(16.0, 12.0),
+            open: false,
+            lead_heel: 0.5,
+            rear_heel: 0.5,
+            twist: 0.0,
+        };
+        let ease = |a: f32, b: f32| { let x = ((k - a) / (b - a)).clamp(0.0, 1.0); x * x * (3.0 - 2.0 * x) };
+        return down.to(tuck, ease(0.0, 0.30)).to(spring, ease(0.30, 0.58)).to(crouched(0.0), ease(0.58, 0.78))
+            .to(stance(0.0, f.who), ease(0.78, 1.0));
+    }
+    if t > 0.85 {
+        let k = ((t - 0.85) / 0.30).clamp(0.0, 1.0);
+        let mut up = crouched(0.0);
+        up.rear_hand = p(22.0, 16.0);
+        up.lead_hand = p(28.0, 34.0);
+        up.rear_foot = p(-10.0, 0.0);
+        return down.to(up, (k * 1.8).min(1.0)).to(stance(0.0, f.who), (k - 0.55).max(0.0) / 0.45);
+    }
+    // The boards give the body back: one bounce, and a smaller one.
+    let mut down = down;
+    let b = if (FALL..FALL + 0.18).contains(&t) { 9.0 * (std::f32::consts::PI * (t - FALL) / 0.18).sin() }
+        else if (0.40..0.50).contains(&t) { 2.5 * (std::f32::consts::PI * (t - 0.40) / 0.10).sin() } else { 0.0 };
+    for j in [&mut down.hip, &mut down.head, &mut down.lead_hand, &mut down.rear_hand, &mut down.lead_foot, &mut down.rear_foot] {
+        j.u += b;
+    }
+    down
+}
+
+/// Walking: the stride in the fighter's own gait.
+fn walk_pose(mut q: Pose, f: &Fighter) -> Pose {
+    let gait = GAITS[f.who];
+    let ph = walk_phase(f);
+    let s = ph.sin();
+    let (lift, from_lead, from_rear) = match gait {
+        // Boxers keep the stance and slide it: front foot first, the back one after.
+        Gait::Shuffle => (4.0, q.lead_foot.f, q.rear_foot.f),
+        Gait::Stomp => (15.0, WALK_MID + 2.0, WALK_MID - 2.0),
+        Gait::Prowl => (9.0, WALK_MID + 3.0, WALK_MID + 3.0),
+        Gait::Glide => (8.0, WALK_MID + 1.0, WALK_MID - 1.0),
+        Gait::Stride => (9.0, WALK_MID, WALK_MID),
+    };
+    let (lf, ll) = gait_foot(gait, ph, lift);
+    let (rf, rl) = gait_foot(gait, ph + std::f32::consts::PI, lift * 0.9);
+    // A stride is a real walk: the feet pass each other under the body, so the front leg changes with
+    // every step. A shuffle never crosses them.
+    q.lead_foot = p(from_lead + lf, ll);
+    q.rear_foot = p(from_rear + rf, rl);
+    let toes = 1.0 + 0.4 * (1.0 - (f.arch().bulk - 0.85).clamp(0.0, 0.4) / 0.4);
+    q.lead_heel = heel_cycle(ph) * toes;
+    q.rear_heel = heel_cycle(ph + std::f32::consts::PI) * toes;
+    if gait == Gait::Shuffle { q.rear_heel = q.rear_heel.max(0.45); }
+    // Up out of the stance to walk: the legs are under the body now,
+    // and nearly straight as each foot passes.
+    // (A fighter who sits low in the stance comes up most of that too.)
+    // How much the body rides each step is the fighter's weight: the heavies sink into every one,
+    // the light ones are springy on their toes.
+    let tread = (f.arch().bulk - 0.85).clamp(0.0, 0.4) / 0.4;
+    let ride = match gait {
+        Gait::Glide => 0.2,
+        Gait::Shuffle => 0.8,
+        Gait::Stomp => 2.4 + 1.2 * tread,
+        _ => 0.9 + 1.6 * tread,
+    };
+    let rise = match gait { Gait::Shuffle => 0.0, Gait::Prowl => -6.0, _ => WALK_RISE };
+    let sink = ride + ride * (2.0 * ph).cos() - rise - 0.8 * STYLES[f.who].sink;
+    q.hip.u -= sink;
+    q.head.u -= sink * 0.7;
+    // The arms swing against the legs; a heavy swings them wide, a boxer hardly at all.
+    let swing = match gait { Gait::Stomp => 2.0, Gait::Shuffle => 0.3, Gait::Glide => 0.5, _ => 1.0 };
+    q.hip.f += 1.4 * s;
+    q.head.f -= 1.0 * s * swing;
+    q.lead_hand.f -= 2.6 * s * swing;
+    q.rear_hand.f += 2.2 * s * swing;
+    q.lead_hand.u -= sink * 0.7;
+    q.rear_hand.u -= sink * 0.7;
+    // Into the advance, chin first. (Walking back is the guard, below.)
+    match gait {
+        // Low to the floor, head out and the hands down near the boards.
+        Gait::Prowl => {
+            q.head.f += 9.0;
+            q.head.u -= 4.0;
+            q.lead_hand = p(q.lead_hand.f + 2.0, q.lead_hand.u - 8.0);
+            q.rear_hand = p(q.rear_hand.f + 10.0, q.rear_hand.u - 18.0);
+        }
+        // Chest out, upright, as if the floor were optional.
+        Gait::Glide => q.head.f -= 1.0,
+        _ => q.head.f += 4.0,
+    }
+    q.hip.f += 1.5;
+    q
+}
+
+/// Turtled up: weight off the front foot, forearms stacked before head or belly.
+fn block_pose(mut q: Pose, f: &Fighter, bob: f32) -> Pose {
+    let b = bob;
+    if f.crouch_block {
+        q.lead_hand = p(12.0, 31.0 + b * 0.5);
+        q.rear_hand = p(27.0, 42.0 + b * 0.7);
+        q.head.f -= 4.0;
+    } else {
+        q.hip = p(-4.0, HIP_U - 2.0 + b * 0.6);
+        q.head = p(-8.0 - b * 0.7, HEAD_U - 2.0 + b * 0.4);
+        q.lead_hand = p(13.0 + b * 0.4, 73.0 + b * 0.6);
+        q.rear_hand = p(26.0 + b * 0.6, 88.0 + b * 0.8);
+        let ph = f.x * f.facing * STRIDE / f.size();
+        let sink = 1.0 + (2.0 * ph).cos();
+        let (lf, ll) = foot_cycle(ph, 7.0);
+        let (rf, rl) = foot_cycle(ph + std::f32::consts::PI, 6.0);
+        q.lead_foot = p(14.0 + lf, ll);
+        q.rear_foot = p(-17.0 + rf, rl);
+        q.lead_heel = heel_cycle(ph) * 0.6;
+        q.rear_heel = heel_cycle(ph + std::f32::consts::PI) * 0.6;
+        // Each art guards its own way.
+        let (near, far, open) = match ARTS[f.who] {
+            // Soto-uke: the near forearm upright across the face, the other fist back at the hip.
+            Art::Karate => (p(20.0, 92.0), p(q.hip.f + 7.0, q.hip.u + 15.0), false),
+            // The shell: both gloves to the face, elbows tight to the ribs.
+            Art::Boxing => (p(9.0, 86.0), p(25.0, 96.0), false),
+            // Forearms up like a wall either side of the head.
+            Art::MuayThai => (p(11.0, 90.0), p(29.0, 101.0), false),
+            // Bong sau: the far forearm out flat across the chest, elbow up; the near hand behind it.
+            Art::WingChun => (p(20.0, 80.0), p(31.0, 85.0), true),
+            // The bridge: the far arm thrown out to meet the blow, the near claw at the chest.
+            Art::HungGar => (p(16.0, 84.0), p(35.0, 81.0), true),
+            // Pak sao: the far hand out slapping the blow aside, the near one cocked at the chin to answer;
+            // or (his roll) the blow slipped, leaning back out of it with both hands up.
+            Art::JeetKuneDo if f.stumble_roll % 2 == 1 => {
+                q.hip.f -= 4.0;
+                q.head = p(q.head.f - 10.0, q.head.u - 3.0);
+                (p(10.0, 86.0), p(22.0, 92.0), false)
+            }
+            Art::JeetKuneDo => (p(14.0, 90.0), p(34.0, 86.0), true),
+            _ => (q.lead_hand, q.rear_hand, q.open),
+        };
+        q.lead_hand = near;
+        q.rear_hand = far;
+        q.open = open;
+        q.hip.u -= sink;
+        q.head.u -= sink * 0.7;
+        q.lead_hand.u -= sink * 0.7;
+        q.rear_hand.u -= sink * 0.7;
+        // A Thai fighter checks a blow with the shin: the lead knee comes up to meet it.
+        if ARTS[f.who] == Art::MuayThai && f.stun > 0.0 {
+            let k = (f.stun / (6.0 * F)).clamp(0.0, 1.0);
+            q.lead_foot = q.lead_foot.to(p(18.0, 26.0), k);
+            q.lead_heel = 0.3 * k;
+        }
+    }
+    // A blocked blow (its blockstun is running) drives the forearms back into the body, and the
+    // head with them.
+    let jolt = (f.stun / (10.0 * F)).clamp(0.0, 1.0);
+    let jolt = jolt * jolt;
+    q.lead_hand.f -= 6.0 * jolt;
+    q.rear_hand.f -= 7.0 * jolt;
+    q.head.f -= 4.0 * jolt;
+    q.hip.f -= 2.0 * jolt;
+    q
+}
+
+/// Snapped back off the blow: head first, back foot skidding out.
+fn hitstun_pose(mut q: Pose, f: &Fighter, low: bool, now: f32) -> Pose {
+    // The head goes first and furthest, and comes back last.
+    let k = (1.0 - f.t * 3.4).clamp(0.40, 1.0);
+    let drop = if low { 0.5 } else { 1.0 };
+    let force = f.struck_force;
+    let fling = ((k - 0.4) / 0.6).max(0.0);
+    if f.struck_legs && !low {
+        // Kicked in the shins: the front knee gives and the foot is swept back under, the body
+        // dropping over it and the arms out for balance.
+        // (The feet stay put: swept back, the weight went past them.)
+        let give = k * force;
+        q.hip = p(q.hip.f + 1.0 * give, q.hip.u - 6.0 * give);
+        q.head = p(q.head.f + 3.0 * give, q.head.u - 7.0 * give);
+        q.lead_foot = p(q.lead_foot.f - 3.0 * give, 0.0);
+        q.lead_heel = 0.5 * give;
+        q.lead_hand = p(q.lead_hand.f - 8.0 * fling, q.lead_hand.u - 4.0 * give);
+        q.rear_hand = p(q.rear_hand.f + 6.0 * fling, q.rear_hand.u - 8.0 * give);
+    } else if f.struck_body && !low {
+        // Winded: doubled over the blow, the hips pushed back, both hands to the gut, the knees giving.
+        let fold = k * force;
+        q.hip = p(q.hip.f - 9.0 * fold, q.hip.u - 7.0 * fold);
+        q.head = p(q.head.f + 10.0 * fold, q.head.u - 22.0 * fold);
+        // (Held further out than the belly itself: a heavy's forward lean put the far hand
+        // through his back.)
+        let belly = q.hip.f.max(q.head.f - 10.0);
+        q.lead_hand = q.lead_hand.to(p(belly + 18.0, q.hip.u + 4.0), 0.85 * k);
+        q.rear_hand = q.rear_hand.to(p(belly + 26.0, q.hip.u + 11.0), 0.85 * k);
+    } else {
+        q.hip = p(q.hip.f - 6.0 * k * force, q.hip.u - 3.0 * k);
+        q.head = p(q.head.f - 24.0 * k * drop * force, q.head.u - 1.6 + 3.0 * fling * (force - 1.0).max(0.0));
+        // The arms are thrown up and out by it, and drop back in.
+        q.lead_hand = p(q.lead_hand.f - 9.0 - 4.0 * fling * force, q.lead_hand.u - 5.0 + 9.0 * fling * force);
+        q.rear_hand = p(q.rear_hand.f - 7.0 + 6.0 * fling, q.rear_hand.u - 9.0 + 12.0 * fling * force);
+    }
+    q.lead_foot = p(q.lead_foot.f - 10.0, 0.0);
+    q.rear_foot = p(q.rear_foot.f - 6.0 * force, 0.0);
+    // Seeing stars: swaying on the spot, arms hanging.
+    if f.dizzy > 0.0 {
+        let sway = (now * 5.0).sin();
+        q.head = p(q.head.f + 6.0 * sway, q.head.u - 2.0);
+        q.hip.f += 2.0 * sway;
+        q.lead_hand = p(10.0 + 3.0 * sway, 50.0);
+        q.rear_hand = p(20.0 + 3.0 * sway, 52.0);
+    }
+    // Rocked back onto flat feet, the hands knocked open.
+    q.open = true;
+    q.lead_heel = 0.0;
+    q.rear_heel = 0.0;
+    q
+}
+
+/// Won: guard drops, the arm sweeps up and forward (raised straight it hides the face), then held.
+fn victory_pose(mut q: Pose, f: &Fighter) -> Pose {
+    let t = f.t;
+    let settle = (t / 0.30).clamp(0.0, 1.0);
+    let raise = ((t - 0.26) / 0.34).clamp(0.0, 1.0);
+    let sweep = raise * raise * (3.0 - 2.0 * raise);
+    let bob = ((t - 0.6).max(0.0) * 2.2).sin() * 1.8;
+
+    q.head = p(-1.5 + 2.0 * settle - 2.0 * sweep,
+               HEAD_U + 1.2 * settle + 1.5 * sweep + bob * 0.3);
+    q.hip = p(0.0, HIP_U + 1.0 * settle);
+    q.lead_foot = p(16.0 - 3.0 * settle, 0.0);
+    q.rear_foot = p(-21.0 + 4.0 * settle, 0.0);
+    q.rear_heel *= 1.0 - settle;
+    let ease = |from: f32, len: f32| {
+        let k = ((t - from) / len).clamp(0.0, 1.0);
+        k * k * (3.0 - 2.0 * k)
+    };
+    // DRAKE wins three ways, at random (his per-attack roll): the nunchaku and the thumb, the salute, or the
+    // beckon for more.
+    // Over LANCER, DRAKE always plucks the hair and blows it away, as in Way of the Dragon's Colosseum.
+    let plucks = plucking(f);
+    let win = if plucks { Win::Pluck }
+              else if formless(f.who) { [Win::Thumb, Win::Salute, Win::Beckon, Win::Stamp][(f.stumble_roll % 4) as usize] }
+              else { STYLES[f.who].win };
+    if win == Win::Pluck {
+        // Weight back and easy, the far fist low; the near hand comes up to the lips, pinched, at 0.3 s,
+        // and the blow is at 0.8 s (the hairs drift off in `draw_body`).
+        let up = ease(0.25, 0.25);
+        // (Held a little out from the lips: against them it read as eating.)
+        q.lead_hand = q.lead_hand.to(p(q.head.f + 18.0, q.head.u - 3.0), up);
+        q.rear_hand = q.rear_hand.to(p(30.0, 84.0), ease(0.0, 0.3));
+        q.head.f -= 2.0 * up;
+        q.open = false;
+        q.twist = 0.0;
+    } else if win == Win::Rei {
+        let bow = ease(0.3, 0.42) * (1.0 - ease(1.2, 0.42));
+        let ready = ease(1.5, 0.25);
+        let hip = p(-6.0 * bow, HIP_U + 5.5 - 1.5 * bow - 2.0 * ready);
+        let spine = HEAD_U - HIP_U + 1.0;
+        let lean = 0.62 * bow;
+        let head = p(hip.f + spine * lean.sin() + 3.0 * bow, hip.u + spine * lean.cos() - 3.0 * bow);
+        let down = |side: f32| p(side + 12.0 * bow, 45.0 - 12.0 * bow);
+        q = Pose {
+            hip, head,
+            // (0 and 14 apart: nearer, from the side the two hands are one.)
+            lead_hand: down(0.0).to(p(8.0, 48.0), ready),
+            rear_hand: down(14.0).to(p(18.0, 47.0), ready),
+            lead_foot: p(6.0 + 4.0 * ready, 0.0),
+            rear_foot: p(-6.0 - 4.0 * ready, 0.0),
+            open: ready < 0.5,
+            lead_heel: 0.0, rear_heel: 0.0, twist: 0.0,
+        };
+    } else if win == Win::Stamp {
+        // Up comes the knee, then the foot drives down at a third of a second and stays planted, the fists
+        // clenched low, the body sunk over it.
+        let up = ease(0.0, 0.2) * (1.0 - ease(0.3, 0.06));
+        let sunk = ease(0.3, 0.08);
+        q.lead_foot = p(18.0, 34.0 * up);
+        q.lead_heel = 0.2 * up;
+        q.hip.u -= 4.0 * sunk;
+        q.head = p(q.head.f + 4.0 * sunk, q.head.u - 6.0 * sunk);
+        q.lead_hand = q.lead_hand.to(p(18.0, 60.0), ease(0.0, 0.2));
+        q.rear_hand = q.rear_hand.to(p(-2.0, 62.0), ease(0.0, 0.2));
+        q.open = false;
+        q.twist = 0.0;
+    } else if win == Win::Beckon {
+        // Side on, chin up, the far hand out palm up and curling: come back for more.
+        let on = ease(0.0, 0.3);
+        let curl = ((t - 0.4).max(0.0) * 9.0).sin().max(0.0);
+        q.rear_hand = q.rear_hand.to(p(40.0 - 3.0 * curl, 84.0 + 2.0 * curl), on);
+        q.lead_hand = q.lead_hand.to(p(16.0, 80.0), on);
+        q.head.u += 1.5 * on;
+        q.open = true;
+        q.twist = 0.0;
+    } else if win == Win::Thumb && (0.9..1.6).contains(&t) {
+        // Then caught under the arm, as in Enter the Dragon: the near hand at the chest holding the sticks
+        // tucked back under the armpit, the far hand out in guard, held a moment.
+        let k = ease(0.9, 0.12);
+        q.lead_hand = q.lead_hand.to(p(q.head.f + 8.0, q.head.u - 30.0), k);
+        q.rear_hand = q.rear_hand.to(p(36.0, 84.0), k);
+        q.open = false;
+        q.twist = 0.0;
+    } else if win == Win::Thumb && t < 0.9 {
+        // First the nunchaku whirled at his side (drawn in `draw_sticks`), weight back, chin up.
+        let a = t * 24.0;
+        let sh = p(q.head.f + 2.0, q.head.u - 20.0);
+        q.lead_hand = q.lead_hand.to(p(sh.f + 20.0 + 6.0 * a.cos(), sh.u - 2.0 + 5.0 * (2.0 * a).sin()), ease(0.0, 0.2));
+        q.rear_hand = q.rear_hand.to(p(30.0, 70.0), ease(0.0, 0.3));
+        q.open = false;
+        q.twist = 0.0;
+    } else if win == Win::Thumb {
+        // Then the sticks put away, weight back, the far fist low; the near thumb brushes across the nose,
+        // twice, head tipped up.
+        let on = 1.0;
+        let flick = ((t - 1.7).max(0.0) * 10.0).sin().max(0.0) * (1.0 - ease(2.6, 0.3));
+        q.head = p(q.head.f - 2.0 * on, q.head.u + 1.5 * on);
+        // (Just in front of the face: the thumb is at the nose, the fist clear of the head.)
+        q.lead_hand = q.lead_hand.to(p(q.head.f + 16.0 + 4.0 * flick, q.head.u - 8.0), on);
+        q.rear_hand = q.rear_hand.to(p(30.0, 70.0), on);
+        q.open = false;
+        q.twist = 0.0;
+    } else if matches!(win, Win::Salute | Win::Wai) {
+        // Feet together, hands brought together, then the bow, held.
+        let join = ease(0.0, 0.35);
+        let bow = ease(0.45, 0.35);
+        q.lead_foot = p(8.0, 0.0);
+        q.rear_foot = p(-8.0, 0.0);
+        q.rear_heel = 0.0;
+        q.hip = p(0.0, HIP_U + 3.0);
+        q.head = p(1.0 + 7.0 * bow, HEAD_U + 3.0 - 5.0 * bow);
+        let at = if win == Win::Salute { p(17.0 + 4.0 * bow, 84.0 - 3.0 * bow) } else { p(19.0 + 5.0 * bow, 90.0 - 4.0 * bow) };
+        // Fist and palm, or two palms: side on, one hand just in front of the other.
+        q.lead_hand = q.lead_hand.to(p(at.f - 4.0, at.u), join);
+        q.rear_hand = q.rear_hand.to(p(at.f + 4.0, at.u + 1.0), join);
+        q.open = win == Win::Wai || join < 0.5;
+        q.twist = 0.0;
+    } else if win == Win::Flex {
+        // The crunch: hunched forward over both fists, knuckles together in front of the belly,
+        // head pushed out roaring, and squeezed again and again. (Arms up beside the head read,
+        // side on, as a punch.)
+        let lift = ease(0.0, 0.4);
+        let squeeze = ((t - 0.6).max(0.0) * 6.0).sin().abs() * lift;
+        q.hip = p(q.hip.f - 3.0 * lift, q.hip.u - 7.0 * lift - 2.0 * squeeze);
+        q.head = p(q.head.f + 12.0 * lift, q.head.u - 12.0 * lift - 3.0 * squeeze);
+        q.lead_hand = q.lead_hand.to(p(22.0 - 3.0 * squeeze, 48.0), lift);
+        q.rear_hand = q.rear_hand.to(p(36.0 - 2.0 * squeeze, 64.0), ease(0.06, 0.4));
+        q.lead_foot.f += 6.0 * lift;
+        q.rear_foot.f -= 6.0 * lift;
+        q.twist = 0.0;
+        q.open = false;
+    } else if win == Win::Pump {
+        // The fist comes down to the hip, hard, three times a second, the knees dipping with it.
+        let on = ease(0.0, 0.3);
+        let pump = ((t - 0.3).max(0.0) * 9.0).sin().max(0.0) * on;
+        q.lead_hand = q.lead_hand.to(p(30.0, 92.0 - 30.0 * pump), on);
+        q.rear_hand = q.rear_hand.to(p(10.0, 50.0), on);
+        q.hip.u -= 3.0 * pump;
+        q.head.u -= 3.0 * pump;
+        q.head.f += 3.0 * pump;
+        q.twist = 0.5 * pump;
+    } else if matches!(win, Win::Both | Win::Hop) {
+        // Both arms up, the far one first so the near one comes up
+        // outside it.
+        q.rear_hand = q.rear_hand.to(p(20.0, 126.0 - bob), ease(0.0, 0.35));
+        let lift = ease(0.12, 0.45);
+        q.lead_hand = q.lead_hand.to(p(38.0, 118.0 + bob), lift);
+        q.twist = lift;
+        if win == Win::Hop {
+            // Bouncing on the toes, the knees giving at the bottom of each. (Off the boards, the
+            // head left the hurtbox by 8 px.)
+            let ph = ((t - 0.4).max(0.0) * 7.0).sin();
+            let up = ph.max(0.0);
+            let give = (-ph).max(0.0) * 5.0;
+            q.hip.u -= give;
+            q.head.u -= give * 0.8;
+            q.lead_hand.u -= give * 0.6;
+            q.rear_hand.u -= give * 0.6;
+            q.lead_heel = 0.7 * up;
+            q.rear_heel = 0.7 * up;
+        }
+    } else {
+        // One fist straight up, the shoulder coming round under it;
+        // the other waits for it to pass, then comes down to the hip.
+        let lift = ease(0.0, 0.5);
+        q.lead_hand = q.lead_hand.to(p(36.0, 120.0 + bob), lift);
+        q.rear_hand = q.rear_hand.to(p(8.0, 42.0), ease(0.14, 0.30));
+        q.twist = lift;
+    }
+    q
+}
+
+/// Rei: heels together, open hands at thighs, bow about 30°, then blend back to Idle.
+fn intro_pose(mut q: Pose, f: &Fighter) -> Pose {
+    let ease = |from: f32, len: f32| {
+        let k = ((f.t - from) / len).clamp(0.0, 1.0);
+        k * k * (3.0 - 2.0 * k)
+    };
+    let on = ease(0.15, 0.3) * (1.0 - ease(1.25, 0.3));
+    // Standing tall to start from: feet under the hips, hands down.
+    let mut tall = q;
+    tall.hip = p(0.0, HIP_U + 4.0);
+    tall.head = p(1.0, HEAD_U + 3.0);
+    tall.lead_foot = p(10.0, 0.0);
+    tall.rear_foot = p(-10.0, 0.0);
+    tall.lead_hand = p(6.0, 48.0);
+    tall.rear_hand = p(14.0, 46.0);
+    tall.lead_heel = 0.0;
+    tall.rear_heel = 0.0;
+    let mut show = tall;
+    // DRAKE opens either way, at random: the nunchaku and the beckon, or the salute.
+    let intro = intro_now(f);
+    match intro {
+        Intro::Pound => {
+            // Two fists beaten on the chest, one after the other, the head back roaring.
+            let beat = (f.t * 9.0).sin();
+            show.lead_hand = p(16.0 + 9.0 * beat.max(0.0), 82.0);
+            show.rear_hand = p(36.0 + 9.0 * (-beat).max(0.0), 92.0);
+            show.head = p(-3.0, HEAD_U + 2.0);
+            show.lead_foot = p(18.0, 0.0);
+            show.rear_foot = p(-18.0, 0.0);
+            show.hip.u -= 3.0;
+        }
+        Intro::Hips => {
+            // Fists on the hips, chest out, and one slow nod. (Folded arms read, side on, as a guard.)
+            let nod = (1.0 - ((f.t - 0.85) / 0.22).abs()).max(0.0);
+            show.lead_hand = p(11.0, 50.0);
+            show.rear_hand = p(-4.0, 54.0);
+            show.head = p(-3.0 + 5.0 * nod, HEAD_U + 3.0 - 4.0 * nod);
+            show.hip.f += 1.0;
+        }
+        Intro::Salute | Intro::Wai => {
+            let nod = (1.0 - ((f.t - 0.8) / 0.25).abs()).max(0.0);
+            let at = if intro == Intro::Salute { p(18.0, 84.0) } else { p(19.0, 90.0) };
+            show.lead_hand = p(at.f - 4.0, at.u);
+            show.rear_hand = p(at.f + 4.0, at.u + 1.0);
+            show.head = p(1.0 + 6.0 * nod, HEAD_U + 3.0 - 4.0 * nod);
+        }
+        Intro::Beckon if f.t < 0.6 => {
+            // First a flourish of the nunchaku at his side (drawn in `draw_sticks`).
+            let a = f.t * 24.0;
+            let sh = p(show.head.f + 2.0, show.head.u - 20.0);
+            show.lead_hand = p(sh.f + 20.0 + 6.0 * a.cos(), sh.u - 2.0 + 5.0 * (2.0 * a).sin());
+            show.rear_hand = p(16.0, 74.0);
+            show.lead_foot = p(16.0, 0.0);
+            show.rear_foot = p(-16.0, 0.0);
+        }
+        Intro::Beckon => {
+            // Then side on, the far hand out palm up at the opponent, the fingers curling in twice.
+            let curl = ((f.t - 0.7).max(0.0) * 9.0).sin().max(0.0) * (1.0 - ((f.t - 1.2) / 0.25).clamp(0.0, 1.0));
+            show.rear_hand = p(40.0 - 3.0 * curl, 84.0 + 2.0 * curl);
+            show.lead_hand = p(16.0, 80.0);
+            show.head = p(3.0, HEAD_U);
+            show.lead_foot = p(16.0, 0.0);
+            show.rear_foot = p(-16.0, 0.0);
+        }
+        Intro::WarmUp => {
+            let t = f.t;
+            if t < 0.55 {
+                // Palms pressed hard together before the chest, the shoulders squeezing.
+                show.lead_hand = p(16.0, 86.0);
+                show.rear_hand = p(23.0, 87.0);
+                show.head = p(2.0, HEAD_U + 1.0);
+            } else if t < 0.95 {
+                // The neck rolled round, slow.
+                let a = (t - 0.55) / 0.4 * std::f32::consts::TAU;
+                show.lead_hand = p(10.0, 54.0);
+                show.rear_hand = p(16.0, 52.0);
+                show.head = p(2.0 + 3.0 * a.cos(), HEAD_U - 1.0 + 2.5 * a.sin());
+            } else {
+                // The knuckles cracked: one fist pressed into the other palm, and a twist.
+                let crack = ((t - 0.95) * 14.0).sin().max(0.0);
+                show.lead_hand = p(17.0 - 2.0 * crack, 82.0);
+                show.rear_hand = p(24.0, 82.0 + 2.0 * crack);
+                show.head = p(4.0, HEAD_U);
+            }
+        }
+        Intro::Gloves => {
+            // Two taps, a beat apart, then up into the guard.
+            let tap = ((f.t - 0.3) * 8.0).sin().max(0.0) * (1.0 - ((f.t - 0.9) / 0.3).clamp(0.0, 1.0));
+            show.lead_hand = p(20.0 - 3.0 * tap, 76.0);
+            show.rear_hand = p(28.0 + 3.0 * tap - 10.0 * tap, 78.0);
+            show.head = p(4.0, HEAD_U);
+        }
+        Intro::Limber | Intro::Bow => {
+            // Shaking it out: up on the toes and down, the hands loose and flicking.
+            let hop = (f.t * 11.0).sin();
+            let flick = (f.t * 23.0).sin();
+            show.hip.u -= 4.0 * hop.max(0.0);
+            show.head.u -= 3.5 * hop.max(0.0);
+            show.head.f += 2.0 * (f.t * 5.0).sin();
+            show.lead_hand = p(12.0 + 6.0 * flick, 54.0 + 4.0 * flick);
+            show.rear_hand = p(22.0 - 6.0 * flick, 52.0 - 4.0 * flick);
+            show.lead_heel = 0.5 * (-hop).max(0.0);
+            show.rear_heel = 0.5 * (-hop).max(0.0);
+        }
+    }
+    q = tall.to(show, on);
+    q.open = matches!(intro, Intro::Wai | Intro::Beckon) || (intro == Intro::WarmUp && f.t < 0.55);
+    q
+}
+
+/// The bow before the round.
+fn bow_pose(f: &Fighter) -> Pose {
+    let ease = |from: f32, len: f32| {
+        let k = ((f.t - from) / len).clamp(0.0, 1.0);
+        k * k * (3.0 - 2.0 * k)
+    };
+    let bow = ease(0.3, 0.42) * (1.0 - ease(1.0, 0.42));
+    // standing tall: legs all but straight, the hips going back as
+    // the torso tips forward
+    let hip = p(-6.0 * bow, HIP_U + 5.5 - 1.5 * bow);
+    let spine = HEAD_U - HIP_U + 1.0;
+    let lean = 0.62 * bow; // about 35 degrees at the bottom
+    let head = p(hip.f + spine * lean.sin() + 3.0 * bow, hip.u + spine * lean.cos() - 3.0 * bow);
+    Pose {
+        hip,
+        head,
+        // open hands at the sides of the thighs, sliding toward the knees
+        lead_hand: p(3.0 + 12.0 * bow, 46.0 - 12.0 * bow),
+        rear_hand: p(11.0 + 12.0 * bow, 44.0 - 12.0 * bow),
+        lead_foot: p(6.0, 0.0),
+        rear_foot: p(-6.0, 0.0),
+        open: true,
+        lead_heel: 0.0,
+        rear_heel: 0.0,
+        twist: 0.0,
+    }
+}
+
+/// Lost.
+fn defeat_pose(mut q: Pose, f: &Fighter) -> Pose {
+    let fall = |from: f32, len: f32| {
+        let k = ((f.t - from) / len).clamp(0.0, 1.0);
+        k * k * (3.0 - 2.0 * k)
+    };
+    let (hips, slump) = (fall(0.0, 0.55), fall(0.2, 0.8));
+    let heave = (f.t * 2.4).sin() * slump;
+    q.hip = q.hip.to(p(-4.0, 30.0), hips);
+    q.head = q.head.to(p(25.0, 72.0 + heave * 0.8), slump);
+    q.lead_foot = q.lead_foot.to(p(22.0, 0.0), hips);
+    q.rear_foot = q.rear_foot.to(p(-34.0, 3.0), hips);
+    q.rear_heel = 0.9 * hips;
+    q.lead_heel = 0.0;
+    q.lead_hand = q.lead_hand.to(p(-2.0, 18.0 + heave * 0.5), slump);
+    q.rear_hand = q.rear_hand.to(p(28.0, 28.0), slump);
+    q
+}
+
+/// What is laid over any pose: the knees giving on landing, rage, DRAKE shaking off a blow, feinting and taunting, a
+/// stumble and a stagger, the lead foot switched, and the spin of a jump.
+fn finishing_touches(mut q: Pose, f: &Fighter, now: f32, idx: usize, low: bool) -> Pose {
     if f.land > 0.0 && !f.airborne()
         && matches!(f.act, Act::Idle | Act::Walk | Act::Crouch | Act::Block) {
         let k = 1.0 - (f.land / LAND_ABSORB).clamp(0.0, 1.0);

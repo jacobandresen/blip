@@ -130,7 +130,8 @@ impl Meter {
     pub(crate) fn near(&mut self, me: &[Mover], hazards: &[Mover], clock: f32) {
         self.boxes_seen = true;
         if let Some(m) = me.first() { self.at(m.x, m.y); }
-        let gaps: Vec<f32> = hazards.iter().map(|h| if h.weight > 0.0 { me.iter().map(|m| gap(m, h)).fold(f32::INFINITY, f32::min) } else { f32::INFINITY }).collect();
+        let gap_to = |h: &Mover| if h.weight > 0.0 { me.iter().map(|m| gap(m, h)).fold(f32::INFINITY, f32::min) } else { f32::INFINITY };
+        let gaps: Vec<f32> = hazards.iter().map(gap_to).collect();
         let nearest = gaps.iter().enumerate().min_by(|a, b| a.1.total_cmp(b.1)).map(|(i, g)| (*g, i));
         let closest = nearest.map_or(f32::INFINITY, |(g, _)| g);
         if self.dir.is_some() {

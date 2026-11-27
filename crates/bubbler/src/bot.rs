@@ -67,23 +67,15 @@ struct Mind {
 
 /// One dragon's wish this frame, as `Input` (presses, not keys).
 fn think(g: &Game, pi: usize, mem: &mut Mind) -> Input {
-    let mut k = Input::default();
-    let passive = blip::bot::flag("PASSIVE");
     let p = &g.p[pi];
-    if !p.joined || !p.alive || p.dead_t > 0.0 {
-        return k;
-    }
+    if !p.joined || !p.alive || p.dead_t > 0.0 { return Input::default(); }
     let (px, py) = (p.cx(), p.cy());
     mem.jump_wait -= 1.0 / 60.0;
-    // danger: a monster about to walk into us
     // danger: a monster near, or about to be (where it will be a quarter-second on)
-    let danger = g
-        .enemies
-        .iter()
-        .filter(|e| e.active)
+    let danger = g.enemies.iter().filter(|e| e.active)
         .flat_map(|e| [0.0, 0.25].map(|t| (e.x + e.vx * t + E_W / 2.0 - px, e.y + e.vy * t + E_H / 2.0 - py)))
         .find(|(dx, dy)| dx.abs() < 34.0 && dy.abs() < 22.0);
-    // trapped bubbles are the priority, when popping them is worth it
+    // trapped bubbles are the priority, when popping them is worth it; then fruit nearby; then the nearest monster
     let trapped = best(g.bubbles.iter().filter(|b| ready_to_pop(g, b)), |b| (b.x - px).abs());
     let fruit = best(g.fruits.iter().filter(|f| f.on_ground && (f.y + 8.0 - py).abs() < 30.0), |f| (f.x - px).abs());
     let target = if let Some(b) = trapped {
@@ -94,95 +86,12 @@ fn think(g: &Game, pi: usize, mem: &mut Mind) -> Input {
         best(g.enemies.iter().filter(|e| e.active && e.pop_in >= 1.0), |e| (e.x - px).hypot((e.y - py) * 1.6))
             .map(|e| (e.x + E_W / 2.0, e.y + E_H / 2.0, false))
     };
-    // a rock or spark about to hit: hop over one along the ground, else step aside
-    if let Some(shot) = incoming_shot(g, p) {
-        let away = if shot.x > px { -1.0 } else { 1.0 };
-        k.left = away < 0.0;
-        k.right = away > 0.0;
-        k.jump = p.on_ground && shot.vy.abs() < 60.0;
-        k.jump_held = k.jump;
-        return k;
-    }
-    // in the air over a monster: steer clear of it
-    if !p.on_ground {
-        if let Some(e) = g
-            .enemies
-            .iter()
-            .filter(|e| e.active)
-            .find(|e| (e.x + E_W / 2.0 - px).abs() < 30.0 && e.y > py && e.y - py < 90.0)
-        {
-            let away = if e.x + E_W / 2.0 > px { -1.0 } else { 1.0 };
-            k.left = away < 0.0;
-            k.right = away > 0.0;
-            return k;
-        }
-    }
-    if let Some((dx, _)) = danger {
-        // hop away / over
-        k.left = dx > 0.0;
-        k.right = dx < 0.0;
-        if p.on_ground && chance(0.25) {
-            k.jump = true;
-        }
-        // and bubble it if we face it
-        if (dx > 0.0) == (p.face > 0.0) && !passive {
-            k.blow = true;
-        }
-        k.jump_held = true;
-        return k;
-    }
+    if let Some(shot) = incoming_shot(g, p) { return dodge_shot(p, shot); }
+    if let Some(k) = clear_below(g, p) { return k; }
+    if let Some((dx, _)) = danger { return flee(p, dx); }
+    let mut k = Input::default();
     if let Some((tx, ty, is_bubble)) = target {
-        let dx = tx - px;
-        let dy = ty - py;
-        // Too high to reach with a jump: climb a ledge toward it first (one-way platforms: jump up through one
-        // from below). Walking under a ceiling cluster and jumping let both its catches break out (seed 1).
-        if is_bubble && dy < -CLIMB_ABOVE {
-            if p.on_ground { mem.climb = ledge_toward(g, px, p.y + P_H, tx); }
-            if let Some(lx) = mem.climb {
-                k.left = lx - px < -4.0;
-                k.right = lx - px > 4.0;
-                k.jump = p.on_ground && (lx - px).abs() < 8.0;
-                k.jump_held = k.jump;
-                return k;
-            }
-        }
-        if is_bubble {
-            if dx.abs() > 10.0 {
-                k.left = dx < 0.0;
-                k.right = dx > 0.0;
-            }
-            if p.on_ground && (dy < -20.0 || dx.abs() < 40.0) && mem.jump_wait <= 0.0 {
-                k.jump = true;
-                mem.jump_wait = 0.3;
-            }
-            k.jump_held = false; // bump into it, do not ride it
-        } else {
-            let level = dy.abs() < 18.0;
-            if level && dx.abs() < 150.0 {
-                // face it and blow
-                if (dx > 0.0) != (p.face > 0.0) {
-                    k.left = dx < 0.0;
-                    k.right = dx > 0.0;
-                } else if chance(0.5) && !passive {
-                    k.blow = true;
-                }
-                if dx.abs() > 70.0 {
-                    k.left = dx < 0.0;
-                    k.right = dx > 0.0;
-                }
-            } else {
-                if dx.abs() > 30.0 || dy > 0.0 {
-                    // head for it; to go down walk off an edge, to go up jump
-                    let dir = if mem.wander_t > 0.0 { mem.wander_dir } else { dx.signum() };
-                    k.left = dir < 0.0;
-                    k.right = dir > 0.0;
-                }
-                if dy < -30.0 && p.on_ground && mem.jump_wait <= 0.0 && chance(0.12) {
-                    k.jump = true;
-                    mem.jump_wait = 0.4;
-                }
-            }
-        }
+        if let Some(climb) = go_for(g, p, mem, (tx - px, ty - py), tx, is_bubble, &mut k) { return climb; }
         // stuck against a wall or under a ledge: wander a bit
         mem.wander_t -= 1.0 / 60.0;
         if (p.vx.abs() < 5.0 && (k.left || k.right)) && mem.wander_t <= 0.0 {
@@ -192,6 +101,83 @@ fn think(g: &Game, pi: usize, mem: &mut Mind) -> Input {
     }
     k.jump_held = k.jump_held || k.jump;
     k
+}
+
+/// Holds the stick toward `dir` (left below 0, right above).
+fn steer(k: &mut Input, dir: f32) {
+    k.left = dir < 0.0;
+    k.right = dir > 0.0;
+}
+
+/// A rock or spark about to hit: hop over one along the ground, else step aside.
+fn dodge_shot(p: &Player, shot: &Shot) -> Input {
+    let mut k = Input::default();
+    steer(&mut k, if shot.x > p.cx() { -1.0 } else { 1.0 });
+    k.jump = p.on_ground && shot.vy.abs() < 60.0;
+    k.jump_held = k.jump;
+    k
+}
+
+/// In the air over a monster: steer clear of it.
+fn clear_below(g: &Game, p: &Player) -> Option<Input> {
+    if p.on_ground { return None; }
+    let (px, py) = (p.cx(), p.cy());
+    let e = g.enemies.iter().filter(|e| e.active).find(|e| (e.x + E_W / 2.0 - px).abs() < 30.0 && e.y > py && e.y - py < 90.0)?;
+    let mut k = Input::default();
+    steer(&mut k, if e.x + E_W / 2.0 > px { -1.0 } else { 1.0 });
+    Some(k)
+}
+
+/// A monster about to walk in (`dx` away): hop away or over, bubbling it if we face it.
+fn flee(p: &Player, dx: f32) -> Input {
+    let mut k = Input::default();
+    steer(&mut k, -dx);
+    if p.on_ground && chance(0.25) { k.jump = true; }
+    if (dx > 0.0) == (p.face > 0.0) && !blip::bot::flag("PASSIVE") { k.blow = true; }
+    k.jump_held = true;
+    k
+}
+
+/// Toward the target `(dx, dy)` away (at `tx`): a bubble is climbed to (Some, the whole wish) when it is out of a
+/// jump's reach, else bumped into from below; a monster is faced and blown at once level with it, else headed for.
+fn go_for(g: &Game, p: &Player, mem: &mut Mind, (dx, dy): (f32, f32), tx: f32, is_bubble: bool, k: &mut Input) -> Option<Input> {
+    let px = p.cx();
+    // Too high to reach with a jump: climb a ledge toward it first (one-way platforms: jump up through one
+    // from below). Walking under a ceiling cluster and jumping let both its catches break out (seed 1).
+    if is_bubble && dy < -CLIMB_ABOVE {
+        if p.on_ground { mem.climb = ledge_toward(g, px, p.y + P_H, tx); }
+        if let Some(lx) = mem.climb {
+            let mut c = Input::default();
+            c.left = lx - px < -4.0;
+            c.right = lx - px > 4.0;
+            c.jump = p.on_ground && (lx - px).abs() < 8.0;
+            c.jump_held = c.jump;
+            return Some(c);
+        }
+    }
+    if is_bubble {
+        if dx.abs() > 10.0 { steer(k, dx); }
+        if p.on_ground && (dy < -20.0 || dx.abs() < 40.0) && mem.jump_wait <= 0.0 {
+            k.jump = true;
+            mem.jump_wait = 0.3;
+        }
+        k.jump_held = false; // bump into it, do not ride it
+    } else if dy.abs() < 18.0 && dx.abs() < 150.0 {
+        // face it and blow
+        if (dx > 0.0) != (p.face > 0.0) { steer(k, dx); }
+        else if chance(0.5) && !blip::bot::flag("PASSIVE") { k.blow = true; }
+        if dx.abs() > 70.0 { steer(k, dx); }
+    } else {
+        if dx.abs() > 30.0 || dy > 0.0 {
+            // head for it; to go down walk off an edge, to go up jump
+            steer(k, if mem.wander_t > 0.0 { mem.wander_dir } else { dx.signum() });
+        }
+        if dy < -30.0 && p.on_ground && mem.jump_wait <= 0.0 && chance(0.12) {
+            k.jump = true;
+            mem.jump_wait = 0.4;
+        }
+    }
+    None
 }
 
 /// A bubble this far above the dragon's middle (px) is out of a jump's reach (116 px up, popping 30 px further).

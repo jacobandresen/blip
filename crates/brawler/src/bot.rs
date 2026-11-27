@@ -79,8 +79,6 @@ struct Bot {
     last_dist: f32,
 }
 
-
-
 /// Menus: fire through the title, pick the fighter, fire again.
 pub fn menus(g: &mut Game) {
     if g.state == State::Select {

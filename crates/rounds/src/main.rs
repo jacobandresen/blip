@@ -103,29 +103,7 @@ async fn main() {
     web::set_players(2);
     let sfx = Sounds::load().await;
     let mut music = Jukebox::new("rounds", &["MORNING", "RUSH", "CANAL"]);
-    // A screenshot (BLIP_SCREENSHOT_OUT) of a ride: ROUNDS_ROW puts the bike on that row, ROUNDS_DAY on that day.
-    if blip.screenshot_mode {
-        #[cfg(not(target_arch = "wasm32"))]
-        let env = |k: &str, d: f32| std::env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(d);
-        #[cfg(target_arch = "wasm32")]
-        let env = |_: &str, d: f32| d;
-        g.start(false);
-        g.day = env("ROUNDS_DAY", 1.0) as usize - 1;
-        g.begin_day();
-        g.state = State::Play;
-        g.clock = 5.0;
-        g.bike_d = LOT * env("ROUNDS_ROW", 5.6);
-        g.turned = g.bike_d >= NEW_STREET_ROW as f32 * LOT;
-        g.bike_x = 214.0;
-        // ROUNDS_CANAL=<distance>: Nyhavn, that far along the quay
-        if env("ROUNDS_TITLE", 0.0) > 0.0 { g.state = State::Title; }
-        let canal = env("ROUNDS_CANAL", -1.0);
-        if canal >= 0.0 {
-            g.start_canal();
-            g.bike_d = canal;
-            g.clock = 5.0;
-        }
-    }
+    if blip.screenshot_mode { pose_for_screenshot(&mut g); }
 
     // Player two's J on a card or a tally between rides: they climb on as the next ride starts.
     let mut p2_waiting = false;
@@ -139,21 +117,7 @@ async fn main() {
             _ => if !g.two_player && key_pressed(BLIP_KEY_J) { p2_waiting = true; },
         }
         match g.state {
-            State::Title => {
-                // the street rolls by under the title
-                g.bike_d += 50.0 * dt;
-                if g.bike_d > g.end_d() { g.bike_d = LOT; }
-                g.bike_x = 240.0 + (t * 0.7).sin() * 40.0;
-                if key_pressed(BLIP_KEY_J) {
-                    web::spend_coin();
-                    web::spend_coin();
-                    web::set_mode(true);
-                    g.start(false);
-                    g.join();
-                } else if coin_start() {
-                    g.start(false);
-                }
-            }
+            State::Title => update_title(&mut g, dt, t),
             State::Card => g.update_card(dt, skip()),
             State::Play => {
                 if !g.two_player && p2_waiting {
@@ -176,21 +140,7 @@ async fn main() {
                 g.update_canal(dt);
             }
             State::Week => g.update_week(dt, skip()),
-            State::Over if g.offering() => match g.cont.update(dt, blip::input::btn1_pressed()) {
-                Some(true) => g.continue_day(),
-                Some(false) => {
-                    g.post_score();
-                    web::set_players(2);
-                    g.state = State::Title;
-                }
-                None => if g.cont.ticked() { g.cues.push(Cue::Ting); },
-            },
-            State::Over => {
-                if play_again(&mut g.wait, dt) {
-                    web::set_players(2);
-                    g.start(false);
-                }
-            }
+            State::Over => update_over(&mut g, dt),
         }
         if g.state != was {
             if g.state == State::Crash { web::haptic(); }
@@ -202,34 +152,97 @@ async fn main() {
         for cue in std::mem::take(&mut g.cues) { play(&sfx, cue); }
         match track(&g) { Some(i) => music.play(i), None => music.stop() }
 
-        match g.state {
-            State::Title => draw::draw_title(&blip, &g, web::high_score(), t),
-            State::Canal => {
-                draw::plain_view(&blip, &g);
-                draw::draw_canal(&blip, &g, t);
-                draw::draw_bike(&blip, &g, t, g.bike_x, BIKE_Y);
-                draw::draw_bits(&blip, &g);
-                draw::draw_pops(&blip, &g);
-                blip.draw_hud(g.sess.score, g.sess.lives);
-                draw::draw_bar(&blip, &g, t);
-                draw::draw_canal_hud(&blip, &g);
+        draw(&blip, &g, t);
+        blip.next_frame().await;
+    }
+}
+
+/// A screenshot (BLIP_SCREENSHOT_OUT) of a ride: ROUNDS_ROW puts the bike on that row, ROUNDS_DAY on that day,
+/// ROUNDS_CANAL=<distance> on Nyhavn's quay that far along, ROUNDS_TITLE=1 on the title.
+fn pose_for_screenshot(g: &mut Game) {
+    #[cfg(not(target_arch = "wasm32"))]
+    let env = |k: &str, d: f32| std::env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(d);
+    #[cfg(target_arch = "wasm32")]
+    let env = |_: &str, d: f32| d;
+    g.start(false);
+    g.day = env("ROUNDS_DAY", 1.0) as usize - 1;
+    g.begin_day();
+    g.state = State::Play;
+    g.clock = 5.0;
+    g.bike_d = LOT * env("ROUNDS_ROW", 5.6);
+    g.turned = g.bike_d >= NEW_STREET_ROW as f32 * LOT;
+    g.bike_x = 214.0;
+    if env("ROUNDS_TITLE", 0.0) > 0.0 { g.state = State::Title; }
+    let canal = env("ROUNDS_CANAL", -1.0);
+    if canal >= 0.0 {
+        g.start_canal();
+        g.bike_d = canal;
+        g.clock = 5.0;
+    }
+}
+
+/// The title: the street rolls by under it until a coin (or two, with player two's J) starts a day.
+fn update_title(g: &mut Game, dt: f32, t: f32) {
+    g.bike_d += 50.0 * dt;
+    if g.bike_d > g.end_d() { g.bike_d = LOT; }
+    g.bike_x = 240.0 + (t * 0.7).sin() * 40.0;
+    if key_pressed(BLIP_KEY_J) {
+        web::spend_coin();
+        web::spend_coin();
+        web::set_mode(true);
+        g.start(false);
+        g.join();
+    } else if coin_start() {
+        g.start(false);
+    }
+}
+
+/// The end of a run: the continue offer while it stands, then a coin to play again.
+fn update_over(g: &mut Game, dt: f32) {
+    if g.offering() {
+        match g.cont.update(dt, blip::input::btn1_pressed()) {
+            Some(true) => g.continue_day(),
+            Some(false) => {
+                g.post_score();
+                web::set_players(2);
+                g.state = State::Title;
             }
-            _ => {
-                draw::draw_world(&blip, &g, t);
-                draw::draw_weather(&blip, &g, t);
-                draw::draw_pops(&blip, &g);
-                blip.draw_hud(g.sess.score, g.sess.lives);
-                draw::draw_bar(&blip, &g, t);
-                draw::draw_banner(&blip, &g);
-                match g.state {
-                    State::Card => draw::draw_card(&blip, &g, t),
-                    State::Tally => draw::draw_tally(&blip, &g),
-                    State::Week => draw::draw_week(&blip, &g),
-                    State::Over => draw::draw_over(&blip, &g, web::high_score()),
-                    _ => {}
-                }
+            None => if g.cont.ticked() { g.cues.push(Cue::Ting); },
+        }
+    } else if play_again(&mut g.wait, dt) {
+        web::set_players(2);
+        g.start(false);
+    }
+}
+
+/// The frame: the title, the canal ride, or the streets with whichever card stands over them.
+fn draw(blip: &Blip, g: &Game, t: f32) {
+    match g.state {
+        State::Title => draw::draw_title(blip, g, web::high_score(), t),
+        State::Canal => {
+            draw::plain_view(blip, g);
+            draw::draw_canal(blip, g, t);
+            draw::draw_bike(blip, g, t, g.bike_x, BIKE_Y);
+            draw::draw_bits(blip, g);
+            draw::draw_pops(blip, g);
+            blip.draw_hud(g.sess.score, g.sess.lives);
+            draw::draw_bar(blip, g, t);
+            draw::draw_canal_hud(blip, g);
+        }
+        _ => {
+            draw::draw_world(blip, g, t);
+            draw::draw_weather(blip, g, t);
+            draw::draw_pops(blip, g);
+            blip.draw_hud(g.sess.score, g.sess.lives);
+            draw::draw_bar(blip, g, t);
+            draw::draw_banner(blip, g);
+            match g.state {
+                State::Card => draw::draw_card(blip, g, t),
+                State::Tally => draw::draw_tally(blip, g),
+                State::Week => draw::draw_week(blip, g),
+                State::Over => draw::draw_over(blip, g, web::high_score()),
+                _ => {}
             }
         }
-        blip.next_frame().await;
     }
 }

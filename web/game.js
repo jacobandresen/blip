@@ -349,7 +349,7 @@ overlay.addEventListener('click', function (e) {
   try { canvas.focus(); } catch (err) {}
 });
 
-// The controls card (kiosk.js builds it): this game's keys and touch choices.
+// The controls card (cabinet.js builds it): this game's keys and touch choices.
 var cardApi = (function () {
   var noTouch = !document.documentElement.hasAttribute('data-has-touch');
   if (!GAME) return null;
@@ -572,18 +572,18 @@ function deckCover(bar) {
   return Math.ceil(window.innerHeight - top);
 }
 
-/** Fullscreen on a PC: no deck and no cabinet frame, so the picture runs to
- * the edges under the top bar (see #fullscreen-btn in shell.css). */
+/** Fullscreen on a PC: the game alone on the screen, no top bar (blip.css "Fullscreen on a PC"). */
 function fullscreenPC() {
   return document.documentElement.hasAttribute('data-fullscreen') && !blipHasTouch();
 }
+/** No deck and no cabinet frame, so the picture runs to the edges: fullscreen on a PC, or a bare page (data-bare). */
 function bareScreen() {
   var root = document.documentElement;
   return root.hasAttribute('data-bare') || (root.hasAttribute('data-fullscreen') && !blipHasTouch());
 }
 
 // App mode needs no deck where nothing plays on it: a PC (keys or a pad),
-// or a tablet with a gamepad connected (kiosk.js sets data-pad), until a
+// or a tablet with a gamepad connected (cabinet.js sets data-pad), until a
 // finger touches the screen again.
 (function () {
   var root = document.documentElement;
@@ -821,7 +821,7 @@ if (typeof ResizeObserver === 'function') {
   });
 }
 
-// Fullscreen went on or off (kiosk.js owns the button): the deck comes or
+// Fullscreen went on or off (blip_core.js; the corner toggle, placeFullscreenToggle): the deck comes or
 // goes, so the picture is fitted again.
 window.onBlipFullscreenChange = function () {
   fillCanvas();
@@ -1469,7 +1469,7 @@ window.addEventListener('keydown', function (e) {
     }
     window.addEventListener('pointerup', end);
     // iOS cancels fingers that are still down when a second one moves
-    // (blip_controller.js), so a finger's pointercancel is not a lift; the
+    // (controller.js), so a finger's pointercancel is not a lift; the
     // last finger's touchend releases everything instead.
     window.addEventListener('pointercancel', function (e) { if (e.pointerType === 'mouse') end(e); });
     ['touchend', 'touchcancel'].forEach(function (t) {
@@ -1505,7 +1505,7 @@ window.addEventListener('keydown', function (e) {
   // ---- Rally: hide both deck controllers, run the paddle dials ----
   if (isRally) {
     // Same panel as every other game (data-dials swaps its controls for
-    // the dials in kiosk-sized slots; see shell.css).
+    // the dials in kiosk-sized slots; see blip.css).
     root.setAttribute('data-dials', '');
 
     var dialP1 = document.getElementById('paddle-dial');

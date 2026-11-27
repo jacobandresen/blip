@@ -8,7 +8,7 @@ wrappers. Do not publish or push unless asked.
 
 | Area | Where |
 |---|---|
-| A game: rules, drawing, sound, bot | `crates/<game>/src/` (`gfx.rs` pictures, `tunes.rs` sound, `bot.rs` playtest bot) |
+| A game: rules, drawing, sound, bot | `crates/<game>/src/`: `main.rs` (state and loop), `draw.rs`, `gfx.rs` pictures, `tunes.rs` sound, `bot.rs` playtest bot, `tests.rs`, and a module per part of the game (`use super::*`) |
 | Shared engine | `crates/blip/src/` — put anything two games need here |
 | Game list, controls, front ends, fullscreen, coins | `web/blip_core.js` (`BLIP_GAMES`) |
 | Game page | `web/game.html` (copied to each `web/<game>/index.html`), `web/game.js` |
@@ -50,7 +50,7 @@ Copy the smallest similar game (Serpent is compact).
 
 1. Add `crates/<slug>` to the workspace, with `macroquad` and `blip` dependencies and `blip` (default features
    off) as a build dependency. `build.rs` is `blip::build_script!();`.
-2. Write `main.rs`, `gfx.rs`, `tunes.rs` and `bot.rs`; `levels.rs` for authored levels. Draw it in the blip look
+2. Write `main.rs`, `draw.rs`, `gfx.rs`, `tunes.rs` and `bot.rs`; `levels.rs` for authored levels. Draw it in the blip look
    (Conventions). Keep score, lives and
    level in `blip::Session` (`lose_life_after` starts the respawn or game-over wait and reports the score); name the
    effects once with `blip::sounds!`.
@@ -106,7 +106,7 @@ the measured reason; [FUN-LOG.md](crates/blip/src/bot/FUN-LOG.md) keeps the earl
 - The blip look, in every game (`crates/blip/src/look.rs`, `frame.rs`): the shared palette (`BLIP_INK`, `BLIP_CREAM`,
   `BLIP_GOLD`, …), ink outlines on sprites (`Image::outline`), soft shadows (`draw_shadow`), `draw_hud` (coin, score,
   hearts), `draw_logo` for titles and big calls, `draw_message`/`draw_panel` for every banner and box, and
-  `draw_attract_bar` on a title. Keep the arcade feel: score up front, fast readable play, space stays dark (`BLIP_NIGHT`).
+  `draw_attract_bar` on a title, `Shake` with `Blip::shaken` for a screen shake. Keep the arcade feel: score up front, fast readable play, space stays dark (`BLIP_NIGHT`).
 - The arcade's cabinet is its game page's machine seen from farther (`arcade.js` fitDecks, gameMachine): change the
   game page's monitor or deck and the cabinet follows; starting a game walks the eye up to it (arcadeWalk) and the
   pages cross-fade. Room props (`web/room.js`) are simple CSS solids with SVG textures, kept clear of the machines by

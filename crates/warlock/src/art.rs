@@ -321,7 +321,9 @@ impl Art {
         'find: for r in (1..ROWS as i32 - 1).rev() {
             for cc in 1..COLS as i32 - 2 {
                 let (a, b) = (Cell { c: cc, r }, Cell { c: cc + 1, r });
-                if free(a) && free(b) && g.walls.get(cc, r + 1) && g.walls.get(cc + 1, r + 1) && !self.candles.contains(&a) && !self.candles.contains(&b) && hash(cc + salt, r, ART_SEED) > 0.55 {
+                let on_wall = g.walls.get(cc, r + 1) && g.walls.get(cc + 1, r + 1);
+                let unlit = !self.candles.contains(&a) && !self.candles.contains(&b);
+                if free(a) && free(b) && on_wall && unlit && hash(cc + salt, r, ART_SEED) > 0.55 {
                     self.skull = Some((a, hash(r, cc, ART_SEED) > 0.5));
                     break 'find;
                 }
@@ -1175,7 +1177,11 @@ impl Art {
         let w = (WIN_W as f32 * 0.7) * ink;
         draw_rectangle(WIN_W as f32 / 2.0 - w / 2.0, cy - 16.0, w, 1.0, with_a(gold, ink * 0.8));
         draw_rectangle(WIN_W as f32 / 2.0 - w / 2.0, cy + sz * 7.0 + 12.0, w, 1.0, with_a(gold, ink * 0.8));
-        if ink >= 1.0 { blip.draw_logo(name, WIN_W as f32 / 2.0, cy, sz, BLIP_GOLD); } else { blip.draw_centered_outlined(name, WIN_W as f32 / 2.0, cy, sz, gold, c(0.0, 0.0, 0.0, ink)); }
+        if ink >= 1.0 {
+            blip.draw_logo(name, WIN_W as f32 / 2.0, cy, sz, BLIP_GOLD);
+        } else {
+            blip.draw_centered_outlined(name, WIN_W as f32 / 2.0, cy, sz, gold, c(0.0, 0.0, 0.0, ink));
+        }
         let sub = if g.double { "THIS CHAMBER PAYS DOUBLE".to_string() } else { format!("CHAMBER {}", g.sess.level) };
         blip.draw_centered_outlined(&sub, WIN_W as f32 / 2.0, cy + sz * 7.0 + 24.0, 2.0, c(0.7, 0.68, 0.65, ink), c(0.0, 0.0, 0.0, ink));
         self.additive(true);

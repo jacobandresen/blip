@@ -1125,7 +1125,7 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
 .machine-side::after {content:'';position:absolute;inset:0;background:linear-gradient(90deg,#0000,#0007)}
 .machine-side.left::after {background:linear-gradient(270deg,#0000,#0007)}
 
-/* Marquee (marquee.css), standing on the cabinet's top and a little wider than it. */
+/* Marquee (blip.css .machine-marquee), standing on the cabinet's top and a little wider than it. */
 #game-grid .card-title {
   position:absolute;z-index:4;left:-3%;right:-3%;top:0;width:auto;height:8.5%;min-height:0;margin:0;padding:0 10px;order:0;
 }

@@ -4,7 +4,6 @@
 
 use std::f32::consts::PI;
 
-
 use crate::wav::{fade_out as fade_out_samples, limit_pcm16, warm, Rng};
 use crate::wav::{encode_pcm16_mono, encode_pcm16_music, SAMPLE_RATE};
 

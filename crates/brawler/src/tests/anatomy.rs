@@ -469,8 +469,6 @@ pub(crate) fn nothing_teleports_between_one_frame_and_the_next() {
         over.join("\n  "), worst.1);
 }
 
-
-
 #[test]
 pub(crate) fn a_waiting_fighter_has_their_knees_bent() {
     // Standing, walking and guarding with bent knees: a hip a leg's length

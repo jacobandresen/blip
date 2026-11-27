@@ -53,6 +53,19 @@ struct Popup { x: f32, y: f32, t: f32, text: String, c: Color }
 struct Spark { x: f32, y: f32, vx: f32, vy: f32, t: f32, life: f32, c: Color, size: f32 }
 struct Ring { x: f32, y: f32, t: f32, life: f32, r: f32, c: Color }
 
+/// A screen shake: `start` it, `tick` it each frame, and draw through it with `Blip::shaken`; it runs `secs`, at most
+/// `amp` canvas pixels, easing out ([`shake`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Shake { left: f32, secs: f32, amp: f32 }
+
+impl Shake {
+    pub const fn new(secs: f32, amp: f32) -> Shake { Shake { left: 0.0, secs, amp } }
+    pub fn start(&mut self) { self.left = self.secs; }
+    pub fn tick(&mut self, dt: f32) { self.left = (self.left - dt).max(0.0); }
+    /// The offset to draw at now.
+    pub fn offset(&self) -> (f32, f32) { shake(self.left, self.secs, self.amp) }
+}
+
 /// A screen shake's offset now, for `Blip::set_offset`: `left` of `secs` to go, at most `amp` canvas pixels, easing
 /// out. Driven by the time left, so it draws none of the game's random numbers.
 pub fn shake(left: f32, secs: f32, amp: f32) -> (f32, f32) {

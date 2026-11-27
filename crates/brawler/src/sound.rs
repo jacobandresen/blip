@@ -2,7 +2,6 @@
 
 use crate::roster::{Build, FIGHTERS};
 
-
 /// A sound the rules ask for. They only name it and the main loop plays it,
 /// so a round can be run, and tested, with no audio device.
 #[derive(Copy, Clone, PartialEq, Debug)]

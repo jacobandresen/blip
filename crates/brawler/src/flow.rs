@@ -34,92 +34,102 @@ pub(crate) fn read_menu(g: &mut Game) -> [MenuIn; 2] {
 }
 
 /// The title and the select screen. Returns the sound to make, if any.
+/// The next fighter from player `who`'s cursor, `step` along the roster (wrapping), stepping over any the other player
+/// has already taken rather than stopping on one `who` may not confirm.
+fn next_free(g: &Game, who: usize, step: usize) -> usize {
+    let n = FIGHTERS.len();
+    let mut at = g.picked(who);
+    for _ in 0..n {
+        at = (at + step) % n;
+        if !g.taken_by_other(who, at) { break; }
+    }
+    at
+}
+
 pub(crate) fn update_menus(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
     match g.state {
-        State::Title => {
-            // Player two announcing themselves is the choice, like a cabinet:
-            // they reach for their own stick. It cannot be toggled back off.
-            if g.menu == 0 && (m[1].back || m[1].fwd || m[1].fire) {
-                g.menu = 1;
-                web::set_mode(true);
-                return Some(Cue::Step);
-            }
-            // The title is where the mode is chosen, on a stick and one
-            // button, because that is all a cabinet has.
-            if m[0].back || m[0].fwd {
-                g.menu = 1 - g.menu;
-                // The second station appears as the cursor lands on 2
-                // PLAYERS, not on confirm: choosing is asking what two looks
-                // like.
-                web::set_players(if g.menu == 1 { 1 } else { TITLE_OPEN });
-                return Some(Cue::Step);
-            }
-            // Once the second station is claimed, either player may
-            // start the match — player two has as much right to it as
-            // the player who put the coin in.
-            if m[0].fire || (g.menu == 1 && m[1].fire) {
-                g.mode = if g.menu == 0 { Mode::Solo } else { Mode::Versus };
-                web::set_mode(g.mode == Mode::Versus);
-                // a two-player game takes two coins: this is player two's
-                if g.mode == Mode::Versus { web::spend_coin(); }
-                g.state = State::Select;
-                g.pick = 0;
-                g.pick2 = FIGHTERS.len() - 1;
-                g.locked = [false; 2];
-                return Some(Cue::Confirm);
-            }
-            None
-        }
-        State::Select => {
-            let versus = g.mode == Mode::Versus;
-            let players = if versus { 2 } else { 1 };
-            let mut cue = None;
-            for (who, min) in m.iter().enumerate().take(players) {
-                if g.locked[who] { continue; }
-                let n = FIGHTERS.len();
-                // A cursor steps over a fighter the other player has
-                // already taken rather than stopping on one it is not
-                // allowed to confirm.
-                for (step, moved) in [(n - 1, min.back), (1, min.fwd)] {
-                    if !moved { continue; }
-                    let mut at = g.picked(who);
-                    for _ in 0..n {
-                        at = (at + step) % n;
-                        if !g.taken_by_other(who, at) { break; }
-                    }
-                    g.set_pick(who, at);
-                    cue = Some(Cue::Step);
-                }
-                if min.fire && !g.taken_by_other(who, g.picked(who)) {
-                    g.locked[who] = true;
-                    g.costume[who] = min.alt;
-                    // Move the other player's cursor off a fighter now taken,
-                    // so it is never parked on something it cannot confirm.
-                    let other = 1 - who;
-                    if versus && !g.locked[other] && g.picked(other) == g.picked(who) {
-                        let mut at = g.picked(other);
-                        for _ in 0..n {
-                            at = (at + 1) % n;
-                            if !g.taken_by_other(other, at) { break; }
-                        }
-                        g.set_pick(other, at);
-                    }
-                    cue = Some(Cue::Confirm);
-                }
-            }
-            if (0..players).all(|w| g.locked[w]) {
-                web::spend_coin();
-                g.sess.reset(1);
-                g.p[0].rounds = 0;
-                g.p[1].rounds = 0;
-                if versus { g.start_versus(); } else { g.start_match(0); }
-                g.announce();
-                cue = Some(Cue::Confirm);
-            }
-            cue
-        }
+        State::Title => title_menu(g, m),
+        State::Select => select_menu(g, m),
         _ => None,
     }
+}
+
+/// The title: one player or two, and the start.
+fn title_menu(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
+    // Player two announcing themselves is the choice, like a cabinet:
+    // they reach for their own stick. It cannot be toggled back off.
+    if g.menu == 0 && (m[1].back || m[1].fwd || m[1].fire) {
+        g.menu = 1;
+        web::set_mode(true);
+        return Some(Cue::Step);
+    }
+    // The title is where the mode is chosen, on a stick and one
+    // button, because that is all a cabinet has.
+    if m[0].back || m[0].fwd {
+        g.menu = 1 - g.menu;
+        // The second station appears as the cursor lands on 2
+        // PLAYERS, not on confirm: choosing is asking what two looks
+        // like.
+        web::set_players(if g.menu == 1 { 1 } else { TITLE_OPEN });
+        return Some(Cue::Step);
+    }
+    // Once the second station is claimed, either player may
+    // start the match — player two has as much right to it as
+    // the player who put the coin in.
+    if m[0].fire || (g.menu == 1 && m[1].fire) {
+        g.mode = if g.menu == 0 { Mode::Solo } else { Mode::Versus };
+        web::set_mode(g.mode == Mode::Versus);
+        // a two-player game takes two coins: this is player two's
+        if g.mode == Mode::Versus { web::spend_coin(); }
+        g.state = State::Select;
+        g.pick = 0;
+        g.pick2 = FIGHTERS.len() - 1;
+        g.locked = [false; 2];
+        return Some(Cue::Confirm);
+    }
+    None
+}
+
+/// Choosing fighters: each player steps a cursor over the roster and locks one in; the match starts when all are in.
+fn select_menu(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
+    let versus = g.mode == Mode::Versus;
+    let players = if versus { 2 } else { 1 };
+    let mut cue = None;
+    for (who, min) in m.iter().enumerate().take(players) {
+        if g.locked[who] { continue; }
+        let n = FIGHTERS.len();
+        // A cursor steps over a fighter the other player has
+        // already taken rather than stopping on one it is not
+        // allowed to confirm.
+        for (step, moved) in [(n - 1, min.back), (1, min.fwd)] {
+            if !moved { continue; }
+            let at = next_free(g, who, step);
+            g.set_pick(who, at);
+            cue = Some(Cue::Step);
+        }
+        if min.fire && !g.taken_by_other(who, g.picked(who)) {
+            g.locked[who] = true;
+            g.costume[who] = min.alt;
+            // Move the other player's cursor off a fighter now taken,
+            // so it is never parked on something it cannot confirm.
+            let other = 1 - who;
+            if versus && !g.locked[other] && g.picked(other) == g.picked(who) {
+                let at = next_free(g, other, 1);
+                g.set_pick(other, at);
+            }
+            cue = Some(Cue::Confirm);
+        }
+    }
+    if (0..players).all(|w| g.locked[w]) {
+        web::spend_coin();
+        g.sess.reset(1);
+        g.p[0].rounds = 0;
+        g.p[1].rounds = 0;
+        if versus { g.start_versus(); } else { g.start_match(0); }
+        g.announce();
+        cue = Some(Cue::Confirm);
+    }
+    cue
 }
 
 /// One frame of the bonus round. Returns what happened to a barrel this
@@ -143,20 +153,7 @@ pub(crate) fn update_bonus(g: &mut Game, dt: f32, inp: Input) -> Option<bool> {
     }
     if g.hitstop > 0.0 { g.hitstop -= dt; return None; }
     g.clock -= dt;
-    // The ones that fall: down under gravity, a bounce, then away along the
-    // boards to the nearer edge, and lost if they reach it.
-    for b in g.barrels.iter_mut().filter(|b| b.rolls && b.hp > 0) {
-        if b.wait > 0.0 { b.wait -= dt; continue; }
-        b.vy += 900.0 * dt;
-        b.y += b.vy * dt;
-        if b.y >= FLOOR_Y {
-            b.y = FLOOR_Y;
-            b.vy = if b.vy > 140.0 { -b.vy * 0.35 } else { 0.0 };
-            if b.vx == 0.0 { b.vx = if b.x < WIN_W as f32 / 2.0 { -BARREL_ROLL } else { BARREL_ROLL }; }
-        }
-        b.x += b.vx * dt;
-        if b.x < -30.0 || b.x > WIN_W as f32 + 30.0 { b.hp = 0; }
-    }
+    roll_barrels(g, dt);
 
     // The fighter faces the nearest barrel still standing.
     let me = g.p[0].x;
@@ -170,28 +167,8 @@ pub(crate) fn update_bonus(g: &mut Game, dt: f32, inp: Input) -> Option<bool> {
     apply_input(&mut g.p[0], inp, false, dt);
     advance(&mut g.p[0], dt);
     g.p[0].x = clamp(g.p[0].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
+    let event = strike_barrel(g, me);
 
-    // One barrel a swing: the nearest the blow reaches, whatever its height.
-    let mut event = None;
-    if let Some((hx, _, hw, _)) = g.p[0].hit_box() {
-        let heavy = g.p[0].scaled(move_data(g.p[0].mv)).damage >= 12;
-        // (One still high over the fighter's head is out of reach.)
-        let hit = g.barrels.iter_mut().filter(|b| b.hp > 0 && b.wait <= 0.0 && b.y > FLOOR_Y - 150.0)
-            .filter(|b| hx < b.x + BARREL_W / 2.0 && hx + hw > b.x - BARREL_W / 2.0)
-            .min_by(|a, b| (a.x - me).abs().total_cmp(&(b.x - me).abs()));
-        if let Some(b) = hit {
-            b.hp -= if heavy { 2 } else { 1 };
-            b.hit_t = 0.0;
-            let (x, y, broke) = (b.x, b.y, b.hp <= 0);
-            if broke { b.broke_t = 0.0; }
-            g.p[0].hit_done = true;
-            g.spark(x - g.p[0].facing * BARREL_W / 2.0, y - 34.0, broke, false);
-            g.hitstop = hitstop_for(if heavy { 12 } else { 6 }, broke, false);
-            if broke { g.rouse(0.10); }
-            g.sess.add_score(if broke { 1000 } else { 100 });
-            event = Some(broke);
-        }
-    }
     let done = g.barrels.iter().all(|b| b.hp <= 0);
     let broken = g.barrels.iter().filter(|b| b.broke_t >= 0.0).count();
     let cleared = broken == g.bonus_total;
@@ -203,6 +180,43 @@ pub(crate) fn update_bonus(g: &mut Game, dt: f32, inp: Input) -> Option<bool> {
         if g.p[0].free() && !g.p[0].airborne() && cleared { g.p[0].act = Act::Victory; g.p[0].t = 0.0; }
     }
     event
+}
+
+/// The barrels that fall: down under gravity, a bounce, then away along the boards to the nearer edge, and lost if
+/// they reach it.
+fn roll_barrels(g: &mut Game, dt: f32) {
+    for b in g.barrels.iter_mut().filter(|b| b.rolls && b.hp > 0) {
+        if b.wait > 0.0 { b.wait -= dt; continue; }
+        b.vy += 900.0 * dt;
+        b.y += b.vy * dt;
+        if b.y >= FLOOR_Y {
+            b.y = FLOOR_Y;
+            b.vy = if b.vy > 140.0 { -b.vy * 0.35 } else { 0.0 };
+            if b.vx == 0.0 { b.vx = if b.x < WIN_W as f32 / 2.0 { -BARREL_ROLL } else { BARREL_ROLL }; }
+        }
+        b.x += b.vx * dt;
+        if b.x < -30.0 || b.x > WIN_W as f32 + 30.0 { b.hp = 0; }
+    }
+}
+
+/// One barrel a swing: the nearest to `me` the blow reaches, whatever its height (one still high over the fighter's
+/// head is out of reach). A heavy blow counts twice; whether the barrel broke, if one was struck.
+fn strike_barrel(g: &mut Game, me: f32) -> Option<bool> {
+    let (hx, _, hw, _) = g.p[0].hit_box()?;
+    let heavy = g.p[0].scaled(move_data(g.p[0].mv)).damage >= 12;
+    let b = g.barrels.iter_mut().filter(|b| b.hp > 0 && b.wait <= 0.0 && b.y > FLOOR_Y - 150.0)
+        .filter(|b| hx < b.x + BARREL_W / 2.0 && hx + hw > b.x - BARREL_W / 2.0)
+        .min_by(|a, b| (a.x - me).abs().total_cmp(&(b.x - me).abs()))?;
+    b.hp -= if heavy { 2 } else { 1 };
+    b.hit_t = 0.0;
+    let (x, y, broke) = (b.x, b.y, b.hp <= 0);
+    if broke { b.broke_t = 0.0; }
+    g.p[0].hit_done = true;
+    g.spark(x - g.p[0].facing * BARREL_W / 2.0, y - 34.0, broke, false);
+    g.hitstop = hitstop_for(if heavy { 12 } else { 6 }, broke, false);
+    if broke { g.rouse(0.10); }
+    g.sess.add_score(if broke { 1000 } else { 100 });
+    Some(broke)
 }
 
 /// A second player has pressed their button in the middle of a solo fight.

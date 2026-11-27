@@ -335,7 +335,6 @@ fn dragon(body: Rgb, player: usize) -> Vec<u8> {
     img.encode_png()
 }
 
-
 /// Each round's brick: its face, its lit edge and its shadow.
 const TILES: [(Rgb, Rgb, Rgb); 8] = [
     ((240, 120, 180), (255, 190, 225), (160, 60, 120)),
