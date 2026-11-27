@@ -4,10 +4,9 @@
 use macroquad::camera::{set_camera, Camera2D};
 use macroquad::color::{Color, WHITE};
 use macroquad::material::{
-    gl_use_default_material, gl_use_material, load_material, Material, MaterialParams,
+    gl_use_default_material, gl_use_material, Material,
 };
 use macroquad::math::{vec2, Rect};
-use macroquad::miniquad::{ShaderSource, UniformDesc, UniformType};
 use macroquad::shapes::draw_rectangle;
 use macroquad::texture::{
     draw_texture_ex, render_target_ex, DrawTextureParams, FilterMode,
@@ -16,7 +15,7 @@ use macroquad::texture::{
 use macroquad::time::get_frame_time;
 use macroquad::window::{clear_background, get_internal_gl, next_frame, screen_height, screen_width, Conf};
 
-use crate::color::*;
+use crate::crt;
 
 /// Create the macroquad window configuration. Pass the result to `#[macroquad::main(conf)]`.
 /// `width` and `height` set the *virtual* canvas size — the window is resizable and will
@@ -40,167 +39,6 @@ impl Lcg {
         (self.0 >> 16) as f32 / 65_535.0
     }
 }
-
-// Curved-glass shader, GLSL ES 1.00 for WebGL 1.
-// Applied to the flat composite for curvature, bloom, vignette and glare.
-
-/// CPU twin of the shader's `curve()`: screen UV -> the picture UV drawn there.
-fn crt_curve(p: macroquad::math::Vec2) -> macroquad::math::Vec2 {
-    let p = p * 2.0 - 1.0;
-    let off = vec2(p.y.abs() / 12.0, p.x.abs() / 11.0);
-    let p = (p + p * off * off) * 0.99;
-    p * 0.5 + 0.5
-}
-
-/// The HUD bar's height, and its text's top: low enough in the bar that the curved-glass shader's barrel doesn't
-/// bow the top row off the top edge near the corners.
-const HUD_BAR: f32 = 28.0;
-const HUD_TEXT_Y: f32 = 7.0;
-/// The HUD: the score's place right of its coin, and the hearts' spacing and most shown.
-const HUD_SCORE_DX: f32 = 24.0;
-const HUD_HEART_STEP: f32 = 18.0;
-const HUD_HEARTS: i32 = 5;
-const HUD_SLOTS: i32 = 3;
-/// The digits `n` takes (anything below 1 counts as one).
-fn digits(n: i32) -> usize { n.max(0).checked_ilog10().map_or(1, |d| d as usize + 1) }
-/// The width of the best-score line "HI <n>" at size 2.
-fn hi_width(hi: i32) -> f32 { (3 + digits(hi)) as f32 * 12.0 }
-
-const SEAL_FRAGMENT: &str = r#"#version 100
-void main() { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); }
-"#;
-
-const CRT_VERTEX: &str = r#"#version 100
-attribute vec3 position;
-attribute vec2 texcoord;
-attribute vec4 color0;
-varying highp vec2 uv;
-varying lowp vec4 color;
-uniform mat4 Model;
-uniform mat4 Projection;
-void main() {
-    gl_Position = Projection * Model * vec4(position, 1);
-    color = color0 / 255.0;
-    uv = texcoord;
-}
-"#;
-
-// Fragment floats are highp where the device has it: mediump can be 16 bits
-// (NVIDIA's GLES is), too coarse for screen coordinates on a big canvas.
-const CRT_FRAGMENT: &str = r#"#version 100
-#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
-
-varying vec2 uv;
-varying lowp vec4 color;
-
-uniform sampler2D Texture;
-uniform vec4 _Time;
-uniform vec2 ScreenSize;
-uniform float Bloom;
-
-// Bow 0..1 UVs into a convex tube (larger divisors = flatter); the <1 scale
-// pulls the picture back so the pushed corners stay in range and the whole
-// game, corners and HUD row included, stays visible.
-vec2 curve(vec2 p) {
-    p = p * 2.0 - 1.0;
-    vec2 off = abs(p.yx) / vec2(12.0, 11.0);
-    p = p + p * off * off;
-    p *= 0.99;
-    return p * 0.5 + 0.5;
-}
-
-// Cheap ordered dither against 8-bit banding in the dark gradients. The pixel
-// is wrapped to a 64px cell: unwrapped, the dot product passes the 16-bit
-// float limit toward the top right of a 1080p canvas and the result is NaN.
-float dither(vec2 p) {
-    return fract(sin(dot(mod(floor(p), 64.0), vec2(12.9898, 78.233))) * 43758.5453);
-}
-
-void main() {
-    // The offscreen composite is stored y-flipped relative to the screen; undo
-    // that here (a clean full flip, no half-texel offset from DrawTextureParams).
-    vec2 fuv = vec2(uv.x, 1.0 - uv.y);
-
-    vec2 cuv = curve(fuv);
-
-    // The edge fade runs outward from the 0..1 boundary only, so every game
-    // pixel is drawn at full weight.
-    vec2 lo = smoothstep(vec2(-0.006), vec2(0.0), cuv);
-    vec2 hi = smoothstep(vec2(-0.006), vec2(0.0), vec2(1.0) - cuv);
-    float mask = lo.x * lo.y * hi.x * hi.y;
-
-    vec3 col = texture2D(Texture, cuv).rgb;
-
-    // ---- phosphor bloom: blur a ring of taps, keep the bright part, add back ----
-    vec2 px = 1.0 / ScreenSize;
-    vec3 b = vec3(0.0);
-    b += texture2D(Texture, cuv + vec2( 1.5,  0.5) * px * 2.0).rgb;
-    b += texture2D(Texture, cuv + vec2(-1.5, -0.5) * px * 2.0).rgb;
-    b += texture2D(Texture, cuv + vec2( 0.5, -1.5) * px * 2.0).rgb;
-    b += texture2D(Texture, cuv + vec2(-0.5,  1.5) * px * 2.0).rgb;
-    b += texture2D(Texture, cuv + vec2( 2.5,  1.5) * px * 4.0).rgb;
-    b += texture2D(Texture, cuv + vec2(-2.5, -1.5) * px * 4.0).rgb;
-    b += texture2D(Texture, cuv + vec2( 1.5, -2.5) * px * 4.0).rgb;
-    b += texture2D(Texture, cuv + vec2(-1.5,  2.5) * px * 4.0).rgb;
-    b *= 0.125;
-    col += max(b - 0.25, 0.0) * 1.4 * Bloom;
-
-    // ---- tube vignette ----
-    // Radial, easing only the last sliver near the glass edge, so corner HUD
-    // text stays readable.
-    float d = distance(cuv, vec2(0.5, 0.5));
-    float vig = 1.0 - smoothstep(0.62, 1.02, d) * 0.42;
-    col *= vig;
-
-    // ---- glare on the glass (flat fuv, so it doesn't move with the curve) ----
-    // Scaled by the pixel's own brightness so it only shows over lit phosphor —
-    // over the black background it stays exactly black and can't band.
-    float glare = smoothstep(0.7, 0.05,
-        distance(fuv * vec2(1.0, 1.3), vec2(0.32, 0.30 * 1.3)));
-    col += glare * 0.18 * dot(col, vec3(0.333));
-
-    // gentle mains-hum brightness flicker + a touch of gain
-    col *= 1.08 + 0.002 * sin(_Time.x * 10.7);
-
-    // dither the near-black gradients so the vignette doesn't step
-    col += (dither(gl_FragCoord.xy) - 0.5) * (1.0 / 255.0);
-
-    gl_FragColor = vec4(col * color.rgb * mask, 1.0);
-}
-"#;
-
-// Interlaced scanlines in the main blit's fragment shader, not a rectangle
-// per screen row (hundreds of draw calls on a tall window). Reuses
-// CRT_VERTEX.
-const SCANLINE_FRAGMENT: &str = r#"#version 100
-#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
-
-varying vec2 uv;
-varying lowp vec4 color;
-
-uniform sampler2D Texture;
-uniform float InterlaceField; // 0.0 or 1.0, flips every frame (Blip::interlace_field)
-uniform float FieldDim;       // brightness of the fading field's rows (Blip::set_interlace)
-
-void main() {
-    vec3 col = texture2D(Texture, uv).rgb;
-
-    // Alternate light and dark fields each frame; `composite` corrects parity for the target.
-    float parity = mod(floor(gl_FragCoord.y), 2.0);
-    float dim = (parity == InterlaceField) ? FieldDim : (1.0 - 60.0 / 255.0);
-    col *= dim;
-
-    gl_FragColor = vec4(col * color.rgb, 1.0);
-}
-"#;
 
 /// The main blip runtime. Create one at the start of `main` with `Blip::new(w, h)`,
 /// then call `blip.next_frame().await` at the end of every game loop iteration.
@@ -236,10 +74,10 @@ pub struct Blip {
     // How much of the phosphor bloom is added back: 1.0 suits lit lines on
     // black; a game with bright filled scenes turns it down or it smears.
     bloom:       f32,
-    // Scanline dimming shader (SCANLINE_FRAGMENT); None falls back to a
+    // Scanline dimming shader (crt::SCANLINE_FRAGMENT); None falls back to a
     // rectangle per row, like `crt` above.
     scanline:    Option<Material>,
-    seal:        Option<Material>, // SEAL_FRAGMENT: sets the frame's alpha to 1
+    seal:        Option<Material>, // crt::SEAL_FRAGMENT: sets the frame's alpha to 1
     screen_rt:   Option<RenderTarget>, // offscreen composite target, window-sized
     screen_rt_w: i32,
     screen_rt_h: i32,
@@ -250,7 +88,7 @@ pub struct Blip {
     fx_slow_accum: f32, // seconds run slow at the current level
     fx_frame_ema:  f32, // smoothed frame time, seconds
     // ---- the HUD's score multiple: the last one drawn, and seconds since it last rose or broke ----
-    multiple: std::cell::Cell<(i32, i32, f32)>, // (shown, before the change, seconds since)
+    pub(crate) multiple: std::cell::Cell<(i32, i32, f32)>, // (shown, before the change, seconds since)
     // ---- screenshot capture (native only) ----
     pub screenshot_mode:   bool,
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
@@ -284,43 +122,9 @@ impl Blip {
         });
         rt.texture.set_filter(FilterMode::Nearest);
 
-        // Curved-glass post-process. If the shader fails to compile (old WebGL,
-        // driver quirks) we fall back to compositing straight to the screen.
-        let crt = load_material(
-            ShaderSource::Glsl { vertex: CRT_VERTEX, fragment: CRT_FRAGMENT },
-            MaterialParams {
-                uniforms: vec![UniformDesc::new("ScreenSize", UniformType::Float2),
-                               UniformDesc::new("Bloom", UniformType::Float1)],
-                ..Default::default()
-            },
-        )
-        .ok();
-
-        // Seals the frame's alpha to 1 (writes alpha only): a translucent shape lowers the target's alpha where it
-        // blends, and the frame is then blitted with alpha onto black, so glass and glows came out darkened.
-        let seal = load_material(
-            ShaderSource::Glsl { vertex: CRT_VERTEX, fragment: SEAL_FRAGMENT },
-            MaterialParams {
-                pipeline_params: macroquad::miniquad::PipelineParams {
-                    color_write: (false, false, false, true),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-        )
-        .ok();
-
-        let scanline = load_material(
-            ShaderSource::Glsl { vertex: CRT_VERTEX, fragment: SCANLINE_FRAGMENT },
-            MaterialParams {
-                uniforms: vec![
-                    UniformDesc::new("InterlaceField", UniformType::Float1),
-                    UniformDesc::new("FieldDim", UniformType::Float1),
-                ],
-                ..Default::default()
-            },
-        )
-        .ok();
+        // Curved glass, the alpha seal and the scanlines; a shader that fails to compile (old WebGL, driver quirks)
+        // is None, and the frame is composited straight to the screen without it.
+        let (crt, seal, scanline) = (crt::glass(), crt::seal(), crt::scanlines());
 
         // Unseeded, every game deals the same food, rocks and drops each time.
         // A bot run draws the same numbers every time, so its result repeats.
@@ -387,10 +191,9 @@ impl Blip {
         set_camera(&cam);
     }
 
-    /// Draw with `draw` shaken by [`crate::shake`] (`left` of `secs` to go, at most `amp` pixels), then the view
-    /// restored.
-    pub fn shaken(&self, left: f32, secs: f32, amp: f32, draw: impl FnOnce()) {
-        let (dx, dy) = crate::shake(left, secs, amp);
+    /// Draw with `draw` shaken by `shake`, then the view restored.
+    pub fn shaken(&self, shake: &crate::Shake, draw: impl FnOnce()) {
+        let (dx, dy) = shake.offset();
         self.set_offset(dx, dy);
         draw();
         self.set_offset(0.0, 0.0);
@@ -469,7 +272,7 @@ impl Blip {
         if vw <= 0.0 || vh <= 0.0 { return None; }
         let mut u = vec2((fx * screen_width() - vx) / vw, (fy * screen_height() - vy) / vh);
         if self.crt.is_some() && self.fx() == 0 && !self.screenshot_mode {
-            u = crt_curve(u);
+            u = crt::curve(u);
         }
         Some(vec2(u.x * self.width as f32, u.y * self.height as f32))
     }
@@ -704,9 +507,7 @@ impl Blip {
     /// Composite glitch effects and scanlines into `(vx, vy, vw, vh)`.
     /// `offscreen_target` corrects scanline parity, which flips for FBOs.
     fn composite(&mut self, vx: f32, vy: f32, vw: f32, vh: f32, offscreen_target: bool) {
-        let lw = self.width  as f32;
-        let lh = self.height as f32;
-        let scale = vw / lw;
+        let scale = vw / self.width as f32;
         // Shrunk (a phone shows Meteors at half size), nearest sampling
         // drops every other pixel and one-pixel lines break up: blend then.
         // Enlarged, pixels stay crisp.
@@ -717,20 +518,12 @@ impl Blip {
             self.rt.texture.set_filter(filter);
         }
 
-        let roll_on   = self.roll_t  > 0.0;
-        let tear_on   = self.tear_t  > 0.0 && !roll_on; // don't combine tear + roll
-        let chroma_on = self.chroma_t > 0.0;
-
-
-        // ---- chromatic aberration: coloured ghost layers under main image ----
-        if chroma_on {
+        // Chromatic aberration: coloured ghost layers under the picture.
+        if self.chroma_t > 0.0 {
             let dx = self.chroma_dx * scale;
-            draw_texture_ex(&tex, vx - dx, vy,
-                Color::new(1.0, 0.0, 0.0, 0.12),
-                DrawTextureParams { dest_size: Some(vec2(vw, vh)), ..Default::default() });
-            draw_texture_ex(&tex, vx + dx, vy,
-                Color::new(0.0, 0.4, 1.0, 0.12),
-                DrawTextureParams { dest_size: Some(vec2(vw, vh)), ..Default::default() });
+            let params = || DrawTextureParams { dest_size: Some(vec2(vw, vh)), ..Default::default() };
+            draw_texture_ex(&tex, vx - dx, vy, Color::new(1.0, 0.0, 0.0, 0.12), params());
+            draw_texture_ex(&tex, vx + dx, vy, Color::new(0.0, 0.4, 1.0, 0.12), params());
         }
 
         // The top-origin screen camera and `gl_FragCoord` keep scanlines aligned across roll/tear strips.
@@ -742,83 +535,93 @@ impl Blip {
             scanline.set_uniform("FieldDim", self.field_dim);
             gl_use_material(scanline);
         }
+        let roll_on = self.roll_t > 0.0;
         if roll_on {
-            // Upper screen strip: game rows [roll_dy, lh)
-            let top_src_h = lh - self.roll_dy;
-            let top_dst_h = vh * top_src_h / lh;
-            draw_texture_ex(&tex, vx, vy, WHITE, DrawTextureParams {
-                dest_size: Some(vec2(vw, top_dst_h)),
-                source:    Some(Rect::new(0.0, self.roll_dy, lw, top_src_h)),
-                ..Default::default()
-            });
-            // Lower screen strip: game rows [0, roll_dy) (wrapped)
-            if self.roll_dy >= 1.0 {
-                let bot_dst_h = vh - top_dst_h;
-                draw_texture_ex(&tex, vx, vy + top_dst_h, WHITE, DrawTextureParams {
-                    dest_size: Some(vec2(vw, bot_dst_h)),
-                    source:    Some(Rect::new(0.0, 0.0, lw, self.roll_dy)),
-                    ..Default::default()
-                });
-            }
-        } else if tear_on {
-            let split_lh = self.tear_y * lh;
-            let split_vh = self.tear_y * vh;
-            let tdx      = self.tear_dx * scale;
-
-            // Top strip: game rows [0, split_lh)
-            draw_texture_ex(&tex, vx, vy, WHITE, DrawTextureParams {
-                dest_size: Some(vec2(vw, split_vh)),
-                source:    Some(Rect::new(0.0, 0.0, lw, split_lh)),
-                ..Default::default()
-            });
-            // Bottom strip: game rows [split_lh, lh), shifted horizontally
-            draw_texture_ex(&tex, vx + tdx, vy + split_vh, WHITE, DrawTextureParams {
-                dest_size: Some(vec2(vw, vh - split_vh)),
-                source:    Some(Rect::new(0.0, split_lh, lw, lh - split_lh)),
-                ..Default::default()
-            });
-            // Bright glitch line at the split point — plain color, not the
-            // scanline-shaded texture, so reset first (its own alpha needs
-            // to blend normally; SCANLINE_FRAGMENT doesn't handle that).
-            if scanline_shader_active { gl_use_default_material(); }
-            let gw = vw * (0.2 + self.rng.next() * 0.3);
-            let gh = 1.0;
-            let ga = 0.1 + self.rng.next() * 0.1;
-            draw_rectangle(vx, vy + split_vh - gh * 0.5, gw, gh,
-                Color::new(1.0, 1.0, 1.0, ga));
+            self.draw_rolled(&tex, vx, vy, vw, vh);
+        } else if self.tear_t > 0.0 { // a tear never combines with a roll
+            self.draw_torn(&tex, vx, vy, vw, vh);
         } else {
-            draw_texture_ex(&tex, vx, vy, WHITE, DrawTextureParams {
-                dest_size: Some(vec2(vw, vh)),
-                ..Default::default()
-            });
+            draw_texture_ex(&tex, vx, vy, WHITE, DrawTextureParams { dest_size: Some(vec2(vw, vh)), ..Default::default() });
         }
         if scanline_shader_active { gl_use_default_material(); }
 
         // If shader compilation failed, draw scanlines as row rectangles. Quality level 2 skips them.
-        if self.fx() < 2 && self.scanline.is_none() {
-            let active   = Color { r: 0.0, g: 0.0, b: 0.0, a: 60.0 / 255.0 };
-            let inactive = Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 - self.field_dim };
-            let bottom   = vy + vh;
-            let f0 = self.interlace_field as f32;
-            let f1 = 1.0 - f0;
-            let mut sy = vy + f0;
-            while sy < bottom { draw_rectangle(vx, sy, vw, 1.0, active);   sy += 2.0; }
-            let mut sy = vy + f1;
-            while sy < bottom { draw_rectangle(vx, sy, vw, 1.0, inactive); sy += 2.0; }
-        }
+        if self.fx() < 2 && self.scanline.is_none() { self.draw_scanline_rows(vx, vy, vw, vh); }
+        if self.fx() < 2 { self.draw_noise(vx, vy, vw, vh, scale); }
+    }
 
-        // ---- background noise ----
-        if self.fx() < 2 {
-            let pixel = scale.max(1.0);
-            for _ in 0..48 {
-                let nx = vx + self.rng.next() * vw;
-                let ny = vy + self.rng.next() * vh;
-                let a  = 0.02 + self.rng.next() * 0.10;
-                let v  = self.rng.next();
-                draw_rectangle(nx, ny, pixel, pixel, Color::new(v, v, v, a));
-            }
+    /// The vertical roll: the picture slid up by `roll_dy` game rows, the rows off the top wrapping round below.
+    fn draw_rolled(&self, tex: &macroquad::texture::Texture2D, vx: f32, vy: f32, vw: f32, vh: f32) {
+        let (lw, lh) = (self.width as f32, self.height as f32);
+        // Upper screen strip: game rows [roll_dy, lh)
+        let top_src_h = lh - self.roll_dy;
+        let top_dst_h = vh * top_src_h / lh;
+        draw_texture_ex(tex, vx, vy, WHITE, DrawTextureParams {
+            dest_size: Some(vec2(vw, top_dst_h)),
+            source:    Some(Rect::new(0.0, self.roll_dy, lw, top_src_h)),
+            ..Default::default()
+        });
+        // Lower screen strip: game rows [0, roll_dy) (wrapped)
+        if self.roll_dy >= 1.0 {
+            draw_texture_ex(tex, vx, vy + top_dst_h, WHITE, DrawTextureParams {
+                dest_size: Some(vec2(vw, vh - top_dst_h)),
+                source:    Some(Rect::new(0.0, 0.0, lw, self.roll_dy)),
+                ..Default::default()
+            });
         }
+    }
 
+    /// The tear: the picture below `tear_y` shifted sideways, with a bright glitch line along the split.
+    fn draw_torn(&mut self, tex: &macroquad::texture::Texture2D, vx: f32, vy: f32, vw: f32, vh: f32) {
+        let (lw, lh) = (self.width as f32, self.height as f32);
+        let scale = vw / lw;
+        let split_lh = self.tear_y * lh;
+        let split_vh = self.tear_y * vh;
+        let tdx      = self.tear_dx * scale;
+        // Top strip: game rows [0, split_lh)
+        draw_texture_ex(tex, vx, vy, WHITE, DrawTextureParams {
+            dest_size: Some(vec2(vw, split_vh)),
+            source:    Some(Rect::new(0.0, 0.0, lw, split_lh)),
+            ..Default::default()
+        });
+        // Bottom strip: game rows [split_lh, lh), shifted horizontally
+        draw_texture_ex(tex, vx + tdx, vy + split_vh, WHITE, DrawTextureParams {
+            dest_size: Some(vec2(vw, vh - split_vh)),
+            source:    Some(Rect::new(0.0, split_lh, lw, lh - split_lh)),
+            ..Default::default()
+        });
+        // The glitch line is plain colour, not the scanline-shaded texture, so reset first (its own alpha needs
+        // to blend normally; crt::SCANLINE_FRAGMENT doesn't handle that).
+        if self.fx() < 2 && self.scanline.is_some() { gl_use_default_material(); }
+        let gw = vw * (0.2 + self.rng.next() * 0.3);
+        let gh = 1.0;
+        let ga = 0.1 + self.rng.next() * 0.1;
+        draw_rectangle(vx, vy + split_vh - gh * 0.5, gw, gh, Color::new(1.0, 1.0, 1.0, ga));
+    }
+
+    /// Scanlines as row rectangles, for when the scanline shader did not compile.
+    fn draw_scanline_rows(&self, vx: f32, vy: f32, vw: f32, vh: f32) {
+        let active   = Color { r: 0.0, g: 0.0, b: 0.0, a: 60.0 / 255.0 };
+        let inactive = Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 - self.field_dim };
+        let bottom   = vy + vh;
+        let f0 = self.interlace_field as f32;
+        let f1 = 1.0 - f0;
+        let mut sy = vy + f0;
+        while sy < bottom { draw_rectangle(vx, sy, vw, 1.0, active);   sy += 2.0; }
+        let mut sy = vy + f1;
+        while sy < bottom { draw_rectangle(vx, sy, vw, 1.0, inactive); sy += 2.0; }
+    }
+
+    /// Background noise: a few dozen faint specks, a game pixel each.
+    fn draw_noise(&mut self, vx: f32, vy: f32, vw: f32, vh: f32, scale: f32) {
+        let pixel = scale.max(1.0);
+        for _ in 0..48 {
+            let nx = vx + self.rng.next() * vw;
+            let ny = vy + self.rng.next() * vh;
+            let a  = 0.02 + self.rng.next() * 0.10;
+            let v  = self.rng.next();
+            draw_rectangle(nx, ny, pixel, pixel, Color::new(v, v, v, a));
+        }
     }
 
     // ----- drawing helpers — see blip::draw and blip::font for full docs -----
@@ -839,176 +642,4 @@ impl Blip {
     /// Set the strength of the screen's phosphor bloom, 0.0 (none) to 1.0
     /// (the default, tuned for bright lines on a black field).
     pub fn set_bloom(&mut self, k: f32) { self.bloom = k.clamp(0.0, 1.0); }
-
-    /// Draw SCORE, the best score and LIVES across the top.
-    /// The high-score field is clipped between the left and right fields.
-    /// Where the HUD's SCORE starts: the shell clips 3 screen pixels, which at half scale is 6 game pixels.
-    fn hud_score_x(&self) -> f32 {
-        (self.width as f32 * 0.012).max(4.0).round()
-    }
-
-    /// The right edge of the HUD's SCORE cluster: the label and one digit cell per digit.
-    fn hud_score_right(&self, score: i32) -> f32 {
-        self.hud_score_x() + HUD_SCORE_DX + digits(score) as f32 * 12.0
-    }
-
-    /// A score multiple (a streak's xN), just after the HUD's score, while there is one (`times` above 1). Call once a
-    /// frame. A rise pops: bigger and flashing for MULTIPLE_POP seconds. A broken streak shows the lost multiple in red
-    /// for MULTIPLE_LOST, so a player sees the rule that broke it as it happens.
-    pub fn draw_hud_multiple(&self, score: i32, times: i32) {
-        const MULTIPLE_POP: f32 = 0.6;
-        const MULTIPLE_LOST: f32 = 0.5;
-        let (shown, before, since) = self.multiple.get();
-        let (before, since) = if times != shown { (shown, 0.0) } else { (before, since + self.delta_time) };
-        self.multiple.set((times, before, since));
-        let x = self.hud_score_right(score) + 12.0;
-        if times > before && since < MULTIPLE_POP {
-            // Size 3 sits 3 px higher to stay centred in the 28 px bar; white and yellow alternate every 0.1 s.
-            let color = if (since * 10.0) as i32 % 2 == 0 { BLIP_WHITE } else { BLIP_YELLOW };
-            self.draw_text(&format!("X{times}"), x, 4.0, 3.0, color);
-        } else if times > 1 {
-            self.draw_text(&format!("X{times}"), x, 7.0, 2.0, BLIP_YELLOW);
-        } else if before > 1 && since < MULTIPLE_LOST {
-            self.draw_text(&format!("X{before}"), x, 7.0, 2.0, BLIP_RED);
-        }
-    }
-
-    /// The HUD's bar, `h` tall: ink with a cream rim a pixel above its foot.
-    pub fn draw_hud_bar(&self, h: f32) {
-        let w = self.width as f32;
-        self.fill_rect(0.0, 0.0, w, h, BLIP_INK);
-        self.fill_rect(0.0, h - 3.0, w, 2.0, BLIP_CREAM);
-    }
-
-    /// The HUD's bar on a title screen, the best score in its middle, as an arcade's attract mode shows it.
-    pub fn draw_attract_bar(&self) { self.draw_attract_bar_with(crate::web::high_score()); }
-
-    fn draw_attract_bar_with(&self, hi: i32) {
-        self.draw_hud_bar(HUD_BAR);
-        if hi <= 0 { return; }
-        self.draw_hi(((self.width as f32 - hi_width(hi)) / 2.0).round(), HUD_TEXT_Y, hi);
-    }
-
-    /// The best score in the HUD's bar: HI in gold, the number in cream.
-    fn draw_hi(&self, x: f32, y: f32, hi: i32) {
-        self.draw_text("HI", x, y, 2.0, BLIP_GOLD);
-        self.draw_text(&hi.to_string(), x + 36.0, y, 2.0, BLIP_CREAM);
-    }
-
-    /// The shared HUD, the same in every game: an ink bar with a cream rim, the coin and score left, the best in the
-    /// middle and a heart a life right (empty hearts for lives lost below three, a count past five).
-    pub fn draw_hud(&self, score: i32, lives: i32) {
-        let w = self.width as f32;
-        let ty = HUD_TEXT_Y;
-        self.draw_hud_bar(HUD_BAR);
-
-        // ---- the coin and the score, left ----
-        let x0 = self.hud_score_x();
-        self.draw_coin(x0, 4.0, 2.0);
-        self.draw_number(score, x0 + HUD_SCORE_DX, ty, 2.0, BLIP_CREAM);
-        let score_right = self.hud_score_right(score);
-
-        // ---- hearts, right ----
-        // Inset from the right edge to clear the curved glass's black rim on every canvas width.
-        let right = w - (w * 0.085).round();
-        // Three heart slots at least, so a life lost leaves an empty heart, as in the adventure games.
-        let shown = lives.clamp(HUD_SLOTS, HUD_HEARTS);
-        let count = if lives > HUD_HEARTS { format!("X{lives}") } else { String::new() };
-        let count_w = crate::font::text_width(&count, 2.0);
-        let hearts_left = right - count_w - shown as f32 * HUD_HEART_STEP;
-        for i in 0..shown {
-            self.draw_heart(hearts_left + i as f32 * HUD_HEART_STEP, 3.0, 2.0, i < lives);
-        }
-        self.draw_text(&count, right - count_w, ty, 2.0, BLIP_CREAM);
-
-        // ---- HI <score>, centred in the gap ----
-        let hi = crate::web::high_score();
-        if hi <= 0 {
-            return;
-        }
-        let lo = score_right + 16.0;
-        let avail = hearts_left - 16.0 - lo;
-        let head_w = hi_width(hi);
-        // No clear room (a tiny canvas or a very long live score): no line.
-        if head_w > avail {
-            return;
-        }
-        self.draw_hi(lo + (avail - head_w) / 2.0, ty, hi);
-    }
-
-    /// The title screen's start prompt, the same in every game: PRESS START (a keyboard's Space and the deck's red
-    /// button are labelled START; "PRESS START TO START" said it twice) or TAP TO START, white at size 3, outlined so
-    /// it reads over artwork too.
-    pub fn draw_start_prompt(&self, y: f32) {
-        let prompt = crate::web::controls().pick("PRESS START", "PRESS START", "TAP TO START");
-        self.draw_centered_outlined(prompt, self.width as f32 / 2.0, y, 3.0, BLIP_WHITE, BLIP_BLACK);
-    }
-
-    /// Draw the shared game-over screen over the game's chosen backdrop.
-    /// `ready` shows the prompt to play again, after [`crate::GAME_OVER_MIN_WAIT`].
-    pub fn draw_game_over(&self, score: i32, hi: i32, headline: Color, best: Color, prompt: Color, ready: bool) {
-        self.draw_end_screen("GAME OVER", score, hi, headline, best, prompt, ready);
-    }
-
-    /// The screen a game ends on, won or lost: `title` (GAME OVER, YOU WON),
-    /// the score, the best, and the prompt to play again once `ready`.
-    #[allow(clippy::too_many_arguments)]
-    pub fn draw_end_screen(&self, title: &str, score: i32, hi: i32, headline: Color, best: Color, prompt: Color, ready: bool) {
-        let h = self.height as f32;
-        self.draw_attract_bar();
-        self.draw_end_panel();
-        self.draw_logo(title, self.width as f32 / 2.0, h / 4.0, 5.0, headline);
-        self.draw_centered(&format!("SCORE {score}"), h / 2.0, 3.0, BLIP_WHITE);
-        self.draw_best(score, hi, h / 2.0 + 28.0, best);
-        if ready {
-            let again = crate::web::controls().pick("PRESS START", "PRESS START", "TAP TO PLAY");
-            self.draw_centered(again, Self::game_over_prompt_y(h), 3.0, prompt);
-        }
-    }
-
-    /// A game's own line on its game-over screen (the round reached, the
-    /// length grown): between the best score and the prompt to play again.
-    pub fn draw_game_over_note(&self, text: &str, color: Color) {
-        let h = self.height as f32;
-        let best_end = h / 2.0 + 28.0 + 16.0;
-        self.draw_centered(text, (best_end + Self::game_over_prompt_y(h)) / 2.0 - 8.0, 2.0, color);
-    }
-
-    /// A line in place of the game-over screen's prompt (a continue's count, say), drawn with `ready` false.
-    fn draw_game_over_prompt(&self, text: &str, color: Color) {
-        let h = self.height as f32;
-        self.draw_centered(text, Self::game_over_prompt_y(h), 3.0, color);
-    }
-
-    /// The continue offer's count, while it shows.
-    pub fn draw_continue(&self, cont: &crate::Continue, color: Color) {
-        if cont.showing() { self.draw_game_over_prompt(&format!("CONTINUE? {}", cont.seconds()), color); }
-    }
-
-    /// The end screen's message box, behind the title, the score and the prompt.
-    fn draw_end_panel(&self) {
-        let (w, h) = (self.width as f32, self.height as f32);
-        let top = h / 4.0 - 26.0;
-        let bottom = Self::game_over_prompt_y(h) + 21.0 + 22.0;
-        let margin = (w * 0.08).round().max(12.0);
-        self.draw_panel(margin, top, w - margin * 2.0, bottom - top, 1.0);
-    }
-
-    /// Two thirds down, or lower on a short screen, to leave the note its line.
-    fn game_over_prompt_y(h: f32) -> f32 {
-        (h * 2.0 / 3.0).max(h / 2.0 + 80.0)
-    }
-
-    /// Centred end-of-game line: `NEW BEST!` in `new_color` when this run beat
-    /// (or tied) the best, otherwise `BEST 12345` in grey; nothing while no
-    /// best is known.
-    fn draw_best(&self, score: i32, hi: i32, y: f32, new_color: Color) {
-        if hi > 0 && score >= hi {
-            // It flashes (its colour and white, four times a second): the moment a player most wants to see.
-            let lit = crate::blink(4.0);
-            self.draw_centered("NEW BEST!", y, 2.0, if lit { new_color } else { BLIP_WHITE });
-        } else if hi > 0 {
-            self.draw_centered(&format!("BEST {hi}"), y, 2.0, blend(BLIP_CREAM, BLIP_INK, 0.35));
-        }
-    }
 }

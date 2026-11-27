@@ -8,7 +8,7 @@ use blip::macroquad::rand::rand;
 use blip::macroquad::texture::Texture2D;
 use blip::{
     load_png, load_png_smooth,
-    clamp, Fx, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, segment_rect_overlap, web,
+    clamp, Fx, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, web,
     window_conf, Blip, BlipColor, LifeResult, Pooled, Session, Timer, rand_range_f32, BLIP_BLACK, BLIP_CYAN,
     BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
@@ -18,6 +18,14 @@ use blip::{
 mod tunes;
 mod bot;
 mod levels;
+mod draw;
+mod ball;
+mod bricks;
+mod drops;
+use drops::*;
+use ball::*;
+use bricks::*;
+use draw::*;
 
 use levels::*;
 
@@ -153,57 +161,6 @@ struct Shard { x: f32, y: f32, vx: f32, vy: f32, turn: f32, spin: f32, pts: Vec<
 
 /// The shards' own random numbers, so breaking a brick never moves the game's.
 use blip::wav::Rng as ShardRng;
-
-/// Crack a brick at `(bx, by)` from the impact point `hit` into 3 to 5 shards: cuts run out from the impact at
-/// uneven angles, and each shard is the piece of the rectangle between two cuts. Shards fly out from the impact,
-/// pushed along the ball's travel.
-fn shatter(bx: f32, by: f32, hit: (f32, f32), push: (f32, f32), base: BlipColor, rng: &mut ShardRng) -> Vec<Shard> {
-    let (w, h) = (BRICK_W as f32, BRICK_H as f32);
-    // 3 to 5 pieces, drifting rather than flung: 3 to 7 flung at up to 140 px/s, spinning, read as too busy (user, 2026-11-27).
-    let n = 3 + (rng.next_f32() * 3.0) as usize;
-    // Cuts jitter within the middle of their share of the circle: wider jitter left slivers that read as lines.
-    let mut cuts: Vec<f32> = (0..n).map(|k| (k as f32 + 0.35 + rng.next_f32() * 0.3) / n as f32 * std::f32::consts::TAU).collect();
-    cuts.sort_by(f32::total_cmp);
-    // Where a ray from the impact leaves the rectangle.
-    let exit = |a: f32| {
-        let (dx, dy) = (a.cos(), a.sin());
-        let tx = if dx > 0.0 { (bx + w - hit.0) / dx } else if dx < 0.0 { (bx - hit.0) / dx } else { f32::MAX };
-        let ty = if dy > 0.0 { (by + h - hit.1) / dy } else if dy < 0.0 { (by - hit.1) / dy } else { f32::MAX };
-        let t = tx.min(ty);
-        (hit.0 + dx * t, hit.1 + dy * t)
-    };
-    let corners = [(bx + w, by + h), (bx, by + h), (bx, by), (bx + w, by)];
-    let corner_angle = |c: (f32, f32)| (c.1 - hit.1).atan2(c.0 - hit.0).rem_euclid(std::f32::consts::TAU);
-    let mut out = Vec::new();
-    for k in 0..n {
-        let (a0, a1) = (cuts[k], if k + 1 < n { cuts[k + 1] } else { cuts[0] + std::f32::consts::TAU });
-        let mut poly = vec![hit, exit(a0)];
-        let mut inside: Vec<(f32, f32)> = corners.iter().copied().filter(|&c| {
-            let a = corner_angle(c);
-            (a > a0 && a < a1) || (a + std::f32::consts::TAU > a0 && a + std::f32::consts::TAU < a1)
-        }).collect();
-        inside.sort_by(|p, q| {
-            let ap = (corner_angle(*p) - a0).rem_euclid(std::f32::consts::TAU);
-            let aq = (corner_angle(*q) - a0).rem_euclid(std::f32::consts::TAU);
-            ap.total_cmp(&aq)
-        });
-        poly.extend(inside);
-        poly.push(exit(a1));
-        let (cx, cy) = poly.iter().fold((0.0, 0.0), |s, p| (s.0 + p.0, s.1 + p.1));
-        let (cx, cy) = (cx / poly.len() as f32, cy / poly.len() as f32);
-        let mid = (a0 + a1) / 2.0;
-        let fling = 25.0 + rng.next_f32() * 35.0;
-        let light = 0.75 + rng.next_f32() * 0.4;
-        out.push(Shard {
-            x: cx, y: cy,
-            vx: mid.cos() * fling + push.0 * 0.06, vy: mid.sin() * fling + push.1 * 0.06 - 20.0,
-            turn: 0.0, spin: (rng.next_f32() - 0.5) * 6.0,
-            pts: poly.iter().map(|p| (p.0 - cx, p.1 - cy)).collect(),
-            color: BlipColor { r: (base.r * light).min(1.0), g: (base.g * light).min(1.0), b: (base.b * light).min(1.0), a: 1.0 },
-        });
-    }
-    out
-}
 
 /// One ball's own state. The game's `ball_*` fields are the ball in hand;
 /// the others wait in `extra` and are swapped in for their turn.
@@ -506,35 +463,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     } else {
         g.ball_speed
     };
-
-    // Every ball flies by the same code: each extra is swapped into the ball
-    // fields for its turn.
-    let lost = fly_ball(g, dt, active_speed, sfx);
-    let mut k = 0;
-    while k < g.extra.len() {
-        g.swap_ball(k);
-        let gone = fly_ball(g, dt, active_speed, sfx);
-        g.swap_ball(k);
-        if gone { g.extra.remove(k); } else { k += 1; }
-    }
-    if lost {
-        if let Some(b) = g.extra.pop() {
-            g.set_ball(b);
-        } else {
-            blip::bot::add(&format!("lost_at_speed{}", (g.ball_vx.hypot(g.ball_vy) / 50.0) as i32 * 50), 1.0);
-            play_sfx(&sfx.life_lost);
-            g.reset_drops();
-            g.state = match g.sess.lose_life() {
-                LifeResult::StillAlive => { g.dead_timer.start(1.2); State::Dead }
-                LifeResult::GameOver => {
-                    // A new best (over the run's continues) gets the win jingle after the lost ball.
-                    if g.sess.beats_best() { play_sfx(&sfx.win); }
-                    g.cont.start(CONTINUE_SECS);
-                    State::Over
-                }
-            };
-            return;
-        }
+    if fly_balls(g, dt, active_speed, sfx) {
+        if let Some(b) = g.extra.pop() { g.set_ball(b); } else { return ball_lost(g, sfx); }
     }
 
     if g.bricks_alive() == 0 {
@@ -542,6 +472,36 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.dead_timer.start(1.5);
         g.state = State::Win;
     }
+}
+
+/// Every ball flies by the same code: each extra is swapped into the ball fields for its turn, and an extra that is
+/// lost is gone. True when the main ball is lost.
+fn fly_balls(g: &mut Game, dt: f32, speed: f32, sfx: &Sounds) -> bool {
+    let lost = fly_ball(g, dt, speed, sfx);
+    let mut k = 0;
+    while k < g.extra.len() {
+        g.swap_ball(k);
+        let gone = fly_ball(g, dt, speed, sfx);
+        g.swap_ball(k);
+        if gone { g.extra.remove(k); } else { k += 1; }
+    }
+    lost
+}
+
+/// The last ball is lost: a life goes, and the ball waits on the paddle again, or the game is over.
+fn ball_lost(g: &mut Game, sfx: &Sounds) {
+    blip::bot::add(&format!("lost_at_speed{}", (g.ball_vx.hypot(g.ball_vy) / 50.0) as i32 * 50), 1.0);
+    play_sfx(&sfx.life_lost);
+    g.reset_drops();
+    g.state = match g.sess.lose_life() {
+        LifeResult::StillAlive => { g.dead_timer.start(1.2); State::Dead }
+        LifeResult::GameOver => {
+            // A new best (over the run's continues) gets the win jingle after the lost ball.
+            if g.sess.beats_best() { play_sfx(&sfx.win); }
+            g.cont.start(CONTINUE_SECS);
+            State::Over
+        }
+    };
 }
 
 /// Hit bricks settle; broken halves fall under gravity until they leave the screen.
@@ -555,411 +515,6 @@ fn shake_and_tumble(g: &mut Game, dt: f32) {
         s.turn += s.spin * dt;
     }
     g.shards.retain(|s| s.y < WIN_H as f32 + 30.0);
-}
-
-/// The screwball curve: the velocity turns (speed kept) at the spin's rate,
-/// up to SCREW_MAX_CURVE, the spin bleeding off so the curve eases out
-/// instead of looping.
-fn curve_ball(g: &mut Game, dt: f32) {
-    if g.ball_spin.abs() > 0.001 {
-        let remaining = (SCREW_MAX_CURVE - g.ball_curve_used).max(0.0);
-        let mut ang = g.ball_spin * dt;
-        if ang.abs() > remaining {
-            ang = ang.signum() * remaining;
-            g.ball_spin = 0.0;
-        }
-        g.ball_curve_used += ang.abs();
-        let (s, c) = ang.sin_cos();
-        let (vx, vy) = (g.ball_vx, g.ball_vy);
-        g.ball_vx = vx * c - vy * s;
-        g.ball_vy = vx * s + vy * c;
-        g.ball_spin *= (1.0 - SCREW_SPIN_DECAY * dt).max(0.0);
-    }
-}
-
-/// The pull: the flight steepens and quickens (see PULL).
-fn pull_ball(g: &mut Game, dt: f32) {
-    let sp = g.ball_vx.hypot(g.ball_vy).max(1.0);
-    let flat = (1.0 - (g.ball_vy.abs() / sp) / 0.4).clamp(0.0, 1.0);
-    let dir = if g.ball_vy < 0.0 { -1.0 } else { 1.0 };
-    g.ball_vy += dir * (PULL + PULL_FLAT * flat) * dt;
-    if g.ball_spin.abs() > 0.001 || g.ball_curve_used > 0.0 {
-        let k = 1.0 + SCREW_GAIN * dt;
-        g.ball_vx *= k;
-        g.ball_vy *= k;
-    }
-    let sp = g.ball_vx.hypot(g.ball_vy);
-    let cap = BALL_SPEED_MAX * PULL_CAP;
-    if sp > cap { g.ball_vx *= cap / sp; g.ball_vy *= cap / sp; }
-}
-
-/// One frame of the ball in hand: seeking, spin, pull, and the move itself
-/// against walls, paddle and bricks. Returns true if it fell out the bottom.
-fn fly_ball(g: &mut Game, dt: f32, active_speed: f32, sfx: &Sounds) -> bool {
-    seek_brick(g, dt);
-    curve_ball(g, dt);
-    pull_ball(g, dt);
-
-    // Rolling-mark spin (visual only): angular rate = speed / radius, driven
-    // by the horizontal component so a curving shot visibly spins faster.
-    roll_ball(g, dt);
-
-    // ---- integrate in substeps so a fast ball can't tunnel through a brick,
-    //      the seam between two bricks, or the paddle in a single frame ----
-    let speed = g.ball_vx.hypot(g.ball_vy).max(1.0);
-    let substeps = ((speed * dt / (BALL_W as f32 * 0.4)).ceil() as i32).clamp(1, 8);
-    let sdt = dt / substeps as f32;
-    let pad_start_x = g.pad_x - g.pad_vx * dt;
-
-    for step in 0..substeps {
-        g.ball_x += g.ball_vx * sdt;
-        g.ball_y += g.ball_vy * sdt;
-
-        bounce_off_walls(g, sfx);
-        let pad_x = pad_start_x + g.pad_vx * dt * (step as f32 + 0.5) / substeps as f32;
-        bounce_off_paddle(g, active_speed, pad_x, sfx);
-        hit_bricks(g, active_speed, sfx);
-
-        if g.ball_y > WIN_H as f32 {
-            g.fx.burst(g.ball_x + BALL_W as f32 / 2.0, WIN_H as f32 - 4.0, 14, 160.0, BLIP_RED);
-            return true;
-        }
-    }
-    false
-}
-
-/// The top-left corner of brick `i`.
-fn brick_rect(i: usize) -> (f32, f32) {
-    let (row, col) = (i as i32 / BRICK_COLS, i as i32 % BRICK_COLS);
-    ((BRICK_OX + col * (BRICK_W + BRICK_GAP)) as f32, (BRICK_OY + row * (BRICK_H + BRICK_GAP)) as f32)
-}
-
-/// While seeking, bend a rising ball toward the nearest brick.
-fn seek_brick(g: &mut Game, dt: f32) {
-    if !g.seeking() || g.ball_vy >= 0.0 { return; }
-    let Some((tx, ty)) = g.nearest_brick() else { return };
-    let (cx, cy, _) = ball_circle(g);
-    let want = (ty - cy).atan2(tx - cx);
-    let have = g.ball_vy.atan2(g.ball_vx);
-    let diff = blip::angle_diff(have, want);
-    let turn = diff.clamp(-SEEK_RATE * dt, SEEK_RATE * dt);
-    let (s, c) = turn.sin_cos();
-    let (vx, vy) = (g.ball_vx, g.ball_vy);
-    g.ball_vx = vx * c - vy * s;
-    g.ball_vy = vx * s + vy * c;
-}
-
-type Mat3 = [[f32; 3]; 3];
-const MAT3_ID: Mat3 = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
-
-fn mat_mul(a: &Mat3, b: &Mat3) -> Mat3 {
-    let mut o = [[0.0; 3]; 3];
-    for i in 0..3 { for j in 0..3 { for k in 0..3 { o[i][j] += a[i][k] * b[k][j]; } } }
-    o
-}
-fn rot_x(t: f32) -> Mat3 { let (s, c) = t.sin_cos(); [[1.0, 0.0, 0.0], [0.0, c, -s], [0.0, s, c]] }
-fn rot_y(t: f32) -> Mat3 { let (s, c) = t.sin_cos(); [[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]] }
-/// Rolls the ball without slipping: its surface drifts along the velocity
-/// (axis = view-normal x v), plus the screwball spin about the view axis.
-fn roll_ball(g: &mut Game, dt: f32) {
-    let r = BALL_W as f32 * 0.5;
-    let w = [-g.ball_vy / r, g.ball_vx / r, g.ball_spin * 2.0];
-    let ang = (w[0] * w[0] + w[1] * w[1] + w[2] * w[2]).sqrt() * dt;
-    if ang < 1e-6 { return; }
-    let m = ang / dt;
-    let (n0, n1, n2) = (w[0] / m, w[1] / m, w[2] / m);
-    let (s, c) = ang.sin_cos();
-    let t = 1.0 - c;
-    let d: Mat3 = [
-        [c + n0 * n0 * t,      n0 * n1 * t - n2 * s, n0 * n2 * t + n1 * s],
-        [n1 * n0 * t + n2 * s, c + n1 * n1 * t,      n1 * n2 * t - n0 * s],
-        [n2 * n0 * t - n1 * s, n2 * n1 * t + n0 * s, c + n2 * n2 * t],
-    ];
-    g.ball_rot = mat_mul(&d, &g.ball_rot);
-    // Re-orthonormalise the rows so float drift never skews the sphere.
-    let m = &mut g.ball_rot;
-    for i in 0..3 {
-        for j in 0..i {
-            let dot: f32 = (0..3).map(|k| m[i][k] * m[j][k]).sum();
-            // `k` walks two rows at once (mi and mj); the rows are split apart for the borrow checker.
-            let (past, current) = m.split_at_mut(i);
-            for (mi, mj) in current[0].iter_mut().zip(&past[j]) { *mi -= dot * *mj; }
-        }
-        let len = m[i].iter().map(|v| v * v).sum::<f32>().sqrt();
-        for v in m[i].iter_mut() { *v /= len; }
-    }
-}
-
-/// Split the orientation into sheet cell (yaw, pitch) and a roll angle:
-/// R = Rz(roll) * Rx(pitch) * Ry(yaw).
-fn ball_pose(m: &Mat3) -> (u32, u32, f32) {
-    let pitch = m[2][1].clamp(-1.0, 1.0).asin();
-    let yaw = (-m[2][0]).atan2(m[2][2]);
-    let roll = m[1][0].atan2(m[0][0]) - (pitch.sin() * yaw.sin()).atan2(yaw.cos());
-    let period = 2.0 * PI / 3.0;
-    let col = ((yaw.rem_euclid(period) / period * BALL_YAW_N as f32).round() as u32) % BALL_YAW_N;
-    let row = (((pitch + PI / 2.0) / PI * (BALL_PITCH_N - 1) as f32).round() as u32).min(BALL_PITCH_N - 1);
-    (col, row, roll)
-}
-
-/// The ball as a circle: centre and radius.
-#[inline]
-fn ball_circle(g: &Game) -> (f32, f32, f32) {
-    let r = BALL_W as f32 / 2.0;
-    (g.ball_x + r, g.ball_y + r, r)
-}
-
-/// Left / right / top walls. The overshoot past the wall is reflected back
-/// rather than clamped flat, so no speed is lost to the ball "sticking".
-fn bounce_off_walls(g: &mut Game, sfx: &Sounds) {
-    if g.ball_x < 0.0 {
-        g.ball_x = -g.ball_x;
-        g.ball_vx = g.ball_vx.abs();
-        play_sfx_volume(&sfx.wall_hit, 0.55);
-    }
-    let right = (WIN_W - BALL_W) as f32;
-    if g.ball_x > right {
-        g.ball_x = 2.0 * right - g.ball_x;
-        g.ball_vx = -g.ball_vx.abs();
-        play_sfx_volume(&sfx.wall_hit, 0.55);
-    }
-    let top = HUD_H as f32;
-    if g.ball_y < top {
-        g.ball_y = 2.0 * top - g.ball_y;
-        g.ball_vy = g.ball_vy.abs();
-        play_sfx_volume(&sfx.wall_hit, 0.55);
-    }
-}
-
-fn bounce_off_paddle(g: &mut Game, speed: f32, pad_x: f32, sfx: &Sounds) {
-    if g.ball_vy <= 0.0 {
-        return;
-    }
-    if !rects_overlap(
-        g.ball_x, g.ball_y, BALL_W as f32, BALL_H as f32,
-        pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32,
-    ) {
-        return;
-    }
-    play_variant(&sfx.paddle_hit, speed);
-    web::haptic();
-    g.chain = 0;
-    g.fx.ring(g.ball_x + BALL_W as f32 / 2.0, PAD_Y as f32, 22.0, 0.25, BlipColor { r: 0.6, g: 0.85, b: 1.0, a: 0.8 });
-    g.pad_kick_v = 40.0 + 70.0 * (speed / BALL_SPEED_MAX).min(1.0);
-    let incoming_vx = g.ball_vx;
-
-    // Where it landed across the face, -1 (left tip) .. +1 (right tip). The
-    // classic "aim by where you hit" english, plus a slice of the paddle's
-    // own sideways speed carried into the ball the way a moving bat drags it.
-    let rel = ((g.ball_x + BALL_W as f32 / 2.0 - pad_x) / g.pad_w - 0.5) * 2.0;
-    let steer = rel.clamp(-1.0, 1.0) * 1.15; // radians
-    let nvx = speed * steer.sin() + g.pad_vx * 0.18;
-    let mut nvy = -(speed * steer.cos()).abs();
-    if nvy > -speed * 0.32 {
-        nvy = -speed * 0.32; // keep it from grazing along just over the paddle
-    }
-    // Renormalise: the english + paddle drag changed |v|; the ball's speed
-    // stays exactly on the ramp.
-    let m = (nvx * nvx + nvy * nvy).sqrt().max(1.0);
-    g.ball_vx = nvx / m * speed;
-    g.ball_vy = nvy / m * speed;
-    g.ball_y = (PAD_Y - BALL_H) as f32 - 0.5;
-
-    // Screwball spin from the slip between the paddle's surface and the
-    // ball's — their *relative* horizontal velocity, not the paddle's alone.
-    let rel_vx = g.pad_vx - incoming_vx;
-    g.ball_spin = if rel_vx.abs() > SCREW_MIN_PAD_SPEED {
-        let t = (rel_vx.abs() / (PAD_SPEED + BALL_SPEED_MAX)).min(1.0);
-        rel_vx.signum() * t * SCREW_MAX_SPIN_RATE
-    } else {
-        0.0
-    };
-    g.ball_curve_used = 0.0;
-}
-
-/// Brick `i` breaks: the points (see CHAIN_MAX), the sparks, the ball a
-/// little faster, perhaps a drop. A bomb takes its eight neighbours with it
-/// (`blasted`: this one went that way).
-fn break_brick(g: &mut Game, i: usize, speed: f32, sfx: &Sounds, blasted: bool) {
-    let (row, col) = (i as i32 / BRICK_COLS, i as i32 % BRICK_COLS);
-    let (bx, by) = brick_rect(i);
-    let (mx, my) = (bx + BRICK_W as f32 / 2.0, by + BRICK_H as f32 / 2.0);
-    g.bricks[i].alive = false;
-    g.since_break = 0.0;
-    blip::bot::add(if blasted { "bricks_blasted" } else { "bricks" }, 1.0);
-    g.chain += 1;
-    let times = g.chain.min(CHAIN_MAX);
-    let points = (BRICK_ROWS - row) * 10 * g.sess.level * times;
-    g.sess.add_score(points);
-    // The brick shatters from where the ball struck it (its centre when blasted), and its neighbours shake.
-    let hit = if blasted { (mx, my) } else {
-        ((g.ball_x + BALL_W as f32 / 2.0).clamp(bx + 2.0, bx + BRICK_W as f32 - 2.0),
-         (g.ball_y + BALL_H as f32 / 2.0).clamp(by + 2.0, by + BRICK_H as f32 - 2.0))
-    };
-    let mut rng = ShardRng((i as u32 + 1).wrapping_mul(2654435761) ^ (g.sess.score as u32).wrapping_mul(40503) ^ g.ball_x.to_bits() | 1);
-    let shards = shatter(bx, by, hit, (g.ball_vx, g.ball_vy), BRICK_COLORS[g.bricks[i].kind], &mut rng);
-    g.shards.extend(shards);
-    for (dr, dc) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
-        let (r, c) = (row + dr, col + dc);
-        if (0..BRICK_ROWS).contains(&r) && (0..BRICK_COLS).contains(&c) { g.bricks[(r * BRICK_COLS + c) as usize].wobble = 1.0; }
-    }
-    // Only a multiplied score earns a label; plain points show in the score.
-    if times > 1 {
-        g.fx.popup(mx, my, &format!("{points} X{times}"), BLIP_YELLOW);
-    }
-    // Same ramp on every level, so the ball plays identically no
-    // matter how far the player has gotten.
-    g.ball_speed = clamp(g.ball_speed + SPEED_INC, 0.0, BALL_SPEED_MAX);
-
-    // 30% chance to spawn a loot drop; one in ten of those a life
-    // (at one in five a steady player ended level 1 with six).
-    if rand() % 10 < 3 {
-        let drop_x = bx + BRICK_W as f32 / 2.0 - DROP_W / 2.0;
-        let drop_kind = match rand() % 10 {
-            0..=1 => DropKind::Wide,
-            2..=3 => DropKind::Slow,
-            4..=5 => DropKind::Multi,
-            6..=8 => DropKind::Narrow,
-            _ => DropKind::Life,
-        };
-        pool_spawn(&mut g.drops, Drop { x: drop_x, y: by, active: true, kind: drop_kind });
-    }
-    // The blast has one sound of its own: nine bricks at once would clip.
-    if g.bricks[i].kind == BRICK_BOMB { play_sfx(&sfx.bomb); }
-    else if !blasted { play_variant(&sfx.brick_break, speed); }
-    if g.bricks[i].kind == BRICK_BOMB {
-        g.fx.ring(mx, my, BRICK_W as f32 * 1.4, 0.35, BRICK_COLORS[BRICK_BOMB]);
-        g.fx.burst(mx, my, 18, 200.0, BRICK_COLORS[BRICK_BOMB]);
-        for (dr, dc) in [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)] {
-            let (r, c) = (row + dr, col + dc);
-            if !(0..BRICK_ROWS).contains(&r) || !(0..BRICK_COLS).contains(&c) { continue; }
-            let j = (r * BRICK_COLS + c) as usize;
-            if g.bricks[j].alive { break_brick(g, j, speed, sfx, true); }
-        }
-    }
-}
-
-/// Resolve one ball/brick contact using the closest-point normal for corner hits.
-fn hit_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
-    let (cx, cy, rad) = ball_circle(g);
-
-    for i in 0..BRICK_TOTAL {
-        if !g.bricks[i].alive {
-            continue;
-        }
-        let row = i as i32 / BRICK_COLS;
-        let col = i as i32 % BRICK_COLS;
-        let bx = (BRICK_OX + col * (BRICK_W + BRICK_GAP)) as f32;
-        let by = (BRICK_OY + row * (BRICK_H + BRICK_GAP)) as f32;
-
-        let px = cx.clamp(bx, bx + BRICK_W as f32);
-        let py = cy.clamp(by, by + BRICK_H as f32);
-        let (dx, dy) = (cx - px, cy - py);
-        let d2 = dx * dx + dy * dy;
-        if d2 >= rad * rad {
-            continue;
-        }
-
-        let d = d2.sqrt();
-        let (nx, ny) = if d > 0.001 {
-            (dx / d, dy / d)
-        } else {
-            // centre buried in the brick — eject along the shallowest axis
-            let ox = (cx - bx).min(bx + BRICK_W as f32 - cx);
-            let oy = (cy - by).min(by + BRICK_H as f32 - cy);
-            if ox < oy {
-                (if cx < bx + BRICK_W as f32 / 2.0 { -1.0 } else { 1.0 }, 0.0)
-            } else {
-                (0.0, if cy < by + BRICK_H as f32 / 2.0 { -1.0 } else { 1.0 })
-            }
-        };
-
-        // reflect about the contact normal, then lift the ball clear of the
-        // brick and put its speed back exactly on the ramp
-        let vn = g.ball_vx * nx + g.ball_vy * ny;
-        if vn < 0.0 {
-            g.ball_vx -= 2.0 * vn * nx;
-            g.ball_vy -= 2.0 * vn * ny;
-        }
-        let pen = rad - d + 0.5;
-        g.ball_x += nx * pen;
-        g.ball_y += ny * pen;
-        let m = g.ball_vx.hypot(g.ball_vy).max(1.0);
-        g.ball_vx = g.ball_vx / m * speed;
-        g.ball_vy = g.ball_vy / m * speed;
-
-        g.bricks[i].hp -= 1;
-        let (mx, my) = (bx + BRICK_W as f32 / 2.0, by + BRICK_H as f32 / 2.0);
-        if g.bricks[i].hp == 0 {
-            break_brick(g, i, speed, sfx, false);
-        } else {
-            // Steel brick survived — the cracked texture warns the next hit
-            // finishes it.
-            g.bricks[i].kind = BRICK_STEEL_CRACKED;
-            g.bricks[i].wobble = 1.0;
-            blip::bot::add("steel_cracked", 1.0);
-            g.fx.burst(mx, my, 5, 70.0, BRICK_COLORS[BRICK_STEEL]);
-            play_variant(&sfx.brick_hit, speed);
-        }
-        return;
-    }
-}
-
-fn move_drops(g: &mut Game, dt: f32, sfx: &Sounds) {
-    let mut split = false;
-    let pad_start_x = g.pad_x - g.pad_vx * dt;
-    let (pad_x, pad_w) = (g.pad_x, g.pad_w);
-    for d in pool_iter_mut(&mut g.drops) {
-        let drop_from = (d.x - pad_start_x, d.y - PAD_Y as f32);
-        d.y += DROP_SPEED * dt;
-        let expired = d.y > WIN_H as f32;
-        if segment_rect_overlap(
-            drop_from.0,
-            drop_from.1,
-            d.x - pad_x,
-            d.y - PAD_Y as f32,
-            -DROP_W,
-            -DROP_H,
-            pad_w + DROP_W,
-            PAD_H as f32 + DROP_H,
-        ) {
-            d.active = false;
-            blip::bot::add("drops", 1.0);
-            blip::bot::add(["got_wide", "got_narrow", "got_slow", "got_life", "got_multi"][d.kind as usize], 1.0);
-            let (label, c) = match d.kind {
-                DropKind::Wide => ("WIDE", BLIP_GREEN),
-                DropKind::Narrow => ("NARROW", BLIP_RED),
-                DropKind::Slow => ("SLOW", BLIP_CYAN),
-                DropKind::Life => ("+1 LIFE", BLIP_YELLOW),
-                DropKind::Multi => ("MULTI", BlipColor { r: 0.8, g: 0.55, b: 1.0, a: 1.0 }),
-            };
-            g.fx.popup(d.x + DROP_W / 2.0, PAD_Y as f32 - 14.0, label, c);
-            play_sfx(match d.kind {
-                DropKind::Wide | DropKind::Slow | DropKind::Multi => &sfx.pickup_good,
-                DropKind::Narrow => &sfx.pickup_bad,
-                DropKind::Life => &sfx.pickup_life,
-            });
-            match d.kind {
-                DropKind::Wide => {
-                    g.pad_w = PAD_W_WIDE;
-                    g.pad_effect_timer.start(EFFECT_DURATION);
-                }
-                DropKind::Narrow => {
-                    g.pad_w = PAD_W_NARROW;
-                    g.pad_effect_timer.start(EFFECT_DURATION);
-                }
-                DropKind::Slow => {
-                    g.slow_timer.start(EFFECT_DURATION);
-                }
-                DropKind::Life => {
-                    g.sess.lives += 1;
-                }
-                DropKind::Multi => split = true,
-            }
-        }
-        if expired { d.active = false; }
-    }
-    if split { g.split_ball(); }
 }
 
 fn update_dead(g: &mut Game, dt: f32) {
@@ -989,197 +544,9 @@ fn update_over(g: &mut Game, dt: f32) {
     }
 }
 
-/// A shard: its face as a fan of triangles, then a darker edge so neighbouring shards read apart.
-fn draw_shard(blip: &Blip, s: &Shard) {
-    let (sn, cs) = s.turn.sin_cos();
-    let pts: Vec<(f32, f32)> = s.pts.iter().map(|p| (s.x + p.0 * cs - p.1 * sn, s.y + p.0 * sn + p.1 * cs)).collect();
-    let edge = BLIP_INK;
-    blip.fill_fan((s.x, s.y), &pts, s.color);
-    for k in 0..pts.len() {
-        let (a, b) = (pts[k], pts[(k + 1) % pts.len()]);
-        blip.draw_line(a.0, a.1, b.0, b.1, edge);
-    }
-}
-
-/// A tiled floor behind the bricks, a new hue each level: big dusky flagstones, each with a lit and a shaded edge
-/// and a small diamond inlay, after the adventure games' dungeon floors. Dim, so the bricks and ball stand out.
-fn draw_backdrop(blip: &Blip, level: i32) {
-    const HUES: [(f32, f32, f32); 5] = [(0.17, 0.19, 0.36), (0.30, 0.17, 0.32), (0.13, 0.27, 0.30), (0.32, 0.22, 0.17), (0.18, 0.27, 0.18)];
-    let (r, g, b) = HUES[((level - 1).max(0) as usize) % HUES.len()];
-    // Kept dim (0.6), so the floor never competes with the ball.
-    let tone = |k: f32| BlipColor { r: r * k * 0.6, g: g * k * 0.6, b: b * k * 0.6, a: 1.0 };
-    const TILE: i32 = 40;
-    blip.fill_rect(0.0, HUD_H as f32, WIN_W as f32, (WIN_H - HUD_H) as f32, tone(0.62));
-    for ty in 0..(WIN_H - HUD_H) / TILE + 1 {
-        for tx in 0..WIN_W / TILE {
-            let (x, y) = ((tx * TILE) as f32, (HUD_H + ty * TILE) as f32);
-            let s = TILE as f32;
-            blip.fill_rect(x + 1.0, y + 1.0, s - 2.0, s - 2.0, tone(if (tx + ty) % 2 == 0 { 0.9 } else { 0.82 }));
-            blip.fill_rect(x + 1.0, y + 1.0, s - 2.0, 1.0, tone(1.08));
-            let (cx, cy) = (x + s / 2.0, y + s / 2.0);
-            blip.fill_quad((cx, cy - 4.0), (cx + 4.0, cy), (cx, cy + 4.0), (cx - 4.0, cy), tone(0.76));
-        }
-    }
-}
-
-fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9], drops: &[Texture2D; 5]) {
-    draw_backdrop(blip, g.sess.level);
-    // The wall's shadow on the floor, then the wall.
-    for i in (0..BRICK_TOTAL).filter(|&i| g.bricks[i].alive) {
-        let (bx, by) = brick_rect(i);
-        blip.fill_rect(bx + 3.0, by + 5.0, BRICK_W as f32, BRICK_H as f32, BLIP_SHADOW);
-    }
-    for i in 0..BRICK_TOTAL {
-        if !g.bricks[i].alive { continue; }
-        let w = g.bricks[i].wobble;
-        let (bx, by0) = brick_rect(i);
-        let by = by0 + (w * 22.0).sin() * w * 1.0;
-        blip.draw_texture(&brick[g.bricks[i].kind], bx, by, BRICK_W as f32, BRICK_H as f32);
-    }
-    for s in &g.shards { draw_shard(blip, s); }
-
-    // Pickups sway as they fall.
-    for d in pool_iter(&g.drops) {
-        let phase = d.y * 0.045 + d.x;
-        blip.draw_texture_cell(&drops[d.kind as usize], 0, 1, 0, 1, d.x, d.y, DROP_W, DROP_H, phase.sin() * 0.16);
-    }
-
-    // Each active effect on its own line with its seconds left; it blinks for the last two.
-    let widened = g.pad_w > PAD_W as f32;
-    let effects = [
-        (g.slow_timer.active(), "SLOW", BLIP_CYAN, g.slow_timer.remaining()),
-        (g.pad_effect_timer.active(), if widened { "WIDE" } else { "NARROW" },
-            if widened { BLIP_GREEN } else { BLIP_RED }, g.pad_effect_timer.remaining()),
-    ];
-    let mut line_y = (PAD_Y - 20) as f32;
-    for (_, label, color, left) in effects.iter().filter(|e| e.0) {
-        if *left > EFFECT_WARN || (left * 6.0) as i32 % 2 == 0 {
-            blip.draw_centered_outlined(&format!("{label} {}", left.ceil() as i32), (WIN_W / 2) as f32, line_y, 2.0, *color, BLIP_INK);
-        }
-        line_y -= 18.0;
-    }
-
-    // Left cap, stretched middle, right cap: the ends keep their shape at any width.
-    let (cap, py) = (PADDLE_CAP as f32, PAD_Y as f32 + g.pad_kick);
-    let (sw, cap_w) = (paddle.width(), PADDLE_CAP as f32 * 0.5);
-    let ph = PAD_H as f32;
-    // Dash afterimages, trailing behind and fading with the boost.
-    if g.dash_t > 0.0 {
-        let k = g.dash_t / DASH_SECS;
-        for i in 1..=3 {
-            let x = g.pad_x - g.dash_dir * i as f32 * 9.0;
-            let c = BlipColor { r: 0.35, g: 0.75, b: 1.0, a: 0.28 * k / i as f32 };
-            blip.fill_rect(x + 2.0, py + 2.0, g.pad_w - 4.0, ph - 4.0, c);
-        }
-    }
-    blip.draw_shadow(g.pad_x + g.pad_w / 2.0 + 3.0, py + ph + 4.0, g.pad_w);
-    blip.draw_texture_region(paddle, 0.0, 0.0, cap, 24.0, g.pad_x, py, cap_w, ph);
-    blip.draw_texture_region(paddle, cap, 0.0, sw - 2.0 * cap, 24.0, g.pad_x + cap_w, py, g.pad_w - 2.0 * cap_w, ph);
-    blip.draw_texture_region(paddle, sw - cap, 0.0, cap, 24.0, g.pad_x + g.pad_w - cap_w, py, cap_w, ph);
-
-    // Seeking: the brick the ball is bending toward pulses.
-    if g.seeking() {
-        let pulse = 0.5 + 0.5 * (blip::now() * 8.0).sin();
-        if let Some((tx, ty)) = g.nearest_brick() {
-            let (x, y) = (tx - BRICK_W as f32 / 2.0 - 2.0, ty - BRICK_H as f32 / 2.0 - 2.0);
-            blip.draw_rect(x, y, BRICK_W as f32 + 4.0, BRICK_H as f32 + 4.0, BlipColor { r: 1.0, g: 0.95, b: 0.6, a: pulse });
-        }
-    }
-
-    for b in g.extra.iter().copied().chain([g.ball()]) {
-        // Soft drop shadow, offset toward the direction of travel, so the ball
-        // reads as rolling across the play field rather than floating over it.
-        let ball_cx = b.x + BALL_W as f32 / 2.0;
-        let ball_cy = b.y + BALL_H as f32 / 2.0;
-        let speed = b.vx.hypot(b.vy).max(1.0);
-        // A fading streak behind a fast ball, longer the faster it goes.
-        let streak = ((speed - 260.0) / 160.0).clamp(0.0, 1.0);
-        for i in (1..=4).rev() {
-            if streak <= 0.0 { break; }
-            let back = i as f32 * 6.0 * streak;
-            blip.fill_circle(ball_cx - b.vx / speed * back, ball_cy - b.vy / speed * back, BALL_W as f32 * (0.5 - i as f32 * 0.07),
-                BlipColor { r: 0.6, g: 0.85, b: 1.0, a: 0.22 * streak * (1.0 - i as f32 / 5.0) });
-        }
-        blip.fill_circle(
-            ball_cx + (b.vx / speed) * 4.0, ball_cy + (b.vy / speed) * 4.0 + 3.0, BALL_W as f32 * 0.42,
-            BLIP_SHADOW,
-        );
-        if g.seeking() {
-            blip.fill_glow_circle(ball_cx, ball_cy, BALL_W as f32 * 0.55, BlipColor { r: 1.0, g: 0.9, b: 0.5, a: 0.35 });
-        }
-        let (col, row, roll) = ball_pose(&b.rot);
-        let (bx, by, bs) = (b.x - 1.0, b.y - 1.0, BALL_W as f32 + 2.0);
-        blip.draw_texture_cell(ball, col, BALL_YAW_N, row, BALL_PITCH_N, bx, by, bs, bs, roll);
-        blip.draw_texture(shade, bx, by, bs, bs);
-    }
-
-    g.fx.draw(blip);
-    blip.draw_hud(g.sess.score, g.sess.lives);
-}
-
-fn draw_title(blip: &Blip, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9]) {
-    draw_backdrop(blip, 1);
-    // A full wall of the game's bricks, a ripple running along it.
-    let t0 = blip::now();
-    for row in 0..3 {
-        for col in 0..BRICK_COLS {
-            let kind = ((row + col) % 6) as usize;
-            let x = (BRICK_OX + col * (BRICK_W + BRICK_GAP)) as f32;
-            let lift = ((t0 * 3.0 - col as f32 * 0.5).sin().max(0.0)).powi(4) * 4.0;
-            let y = (HUD_H + 26 + row * (BRICK_H + BRICK_GAP)) as f32 - lift;
-            blip.draw_texture(&brick[kind], x, y, BRICK_W as f32, BRICK_H as f32);
-        }
-    }
-    blip.draw_logo("BOUNCER", (WIN_W / 2) as f32, (WIN_H / 4) as f32, 6.0, BLIP_SEA);
-    // BOUNCER is sz=6 (42px tall) — clear its bottom by a real margin.
-    blip.draw_attract_bar();
-    let by = web::controls();
-    blip.draw_start_prompt((WIN_H / 2) as f32);
-    let lines = [
-        by.pick("LEFT RIGHT ARROW OR AD", "PAD LEFT AND RIGHT", "DRAG TO MOVE"),
-        by.pick("SPACE TO LAUNCH", "FIRE TO LAUNCH", "TAP TO LAUNCH"),
-        by.pick("DOUBLE TAP TO DASH", "DOUBLE TAP TO DASH", ""),
-    ];
-    let lines: Vec<&str> = lines.into_iter().filter(|l| !l.is_empty()).collect();
-    let top = (WIN_H * 2 / 3 - 14) as f32;
-    blip.draw_panel(WIN_W as f32 * 0.14, top, WIN_W as f32 * 0.72, 20.0 * lines.len() as f32 + 22.0, 1.0);
-    for (i, line) in lines.iter().enumerate() {
-        blip.draw_centered(line, top + 12.0 + 20.0 * i as f32, 2.0, BLIP_CREAM);
-    }
-    let t = blip::now();
-    let cx = WIN_W as f32 * 0.5 + (t * 1.2).sin() * 132.0;
-    let bx = cx - BALL_W as f32 * 0.5;
-    let by = PAD_Y as f32 - 48.0 + (t * 2.0).sin() * 7.0;
-    for i in (1..=3).rev() {
-        blip.fill_rect(bx - i as f32 * 8.0, by + 3.0, BALL_W as f32, BALL_H as f32,
-            BlipColor { r: 0.25, g: 0.55, b: 1.0, a: 0.11 / i as f32 });
-    }
-    blip.draw_texture_cell(ball, 0, BALL_YAW_N, 0, BALL_PITCH_N, bx, by, BALL_W as f32, BALL_H as f32, t * 0.7);
-    blip.draw_texture(shade, bx, by, BALL_W as f32, BALL_H as f32);
-    let pad_x = (cx - PAD_W as f32 * 0.5).clamp(0.0, WIN_W as f32 - PAD_W as f32);
-    let cap = PADDLE_CAP as f32;
-    let sw = paddle.width();
-    blip.draw_texture_region(paddle, 0.0, 0.0, cap, 24.0, pad_x, PAD_Y as f32, cap * 0.5, PAD_H as f32);
-    blip.draw_texture_region(paddle, cap, 0.0, sw - 2.0 * cap, 24.0, pad_x + cap * 0.5, PAD_Y as f32, PAD_W as f32 - cap, PAD_H as f32);
-    blip.draw_texture_region(paddle, sw - cap, 0.0, cap, 24.0, pad_x + PAD_W as f32 - cap * 0.5, PAD_Y as f32, cap * 0.5, PAD_H as f32);
-}
-
-fn draw_clear(blip: &Blip, level: i32, t: f32) {
-    draw_backdrop(blip, level);
-    blip::draw_fireworks(blip, t, (60.0, (HUD_H + 50) as f32, (WIN_W - 120) as f32, 260.0), &BRICK_COLORS[..6]);
-    let buf = format!("LEVEL {}", level + 1);  // level just incremented in next_level
-    blip.draw_logo("CLEARED", (WIN_W / 2) as f32, (WIN_H / 3) as f32, 5.0, BLIP_LEAF);
-    blip.draw_message(&buf, (WIN_W / 2) as f32, (WIN_H / 2 + 10) as f32, 3.0, BLIP_GOLD, 1.0);
-}
-
 fn conf() -> blip::macroquad::window::Conf {
     window_conf("BOUNCER", WIN_W, WIN_H)
 }
-
-const DROP_PNGS: [&[u8]; 5] = [
-    blip::png!("drop_wide"), blip::png!("drop_narrow"), blip::png!("drop_slow"), blip::png!("drop_life"),
-    blip::png!("drop_multi"),
-];
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -1187,16 +554,7 @@ async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
-    let paddle = load_png_smooth(blip::png!("paddle"));
-    let ball = load_png_smooth(blip::png!("ball"));
-    let drops = DROP_PNGS.map(load_png_smooth);
-    let ball_shade = load_png_smooth(blip::png!("ball_shade"));
-    let brick = [
-        load_png(blip::png!("brick_red")), load_png(blip::png!("brick_orange")), load_png(blip::png!("brick_yellow")),
-        load_png(blip::png!("brick_green")), load_png(blip::png!("brick_blue")), load_png(blip::png!("brick_purple")),
-        load_png(blip::png!("brick_steel")), load_png(blip::png!("brick_steel_cracked")),
-        load_png(blip::png!("brick_bomb")),
-    ];
+    let art = Art::load();
 
     let sfx = Sounds::load().await;
     // Two tunes, alternating by level.
@@ -1228,7 +586,7 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title => draw_title(&blip, &paddle, &ball, &ball_shade, &brick),
+            State::Title => draw_title(&blip, &art),
             State::Win   => draw_clear(&blip, g.sess.level, 1.5 - g.dead_timer.remaining()),
             State::Over  => {
                 draw_backdrop(&blip, g.sess.level);
@@ -1236,7 +594,7 @@ async fn main() {
                 blip.draw_continue(&g.cont, BLIP_YELLOW);
             }
             State::Launch | State::Play | State::Dead => {
-                draw_play(&blip, &g, &paddle, &ball, &ball_shade, &brick, &drops);
+                draw_play(&blip, &g, &art);
                 // The ball waits on the paddle after every lost life; say so.
                 if g.state == State::Launch && blip::blink(2.0) {
                     let prompt = web::controls().pick("PRESS SPACE", "PRESS FIRE", "TAP TO LAUNCH");
@@ -1250,145 +608,4 @@ async fn main() {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// A polygon's area (shoelace).
-    fn area(pts: &[(f32, f32)]) -> f32 {
-        (0..pts.len()).map(|k| { let (a, b) = (pts[k], pts[(k + 1) % pts.len()]); a.0 * b.1 - b.0 * a.1 }).sum::<f32>().abs() / 2.0
-    }
-
-    #[test]
-    fn a_shattered_brick_is_three_to_five_shards_that_make_up_the_whole_brick() {
-        for seed in 1..40u32 {
-            let mut rng = ShardRng(seed.wrapping_mul(2654435761) | 1);
-            let hit = (100.0 + (seed % 7) as f32 * 6.0, 50.0 + (seed % 3) as f32 * 6.0);
-            let pieces = shatter(100.0, 50.0, hit, (0.0, -200.0), BLIP_RED, &mut rng);
-            let shards: Vec<&Shard> = pieces.iter().collect();
-            assert!((3..=5).contains(&shards.len()), "seed {seed}: {} shards", shards.len());
-            let total: f32 = shards.iter().map(|s| area(&s.pts)).sum();
-            let brick = (BRICK_W * BRICK_H) as f32;
-            assert!((total - brick).abs() < brick * 0.01, "seed {seed}: shards cover {total} of {brick}");
-        }
-    }
-
-    #[test]
-    fn a_continue_plays_on_against_the_bricks_left_with_fresh_lives() {
-        let mut g = Game::new();
-        g.start_game();
-        g.bricks[0].alive = false;
-        g.sess.score = 700;
-        g.sess.lives = 1;
-        assert!(g.sess.lose_life() == LifeResult::GameOver);
-        g.cont.start(CONTINUE_SECS);
-        g.state = State::Over;
-        g.continue_play();
-        assert!(!g.bricks[0].alive, "the bricks already broken stay broken");
-        assert!(g.state == State::Launch);
-        assert_eq!((g.sess.lives, g.sess.score, g.sess.run_best()), (LIVES_START, 0, 700));
-    }
-
-    fn rot_z(t: f32) -> Mat3 { let (s, c) = t.sin_cos(); [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]] }
-
-    #[test]
-    fn pose_decomposition_reconstructs_orientation() {
-        let r = mat_mul(&rot_z(0.7), &mat_mul(&rot_x(0.4), &rot_y(1.1)));
-        let pitch = r[2][1].asin();
-        let yaw = (-r[2][0]).atan2(r[2][2]);
-        let roll = r[1][0].atan2(r[0][0]) - (pitch.sin() * yaw.sin()).atan2(yaw.cos());
-        assert!((pitch - 0.4).abs() < 1e-4 && (yaw - 1.1).abs() < 1e-4 && (roll - 0.7).abs() < 1e-4);
-    }
-
-    #[test]
-    fn rolling_right_drifts_surface_right() {
-        let mut g = Game::new();
-        g.ball_vx = 100.0;
-        roll_ball(&mut g, 0.05);
-        // The view-facing point (0,0,1) should move toward +x.
-        assert!(g.ball_rot[0][2] > 0.0 && g.ball_rot[1][2].abs() < 1e-4);
-    }
-
-    #[test]
-    fn a_multi_makes_three_balls_at_the_same_speed_none_of_them_flat() {
-        let mut g = Game::new();
-        (g.ball_x, g.ball_y, g.ball_vx, g.ball_vy) = (200.0, 300.0, 240.0, -20.0);
-        g.split_ball();
-        assert_eq!(1 + g.extra.len(), MULTI_BALLS);
-        let speed = g.ball_vx.hypot(g.ball_vy);
-        for b in &g.extra {
-            assert!((b.x, b.y) == (200.0, 300.0), "a copy started somewhere else");
-            assert!(b.vy.abs() >= speed * 0.3 - 0.01, "a copy left along the paddle line: vy {}", b.vy);
-            assert!(b.vx.hypot(b.vy) < speed * 1.2, "a copy left faster than the ball: {}", b.vx.hypot(b.vy));
-        }
-        // A second pickup with three in play adds none.
-        g.split_ball();
-        assert_eq!(1 + g.extra.len(), MULTI_BALLS);
-        // A new ball starts alone.
-        g.new_ball();
-        assert!(g.extra.is_empty());
-    }
-
-    #[test]
-    fn swapping_a_ball_in_and_out_leaves_both_as_they_were() {
-        let mut g = Game::new();
-        (g.ball_x, g.ball_vx) = (10.0, 1.0);
-        g.extra.push(Ball { x: 99.0, vx: -7.0, ..g.ball() });
-        g.swap_ball(0);
-        assert_eq!((g.ball_x, g.ball_vx, g.extra[0].x, g.extra[0].vx), (99.0, -7.0, 10.0, 1.0));
-        g.swap_ball(0);
-        assert_eq!((g.ball_x, g.ball_vx, g.extra[0].x, g.extra[0].vx), (10.0, 1.0, 99.0, -7.0));
-    }
-
-    fn layout(level: i32) -> Game {
-        let mut g = Game::new();
-        g.sess.level = level;
-        g.build_bricks();
-        g
-    }
-
-    #[test]
-    fn the_brick_grid_sits_inside_the_screen_without_overlaps() {
-        let (x0, y0) = brick_rect(0);
-        let (x1, y1) = brick_rect(BRICK_TOTAL - 1);
-        assert!(x0 >= 0.0 && x1 + BRICK_W as f32 <= WIN_W as f32);
-        assert!(y0 > HUD_H as f32 && y1 + (BRICK_H as f32) < WIN_H as f32 / 2.0);
-        assert_eq!(brick_rect(1).0 - x0, (BRICK_W + BRICK_GAP) as f32);
-    }
-
-    #[test]
-    fn every_layout_has_bricks_and_can_be_cleared() {
-        for level in 1..=16 {
-            let g = layout(level);
-            let alive: Vec<_> = g.bricks.iter().filter(|b| b.alive).collect();
-            assert!(!alive.is_empty(), "level {level} has no bricks");
-            assert!(alive.iter().all(|b| b.hp >= 1 && b.hp <= 2), "level {level}: a brick that never breaks");
-            assert!(alive.iter().filter(|b| b.kind == BRICK_BOMB).count() <= BOMB_MAX, "level {level}: too many bombs");
-        }
-    }
-
-    #[test]
-    fn steel_and_bombs_arrive_only_at_their_levels() {
-        for _ in 0..20 {
-            assert!(layout(1).bricks.iter().all(|b| b.kind != BRICK_STEEL && b.kind != BRICK_BOMB));
-            assert!(layout(STEEL_MIN_LEVEL - 1).bricks.iter().all(|b| b.kind != BRICK_STEEL));
-        }
-    }
-
-    #[test]
-    fn the_layouts_cycle_after_eight_levels() {
-        let shape = |level| layout(level).bricks.iter().map(|b| b.alive).collect::<Vec<_>>();
-        assert_eq!(shape(2), shape(10));
-        assert_ne!(shape(1), shape(2));
-    }
-
-    #[test]
-    fn the_nearest_brick_is_the_one_closest_to_the_ball() {
-        let mut g = layout(1);
-        let (x, y) = brick_rect(BRICK_TOTAL - 1);
-        (g.ball_x, g.ball_y) = (x, y + 40.0);
-        let (bx, by) = g.nearest_brick().unwrap();
-        assert_eq!((bx, by), (x + BRICK_W as f32 / 2.0, y + BRICK_H as f32 / 2.0));
-        for b in g.bricks.iter_mut() { b.alive = false; }
-        assert!(g.nearest_brick().is_none());
-    }
-}
+mod tests;

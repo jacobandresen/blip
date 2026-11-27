@@ -206,70 +206,7 @@ fn movers(g: &Game) -> Vec<Mover> {
     // only what the look-ahead can reach: a second and a half at top speed, and what comes down to meet it
     let (lo, hi) = (g.bike_d - 80.0, g.bike_d + SPEED_MAX * 1.6 + 260.0);
     for h in g.hazards.iter().filter(|h| !h.gone && h.d > lo && h.d < hi + if h.oncoming || h.kind == Hz::Blader { 200.0 } else { 0.0 }) {
-        let (hw, hl) = h.size();
-        let (vx, vd) = h.velocity(g.bike_x, g.bike_d);
-        let s = h.side.index();
-        let here = Mover::moving(h.x, h.d, vx, vd).sized(hw, hl);
-        match h.kind {
-            Hz::Car if !h.oncoming && h.phase <= GO => {
-                // backing out once the reverse lights have glowed, stopping in its lane
-                let lane = CAR_LANE[s];
-                let wait = if h.phase == WAIT { ((h.d - g.bike_d - CAR_WAKE).max(0.0) / g.speed.max(1.0)) + CAR_TELL }
-                    else if h.phase == TELL { (CAR_TELL - h.t).max(0.0) } else { 0.0 };
-                let v = -h.side.sign() * 65.0;
-                let travel = ((lane - h.x) / v).max(0.0);
-                if h.phase < GO { out.push(Mover::still(h.x, h.d).sized(19.0, 10.0).weighted(0.0)); }
-                out.push(Mover::moving(h.x, h.d, v, 0.0).sized(19.0, 12.0).from(wait).stops(wait + travel));
-            }
-            // a dog out, or about to be, can be anywhere between its gate and as far as it runs; it keeps up with the bike
-            Hz::Dog if h.phase <= GO => {
-                let wait = match h.phase {
-                    WAIT => (h.d - g.bike_d - DOG_WAKE).max(0.0) / g.speed.max(1.0) + DOG_TELL,
-                    TELL => (DOG_TELL - h.t).max(0.0),
-                    _ => 0.0,
-                };
-                let vd = if h.phase == GO { ((g.bike_d - h.d) * 3.0).clamp(-DOG_SPEED, DOG_SPEED) } else { 0.0 };
-                let reach = DOG_REACH[s];
-                let (lo, hi) = if h.side == Side::Left { (h.x, reach) } else { (reach, h.x) };
-                out.push(Mover::moving((lo + hi) / 2.0, h.d, 0.0, vd).sized((hi - lo) / 2.0 + 7.0, 14.0).from(wait));
-            }
-            Hz::Sprinkler => {
-                let reach = if h.side == Side::Left { CURB[0] + SPRAY_REACH } else { CURB[1] - SPRAY_REACH };
-                let (lo, hi) = if h.side == Side::Left { (FENCE[0], reach) } else { (reach, FENCE[1]) };
-                out.push(Mover::still((lo + hi) / 2.0, h.d).sized((hi - lo) / 2.0, SPRAY_REACH).weighted(0.12));
-            }
-            Hz::Puddle(_) => out.push(Mover::still(h.x, h.d).sized(20.0, 14.0).weighted(0.08)),
-            Hz::Cart => out.push(Mover::moving(h.x, h.d, vx, vd).sized(12.0, 12.0).weighted(if g.stock < 15 { -0.4 } else { 0.0 })),
-            Hz::Pigeons(_) => {}
-            // a tourist can be anywhere from the track out into the road: give it the lot
-            Hz::Tourist => {
-                let base = h.home;
-                let (lo, hi) = if h.side == Side::Left { (base - 10.0, base + 46.0) } else { (base - 46.0, base + 10.0) };
-                let vd = if h.side == Side::Right { 80.0 } else { -95.0 } * if h.phase == GO { 1.0 } else { 0.0 };
-                out.push(Mover::moving((lo + hi) / 2.0, h.d, 0.0, vd).sized((hi - lo) / 2.0, 14.0));
-            }
-            Hz::Bus => {
-                out.push(here);
-                // the passengers' crossing over the cycle track while it waits, and a moment before
-                if h.phase <= TELL {
-                    let wait = if h.phase == WAIT { (h.d - g.bike_d - BUS_WAKE).max(0.0) / g.speed.max(1.0) } else { 0.0 };
-                    let left = if h.phase == TELL { BUS_DWELL - h.t } else { BUS_DWELL + wait };
-                    out.push(Mover::still(BIKE_LANE[s], h.d).sized(13.0, 12.0).from(wait).stops(f32::INFINITY).weighted(if left > 0.0 { 1.0 } else { 0.0 }));
-                }
-            }
-            _ if hw > 0.0 => {
-                // walkers, skaters and vans not yet moving soon will be
-                let (vx, vd) = match (h.kind, h.phase) {
-                    (Hz::Walker, WAIT) => (-h.side.sign() * 34.0, 0.0),
-                    (Hz::Blader, WAIT) => (0.0, -70.0),
-                    (Hz::Cyclist, WAIT) => (0.0, if h.side == Side::Right { 58.0 } else { -85.0 }),
-                    (Hz::Car, WAIT) if h.oncoming => (0.0, -110.0),
-                    _ => (vx, vd),
-                };
-                out.push(Mover { vx, vy: vd, ..here });
-            }
-            _ => {}
-        }
+        hazard_movers(g, h, &mut out);
     }
     // Frederik V on Amalienborg's square
     if statue_d() > lo - LOT && statue_d() < hi { out.push(Mover::still(240.0, statue_d()).sized(STATUE_HALF, STATUE_HALF)); }
@@ -282,6 +219,78 @@ fn movers(g: &Game) -> Vec<Mover> {
         out.push(Mover::still(RAIL[1] + 40.0, mid).sized(40.0, LOT / 2.0 + 4.0));
     }
     out
+}
+
+/// Where hazard `h` is and will be, as the movers the look-ahead avoids (or, weighted below zero, seeks).
+fn hazard_movers(g: &Game, h: &Hazard, out: &mut Vec<Mover>) {
+    let (hw, hl) = h.size();
+    let (vx, vd) = h.velocity(g.bike_x, g.bike_d);
+    let s = h.side.index();
+    let here = Mover::moving(h.x, h.d, vx, vd).sized(hw, hl);
+    match h.kind {
+        Hz::Car if !h.oncoming && h.phase <= GO => backing_car(g, h, out),
+        Hz::Dog if h.phase <= GO => out.push(dog_run(g, h)),
+        Hz::Sprinkler => {
+            let reach = if h.side == Side::Left { CURB[0] + SPRAY_REACH } else { CURB[1] - SPRAY_REACH };
+            let (lo, hi) = if h.side == Side::Left { (FENCE[0], reach) } else { (reach, FENCE[1]) };
+            out.push(Mover::still((lo + hi) / 2.0, h.d).sized((hi - lo) / 2.0, SPRAY_REACH).weighted(0.12));
+        }
+        Hz::Puddle(_) => out.push(Mover::still(h.x, h.d).sized(20.0, 14.0).weighted(0.08)),
+        Hz::Cart => out.push(Mover::moving(h.x, h.d, vx, vd).sized(12.0, 12.0).weighted(if g.stock < 15 { -0.4 } else { 0.0 })),
+        Hz::Pigeons(_) => {}
+        // a tourist can be anywhere from the track out into the road: give it the lot
+        Hz::Tourist => {
+            let base = h.home;
+            let (lo, hi) = if h.side == Side::Left { (base - 10.0, base + 46.0) } else { (base - 46.0, base + 10.0) };
+            let vd = if h.side == Side::Right { 80.0 } else { -95.0 } * if h.phase == GO { 1.0 } else { 0.0 };
+            out.push(Mover::moving((lo + hi) / 2.0, h.d, 0.0, vd).sized((hi - lo) / 2.0, 14.0));
+        }
+        Hz::Bus => {
+            out.push(here);
+            // the passengers' crossing over the cycle track while it waits, and a moment before
+            if h.phase <= TELL {
+                let wait = if h.phase == WAIT { (h.d - g.bike_d - BUS_WAKE).max(0.0) / g.speed.max(1.0) } else { 0.0 };
+                let left = if h.phase == TELL { BUS_DWELL - h.t } else { BUS_DWELL + wait };
+                out.push(Mover::still(BIKE_LANE[s], h.d).sized(13.0, 12.0).from(wait).stops(f32::INFINITY).weighted(if left > 0.0 { 1.0 } else { 0.0 }));
+            }
+        }
+        _ if hw > 0.0 => {
+            // walkers, skaters and vans not yet moving soon will be
+            let (vx, vd) = match (h.kind, h.phase) {
+                (Hz::Walker, WAIT) => (-h.side.sign() * 34.0, 0.0),
+                (Hz::Blader, WAIT) => (0.0, -70.0),
+                (Hz::Cyclist, WAIT) => (0.0, if h.side == Side::Right { 58.0 } else { -85.0 }),
+                (Hz::Car, WAIT) if h.oncoming => (0.0, -110.0),
+                _ => (vx, vd),
+            };
+            out.push(Mover { vx, vy: vd, ..here });
+        }
+        _ => {}
+    }
+}
+
+/// A parked car backing out once the reverse lights have glowed, stopping in its lane.
+fn backing_car(g: &Game, h: &Hazard, out: &mut Vec<Mover>) {
+    let lane = CAR_LANE[h.side.index()];
+    let wait = if h.phase == WAIT { ((h.d - g.bike_d - CAR_WAKE).max(0.0) / g.speed.max(1.0)) + CAR_TELL }
+        else if h.phase == TELL { (CAR_TELL - h.t).max(0.0) } else { 0.0 };
+    let v = -h.side.sign() * 65.0;
+    let travel = ((lane - h.x) / v).max(0.0);
+    if h.phase < GO { out.push(Mover::still(h.x, h.d).sized(19.0, 10.0).weighted(0.0)); }
+    out.push(Mover::moving(h.x, h.d, v, 0.0).sized(19.0, 12.0).from(wait).stops(wait + travel));
+}
+
+/// A dog out, or about to be, can be anywhere between its gate and as far as it runs; it keeps up with the bike.
+fn dog_run(g: &Game, h: &Hazard) -> Mover {
+    let wait = match h.phase {
+        WAIT => (h.d - g.bike_d - DOG_WAKE).max(0.0) / g.speed.max(1.0) + DOG_TELL,
+        TELL => (DOG_TELL - h.t).max(0.0),
+        _ => 0.0,
+    };
+    let vd = if h.phase == GO { ((g.bike_d - h.d) * 3.0).clamp(-DOG_SPEED, DOG_SPEED) } else { 0.0 };
+    let reach = DOG_REACH[h.side.index()];
+    let (lo, hi) = if h.side == Side::Left { (h.x, reach) } else { (reach, h.x) };
+    Mover::moving((lo + hi) / 2.0, h.d, 0.0, vd).sized((hi - lo) / 2.0 + 7.0, 14.0).from(wait)
 }
 
 const LOOK: Rollout = Rollout { me: (BIKE_HW, BIKE_HL), margin: 5.0, dt: 0.1, hit: 10.0, halo: 0.12, halo_reach: 8.0, fade: 0.5 };
@@ -298,7 +307,8 @@ fn turn_left(g: &Game, pad: &mut Pad) {
     if g.heading < target - 0.05 { pad.hold(less); } else if g.heading > target + 0.05 { pad.hold(more); }
 }
 
-/// The hit boxes the game tests (`solid` hazards: each box shrunk by half of `CRASH_INSET`), for the fun meter, on the canvas (`draw::sy`); not while the view turns at the junction.
+/// The hit boxes the game tests (`solid` hazards: each box shrunk by half of `CRASH_INSET`), for the fun meter, on the
+/// canvas (`draw::sy`); not while the view turns at the junction.
 fn hit_boxes(g: &Game) {
     let seg = g.seg();
     let (ix, iy) = (CRASH_INSET.0 / 2.0, CRASH_INSET.1 / 2.0);

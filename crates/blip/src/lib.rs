@@ -115,6 +115,8 @@ engine! {
     pub mod bot;
     pub mod color;
     pub mod ctx;
+    mod crt;
+    mod hud;
     mod draw;
     mod frame;
     pub mod font;
@@ -138,9 +140,9 @@ engine! {
     };
     pub use ctx::{window_conf, Blip};
     pub use draw::{load_png, load_png_smooth};
-    pub use fx::{draw_fireworks, shake, EffectParticle, EffectParticles, Fx};
+    pub use fx::{draw_fireworks, shake, EffectParticle, EffectParticles, Fx, Shake};
     pub use math::{
-        angle_diff, clamp, distance, ease_out_cubic, frame_starts, lerp, rand_int, rand_range_f32, rand_seed,
+        angle_diff, clamp, distance, ease_out_cubic, frame_starts, lerp, rand_int, rand_item, rand_range_f32, rand_seed,
         rects_overlap, scatter, segment_circle_overlap, segment_rect_overlap, smoothstep01, spool, sweep_hits,
         swept_from, wrap,
     };

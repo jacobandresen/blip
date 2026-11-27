@@ -9,7 +9,6 @@ use blip::cosy::{self, Tone, Voice};
 use blip::Asset;
 use blip::song::chords::{E, FS, GSM, CSM, B};
 
-
 /// Slow and spacious: long glass notes that hang in the air.
 pub fn drift_song() -> Song<'static> {
     Song {

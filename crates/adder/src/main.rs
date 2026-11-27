@@ -17,7 +17,7 @@ use blip::input::{
 };
 use blip::macroquad::input::KeyCode;
 use blip::macroquad::texture::Texture2D;
-use blip::{
+use blip::{Shake,
     play_sfx, web, window_conf, Blip, BlipColor, Jukebox, Timer,
     GAME_OVER_MIN_WAIT, BLIP_BLACK, BLIP_RED, BLIP_WHITE,
 };
@@ -43,12 +43,12 @@ struct Game {
     humans: usize,
     /// Player two pressed J and joins at the first moment the pit lets them (not between rounds).
     p2_waiting: bool,
-    /// Seconds of screen shake left after a person's viper goes out (see OUT_SHAKE).
-    shake: f32,
+    /// The pit shakes as a person's viper goes out (see OUT_SHAKE).
+    shake: Shake,
 }
 
-/// A person's viper going out shakes the pit this long, up to 4 px.
-const OUT_SHAKE: f32 = 0.3;
+/// A person's viper going out shakes the pit 0.3 s, up to 4 px.
+const OUT_SHAKE: Shake = Shake::new(0.3, 4.0);
 
 impl Game {
     fn new() -> Self {
@@ -59,7 +59,7 @@ impl Game {
             timer: Timer::default(),
             humans: 1,
             p2_waiting: false,
-            shake: 0.0,
+            shake: OUT_SHAKE,
         }
     }
 
@@ -163,7 +163,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             Event::Die { human } => {
                 play_sfx(&sfx.game_over);
                 web::haptic();
-                if human { g.shake = OUT_SHAKE; }
+                if human { g.shake.start(); }
             }
         }
     }
@@ -213,10 +213,10 @@ async fn main() {
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title => draw_title(&blip, &g, &pit),
-            State::Play => blip.shaken(g.shake, OUT_SHAKE, 4.0, || draw_play(&blip, &g, &pit)),
+            State::Play => blip.shaken(&g.shake, || draw_play(&blip, &g, &pit)),
             State::Over => draw_over(&blip, &g),
         }
-        g.shake = (g.shake - dt).max(0.0);
+        g.shake.tick(dt);
 
         blip.next_frame().await;
     }
@@ -347,12 +347,4 @@ fn draw_over(blip: &Blip, g: &Game) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn each_seat_has_distinct_join_and_turn_keys() {
-        assert_eq!(seat_keys(0), [BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_SPACE]);
-        assert_eq!(seat_keys(1), [BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_J]);
-    }
-}
+mod tests;

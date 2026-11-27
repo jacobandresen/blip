@@ -304,7 +304,7 @@ pub(crate) struct Game {
     /// How the CPU means to fight this round (plan.rs), picked at the bell.
     pub(crate) cpu_style: Plan,
     /// Held so a punch and a kick pressed together read as one input
-    /// rather than two — see read_special(). One per player: shared,
+    /// rather than two — see keys.rs human_input. One per player: shared,
     /// each player's punch armed the other player's special.
     pub(crate) punch_at: [f32; 2],
     pub(crate) kick_at: [f32; 2],

@@ -5,7 +5,7 @@ use std::f32::consts::PI;
 use blip::color::*;
 use blip::input::{coin_start, key_active, key_pressed, play_again, Stick, BLIP_KEY_BUTTON2, BLIP_KEY_SPACE};
 use blip::macroquad::texture::Texture2D;
-use blip::{
+use blip::{Shake,
     hsv,
     Jukebox, pool_iter, pool_iter_mut, pool_spawn, play_sfx, rand_int, rand_range_f32, web, window_conf, Blip, Fx,
     BlipColor, LifeResult, Session, Timer, segment_circle_overlap, wrap, BLIP_WHITE, BLIP_SEA,
@@ -17,6 +17,12 @@ use blip::{
 mod tunes;
 mod bot;
 mod levels;
+mod draw;
+mod rocks;
+mod saucer;
+use rocks::*;
+use saucer::*;
+use draw::*;
 
 use levels::*;
 
@@ -210,8 +216,8 @@ struct Game {
     wave_t: f32,
     fx: Fx,
     crystals: Vec<Crystal>,
-    /// Seconds of screen shake left (see SHIP_SHAKE).
-    shake: f32,
+    /// The screen shakes as the ship goes (see SHIP_SHAKE).
+    shake: Shake,
 }
 
 impl Game {
@@ -234,7 +240,7 @@ impl Game {
             wave_t: 0.0,
             fx: Fx::new(),
             crystals: Vec::new(),
-            shake: 0.0,
+            shake: SHIP_SHAKE,
         }
     }
 
@@ -288,54 +294,7 @@ fn field_centre() -> (f32, f32) {
     (PLAY_W as f32 / 2.0, PLAY_Y0 + PLAY_H as f32 / 2.0)
 }
 
-/// A point at least SAFE_RADIUS from (cx, cy), measured across the wrap.
-fn find_clear_spot(cx: f32, cy: f32) -> (f32, f32) {
-    let (w, h) = (PLAY_W as f32, PLAY_H as f32);
-    loop {
-    let x = rand_range_f32(0.0, w);
-    let y = rand_range_f32(PLAY_Y0, PLAY_Y0 + h);
-        let dx = (x - cx).abs().min(w - (x - cx).abs());
-        let dy = (y - cy).abs().min(h - (y - cy).abs());
-        if dx * dx + dy * dy > SAFE_RADIUS * SAFE_RADIUS {
-            return (x, y);
-        }
-    }
-}
-
-/// A rock's speed for its size, in any direction.
-fn random_velocity(size: ASize) -> (f32, f32) {
-    let (smin, smax) = size.speed_range();
-    let speed = rand_range_f32(smin, smax);
-    let dir = rand_range_f32(0.0, PI * 2.0);
-    (dir.cos() * speed, dir.sin() * speed)
-}
-
-fn spawn_rock(g: &mut Game, x: f32, y: f32, size: ASize, vx: f32, vy: f32) {
-    let mut jag = [1.0f32; 10];
-    for j in jag.iter_mut() { *j = rand_range_f32(0.75, 1.25); }
-    pool_spawn(&mut g.asteroids, Asteroid {
-        active: true, x, y,
-        vx, vy,
-        size, rot: rand_range_f32(0.0, PI * 2.0),
-        spin: rand_range_f32(-1.5, 1.5),
-        jag,
-    });
-}
-
-/// Fragments leave along opposite sides of a random axis, on top of the
-/// parent's velocity (plus a share of the impactor's), so momentum carries through.
-fn split_rock(g: &mut Game, x: f32, y: f32, size: ASize, pvx: f32, pvy: f32) {
-    let Some(child) = size.child() else { return };
-    let axis = rand_range_f32(0.0, PI * 2.0);
-    let (ax, ay) = (axis.cos(), axis.sin());
-    let (smin, smax) = child.speed_range();
-    for sign in [1.0_f32, -1.0] {
-        let kick = rand_range_f32(smin, smax) * 0.6;
-        spawn_rock(g, x + ax * sign * 6.0, y + ay * sign * 6.0, child,
-            pvx + ax * sign * kick, pvy + ay * sign * kick);
-    }
-}
-
+/// `n` shards, up to `len` long, thrown from (`x`, `y`) at up to `speed`, carrying half the velocity of what broke.
 #[allow(clippy::too_many_arguments)]
 fn burst(g: &mut Game, x: f32, y: f32, vx: f32, vy: f32, n: usize, len: f32, speed: f32, color: BlipColor) {
     for _ in 0..n {
@@ -397,30 +356,6 @@ fn wrapped_motion_overlap(
     false
 }
 
-/// Saucers spawn more often, shoot more often, and skew toward the harder
-/// "small" variant as the level climbs, so late levels keep escalating even
-/// after the asteroid count itself caps out.
-fn saucer_spawn_range(level: i32) -> (f32, f32) {
-    let lv = (level - 1).min(6) as f32;
-    ((SAUCER_SPAWN_MIN - lv * 0.6).max(4.0), (SAUCER_SPAWN_MAX - lv * 1.2).max(8.0))
-}
-
-fn saucer_fire_cooldown(level: i32) -> f32 {
-    let lv = (level - 1).min(6) as f32;
-    (SAUCER_FIRE_CD - lv * 0.12).max(0.7)
-}
-
-fn spawn_saucer(g: &mut Game) {
-    let small_prob = (0.33 + (g.sess.level - 1) as f32 * 0.05).min(0.75);
-    let big = g.sess.score < 5000 || rand_range_f32(0.0, 1.0) > small_prob;
-    let from_left = rand_int(0, 1) == 0;
-    let x = if from_left { -20.0 } else { PLAY_W as f32 + 20.0 };
-    let y = rand_range_f32(PLAY_Y0 + 40.0, PLAY_Y0 + PLAY_H as f32 - 40.0);
-    let vx = if from_left { SAUCER_SPEED } else { -SAUCER_SPEED };
-    let fire_cd = saucer_fire_cooldown(g.sess.level);
-    g.saucer = Saucer { active: true, x, y, vx, wave_t: 0.0, fire_t: fire_cd * 0.5, big };
-}
-
 /// Where a jump lands: clear space, so the gamble is the 1-in-N blow-up, not
 /// a rock, the saucer or a saucer's shot the player could not see.
 fn landing_spot(g: &Game) -> (f32, f32) {
@@ -451,11 +386,11 @@ fn hyperspace(g: &mut Game, sfx: &Sounds) {
     }
 }
 
-/// The ship's loss shakes the screen this long, up to 6 px.
-const SHIP_SHAKE: f32 = 0.4;
+/// The ship's loss shakes the screen 0.4 s, up to 6 px.
+const SHIP_SHAKE: Shake = Shake::new(0.4, 6.0);
 
 fn kill_ship(g: &mut Game, sfx: &Sounds) {
-    g.shake = SHIP_SHAKE;
+    g.shake.start();
     if !g.ship_alive { return; }
     play_sfx(&sfx.ship_boom);
     g.ship_alive = false;
@@ -537,257 +472,104 @@ fn fire_shot(g: &mut Game, dt: f32, sfx: &Sounds) {
 fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) {
     // At 0.6 volume: the chime comes often, and its jingle peaks as loud as a level clear.
     if let Some(m) = g.streak.risen() { blip::audio::play_sfx_volume(&sfx.streak_up[(m as usize - 2).min(2)], 0.6); }
-    let ship_before = (g.ship.x, g.ship.y);
-    let mut ship_delta = (0.0, 0.0);
-    let mut ship_teleported = false;
+    let mut ship = Sweep { from: (g.ship.x, g.ship.y), delta: (0.0, 0.0), jumped: false };
     if g.ship_alive {
-        ship_delta = fly_ship(g, dt, sfx, thrust_snd_t);
+        ship.delta = fly_ship(g, dt, sfx, thrust_snd_t);
         fire_shot(g, dt, sfx);
         if key_pressed(BLIP_KEY_BUTTON2) {
             hyperspace(g, sfx);
-            ship_delta = (0.0, 0.0);
-            ship_teleported = true;
+            ship.delta = (0.0, 0.0);
+            ship.jumped = true;
         }
         if g.invuln_t > 0.0 { g.invuln_t -= dt; }
     }
 
-    let asteroids_before: [bool; MAX_ASTEROIDS] =
-        std::array::from_fn(|i| g.asteroids[i].active);
-    let saucer_before = (g.saucer.x, g.saucer.y);
-    let saucer_was_active = g.saucer.active;
-    let bullet_starts: [(f32, f32); MAX_BULLETS] =
-        std::array::from_fn(|i| (g.bullets[i].x, g.bullets[i].y));
-    let bullets_before: [bool; MAX_BULLETS] =
-        std::array::from_fn(|i| g.bullets[i].active);
+    let rocks_before: [bool; MAX_ASTEROIDS] = std::array::from_fn(|i| g.asteroids[i].active);
+    let saucer_before = g.saucer.active.then_some((g.saucer.x, g.saucer.y));
+    let shot_starts: [Option<(f32, f32)>; MAX_BULLETS] =
+        std::array::from_fn(|i| g.bullets[i].active.then_some((g.bullets[i].x, g.bullets[i].y)));
     update_world(g, dt, sfx);
 
-    // ---- enemy bullets / asteroids / saucer vs ship ----
-    if g.ship_alive && g.invuln_t <= 0.0 {
-        for bi in 0..MAX_BULLETS {
-            if !g.bullets[bi].active || g.bullets[bi].from_player { continue; }
-            let (bx, by) = (g.bullets[bi].x, g.bullets[bi].y);
-            let hit = if ship_teleported || !bullets_before[bi] {
-                segment_circle_overlap(bx, by, bx, by, g.ship.x, g.ship.y, SHIP_RADIUS)
-            } else {
-                let start = bullet_starts[bi];
-                let bullet_delta = (g.bullets[bi].vx * dt, g.bullets[bi].vy * dt);
-                let from = (start.0 - ship_before.0, start.1 - ship_before.1);
-                let to = (from.0 + bullet_delta.0 - ship_delta.0,
-                          from.1 + bullet_delta.1 - ship_delta.1);
-                segment_circle_overlap(from.0, from.1, to.0, to.1, 0.0, 0.0, SHIP_RADIUS)
-            };
-            if hit {
-                g.bullets[bi].active = false;
-                blip::bot::add("death_saucer_shot", 1.0);
-                kill_ship(g, sfx);
-                break;
-            }
-        }
-    }
+    let open = |g: &Game| g.ship_alive && g.invuln_t <= 0.0;
+    if open(g) { shot_down(g, dt, sfx, &ship, &shot_starts); }
     expire_enemy_bullets(g);
-    if g.ship_alive && g.invuln_t <= 0.0 {
-        // `ai` pairs the asteroid slot with whether it was active at frame start.
-        for (ai, was) in asteroids_before.iter().enumerate() {
-            if !*was || !g.asteroids[ai].active { continue; }
-            let r = g.asteroids[ai].size.radius();
-            if wrapped_motion_overlap(
-                (g.ship.x, g.ship.y),
-                (g.asteroids[ai].x, g.asteroids[ai].y),
-                ship_delta,
-                (g.asteroids[ai].vx * dt, g.asteroids[ai].vy * dt),
-                r + SHIP_RADIUS,
-            ) {
-                let a = g.asteroids[ai];
-                g.asteroids[ai].active = false;
-                let c = rock_color(&a, g.sess.level, blip::now());
-                burst(g, a.x, a.y, a.vx, a.vy, 6, a.size.radius() * 0.5, 70.0, c);
-                split_rock(g, a.x, a.y, a.size, a.vx, a.vy);
-                blip::bot::add("death_rock", 1.0);
-                kill_ship(g, sfx);
-                break;
+    if open(g) { rammed_by_rock(g, dt, sfx, &ship, &rocks_before); }
+    if open(g) && g.saucer.active { rammed_by_saucer(g, sfx, &ship, saucer_before); }
+}
+
+/// How the ship moved this frame: from where, by how much, and whether it jumped through hyperspace.
+struct Sweep { from: (f32, f32), delta: (f32, f32), jumped: bool }
+
+/// A saucer's shot that meets the ship, swept with it through the frame (one fired this frame, or a ship just out of
+/// hyperspace, from where they are now).
+fn shot_down(g: &mut Game, dt: f32, sfx: &Sounds, ship: &Sweep, starts: &[Option<(f32, f32)>; MAX_BULLETS]) {
+    for (bi, start) in starts.iter().enumerate() {
+        let b = g.bullets[bi];
+        if !b.active || b.from_player { continue; }
+        let hit = match *start {
+            Some(start) if !ship.jumped => {
+                let from = (start.0 - ship.from.0, start.1 - ship.from.1);
+                let to = (from.0 + b.vx * dt - ship.delta.0, from.1 + b.vy * dt - ship.delta.1);
+                segment_circle_overlap(from.0, from.1, to.0, to.1, 0.0, 0.0, SHIP_RADIUS)
             }
-        }
-    }
-    if g.ship_alive && g.invuln_t <= 0.0 && g.saucer.active {
-        let r = saucer_radius(g.saucer.big);
-        let hit = if saucer_was_active {
-            wrapped_motion_overlap(
-                (g.ship.x, g.ship.y),
-                (g.saucer.x, g.saucer.y),
-                ship_delta,
-                (g.saucer.x - saucer_before.0, g.saucer.y - saucer_before.1),
-                r + SHIP_RADIUS,
-            )
-        } else {
-            let dx = g.ship.x - g.saucer.x;
-            let dy = g.ship.y - g.saucer.y;
-            dx * dx + dy * dy <= (r + SHIP_RADIUS) * (r + SHIP_RADIUS)
+            _ => segment_circle_overlap(b.x, b.y, b.x, b.y, g.ship.x, g.ship.y, SHIP_RADIUS),
         };
         if hit {
-            g.saucer.active = false;
-            let (sx, sy) = (g.saucer.x, g.saucer.y);
-            burst(g, sx, sy, g.saucer.vx, 0.0, 6, r, 90.0, BLIP_HEART);
-            blip::bot::add("death_saucer_ram", 1.0);
+            g.bullets[bi].active = false;
+            blip::bot::add("death_saucer_shot", 1.0);
             kill_ship(g, sfx);
+            return;
         }
     }
 }
 
-/// The saucer crosses on a wave, firing at the ship (the big one wildly, the
-/// small one true); when gone, the next is on its way.
-fn fly_saucer(g: &mut Game, dt: f32) {
-    if g.saucer.active {
-        g.saucer.x += g.saucer.vx * dt;
-        g.saucer.wave_t += dt;
-        g.saucer.y += (g.saucer.wave_t * 2.0).sin() * 24.0 * dt;
-        g.saucer.fire_t -= dt;
-        if g.saucer.fire_t <= 0.0 && g.ship_alive {
-            let dx = g.ship.x - g.saucer.x;
-            let dy = g.ship.y - g.saucer.y;
-            let spread = if g.saucer.big { 0.35 } else { 0.04 };
-            let jitter = rand_range_f32(-spread, spread);
-            let base = dy.atan2(dx) + jitter;
-            let speed = 260.0;
-            spawn_bullet(&mut g.bullets, g.saucer.x, g.saucer.y, base.cos() * speed, base.sin() * speed, false);
-            g.saucer.fire_t = saucer_fire_cooldown(g.sess.level);
-        }
-        if g.saucer.x < -40.0 || g.saucer.x > PLAY_W as f32 + 40.0 {
-            g.saucer.active = false;
-        }
-    } else {
-        g.saucer_cd -= dt;
-        if g.saucer_cd <= 0.0 {
-            spawn_saucer(g);
-            let (lo, hi) = saucer_spawn_range(g.sess.level);
-            g.saucer_cd = rand_range_f32(lo, hi);
-        }
+/// A rock (one there when the frame began) that the ship flies into: it breaks up as the ship does.
+fn rammed_by_rock(g: &mut Game, dt: f32, sfx: &Sounds, ship: &Sweep, before: &[bool; MAX_ASTEROIDS]) {
+    for (ai, was) in before.iter().enumerate() {
+        let a = g.asteroids[ai];
+        if !*was || !a.active { continue; }
+        if !wrapped_motion_overlap((g.ship.x, g.ship.y), (a.x, a.y), ship.delta, (a.vx * dt, a.vy * dt), a.size.radius() + SHIP_RADIUS) { continue; }
+        g.asteroids[ai].active = false;
+        let c = rock_color(&a, g.sess.level, blip::now());
+        burst(g, a.x, a.y, a.vx, a.vy, 6, a.size.radius() * 0.5, 70.0, c);
+        split_rock(g, a.x, a.y, a.size, a.vx, a.vy);
+        blip::bot::add("death_rock", 1.0);
+        kill_ship(g, sfx);
+        return;
     }
+}
+
+/// The ship and the saucer collide, swept together through the frame (a saucer new this frame, where it is).
+fn rammed_by_saucer(g: &mut Game, sfx: &Sounds, ship: &Sweep, before: Option<(f32, f32)>) {
+    let r = saucer_radius(g.saucer.big) + SHIP_RADIUS;
+    let (sx, sy) = (g.saucer.x, g.saucer.y);
+    let hit = match before {
+        Some(s0) => wrapped_motion_overlap((g.ship.x, g.ship.y), (sx, sy), ship.delta, (sx - s0.0, sy - s0.1), r),
+        None => (g.ship.x - sx).powi(2) + (g.ship.y - sy).powi(2) <= r * r,
+    };
+    if !hit { return; }
+    g.saucer.active = false;
+    burst(g, sx, sy, g.saucer.vx, 0.0, 6, saucer_radius(g.saucer.big), 90.0, BLIP_HEART);
+    blip::bot::add("death_saucer_ram", 1.0);
+    kill_ship(g, sfx);
 }
 
 fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.fx.update(dt);
     g.wave_t += dt;
-    let asteroids_at_frame_start: [bool; MAX_ASTEROIDS] =
-        std::array::from_fn(|i| g.asteroids[i].active);
-    let saucer_at_frame_start = (g.saucer.x, g.saucer.y);
-    let saucer_was_active = g.saucer.active;
-    let bullet_starts: [(f32, f32); MAX_BULLETS] = std::array::from_fn(|i| {
-        (g.bullets[i].x, g.bullets[i].y)
-    });
-    let mut player_bullet_expired = [false; MAX_BULLETS];
-    for (i, b) in g.bullets.iter_mut().enumerate() {
-        if !b.active { continue; }
-        b.x += b.vx * dt;
-        b.y += b.vy * dt;
-        b.ttl -= dt;
-        // The ship's shots wrap like everything else in the field, so a rock
-        // across the edge can be hit; the saucer's leave, or they would come
-        // back from behind with no warning.
-        if b.from_player {
-            b.x = wrap(b.x, 0.0, PLAY_W as f32);
-            b.y = wrap(b.y, PLAY_Y0, PLAY_Y0 + PLAY_H as f32);
-        }
-        // The saucer's go in expire_enemy_bullets.
-        if b.from_player && b.ttl <= 0.0 {
-            player_bullet_expired[i] = true;
-        }
-    }
-
-    for d in pool_iter_mut(&mut g.debris) {
-        d.x += d.vx * dt;
-        d.y += d.vy * dt;
-        d.rot += d.spin * dt;
-        d.ttl -= dt;
-        if d.ttl <= 0.0 { d.active = false; }
-    }
-
-    for a in pool_iter_mut(&mut g.asteroids) {
-        a.x = wrap(a.x + a.vx * dt, 0.0, PLAY_W as f32);
-        a.y = wrap(a.y + a.vy * dt, PLAY_Y0, PLAY_Y0 + PLAY_H as f32);
-        a.rot += a.spin * dt;
-    }
-
+    let rocks_at_start: [bool; MAX_ASTEROIDS] = std::array::from_fn(|i| g.asteroids[i].active);
+    let saucer_start = g.saucer.active.then_some((g.saucer.x, g.saucer.y));
+    let bullet_starts: [(f32, f32); MAX_BULLETS] = std::array::from_fn(|i| (g.bullets[i].x, g.bullets[i].y));
+    let spent = move_bullets(g, dt);
+    drift_field(g, dt);
     fly_saucer(g, dt);
     collect_crystals(g, dt, sfx);
+    shoot_rocks(g, dt, sfx, &rocks_at_start);
+    if g.saucer.active { shoot_saucer(g, dt, sfx, &bullet_starts, saucer_start); }
 
-    // ---- collisions: player bullets vs asteroids ----
-    for bi in 0..MAX_BULLETS {
-        if !g.bullets[bi].active || !g.bullets[bi].from_player { continue; }
-        for (ai, was) in asteroids_at_frame_start.iter().enumerate() {
-            if !*was || !g.asteroids[ai].active { continue; }
-            let r = g.asteroids[ai].size.radius();
-            if wrapped_motion_overlap(
-                (g.bullets[bi].x, g.bullets[bi].y),
-                (g.asteroids[ai].x, g.asteroids[ai].y),
-                (g.bullets[bi].vx * dt, g.bullets[bi].vy * dt),
-                (g.asteroids[ai].vx * dt, g.asteroids[ai].vy * dt),
-                r,
-            ) {
-                g.bullets[bi].active = false;
-                let a = g.asteroids[ai];
-                let size = a.size;
-                // A share of the bullet's momentum goes into the fragments.
-                let (pvx, pvy) = (a.vx + g.bullets[bi].vx * 0.04, a.vy + g.bullets[bi].vy * 0.04);
-                g.asteroids[ai].active = false;
-                let c = rock_color(&a, g.sess.level, blip::now());
-                burst(g, a.x, a.y, a.vx, a.vy, 5, size.radius() * 0.5, 60.0, c);
-                let times = g.streak.hit();
-                let pts = size.points() * times;
-                if times > 1 { g.fx.popup(a.x, a.y - 10.0, &format!("{pts} X{times}"), BLIP_GOLD); }
-                award(g, sfx, pts);
-                blip::bot::add(if size == ASize::Small { "rocks_dust" } else { "rocks_split" }, 1.0);
-                match size {
-                    ASize::Large  => play_sfx(&sfx.bang_large),
-                    ASize::Medium => play_sfx(&sfx.bang_medium),
-                    ASize::Small  => play_sfx(&sfx.bang_small),
-                }
-                split_rock(g, a.x, a.y, size, pvx, pvy);
-                if size != ASize::Small && g.crystals.len() < MAX_CRYSTALS && rand_range_f32(0.0, 1.0) < CRYSTAL_ODDS {
-                    g.crystals.push(Crystal { x: a.x, y: a.y, vx: pvx * 0.3, vy: pvy * 0.3, ttl: CRYSTAL_TTL });
-                }
-                break;
-            }
-        }
-    }
-
-    // ---- player bullets vs saucer ----
-    if g.saucer.active {
-        // `bi` pairs the bullet slot with its swept start.
-        for (bi, s0) in bullet_starts.iter().enumerate() {
-            if !g.bullets[bi].active || !g.bullets[bi].from_player { continue; }
-            let from = *s0;
-            let to = (from.0 + g.bullets[bi].vx * dt, from.1 + g.bullets[bi].vy * dt);
-            let r = saucer_radius(g.saucer.big);
-            let hit = if saucer_was_active {
-                wrapped_motion_overlap(
-                    (g.bullets[bi].x, g.bullets[bi].y),
-                    (g.saucer.x, g.saucer.y),
-                    (g.bullets[bi].vx * dt, g.bullets[bi].vy * dt),
-                    (g.saucer.x - saucer_at_frame_start.0, g.saucer.y - saucer_at_frame_start.1),
-                    r,
-                )
-            } else {
-                wrapped_segment_circle_overlap(from, to, (g.saucer.x, g.saucer.y), r)
-            };
-            if hit {
-                g.bullets[bi].active = false;
-                g.saucer.active = false;
-                blip::bot::add("saucers", 1.0);
-                let (sx, sy, svx) = (g.saucer.x, g.saucer.y, g.saucer.vx);
-                burst(g, sx, sy, svx, 0.0, 6, r, 90.0, BLIP_HEART);
-                let times = g.streak.hit();
-                let pts = if g.saucer.big { 200 } else { 1000 } * times;
-                g.fx.popup(sx, sy - 14.0, &if times > 1 { format!("{pts} X{times}") } else { format!("{pts}") }, BLIP_GOLD);
-                award(g, sfx, pts);
-                if g.saucer.big { play_sfx(&sfx.saucer_big); } else { play_sfx(&sfx.saucer_small); }
-                break;
-            }
-        }
-    }
-
-    for (i, &expired) in player_bullet_expired.iter().enumerate() {
+    for (i, &spent) in spent.iter().enumerate() {
         // A shot that runs out without hitting anything breaks the run.
-        if expired && g.bullets[i].active { g.bullets[i].active = false; g.streak.miss(); }
+        if spent && g.bullets[i].active { g.bullets[i].active = false; g.streak.miss(); }
     }
 
     if pool_iter(&g.asteroids).count() == 0 {
@@ -799,6 +581,26 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
             g.fx.ring(g.ship.x, g.ship.y, 90.0, 0.5, BLIP_WHITE);
         }
     }
+}
+
+/// Every shot flies on; which of the ship's ran out (they may still hit something this frame).
+fn move_bullets(g: &mut Game, dt: f32) -> [bool; MAX_BULLETS] {
+    let mut spent = [false; MAX_BULLETS];
+    for (i, b) in g.bullets.iter_mut().enumerate() {
+        if !b.active { continue; }
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        b.ttl -= dt;
+        // The ship's shots wrap like everything else in the field, so a rock
+        // across the edge can be hit; the saucer's leave, or they would come
+        // back from behind with no warning (they go in expire_enemy_bullets).
+        if b.from_player {
+            b.x = wrap(b.x, 0.0, PLAY_W as f32);
+            b.y = wrap(b.y, PLAY_Y0, PLAY_Y0 + PLAY_H as f32);
+            spent[i] = b.ttl <= 0.0;
+        }
+    }
+    spent
 }
 
 /// Crystals drift and fade; the ship flying through one takes its points.
@@ -861,407 +663,6 @@ fn update_over(g: &mut Game, dt: f32) {
     if play_again(&mut g.respawn_t, dt) { g.start_game(); }
 }
 
-fn draw_ship(blip: &Blip, ship: &Ship, invuln_t: f32, level: i32, color: BlipColor) {
-    if invuln_t > 0.0 && (invuln_t * 10.0) as i32 % 2 == 0 { return; }
-    let a = ship.angle;
-    let fwd = (a.sin(), -a.cos());
-    let side = (a.cos(), a.sin());
-    let nose = (ship.x + fwd.0 * 14.0, ship.y + fwd.1 * 14.0);
-    let left = (ship.x - fwd.0 * 10.0 - side.0 * 9.0, ship.y - fwd.1 * 10.0 - side.1 * 9.0);
-    let right = (ship.x - fwd.0 * 10.0 + side.0 * 9.0, ship.y - fwd.1 * 10.0 + side.1 * 9.0);
-    let tail = (ship.x - fwd.0 * 4.0, ship.y - fwd.1 * 4.0);
-    let hull = [(nose, left), (left, tail), (tail, right), (right, nose)];
-    for (back, age) in smear_echoes(blip, level) {
-        let (dx, dy) = (ship.vx * back, ship.vy * back);
-        for (p, q) in hull {
-            smear_line(blip, (p, q), ((p.0 - dx, p.1 - dy), (q.0 - dx, q.1 - dy)), age, color);
-        }
-    }
-    if ship.thrusting {
-        let flick = rand_range_f32(0.5, 1.0);
-        let flame = (ship.x - fwd.0 * (10.0 + 10.0 * flick), ship.y - fwd.1 * (10.0 + 10.0 * flick));
-        let (l, r) = ((tail.0 * 0.4 + left.0 * 0.6, tail.1 * 0.4 + left.1 * 0.6), (tail.0 * 0.4 + right.0 * 0.6, tail.1 * 0.4 + right.1 * 0.6));
-        outlined_shape(blip, tail, &[l, flame, r], BLIP_GOLD, 1.5);
-    }
-    outlined_shape(blip, (ship.x, ship.y), &[nose, left, tail, right], color, 2.0);
-    // The canopy.
-    blip.fill_circle(ship.x + fwd.0 * 3.0, ship.y + fwd.1 * 3.0, 2.5, BLIP_INK);
-    blip.fill_circle(ship.x + fwd.0 * 3.0 - 0.5, ship.y + fwd.1 * 3.0 - 0.5, 1.5, BLIP_SEA);
-}
-
-// Line smearing and rock colours increase by wave; flowers appear from wave 3.
-
-type Seg = ((f32, f32), (f32, f32));
-
-/// A filled shape in the blip look: an ink rim `rim` thick (round at the corners), the body, and a lit patch
-/// toward the top left. `pts` go round `centre` in order.
-fn outlined_shape(blip: &Blip, centre: (f32, f32), pts: &[(f32, f32)], fill: BlipColor, rim: f32) {
-    let n = pts.len();
-    for i in 0..n {
-        let (p, q) = (pts[i], pts[(i + 1) % n]);
-        blip.draw_line_ex(p.0, p.1, q.0, q.1, rim * 2.0, BLIP_INK);
-        blip.fill_circle(p.0, p.1, rim, BLIP_INK);
-    }
-    // The shaded side, then the face shifted toward the light, which leaves a dark crescent at the bottom right.
-    blip.fill_fan(centre, pts, blip::shade(fill, 0.68));
-    let lit: Vec<(f32, f32)> = pts.iter()
-        .map(|&(x, y)| (centre.0 + (x - centre.0) * 0.82 - 1.5, centre.1 + (y - centre.1) * 0.82 - 1.5)).collect();
-    blip.fill_fan((centre.0 - 1.5, centre.1 - 1.5), &lit, fill);
-}
-
-/// The echoes a moving line leaves, oldest first: how many seconds back each
-/// one stands, and how bright it is for its age. Both grow with the wave.
-fn smear_echoes(blip: &Blip, level: i32) -> impl Iterator<Item = (f32, f32)> {
-    // A device already short of frame time gets four at most.
-    let n = (1 + level).min(if blip.low_power() { 4 } else { SMEAR_ECHOES });
-    let reach = (SMEAR_REACH * (1 + level) as f32).min(SMEAR_REACH_MAX);
-    (1..=n).rev().map(move |e| (reach * e as f32 / n as f32, 1.0 - (e - 1) as f32 / n as f32))
-}
-
-/// One echo of a line: where it was `then`, lit only by how far it has come
-/// since. What moves fast streaks; what stands still stays a sharp line.
-fn smear_line(blip: &Blip, now: Seg, then: Seg, age: f32, c: BlipColor) {
-    let dist = |a: (f32, f32), b: (f32, f32)| ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt();
-    let moved = (dist(now.0, then.0) + dist(now.1, then.1)) * 0.5;
-    if moved < SMEAR_STILL { return; }
-    let lit = ((moved - SMEAR_STILL) / SMEAR_FULL).min(1.0) * age;
-    blip.draw_line_ex(then.0.0, then.0.1, then.1.0, then.1.1, 1.0, BlipColor { a: SMEAR_ALPHA * lit, ..c });
-}
-
-/// A rock's own fixed random number, 0..1, from its shape.
-fn rock_seed(a: &Asteroid, k: usize) -> f32 { (a.jag[k] * 7.13).fract() }
-
-/// A rock's colour: wave 1's purple, fanning out round the rainbow wave by
-/// wave, and drifting from wave 4.
-fn rock_color(a: &Asteroid, level: i32, t: f32) -> BlipColor {
-    if level <= 1 { return BLIP_PLUM; }
-    let spread = (0.18 * (level - 1) as f32).min(1.0);
-    let drift = if level >= 4 { t * 0.04 * (level - 3) as f32 } else { 0.0 };
-    hsv(0.76 + (rock_seed(a, 3) - 0.5) * spread + drift, 0.5, 0.82, 1.0)
-}
-
-/// From wave 3 a growing share of the rocks are flowers: a quarter, half,
-/// three quarters, then nine in ten.
-fn is_flower(a: &Asteroid, level: i32) -> bool {
-    rock_seed(a, 5) < ((level - 2) as f32 * 0.25).clamp(0.0, 0.9)
-}
-
-/// A rock's outline round its own centre, as it is turned now: a flower's
-/// petals (the same size as the rock it stands for) or the jagged ring.
-fn outline(a: &Asteroid, flower: bool) -> Vec<Seg> {
-    let r = a.size.radius();
-    if flower {
-        let petals = 5 + (rock_seed(a, 1) * 3.0) as usize;
-        (0..petals * 10).map(|i| {
-            let (uy, ux) = (a.rot + (i / 10) as f32 / petals as f32 * PI * 2.0).sin_cos();
-            let pt = |k: usize| {
-                let (ty, tx) = (k as f32 / 10.0 * PI * 2.0).sin_cos();
-                let (ex, ey) = (r * (0.55 + 0.45 * tx), r * 0.22 * ty);
-                (ux * ex - uy * ey, uy * ex + ux * ey)
-            };
-            (pt(i % 10), pt(i % 10 + 1))
-        }).collect()
-    } else {
-        let n = a.jag.len();
-        let pt = |k: usize| {
-            let (s, c) = (a.rot + (k % n) as f32 / n as f32 * PI * 2.0).sin_cos();
-            (c * r * a.jag[k % n], s * r * a.jag[k % n])
-        };
-        (0..n).map(|i| (pt(i), pt(i + 1))).collect()
-    }
-}
-
-/// A mushroom in thin lines, its cap `w` to each side, leaning by `lean`.
-fn draw_mushroom(blip: &Blip, x: f32, y: f32, w: f32, lean: f32, c: BlipColor) {
-    let (s, k) = lean.sin_cos();
-    let at = |px: f32, py: f32| (x + (px * k - py * s) * w, y + (px * s + py * k) * w);
-    let line = |p: (f32, f32), q: (f32, f32)| blip.draw_line_ex(p.0, p.1, q.0, q.1, 1.5, c);
-    // part of an ellipse, from angle `a0` to `a1`, in `n` lines
-    let arc = |cx: f32, cy: f32, rx: f32, ry: f32, a0: f32, a1: f32, n: usize| {
-        let pt = |j: usize| {
-            let (sn, cs) = (a0 + (a1 - a0) * j as f32 / n as f32).sin_cos();
-            at(cx + cs * rx, cy + sn * ry)
-        };
-        for j in 0..n { line(pt(j), pt(j + 1)); }
-    };
-    arc(0.0, -0.2, 1.0, 0.85, PI, PI * 2.0, 12); // the cap
-    arc(0.0, -0.2, 1.0, 0.18, 0.0, PI, 8);       // its underside
-    line(at(-0.26, -0.03), at(-0.36, 0.9));      // the stalk
-    line(at(0.26, -0.03), at(0.36, 0.9));
-    arc(0.0, 0.9, 0.36, 0.1, 0.0, PI, 5);
-    for (sx, sy, sr) in [(-0.45, -0.58, 0.16), (0.1, -0.75, 0.2), (0.55, -0.45, 0.12)] {
-        arc(sx, sy, sr, sr * 0.8, 0.0, PI * 2.0, 8);
-    }
-}
-
-/// A thread from `p` to `q`, shading from `c0` to `c1`: a faint bowed line
-/// with a brighter pulse `pulse` of the way along it.
-#[allow(clippy::too_many_arguments)]
-fn draw_thread(blip: &Blip, p: (f32, f32), q: (f32, f32), bow: f32, pulse: f32, c0: BlipColor, c1: BlipColor, a: f32) {
-    const N: usize = 14;
-    let (dx, dy) = (q.0 - p.0, q.1 - p.1);
-    let at = |u: f32| {
-        let b = 4.0 * u * (1.0 - u) * bow;
-        (p.0 + dx * u - dy * b, p.1 + dy * u + dx * b)
-    };
-    for j in 0..N {
-        let u = j as f32 / N as f32;
-        let (m, n) = (at(u), at(u + 1.0 / N as f32));
-        let lit = 1.0 + 2.0 * (1.0 - ((u - pulse).abs() * 6.0).min(1.0));
-        let mix = |x: f32, y: f32| x + (y - x) * u;
-        blip.draw_line(m.0, m.1, n.0, n.1,
-            BlipColor { r: mix(c0.r, c1.r), g: mix(c0.g, c1.g), b: mix(c0.b, c1.b), a: a * lit });
-    }
-}
-
-/// Green and purple patches behind the field, a mushroom at the heart of
-/// each, coming and going on clocks of their own; by HAZE_FULL_WAVE little
-/// black is left. From wave 3 threads join the mushrooms, later the rocks.
-fn draw_haze(blip: &Blip, blot: &Texture2D, rocks: &[Asteroid], level: i32, t: f32) {
-    let full = ((level - 1) as f32 / (HAZE_FULL_WAVE - 1) as f32).clamp(0.0, 1.0);
-    let patch = |i: usize| {
-        let k = i as f32;
-        let x = PLAY_W as f32 * (0.5 + 0.45 * (t * (0.05 + 0.011 * k) + k * 2.4).sin());
-        let y = PLAY_Y0 + PLAY_H as f32 * (0.5 + 0.45 * (t * (0.04 + 0.013 * k) + k * 1.7).cos());
-        let r = 200.0 + 70.0 * (k * 1.3).sin();
-        // squared, so on the early waves each is gone a while between showings
-        let fade = (0.5 + 0.5 * (t * (0.21 + 0.03 * k) + k * 1.9).sin()).powi(2);
-        (x, y, r, 0.7 * full + (1.0 - 0.7 * full) * fade, if i.is_multiple_of(2) { BLIP_LEAF } else { BLIP_PLUM })
-    };
-    for i in 0..HAZES {
-        let (x, y, r, fade, c) = patch(i);
-        let r = r * (1.0 + 0.6 * full);
-        // purple is the darker of the two to the eye, so it is laid on thicker
-        let a = (HAZE_ALPHA + (HAZE_ALPHA_MAX - HAZE_ALPHA) * full) * if i % 2 == 0 { 1.0 } else { 1.5 };
-        blip.draw_texture_tinted(blot, x - r, y - r, r * 2.0, r * 2.0, BlipColor { a: a * fade, ..c });
-    }
-    if level >= THREAD_WAVE {
-        let grown = ((level - THREAD_WAVE) as f32 / THREAD_WAVES as f32).min(1.0);
-        let a = THREAD_ALPHA + (THREAD_ALPHA_MAX - THREAD_ALPHA) * grown;
-        // from the foot of the stalk
-        let foot = |i: usize| { let (x, y, r, fade, c) = patch(i); ((x, y + r * 0.13), fade, c) };
-        for i in 0..HAZES {
-            let k = i as f32;
-            let (p, fade, c) = foot(i);
-            // each to the next, and two waves on to one across the ring as well
-            for (n, step) in [1, 3].into_iter().enumerate().take(if level >= THREAD_WAVE + 2 { 2 } else { 1 }) {
-                let (q, fade2, c2) = foot((i + step) % HAZES);
-                let bow = 0.12 * (t * 0.3 + k + n as f32 * 2.0).sin();
-                draw_thread(blip, p, q, bow, (t * 0.15 + k * 0.37 + n as f32 * 0.5).fract(), c, c2, a * fade.min(fade2));
-            }
-            if level < THREAD_ROCK_WAVE { continue; }
-            let near = pool_iter(rocks)
-                .map(|rock| (rock, (rock.x - p.0).hypot(rock.y - p.1)))
-                .filter(|&(_, d)| d < THREAD_REACH)
-                .min_by(|m, n| m.1.total_cmp(&n.1));
-            if let Some((rock, d)) = near {
-                // thinning out as the rock gets away
-                let hold = (1.0 - d / THREAD_REACH) * 0.6;
-                draw_thread(blip, p, (rock.x, rock.y), 0.1 * (t * 0.4 + k).sin(), (t * 0.3 + k * 0.61).fract(),
-                    c, rock_color(rock, level, t), a * fade * hold);
-            }
-        }
-    }
-    for i in 0..HAZES {
-        let (x, y, r, fade, c) = patch(i);
-        let a = SHROOM_ALPHA + (SHROOM_ALPHA_MAX - SHROOM_ALPHA) * full;
-        let lean = 0.12 * (t * 0.5 + i as f32).sin();
-        draw_mushroom(blip, x, y, r * 0.14, lean, BlipColor { a: a * fade, ..c });
-    }
-}
-
-fn draw_rock(blip: &Blip, a: &Asteroid, level: i32, t: f32) {
-    let c = rock_color(a, level, t);
-    let flower = is_flower(a, level);
-    let lines = outline(a, flower);
-    let at = |p: (f32, f32)| (a.x + p.0, a.y + p.1);
-    for (back, age) in smear_echoes(blip, level) {
-        // Where the rock was: drifted back, and turned back about its centre.
-        let (ox, oy) = (a.x - a.vx * back, a.y - a.vy * back);
-        let (s, k) = (-a.spin * back).sin_cos();
-        let was = |p: (f32, f32)| (ox + p.0 * k - p.1 * s, oy + p.0 * s + p.1 * k);
-        // A flower's echoes are drawn at half the outline's detail: two
-        // lines as one, which halves the busiest thing on a late wave.
-        for pair in lines.chunks(if flower { 2 } else { 1 }) {
-            let (p, q) = (pair[0].0, pair[pair.len() - 1].1);
-            smear_line(blip, (at(p), at(q)), (was(p), was(q)), age, c);
-        }
-    }
-    if !flower {
-        // A solid lump: ink rim, stone body, a lit face and two craters.
-        let pts: Vec<(f32, f32)> = lines.iter().map(|&(p, _)| at(p)).collect();
-        outlined_shape(blip, (a.x, a.y), &pts, c, 2.0);
-        let r = a.size.radius();
-        for (k, (dx, dy)) in [(0.3f32, 0.25f32), (-0.2, -0.35)].into_iter().enumerate() {
-            let (s, co) = (a.rot + k as f32).sin_cos();
-            let (x, y) = (a.x + (dx * co - dy * s) * r, a.y + (dx * s + dy * co) * r);
-            blip.fill_circle(x, y, r * 0.16, blip::shade(c, 0.7));
-        }
-    } else {
-        for &(p, q) in &lines {
-            let (p, q) = (at(p), at(q));
-            blip.draw_line_ex(p.0, p.1, q.0, q.1, 4.0, BLIP_INK);
-        }
-        for &(p, q) in &lines {
-            let (p, q) = (at(p), at(q));
-            blip.draw_line_ex(p.0, p.1, q.0, q.1, 2.0, c);
-        }
-        let heart = hsv(0.14 + rock_seed(a, 2) * 0.1, 0.7, 1.0, 1.0);
-        let hr = a.size.radius() * 0.2;
-        blip.fill_circle(a.x, a.y, hr + 2.0, BLIP_INK);
-        blip.fill_circle(a.x, a.y, hr, heart);
-    }
-}
-
-fn draw_saucer(blip: &Blip, s: &Saucer, level: i32) {
-    let r = saucer_radius(s.big);
-    // A shot is coming: the core lights up and swells just before it fires.
-    if s.fire_t < SAUCER_TELL {
-        let k = 1.0 - s.fire_t / SAUCER_TELL;
-        blip.fill_glow_circle(s.x, s.y, 2.0 + 4.0 * k, BLIP_HEART);
-    }
-    let w = r * 2.6;
-    let dw = r * 1.1;
-    let h = r * 0.5;
-    let hull = |x: f32, y: f32| [
-        (x - w / 2.0, y),
-        (x - dw / 2.0, y - h),
-        (x + dw / 2.0, y - h),
-        (x + w / 2.0, y),
-        (x + dw / 2.0, y + h),
-        (x - dw / 2.0, y + h),
-    ];
-    let pts = hull(s.x, s.y);
-    for (back, age) in smear_echoes(blip, level) {
-        let was = hull(s.x - s.vx * back, s.y - (s.wave_t * 2.0).sin() * 24.0 * back);
-        for i in 0..pts.len() {
-            let j = (i + 1) % pts.len();
-            smear_line(blip, (pts[i], pts[j]), (was[i], was[j]), age, BLIP_HEART);
-        }
-    }
-    blip.fill_circle(s.x, s.y - h, dw * 0.45 + 2.0, BLIP_INK);
-    blip.fill_circle(s.x, s.y - h, dw * 0.45, BLIP_SEA);
-    outlined_shape(blip, (s.x, s.y), &pts, BLIP_HEART, 2.0);
-    for k in [-1.0f32, 0.0, 1.0] {
-        blip.fill_rect(s.x + k * w * 0.25 - 1.0, s.y - 1.0, 2.0, 2.0, BLIP_GOLD);
-    }
-}
-
-/// A crystal: a turning diamond with a bright heart, blinking as it fades.
-fn draw_crystal(blip: &Blip, c: &Crystal, t: f32) {
-    if c.ttl < CRYSTAL_WARN && (c.ttl * 8.0) as i32 % 2 == 0 { return; }
-    let k = (t * 2.0).cos();
-    let pts: Vec<(f32, f32)> = [(0.0, -1.3), (1.0, 0.0), (0.0, 1.3), (-1.0, 0.0)].iter()
-        .map(|&(x, y)| (c.x + (x * k * 0.6 + 0.4 * x) * CRYSTAL_R, c.y + y * CRYSTAL_R)).collect();
-    outlined_shape(blip, (c.x, c.y), &pts, BLIP_SEA, 1.5);
-    blip.fill_circle(c.x - 1.0, c.y - 2.0, 1.5 + (t * 6.0).sin().abs() * 1.0, BLIP_CREAM);
-}
-
-/// Three layers of stars drifting at different speeds, the near ones brighter, each twinkling: depth and motion
-/// behind an otherwise black wave 1. Placed by a hash, so the game's random numbers are untouched.
-fn draw_stars(blip: &Blip, t: f32) {
-    for i in 0..110u32 {
-        let h = i.wrapping_mul(0x9E37_79B9).rotate_left(7).wrapping_mul(0x85EB_CA6B);
-        let layer = (h % 3) as f32;
-        let speed = 3.0 + layer * 5.0;
-        let x = wrap((h >> 4) as f32 % PLAY_W as f32 + t * speed, 0.0, PLAY_W as f32);
-        let y = wrap((h >> 14) as f32 % PLAY_H as f32 + t * speed * 0.4, 0.0, PLAY_H as f32) + PLAY_Y0;
-        let tw = 0.6 + 0.4 * (t * (1.0 + layer) + i as f32 * 1.7).sin();
-        let a = (0.28 + layer * 0.2) * tw;
-        let s = if layer == 2.0 { 2.0 } else { 1.0 };
-        blip.fill_rect(x, y, s, s, BlipColor { a, ..BLIP_CREAM });
-    }
-}
-
-fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
-    let t = blip::now();
-    blip.clear(BLIP_NIGHT);
-    draw_stars(blip, t);
-    draw_haze(blip, blot, &g.asteroids, g.sess.level, t);
-    for a in pool_iter(&g.asteroids) { draw_rock(blip, a, g.sess.level, t); }
-    for d in pool_iter(&g.debris) {
-        let h = d.len * 0.5;
-        let col = BlipColor { a: d.ttl / d.ttl0, ..d.color };
-        let shard = |back: f32| {
-            let (x, y) = (d.x - d.vx * back, d.y - d.vy * back);
-            let (s, c) = (d.rot - d.spin * back).sin_cos();
-            ((x - c * h, y - s * h), (x + c * h, y + s * h))
-        };
-        let (p, q) = shard(0.0);
-        // no echo from before the burst
-        for (back, age) in smear_echoes(blip, g.sess.level).filter(|e| e.0 < d.ttl0 - d.ttl) {
-            smear_line(blip, (p, q), shard(back), age, col);
-        }
-        blip.draw_line_ex(p.0, p.1, q.0, q.1, 2.0, col);
-    }
-    if g.saucer.active { draw_saucer(blip, &g.saucer, g.sess.level); }
-    for c in &g.crystals { draw_crystal(blip, c, t); }
-    g.fx.draw(blip);
-    if g.wave_t < WAVE_BANNER_SECS && g.state == State::Play {
-        let a = (1.0 - g.wave_t / WAVE_BANNER_SECS).min(0.5) * 2.0;
-        blip.draw_message(&format!("WAVE {}", g.sess.level), (WIN_W / 2) as f32, PLAY_Y0 + 134.0, 3.0, BLIP_GOLD, a);
-    }
-    for b in pool_iter(&g.bullets) {
-        // from wave 3 the ship's shots run through the rainbow
-        let c = if !b.from_player { BLIP_HEART }
-            else if g.sess.level >= 3 { hsv(t * 0.8 + b.x * 0.004, 0.6, 1.0, 1.0) } else { BLIP_GOLD };
-        // a shot's echoes are dots, back to the muzzle and no further
-        for (back, age) in smear_echoes(blip, g.sess.level).filter(|e| e.0 < BULLET_TTL - b.ttl) {
-            let (ex, ey) = (b.x - b.vx * back, b.y - b.vy * back);
-            // a shot's own echoes follow it round the wrap
-            let (ex, ey) = if b.from_player {
-                (wrap(ex, 0.0, PLAY_W as f32), wrap(ey, PLAY_Y0, PLAY_Y0 + PLAY_H as f32))
-            } else { (ex, ey) };
-            blip.fill_circle(ex, ey, 1.0, BlipColor { a: SMEAR_ALPHA * age, ..c });
-        }
-        if b.from_player {
-            blip.fill_circle(b.x, b.y, 3.5, BLIP_INK);
-            blip.fill_circle(b.x, b.y, 2.0, c);
-        } else {
-            // The saucer's shot is the one thing here that kills from afar:
-            // bigger, with a cream heart, so it reads over the haze.
-            blip.fill_circle(b.x, b.y, 5.0, BLIP_INK);
-            blip.fill_circle(b.x, b.y, 3.5, BLIP_HEART);
-            blip.fill_circle(b.x, b.y, 1.5, BLIP_CREAM);
-        }
-    }
-    if g.ship_alive {
-        draw_ship(blip, &g.ship, g.invuln_t, g.sess.level, BLIP_CREAM);
-    }
-    blip.draw_hud(g.sess.score, g.sess.lives);
-    blip.draw_hud_multiple(g.sess.score, g.streak.multiple());
-    // x=12 clears the shell's 3px canvas clip, which eats more of this wider canvas's units.
-    let lvl = format!("LEVEL {}", g.sess.level);
-    blip.draw_text_outlined(&lvl, 12.0, WIN_H as f32 - 22.0, 2.0, BLIP_CREAM, BLIP_INK);
-}
-
-fn draw_title(blip: &Blip, art: &[Texture2D; 3]) {
-    blip.clear(BLIP_NIGHT);
-    draw_stars(blip, blip::now());
-    blip.draw_logo("METEORS", (WIN_W / 2) as f32, (WIN_H / 4) as f32, 6.0, BLIP_PLUM);
-    // METEORS is sz=6 (42px tall) — clear its bottom by a real margin.
-    blip.draw_attract_bar();
-    // No touch surface here: a phone plays on the pad.
-    let keys = web::controls() == web::Controls::Keys;
-    blip.draw_start_prompt((WIN_H / 2) as f32);
-    let (l1, l2) = if keys { ("ARROWS/WASD ROTATE+THRUST", "SPACE FIRE  ·  Z HYPERSPACE") }
-        else { ("PAD TURNS   UP THRUSTS", "BUTTONS FIRE AND HYPERSPACE") };
-    blip.draw_panel(WIN_W as f32 * 0.12, (WIN_H * 2 / 3) as f32 - 14.0, WIN_W as f32 * 0.76, 66.0, 1.0);
-    blip.draw_centered(l1, (WIN_H * 2 / 3) as f32, 2.0, BLIP_CREAM);
-    blip.draw_centered(l2, (WIN_H * 2 / 3) as f32 + 24.0, 2.0, BLIP_CREAM);
-    let t = blip::now();
-    blip.draw_texture_cell(&art[0], 0, 1, 0, 1, 72.0, 558.0, 96.0, 96.0, t * 0.16);
-    blip.draw_texture_cell(&art[1], 0, 1, 0, 1, 528.0, 572.0, 64.0, 64.0, -t * 0.22);
-    blip.draw_texture_cell(&art[2], 0, 1, 0, 1,
-        316.0 + (t * 0.5).sin() * 12.0, 584.0, 48.0, 48.0, (t * 0.35).sin() * 0.12);
-}
-
-fn draw_over(blip: &Blip, score: i32, hi: i32, waiting: bool) {
-    blip.clear(BLIP_NIGHT);
-    draw_stars(blip, blip::now());
-    blip.draw_game_over(score, hi, BLIP_HEART, BLIP_SEA, BLIP_GOLD, !waiting);
-}
-
 fn conf() -> blip::macroquad::window::Conf {
     window_conf("METEORS", WIN_W, WIN_H)
 }
@@ -1316,110 +717,13 @@ async fn main() {
         match g.state {
             State::Title => draw_title(&blip, &title_art),
             State::Over  => draw_over(&blip, g.sess.score, web::high_score(), g.respawn_t.active()),
-            State::Play | State::Dead => blip.shaken(g.shake, SHIP_SHAKE, 6.0, || draw_play(&blip, &g, &blot)),
+            State::Play | State::Dead => blip.shaken(&g.shake, || draw_play(&blip, &g, &blot)),
         }
-        g.shake = (g.shake - dt).max(0.0);
+        g.shake.tick(dt);
 
         blip.next_frame().await;
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_wrapping_shot_hits_rocks_on_both_sides_of_the_seam() {
-        assert!(wrapped_segment_circle_overlap(
-            (PLAY_W as f32 - 3.0, 200.0),
-            (PLAY_W as f32 + 5.0, 200.0),
-            (2.0, 200.0),
-            4.0,
-        ));
-        assert!(wrapped_segment_circle_overlap(
-            (300.0, PLAY_Y0 + 3.0),
-            (300.0, PLAY_Y0 - 5.0),
-            (300.0, PLAY_Y0 + PLAY_H as f32 - 2.0),
-            4.0,
-        ));
-    }
-
-    #[test]
-    fn a_wrapping_shot_does_not_hit_through_the_middle_of_the_screen() {
-        assert!(!wrapped_segment_circle_overlap(
-            (PLAY_W as f32 - 3.0, 200.0),
-            (PLAY_W as f32 + 5.0, 200.0),
-            (PLAY_W as f32 / 2.0, 200.0),
-            4.0,
-        ));
-    }
-
-    fn rocks(g: &Game) -> Vec<ASize> {
-        g.asteroids.iter().filter(|a| a.active).map(|a| a.size).collect()
-    }
-
-    #[test]
-    fn a_jump_lands_clear_of_every_rock() {
-        let mut g = Game::new();
-        g.asteroids = [ASTEROID_OFF; MAX_ASTEROIDS];
-        for (x, y) in [(100.0, 150.0), (300.0, 300.0), (500.0, 200.0), (200.0, 400.0)] {
-            spawn_rock(&mut g, x, PLAY_Y0 + y - 100.0, ASize::Large, 0.0, 0.0);
-        }
-        for _ in 0..200 {
-            let (x, y) = landing_spot(&g);
-            for a in g.asteroids.iter().filter(|a| a.active) {
-                assert!((x - a.x).hypot(y - a.y) > a.size.radius() + SHIP_RADIUS,
-                    "landed on a rock at ({x}, {y})");
-            }
-        }
-    }
-
-    #[test]
-    fn a_jump_lands_clear_of_the_saucer() {
-        let mut g = Game::new();
-        g.asteroids = [ASTEROID_OFF; MAX_ASTEROIDS];
-        g.saucer = Saucer { active: true, x: PLAY_W as f32 / 2.0, y: PLAY_Y0 + PLAY_H as f32 / 2.0, vx: 0.0, wave_t: 0.0, fire_t: 9.0, big: true };
-        for _ in 0..200 {
-            let (x, y) = landing_spot(&g);
-            assert!((x - g.saucer.x).hypot(y - g.saucer.y) > saucer_radius(true) + SHIP_RADIUS, "landed on the saucer at ({x}, {y})");
-        }
-    }
-
-    #[test]
-    fn a_rock_splits_into_two_of_the_next_size_and_the_smallest_into_none() {
-        let mut g = Game::new();
-        g.asteroids = [ASTEROID_OFF; MAX_ASTEROIDS];
-        split_rock(&mut g, 300.0, 300.0, ASize::Large, 10.0, 0.0);
-        assert!(rocks(&g) == vec![ASize::Medium, ASize::Medium]);
-        g.asteroids = [ASTEROID_OFF; MAX_ASTEROIDS];
-        split_rock(&mut g, 300.0, 300.0, ASize::Small, 10.0, 0.0);
-        assert!(rocks(&g).is_empty());
-    }
-
-    #[test]
-    fn the_halves_fly_apart_on_top_of_the_parents_drift() {
-        let mut g = Game::new();
-        g.asteroids = [ASTEROID_OFF; MAX_ASTEROIDS];
-        split_rock(&mut g, 300.0, 300.0, ASize::Large, 40.0, -20.0);
-        let halves: Vec<_> = g.asteroids.iter().filter(|a| a.active).collect();
-        // Each half's kick is along the same axis, in opposite directions.
-        let k0 = (halves[0].vx - 40.0, halves[0].vy + 20.0);
-        let k1 = (halves[1].vx - 40.0, halves[1].vy + 20.0);
-        assert!(k0.0 * k1.0 + k0.1 * k1.1 < 0.0, "the halves should part");
-    }
-
-    #[test]
-    fn a_ship_and_rock_touching_across_the_edge_collide() {
-        let r = ASize::Large.radius() + SHIP_RADIUS;
-        assert!(wrapped_motion_overlap((2.0, 300.0), (PLAY_W as f32 - 2.0, 300.0), (0.0, 0.0), (0.0, 0.0), r));
-        assert!(!wrapped_motion_overlap((2.0, 300.0), (PLAY_W as f32 / 2.0, 300.0), (0.0, 0.0), (0.0, 0.0), r));
-    }
-
-    #[test]
-    fn saucers_come_and_shoot_more_often_each_level_down_to_a_floor() {
-        blip::testing::never_rises("saucer cooldown", 1..=8, saucer_fire_cooldown);
-        blip::testing::never_rises("saucer spawn", 1..=8, |l| saucer_spawn_range(l).0);
-        assert!(saucer_fire_cooldown(50) >= 0.7);
-        assert!(saucer_spawn_range(50).0 >= 4.0);
-    }
-}
+mod tests;

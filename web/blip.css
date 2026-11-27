@@ -1386,20 +1386,10 @@ canvas {
 :root[data-appstyle] #arcade-bezel { background: #000; border: 0; box-shadow: none; border-radius: 0; }
 :root[data-appstyle] #arcade-bezel::before, :root[data-appstyle] #arcade-bezel::after { display: none; }
 
-:root[data-appstyle] #marquee-bar {
-  background: rgba(22, 22, 24, .78);
-  -webkit-backdrop-filter: blur(20px) saturate(1.8); backdrop-filter: blur(20px) saturate(1.8);
-  border: 0; border-bottom: .5px solid rgba(255, 255, 255, .14); box-shadow: none;
-}
+:root[data-appstyle] #marquee-bar { background: rgba(22, 22, 24, .78); border: 0; }
 :root[data-appstyle] #marquee-bar::before, :root[data-appstyle] #marquee-bar::after { display: none; }
-:root[data-appstyle] #marquee-bar.jukebox-marquee #marquee-name {
-  background: none; border: 0; box-shadow: none; pointer-events: none;
-}
+:root[data-appstyle] #marquee-bar.jukebox-marquee #marquee-name { pointer-events: none; }
 :root[data-appstyle] #marquee-name::before { display: none; }
-:root[data-appstyle] #marquee-name::after {
-  content: attr(data-title);
-  font: 600 17px/1 var(--app-font); color: #fff; letter-spacing: -.01em;
-}
 /* Home: an app's back button, where the logo stands. */
 :root[data-appstyle] .blip-logo { display: none !important; }
 :root[data-appstyle] .app-back {
@@ -1414,15 +1404,7 @@ canvas {
 :root[data-appstyle] .app-back:active { opacity: .45; }
 :root[data-appstyle] .app-back:focus-visible { outline: 2px solid var(--app-tint); outline-offset: 2px; border-radius: 8px; }
 /* The controls card's "?" as an app's info button. */
-:root[data-appstyle] #card-button {
-  border: 1.5px solid var(--app-tint);   
-  font: 600 13px/1 var(--app-font); 
-}
-:root[data-appstyle] #card-button:hover, :root[data-appstyle][data-card] #card-button,
-:root[data-appstyle] body:has(#glcanvas) #card-button {
-  border-color: var(--app-tint); background: none; color: var(--app-tint); box-shadow: none; text-shadow: none;
-}
-:root[data-appstyle][data-card] #card-button { background: var(--app-tint); color: #fff; }
+:root[data-appstyle] #card-button { font: 600 13px/1 var(--app-font); }
 
 /* The launch screen: the icon on black while the game loads. */
 :root[data-appstyle] #loader { background: #000; gap: 28px; }
@@ -1521,7 +1503,6 @@ canvas {
   top: calc(env(safe-area-inset-top, 0px) + (var(--cabinet-fascia-height, 52px) - 44px) / 2) !important;
   height: 44px !important; min-height: 44px !important;
 }
-:root[data-appstyle] #marquee-name::after { order: 1; }
 :root[data-appstyle] #marquee-name[data-best]::before {
   display: block !important; order: 2; content: attr(data-best); max-width: 100%;
   font: 400 12px/1 var(--app-font); color: rgba(235, 235, 245, .6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

@@ -291,7 +291,10 @@ impl Magic {
             self.spawn(Kind::Mote, x + gen_range(-8.0, 8.0), y + gen_range(-8.0, 8.0), gen_range(-20.0, 20.0), gen_range(-60.0, -10.0), gen_range(0.6, 1.2), gen_range(1.2, 2.6), c);
         }
         for _ in 0..5 {
-            self.spawn(Kind::Smoke, x + gen_range(-6.0, 6.0), y + gen_range(-6.0, 6.0), gen_range(-10.0, 10.0), gen_range(-20.0, 0.0), gen_range(0.5, 0.9), gen_range(4.0, 7.0), BlipColor { r: 0.12, g: 0.12, b: 0.15, a: 0.22 });
+            let (sx, sy) = (x + gen_range(-6.0, 6.0), y + gen_range(-6.0, 6.0));
+            let (vx, vy) = (gen_range(-10.0, 10.0), gen_range(-20.0, 0.0));
+            let (life, size) = (gen_range(0.5, 0.9), gen_range(4.0, 7.0));
+            self.spawn(Kind::Smoke, sx, sy, vx, vy, life, size, BlipColor { r: 0.12, g: 0.12, b: 0.15, a: 0.22 });
         }
         self.wave(x, y, 44.0, 0.45, 3.0, c, false);
         self.flash(x, y, 150.0, 0.5, c);

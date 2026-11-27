@@ -7,6 +7,7 @@ pub const TUNE_FROM: [i32; 5] = [1, 3, 5, 7, 9];
 /// Where the snake is quick enough that surviving takes skill (a bot playthrough starts there).
 pub const FAST_LEVEL: i32 = 5;
 
+// Bonus fruit: worth five foods, somewhere else, and leaving; whether to go for it is the game's first real choice.
 pub const BONUS_EVERY: i32 = 3;
 pub const BONUS_TTL: f32 = 6.0;
 pub const BONUS_WARN: f32 = 2.0;

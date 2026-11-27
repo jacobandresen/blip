@@ -7,101 +7,109 @@ use super::*;
 /// What the CPU wants to do, decided on a delay that shortens with difficulty
 /// rather than every frame, so it reacts like a player and can be baited.
 pub(crate) fn cpu_think(g: &mut Game) -> CpuPlan {
-    let me = g.p[1];
-    let foe = g.p[0];
-    let dist = (foe.x - me.x).abs();
-    let roll = || (rand_int(0, 99) as f32) / 100.0;
-
+    let s = Sight::of(g);
     // Below zero on the dial it stands and thinks for some of its turns.
     if roll() < -g.difficulty { return CpuPlan::Wait; }
+    // Each step draws its numbers only if the one before it had no answer, in this order.
+    react(g, &s).or_else(|| follow_plan(g, &s)).or_else(|| close_in(g, &s)).unwrap_or_else(|| mix(g, &s))
+}
 
-    // Ranges come from the move table. "Kicking range" is the high kick's.
-    let kick_range = attack_range(&me, MoveId::HighKick);
-    let jab_range = attack_range(&me, MoveId::LowPunch);
-    // The high kick is the shortest kick; thrown from further out it hits
-    // nothing.
-    let high_range = attack_range(&me, MoveId::HighKick);
-    let foe_range = attack_range(&foe, MoveId::HighKick);
+/// A number in 0..1 from the game's dice.
+fn roll() -> f32 { rand_int(0, 99) as f32 / 100.0 }
 
+/// The two fighters as the CPU (player two) sees them, and the reaches it weighs. Ranges come from the move table;
+/// "kicking range" is the high kick's, the shortest kick: thrown from further out it hits nothing.
+#[derive(Clone, Copy)]
+struct Sight { me: Fighter, foe: Fighter, dist: f32, kick_range: f32, jab_range: f32, foe_range: f32 }
 
+impl Sight {
+    fn of(g: &Game) -> Sight {
+        let (me, foe) = (g.p[1], g.p[0]);
+        Sight {
+            me, foe,
+            dist: (foe.x - me.x).abs(),
+            kick_range: attack_range(&me, MoveId::HighKick),
+            jab_range: attack_range(&me, MoveId::LowPunch),
+            foe_range: attack_range(&foe, MoveId::HighKick),
+        }
+    }
+}
+
+/// What the foe is doing now, answered first: a rage jump coming down, a helpless foe, the laser from range, a
+/// jump-in, a blow on its way, a miss to punish, a guard to read.
+fn react(g: &Game, s: &Sight) -> Option<CpuPlan> {
+    let Sight { me, foe, dist, kick_range, jab_range, foe_range } = *s;
     // A rage jump is coming down: be off the floor when it lands. The better
     // the opponent, the more often it sees it.
     if foe.stomp && foe.airborne() && !me.airborne() {
-        return if roll() < 0.35 + 0.5 * g.difficulty { CpuPlan::Jump } else { CpuPlan::Wait };
+        return Some(if roll() < 0.35 + 0.5 * g.difficulty { CpuPlan::Jump } else { CpuPlan::Wait });
     }
-
     // Somebody who cannot move, wrapped up or seeing stars, is walked up to
     // and hit as hard as there is. (A flier keeps its kick, which is the laser.)
     if (foe.webbed > 0.0 || foe.dizzy > 0.0) && !foe.airborne() && !me.airborne() {
-        return if dist > high_range * 0.9 { CpuPlan::Approach }
+        return Some(if dist > kick_range * 0.9 { CpuPlan::Approach }
             else if me.flies() { CpuPlan::Attack(MoveId::HighPunch) }
-            else { CpuPlan::Attack(MoveId::HighKick) };
+            else { CpuPlan::Attack(MoveId::HighKick) });
     }
-
     // The one with the laser uses it from range: level from the ground, which
     // a crouch goes under, and from the air at whoever is sitting under it.
     if me.arch().special == Special::LaserVision && !me.airborne() && me.free()
         && dist > kick_range * 1.4 && roll() < 0.30 + 0.35 * g.difficulty {
-        return if foe.crouching() { CpuPlan::Jump } else { CpuPlan::Attack(MoveId::Special) };
+        return Some(if foe.crouching() { CpuPlan::Jump } else { CpuPlan::Attack(MoveId::Special) });
     }
-
-    // React to what they are doing, before deciding what to do.
+    // A jump-in is met on the way down: the uppercut if they are close enough to be under, the high kick if not.
     if foe.airborne() && dist < kick_range * 1.4 {
-        return if roll() < 0.4 + 0.5 * g.difficulty {
-            // Meet them on the way down: the uppercut if they are close
-            // enough to be under, the high kick if not.
+        return Some(if roll() < 0.4 + 0.5 * g.difficulty {
             if dist < attack_range(&me, MoveId::Uppercut) && !me.flies() { CpuPlan::Attack(MoveId::Uppercut) }
             else { CpuPlan::Attack(MoveId::HighKick) }
         } else {
             CpuPlan::Block
-        };
+        });
     }
     // The intercepting fist: DRAKE meets a blow still on its way out with a jab into it, as often as not,
     // where the others block. (Only while it is winding up: after that it is too late to beat it.)
-    if formless(me.who) && foe.act == Act::Attack && dist < jab_range * 1.1 && foe.t < foe.scaled(move_data(foe.mv)).startup * F * 0.6
-        && roll() < 0.35 + 0.3 * g.difficulty {
-        return CpuPlan::Attack(MoveId::LowPunch);
+    let winding_up = foe.t < foe.scaled(move_data(foe.mv)).startup * F * 0.6;
+    if formless(me.who) && foe.act == Act::Attack && dist < jab_range * 1.1 && winding_up && roll() < 0.35 + 0.3 * g.difficulty {
+        return Some(CpuPlan::Attack(MoveId::LowPunch));
     }
     if foe.act == Act::Attack && dist < foe_range * 1.2 {
         // Block 55–95% against heavy or knockdown moves, 22–42% against jabs.
         let scary = move_data(foe.mv).damage >= 10 || move_data(foe.mv).knockdown;
         let want = if scary { 0.55 + 0.4 * g.difficulty } else { 0.22 + 0.2 * g.difficulty };
-        if roll() < want { return CpuPlan::Block; }
+        if roll() < want { return Some(CpuPlan::Block); }
         // Not blocking means taking the turn back with the fastest thing
         // available, or a throw up close. (Retreating hands a rushing
         // opponent free ground.)
-        if dist <= throw_range(&me) && foe.throw_rest <= 0.0 { return CpuPlan::Attack(MoveId::Throw); }
-        if dist < jab_range { return CpuPlan::Attack(MoveId::LowPunch); }
+        if dist <= throw_range(&me) && foe.throw_rest <= 0.0 { return Some(CpuPlan::Attack(MoveId::Throw)); }
+        if dist < jab_range { return Some(CpuPlan::Attack(MoveId::LowPunch)); }
     }
     // They committed to something slow and it missed: take the turn.
     if foe.act == Act::Attack && foe.hit_done && dist < kick_range && roll() < 0.5 + 0.4 * g.difficulty {
-        return CpuPlan::Attack(MoveId::LowPunch);
+        return Some(CpuPlan::Attack(MoveId::LowPunch));
     }
-
     // Read the guard: without it a crouch-blocker took zero damage over a
     // full round.
-    if foe.act == Act::Block && dist < kick_range * 1.1 {
-        let read = roll() < 0.4 + 0.5 * g.difficulty;
-        if read {
-            return if dist <= throw_range(&me) && foe.throw_rest <= 0.0 {
-                CpuPlan::Attack(MoveId::Throw)  // nothing guards against this
-            } else if foe.crouch_block {
-                // A low guard loses to an overhead: the high kick (slow,
-                // readable) is preferred, the jump-in kept as the surprise.
-                if dist < high_range && roll() < 0.45 { CpuPlan::Attack(MoveId::HighKick) }
-                else { CpuPlan::Jump }
-            } else {
-                // A high guard loses to a low, and there are two of
-                // those as well: the sweep if it can afford the
-                // recovery, the quick one if it cannot.
-                if roll() < 0.6 { CpuPlan::Attack(MoveId::Sweep) }
-                else { CpuPlan::Attack(MoveId::LowKick) }
-            };
-        }
+    if foe.act == Act::Block && dist < kick_range * 1.1 && roll() < 0.4 + 0.5 * g.difficulty {
+        return Some(if dist <= throw_range(&me) && foe.throw_rest <= 0.0 {
+            CpuPlan::Attack(MoveId::Throw)  // nothing guards against this
+        } else if foe.crouch_block {
+            // A low guard loses to an overhead: the high kick (slow,
+            // readable) is preferred, the jump-in kept as the surprise.
+            if dist < kick_range && roll() < 0.45 { CpuPlan::Attack(MoveId::HighKick) } else { CpuPlan::Jump }
+        } else {
+            // A high guard loses to a low, and there are two of
+            // those as well: the sweep if it can afford the
+            // recovery, the quick one if it cannot.
+            if roll() < 0.6 { CpuPlan::Attack(MoveId::Sweep) } else { CpuPlan::Attack(MoveId::LowKick) }
+        });
     }
+    None
+}
 
-    // The round's plan, played as sharply as the dial allows: hardly at all on the first fight, seven
-    // turns in ten on the last. (At one in four there, the bot's rounds on fight 1 fell from 17-5 to 13-5; at this, 17-4.)
+/// The round's plan, played as sharply as the dial allows: hardly at all on the first fight, seven
+/// turns in ten on the last. (At one in four there, the bot's rounds on fight 1 fell from 17-5 to 13-5; at this, 17-4.)
+fn follow_plan(g: &Game, s: &Sight) -> Option<CpuPlan> {
+    let Sight { me, foe, dist, jab_range, .. } = *s;
     let sharp = (0.3 + 0.5 * g.difficulty).max(0.05);
     match g.cpu_style {
         // Spacing answers a foe who comes in: poke them as they step into it, or step back out of
@@ -109,58 +117,56 @@ pub(crate) fn cpu_think(g: &mut Game) -> CpuPlan {
         // stalemate in 75 of 336 test rounds).
         Plan::Spacing if dist > jab_range && room_behind(&me) && foe.act == Act::Walk => {
             let (poke, reach) = longest_poke(&me);
-            if dist < reach && roll() < sharp { return CpuPlan::Attack(poke); }
-            if dist < spacing_edge(&foe) - 20.0 { return CpuPlan::Retreat; }
+            if dist < reach && roll() < sharp { return Some(CpuPlan::Attack(poke)); }
+            if dist < spacing_edge(&foe) - 20.0 { return Some(CpuPlan::Retreat); }
+            None
         }
-        Plan::Zoning if dist > 160.0 => {
-            return if roll() < sharp { CpuPlan::Attack(MoveId::Special) }
-                else if dist > 380.0 { CpuPlan::Approach } else { CpuPlan::Wait };
-        }
-        Plan::JumpIn if (0.8..1.15).contains(&(dist / jump_travel(&me))) && roll() < sharp * 0.6 => {
-            return CpuPlan::Jump;
-        }
-        _ => {}
+        Plan::Zoning if dist > 160.0 => Some(if roll() < sharp { CpuPlan::Attack(MoveId::Special) }
+            else if dist > 380.0 { CpuPlan::Approach } else { CpuPlan::Wait }),
+        Plan::JumpIn if (0.8..1.15).contains(&(dist / jump_travel(&me))) && roll() < sharp * 0.6 => Some(CpuPlan::Jump),
+        _ => None,
     }
+}
 
+/// Out of reach: close the gap, or cross it.
+fn close_in(g: &Game, s: &Sight) -> Option<CpuPlan> {
+    let Sight { me, dist, kick_range, foe_range, .. } = *s;
     if dist > 230.0 {
         // Too far to do anything but close the gap — or throw something
         // that crosses it.
         if matches!(me.arch().special, Special::ChiBolt | Special::LaserVision) && roll() < 0.2 + 0.4 * g.difficulty {
-            return CpuPlan::Attack(MoveId::Special);
+            return Some(CpuPlan::Attack(MoveId::Special));
         }
-        return CpuPlan::Approach;
+        return Some(CpuPlan::Approach);
     }
-    if dist > kick_range * 1.25 {
-        // Jumping in is only worth it from outside their reach: into a
-        // poke it is a free knockdown for them.
-        if dist > foe_range * 1.3 && roll() < 0.10 + 0.14 * g.difficulty {
-            // Two ways in on one budget: the flying kick and the jump-in.
-            // Both on top of each other, a crouch-blocker never survived a
-            // round.
-            return if roll() < 0.35 {
-                CpuPlan::Attack(MoveId::FlyingKick)
-            } else {
-                CpuPlan::Jump
-            };
-        }
-        // Out-ranged, inside their reach and outside your own, the gap must
-        // be crossed, not walked. Without this Brutus landed nothing against
-        // a long-limbed poker; the charge and the jump-in cover ground.
-        if dist < foe_range * 1.15 && foe_range > kick_range * 1.1 {
-            return match roll() {
-                r if r < 0.34 => CpuPlan::Attack(MoveId::Special),
-                r if r < 0.48 => CpuPlan::Jump,
-                r if r < 0.60 => CpuPlan::Attack(MoveId::FlyingKick),
-                r if r < 0.88 => CpuPlan::Approach,
-                _ => CpuPlan::Block,
-            };
-        }
-        return CpuPlan::Approach;
+    if dist <= kick_range * 1.25 { return None; }
+    // Jumping in is only worth it from outside their reach: into a
+    // poke it is a free knockdown for them.
+    if dist > foe_range * 1.3 && roll() < 0.10 + 0.14 * g.difficulty {
+        // Two ways in on one budget: the flying kick and the jump-in.
+        // Both on top of each other, a crouch-blocker never survived a
+        // round.
+        return Some(if roll() < 0.35 { CpuPlan::Attack(MoveId::FlyingKick) } else { CpuPlan::Jump });
     }
+    // Out-ranged, inside their reach and outside your own, the gap must
+    // be crossed, not walked. Without this Brutus landed nothing against
+    // a long-limbed poker; the charge and the jump-in cover ground.
+    if dist < foe_range * 1.15 && foe_range > kick_range * 1.1 {
+        return Some(match roll() {
+            r if r < 0.34 => CpuPlan::Attack(MoveId::Special),
+            r if r < 0.48 => CpuPlan::Jump,
+            r if r < 0.60 => CpuPlan::Attack(MoveId::FlyingKick),
+            r if r < 0.88 => CpuPlan::Approach,
+            _ => CpuPlan::Block,
+        });
+    }
+    Some(CpuPlan::Approach)
+}
 
-    // In range, the mix is the personality: wide enough that no single answer
-    // covers it, weighted to the fighter. `r` shifts toward attacking when
-    // the opponent is nearly out, so the CPU can close a round.
+/// In range, the mix is the personality: wide enough that no single answer covers it, weighted to the fighter.
+fn mix(g: &Game, s: &Sight) -> CpuPlan {
+    let Sight { me, foe, dist, kick_range, jab_range, .. } = *s;
+    // `r` shifts toward attacking when the opponent is nearly out, so the CPU can close a round.
     let nearly_out = (foe.health as f32) < FIGHTERS[foe.who].health as f32 * 0.35;
     // Half the clock gone with both bars nearly full is a round the clock
     // will decide; force the issue, the same nudge as smelling a finish.
@@ -168,6 +174,8 @@ pub(crate) fn cpu_think(g: &mut Game) -> CpuPlan {
         && (foe.health as f32) > FIGHTERS[foe.who].health as f32 * 0.72
         && (me.health as f32) > FIGHTERS[me.who].health as f32 * 0.72;
     let r = if nearly_out || stalling { roll() * 0.7 } else { roll() };
+    let high_or_low = if dist < kick_range { CpuPlan::Attack(MoveId::HighKick) } else { CpuPlan::Attack(MoveId::LowKick) };
+    let may_throw = foe.throw_rest <= 0.0 && dist <= throw_range(&me);
 
     if dist >= jab_range {
         // At the edge of its reach: long pokes only, and the sweep is the
@@ -189,11 +197,11 @@ pub(crate) fn cpu_think(g: &mut Game) -> CpuPlan {
             _ if r < 0.11 => CpuPlan::Attack(MoveId::LowPunch),
             _ if r < 0.21 => CpuPlan::Attack(MoveId::HighPunch),
             _ if r < 0.31 => CpuPlan::Attack(MoveId::LowKick),
-            _ if r < 0.42 => if dist < high_range { CpuPlan::Attack(MoveId::HighKick) } else { CpuPlan::Attack(MoveId::LowKick) },
+            _ if r < 0.42 => high_or_low,
             _ if r < 0.50 => CpuPlan::Attack(MoveId::Sweep),
             _ if r < 0.57 && close => CpuPlan::Attack(MoveId::Uppercut),
             _ if r < 0.66 => CpuPlan::Attack(MoveId::Special),
-            _ if r < 0.73 && foe.throw_rest <= 0.0 && dist <= throw_range(&me) => CpuPlan::Attack(MoveId::Throw),
+            _ if r < 0.73 && may_throw => CpuPlan::Attack(MoveId::Throw),
             _ if r < 0.76 => CpuPlan::Jump,
             // The feint: a step out, to come straight back in on the next thought.
             _ if r < 0.83 => CpuPlan::Retreat,
@@ -209,10 +217,10 @@ pub(crate) fn cpu_think(g: &mut Game) -> CpuPlan {
             _ if r < 0.12 => CpuPlan::Attack(MoveId::LowPunch),
             _ if r < 0.20 => CpuPlan::Attack(MoveId::HighPunch),
             _ if r < 0.34 => CpuPlan::Attack(MoveId::LowKick),
-            _ if r < 0.56 => if dist < high_range { CpuPlan::Attack(MoveId::HighKick) } else { CpuPlan::Attack(MoveId::LowKick) },
+            _ if r < 0.56 => high_or_low,
             _ if r < 0.70 => CpuPlan::Attack(MoveId::Special),
             _ if r < 0.75 => CpuPlan::Attack(MoveId::Sweep),
-            _ if r < 0.80 && foe.throw_rest <= 0.0 && dist <= throw_range(&me) => CpuPlan::Attack(MoveId::Throw),
+            _ if r < 0.80 && may_throw => CpuPlan::Attack(MoveId::Throw),
             _ if r < 0.94 => CpuPlan::Block,
             _ => CpuPlan::Approach,
         };
@@ -239,10 +247,7 @@ pub(crate) fn cpu_think(g: &mut Game) -> CpuPlan {
         _ if r < fast_share => CpuPlan::Attack(MoveId::LowKick),
         _ if r < fast_share + 0.20 => CpuPlan::Attack(MoveId::Sweep),
         // Low or high: the guard can only be in one place.
-        _ if r < fast_share + 0.34 => {
-            if dist < high_range { CpuPlan::Attack(MoveId::HighKick) }
-            else { CpuPlan::Attack(MoveId::LowKick) }
-        }
+        _ if r < fast_share + 0.34 => high_or_low,
         _ if r < fast_share + 0.34 + special => CpuPlan::Attack(MoveId::Special),
         _ if r < fast_share + 0.34 + special + throw && foe.throw_rest <= 0.0 => CpuPlan::Attack(MoveId::Throw),
         _ if r < 0.94 => CpuPlan::Block,

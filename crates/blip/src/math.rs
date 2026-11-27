@@ -92,6 +92,14 @@ pub fn rand_int(lo: i32, hi: i32) -> i32 {
     macroquad::rand::gen_range(lo as i64, hi as i64 + 1) as i32
 }
 
+/// One of `items` at random, or None when there are none. It draws as `rand_int(0, len - 1)` does (nothing for
+/// a single item), so it can replace that index without moving the random numbers.
+#[cfg(feature = "engine")]
+pub fn rand_item<T: Copy>(items: &[T]) -> Option<T> {
+    if items.is_empty() { return None; }
+    Some(items[rand_int(0, items.len() as i32 - 1) as usize])
+}
+
 /// Axis-aligned bounding-box (AABB) overlap test.
 /// Returns true if rectangle 1 and rectangle 2 share any area.
 /// Both rectangles are specified as (x, y, width, height) with origin at top-left.

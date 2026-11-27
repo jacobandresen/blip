@@ -29,8 +29,7 @@ impl Plan {
         }
     }
     pub(crate) fn pick(f: &Fighter) -> Plan {
-        let open = Plan::open_to(f);
-        open[rand_int(0, open.len() as i32 - 1) as usize]
+        blip::rand_item(Plan::open_to(f)).unwrap_or(Plan::Pressure)
     }
     /// The same, from `salt` instead of the shared random numbers: a round starting must not draw on them, or
     /// every test that starts one shifts the numbers under a simulation running beside it.

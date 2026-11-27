@@ -8,7 +8,6 @@ use blip::wav::{
 use blip::Asset;
 use blip::cosy::SR;
 
-
 /// Plucked string using Karplus–Strong averaging; upper harmonics decay first.
 pub(super) fn pluck(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, rng: &mut Rng) {
     let freq = tame(freq);
@@ -777,8 +776,6 @@ pub const THROATS: [Throat; 6] = [
     Throat { f0: 105.0, size: 0.94 },
 ];
 
-
-
 /// The Colosseum's kitten, to the measure of a recorded kitten (20 ms frames): one tone that rises from 1250 Hz to
 /// 1550 in the first tenth of a second and glides down to 650, bright at the start (the 2nd to 4th harmonics as loud
 /// as the 1st, the "mi"), purer through the fall (the 2nd 10 to 20 dB down), opening a little at the end ("ow"), and
@@ -818,7 +815,6 @@ fn meow() -> Vec<i16> {
     hall(&mut buf, 0.25, 0.5);
     render(buf, 9_000.0)
 }
-
 
 /// A hall's tail: four feedback combs into an allpass, `secs` to die away 60 dB, mixed in at `wet`. The reference
 /// yells (dubbed in a studio) carry one: their floor between harmonics is 20 to 40 dB down, where a dry voice is 60.

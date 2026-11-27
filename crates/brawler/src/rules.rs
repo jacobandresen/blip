@@ -197,45 +197,9 @@ pub(crate) fn combo_scale(hits: i32) -> f32 {
 /// Act on this frame's input: turn, walk, crouch, jump, guard, or start (or
 /// buffer) an attack.
 pub(crate) fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
-    let toward = if f.facing > 0.0 { inp.right } else { inp.left };
-    if toward && !f.was_toward { f.parry_t = IMPACT_WINDOW; }
-    else if f.parry_t > 0.0 { f.parry_t -= dt; }
-    f.was_toward = toward;
-    if inp.down && !f.was_down { f.tap_down(); }
-    f.was_down = inp.down;
-
-    if f.buffer_t > 0.0 {
-        f.buffer_t -= dt;
-        if f.buffer_t <= 0.0 { f.buffered = None; }
-    }
-
-    // Flying: the stick steers, a button attacks from where he hangs.
-    if f.soaring() {
-        if f.act == Act::Attack { return; }
-        if let Some(id) = pressed_move(f, inp, close) {
-            f.vx = 0.0;
-            f.vy = 0.0;
-            f.start_attack(id);
-            return;
-        }
-        f.vx = if inp.left { -SOAR } else if inp.right { SOAR } else { 0.0 };
-        f.vy = if inp.up { -SOAR } else if inp.down { SOAR * 1.4 } else { 0.0 };
-        return;
-    }
-
-    // Start jump-in attacks here; the busy path below buffers grounded moves.
-    if f.airborne() && f.act == Act::Air {
-        if let Some(id) = air_move(f, inp) {
-            // Landing cancels unfinished attacks, so buffer moves that cannot start two frames early.
-            if f.air_time() >= (move_data(id).startup + 2.0) * F {
-                f.start_attack(id);
-            } else if let Some(g) = grounded_move(inp, close) {
-                f.buffered = Some(g);
-                f.buffer_t = BUFFER;
-            }
-        }
-        return;
-    }
+    read_taps(f, inp, dt);
+    if f.soaring() { return soar(f, inp, close); }
+    if f.airborne() && f.act == Act::Air { return jump_attack(f, inp, close); }
 
     // The second button of a special, a moment late: the attack the first
     // button began becomes the special, as long as it has not come out yet.
@@ -264,32 +228,73 @@ pub(crate) fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
 
     if let Some(id) = pressed_move(f, inp, close) { f.start_attack(id); return; }
 
-    let crouch = inp.down;
     // An airborne fighter has already committed; the jump is the
     // decision and only an attack is left.
     if f.airborne() { return; }
+    if inp.up { take_off(f, inp); } else { stand(f, inp, dt); }
+}
 
-    if inp.up && f.flies() {
+/// The taps the moves read: a fresh push toward opens the parry window, a fresh down counts toward the stance switch,
+/// and a buffered move runs out.
+fn read_taps(f: &mut Fighter, inp: Input, dt: f32) {
+    let toward = if f.facing > 0.0 { inp.right } else { inp.left };
+    if toward && !f.was_toward { f.parry_t = IMPACT_WINDOW; }
+    else if f.parry_t > 0.0 { f.parry_t -= dt; }
+    f.was_toward = toward;
+    if inp.down && !f.was_down { f.tap_down(); }
+    f.was_down = inp.down;
+
+    if f.buffer_t > 0.0 {
+        f.buffer_t -= dt;
+        if f.buffer_t <= 0.0 { f.buffered = None; }
+    }
+}
+
+/// Flying: the stick steers, a button attacks from where he hangs.
+fn soar(f: &mut Fighter, inp: Input, close: bool) {
+    if f.act == Act::Attack { return; }
+    if let Some(id) = pressed_move(f, inp, close) {
+        f.vx = 0.0;
+        f.vy = 0.0;
+        f.start_attack(id);
+        return;
+    }
+    f.vx = if inp.left { -SOAR } else if inp.right { SOAR } else { 0.0 };
+    f.vy = if inp.up { -SOAR } else if inp.down { SOAR * 1.4 } else { 0.0 };
+}
+
+/// In a jump: a jump-in attack starts here; the busy path buffers grounded moves.
+fn jump_attack(f: &mut Fighter, inp: Input, close: bool) {
+    let Some(id) = air_move(f, inp) else { return };
+    // Landing cancels unfinished attacks, so buffer moves that cannot start two frames early.
+    if f.air_time() >= (move_data(id).startup + 2.0) * F {
+        f.start_attack(id);
+    } else if let Some(g) = grounded_move(inp, close) {
+        f.buffered = Some(g);
+        f.buffer_t = BUFFER;
+    }
+}
+
+/// Up leaves the floor: a flyer rises straight up, anyone else jumps, drifting the way the stick leans.
+fn take_off(f: &mut Fighter, inp: Input) {
+    if f.flies() {
         f.vy = -SOAR;
         f.vx = 0.0;
-        f.y -= 0.5;
-        f.act = Act::Air;
-        f.t = 0.0;
-        return;
-    }
-    if inp.up {
+    } else {
         f.vy = JUMP_VY * f.arch().jump_scale;
         f.vx = if inp.left { -AIR_DRIFT } else if inp.right { AIR_DRIFT } else { 0.0 };
-        f.y -= 0.5; // leave the floor this frame so airborne() reads true
-        f.act = Act::Air;
-        f.t = 0.0;
-        return;
     }
+    f.y -= 0.5; // leave the floor this frame so airborne() reads true
+    f.act = Act::Air;
+    f.t = 0.0;
+}
 
+/// On the floor with nothing to start: block, crouch, walk or stand.
+fn stand(f: &mut Fighter, inp: Input, dt: f32) {
+    let crouch = inp.down;
     // Blocking is not a button: it is holding away, which means every
     // step backwards is already a block and retreating is never free.
-    let back = holding_back(inp, f.facing);
-    if back {
+    if holding_back(inp, f.facing) {
         f.act = Act::Block;
         f.crouch_block = crouch;
         f.t = 0.0;
@@ -313,6 +318,38 @@ pub(crate) fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
 
 /// Advance one fighter's physics and action timer.
 pub(crate) fn advance(f: &mut Fighter, dt: f32) {
+    wear_off(f, dt);
+    let from = f.t;
+    let was = f.stick_strike();
+    f.t += dt;
+    // A step forward into each new strike of the nunchaku (170 px/s, bled off by the slide: about 25 px).
+    if let Some((k, _)) = f.stick_strike() {
+        if was.map(|w| w.0) != Some(k) && !f.hit_done { f.vx = f.facing * 170.0; }
+    }
+    if f.act == Act::Bow && f.t >= BOW_TIME { f.act = Act::Idle; f.t = 0.0; }
+    // A long frame on a slow device can step clean over a two-frame active
+    // window; stop in it for this step so the hit is still tested.
+    if f.act == Act::Attack && !f.hit_done {
+        let m = f.scaled(move_data(f.mv));
+        let (start, end) = (m.startup * F, (m.startup + m.active) * F);
+        if from < start && f.t > end { f.t = (start + end) / 2.0; }
+    }
+    if f.cancel_t > 0.0 { f.cancel_t -= dt; }
+    if f.taunt > 0.0 { f.taunt -= dt; }
+    if f.airborne() || f.vy < 0.0 { fly(f, dt); }
+    // An attack that carries the body along the floor (the rush, a small
+    // fighter's lunge) slides, and the slide bleeds off so it ends.
+    if !f.airborne() && matches!(f.act, Act::Attack | Act::Knockdown) {
+        f.x += f.vx * dt;
+        f.vx *= 1.0 - (6.0 * dt).min(1.0);
+    }
+    run_out(f, dt);
+    note_handover(f, dt);
+}
+
+/// The clocks that run down by themselves: stumbles and staggers, a landing's give, a throw's rest, the daze, the
+/// stars, a web, and how long since each button.
+fn wear_off(f: &mut Fighter, dt: f32) {
     f.stumble = (f.stumble - dt).max(0.0);
     // A stagger wears off once the fighter is back on their feet.
     if f.act != Act::Hitstun && f.act != Act::Knockdown { f.stagger = (f.stagger - dt).max(0.0); }
@@ -332,67 +369,44 @@ pub(crate) fn advance(f: &mut Fighter, dt: f32) {
     }
     let level = if f.soaring() && f.act == Act::Air { (f.vx * f.facing / SOAR).clamp(0.0, 1.0) } else { 0.0 };
     f.soar += (level - f.soar) * (10.0 * dt).min(1.0);
+}
 
-    let from = f.t;
-    let was = f.stick_strike();
-    f.t += dt;
-    // A step forward into each new strike of the nunchaku (170 px/s, bled off by the slide: about 25 px).
-    if let Some((k, _)) = f.stick_strike() {
-        if was.map(|w| w.0) != Some(k) && !f.hit_done { f.vx = f.facing * 170.0; }
-    }
-    if f.act == Act::Bow && f.t >= BOW_TIME { f.act = Act::Idle; f.t = 0.0; }
-    // A long frame on a slow device can step clean over a two-frame active
-    // window; stop in it for this step so the hit is still tested.
-    if f.act == Act::Attack && !f.hit_done {
+/// Off the floor: a flier hangs where the stick left him (under the ceiling), everyone else falls, and lands.
+fn fly(f: &mut Fighter, dt: f32) {
+    if f.soaring() { f.vy = f.vy.max(-SOAR); } else { f.vy += GRAVITY * dt; }
+    f.y += f.vy * dt;
+    if f.soaring() && f.y < FLOOR_Y - CEILING { f.y = FLOOR_Y - CEILING; f.vy = 0.0; }
+    f.x += f.vx * dt;
+    if f.y < FLOOR_Y { return; }
+    f.y = FLOOR_Y;
+    // How hard they arrived, for the drawing.
+    f.land = LAND_ABSORB;
+    f.land_force = (f.vy / -JUMP_VY).clamp(0.25, 1.0);
+    f.vy = 0.0;
+    f.vx = 0.0;
+    // Landing cancels an air attack, except the flying kick: its
+    // recovery plays out on the ground, the price of the distance.
+    if f.act == Act::Attack && matches!(f.mv, MoveId::FlyingKick | MoveId::Uppercut) {
         let m = f.scaled(move_data(f.mv));
-        let (start, end) = (m.startup * F, (m.startup + m.active) * F);
-        if from < start && f.t > end { f.t = (start + end) / 2.0; }
+        let total = (m.startup + m.active + m.recovery) * F;
+        // Blocked or whiffed: at least this much left to pay.
+        // Connected: at most this much.
+        f.t = if f.mv == MoveId::Uppercut {
+            f.t.min(total - 8.0 * F)
+        } else if f.hit_clean {
+            f.t.max(total - FLY_HIT_LAG)
+        } else {
+            f.t.min(total - FLY_LAND_LAG)
+        };
+        f.hit_done = true; // it stops being an attack on contact with the floor
+    } else if f.act == Act::Air || f.act == Act::Attack {
+        f.act = Act::Idle;
+        f.t = 0.0;
     }
-    if f.cancel_t > 0.0 { f.cancel_t -= dt; }
-    if f.taunt > 0.0 { f.taunt -= dt; }
+}
 
-    if f.airborne() || f.vy < 0.0 {
-        // A flier hangs where the stick left him; everyone else falls.
-        if f.soaring() { f.vy = f.vy.max(-SOAR); } else { f.vy += GRAVITY * dt; }
-        f.y += f.vy * dt;
-        if f.soaring() && f.y < FLOOR_Y - CEILING { f.y = FLOOR_Y - CEILING; f.vy = 0.0; }
-        f.x += f.vx * dt;
-        if f.y >= FLOOR_Y {
-            f.y = FLOOR_Y;
-            // How hard they arrived, for the drawing.
-            f.land = LAND_ABSORB;
-            f.land_force = (f.vy / -JUMP_VY).clamp(0.25, 1.0);
-            f.vy = 0.0;
-            f.vx = 0.0;
-            // Landing cancels an air attack, except the flying kick: its
-            // recovery plays out on the ground, the price of the distance.
-            if f.act == Act::Attack && matches!(f.mv, MoveId::FlyingKick | MoveId::Uppercut) {
-                let m = f.scaled(move_data(f.mv));
-                let total = (m.startup + m.active + m.recovery) * F;
-                // Blocked or whiffed: at least this much left to pay.
-                // Connected: at most this much.
-                f.t = if f.mv == MoveId::Uppercut {
-                    f.t.min(total - 8.0 * F)
-                } else if f.hit_clean {
-                    f.t.max(total - FLY_HIT_LAG)
-                } else {
-                    f.t.min(total - FLY_LAND_LAG)
-                };
-                f.hit_done = true; // it stops being an attack on contact with the floor
-            } else if f.act == Act::Air || f.act == Act::Attack {
-                f.act = Act::Idle;
-                f.t = 0.0;
-            }
-        }
-    }
-
-    // An attack that carries the body along the floor (the rush, a small
-    // fighter's lunge) slides, and the slide bleeds off so it ends.
-    if !f.airborne() && matches!(f.act, Act::Attack | Act::Knockdown) {
-        f.x += f.vx * dt;
-        f.vx *= 1.0 - (6.0 * dt).min(1.0);
-    }
-
+/// An attack, a stun or a knockdown that has run its time hands back to standing.
+fn run_out(f: &mut Fighter, dt: f32) {
     match f.act {
         Act::Attack => {
             let m = f.scaled(move_data(f.mv));
@@ -425,8 +439,6 @@ pub(crate) fn advance(f: &mut Fighter, dt: f32) {
         }
         _ => {}
     }
-
-    note_handover(f, dt);
 }
 
 /// Capture the previous pose when an action changes, so drawing can blend across the handover.
@@ -507,38 +519,49 @@ pub(crate) fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: 
         attacker.hit_done = true;
     }
     if attacker.mv == MoveId::Throw { defender.throw_rest = THROW_REST; }
+    if parried(attacker, defender) || blocked(attacker, defender, hold, &m) { return (0, true, false); }
+    let (damage, floored) = land_blow(attacker, defender, &m);
+    (damage, false, floored)
+}
 
-    // The guard impact: the blow is turned and the attacker left open.
-    if defender.parry_t > 0.0 && !defender.airborne() && defender.free()
-        && !unblockable(attacker.mv) {
-        defender.parry_t = 0.0;
-        attacker.turned = true;
-        attacker.act = Act::Hitstun;
-        attacker.stun = IMPACT_STUN;
-        attacker.t = 0.0;
-        attacker.vx = 0.0;
-        return (0, true, false);
+/// The guard impact: a defender who pressed toward the blow just as it came (`parry_t`) turns it, and the attacker
+/// is left open.
+fn parried(attacker: &mut Fighter, defender: &mut Fighter) -> bool {
+    if defender.parry_t <= 0.0 || defender.airborne() || !defender.free() || unblockable(attacker.mv) { return false; }
+    defender.parry_t = 0.0;
+    attacker.turned = true;
+    attacker.act = Act::Hitstun;
+    attacker.stun = IMPACT_STUN;
+    attacker.t = 0.0;
+    attacker.vx = 0.0;
+    true
+}
+
+/// A blow guarded (see `guarding`) at its own height is blocked. A special still chips a little through it.
+fn blocked(attacker: &mut Fighter, defender: &mut Fighter, hold: Input, m: &MoveData) -> bool {
+    if !guarding(defender, hold) || unblockable(attacker.mv) || !blocks(m.level, defender.crouch_block || hold.down) { return false; }
+    // Blocked, the nunchaku's run is over: straight into the recovery.
+    if attacker.nunchaku() {
+        attacker.hit_done = true;
+        attacker.t = attacker.t.max((STICK_WHIRL + STICK_EVERY * STICK_STRIKES as f32) * F);
     }
+    defender.act = Act::Block;
+    defender.crouch_block = hold.down;
+    defender.stun = m.blockstun * F;
+    let chip = if attacker.mv == MoveId::Special { (m.damage / CHIP_DIVISOR).max(1) } else { 0 };
+    if chip > 0 && !defender.shelled() { defender.hurt(chip); }
+    true
+}
 
-    // A defender can only block on the ground, holding away, and not
-    // while already committed to something of their own.
-    let guarding = !defender.airborne()
-        && holding_back(hold, defender.facing)
-        && matches!(defender.act, Act::Idle | Act::Walk | Act::Crouch | Act::Block);
-    if guarding && !unblockable(attacker.mv) && blocks(m.level, defender.crouch_block || hold.down) {
-        // Blocked, the nunchaku's run is over: straight into the recovery.
-        if attacker.nunchaku() {
-            attacker.hit_done = true;
-            attacker.t = attacker.t.max((STICK_WHIRL + STICK_EVERY * STICK_STRIKES as f32) * F);
-        }
-        defender.act = Act::Block;
-        defender.crouch_block = hold.down;
-        defender.stun = m.blockstun * F;
-        let chip = if attacker.mv == MoveId::Special { (m.damage / CHIP_DIVISOR).max(1) } else { 0 };
-        if chip > 0 && !defender.shelled() { defender.hurt(chip); }
-        return (0, true, false);
-    }
+/// Whether a fighter is guarding against what is coming: on the ground, holding away, and not already committed to
+/// something of their own.
+pub(crate) fn guarding(f: &Fighter, hold: Input) -> bool {
+    !f.airborne() && holding_back(hold, f.facing) && matches!(f.act, Act::Idle | Act::Walk | Act::Crouch | Act::Block)
+}
 
+/// A clean hit: the damage (more for a counter, less deep in a combo), and the defender floored or rocked; the
+/// damage done and whether they went down.
+fn land_blow(attacker: &mut Fighter, defender: &mut Fighter, m: &MoveData) -> (i32, bool) {
     // Caught in the middle of their own attack, before its recovery.
     // (Their own timing: the laser's stare is longer than the table's special.)
     let theirs = defender.scaled(move_data(defender.mv));
@@ -564,44 +587,47 @@ pub(crate) fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: 
         attacker.vy = attacker.vy.max(0.0);
     }
     let floored = m.knockdown || attacker.epic_punch();
-    if floored || defender.airborne() {
-        defender.act = Act::Knockdown;
-        // Somebody DRAKE put down gets the thumb across the nose while they lie there (1.4 s, about their time down).
-        if formless(attacker.who) { attacker.taunt = 1.4; }
-        let one_inch = attacker.mv == MoveId::Special && attacker.special() == Special::OneInch;
-        defender.downed_by = if defender.airborne() { MoveId::LowPunch } else { attacker.mv };
-        defender.t = 0.0;
-        defender.vy = 0.0;
-        // The one-inch punch throws them back across the stage: 560 px/s bleeding off at 6 a second is about
-        // 90 px of slide, on top of the push every knockdown gets.
-        defender.vx = if one_inch {
-            attacker.facing * 560.0
-        } else { 0.0 };
-        defender.y = FLOOR_Y;
-    } else {
-        defender.act = Act::Hitstun;
-        defender.struck(if m.level == Level::Overhead { defender.height() } else { m.height }, damage);
-        defender.stun = m.hitstun * F + if counter { COUNTER_STUN } else { 0.0 };
-        defender.t = 0.0;
-        // The blow that finds a dizzy fighter wakes them; the one that fills
-        // the measure sends them off.
-        defender.daze += damage as f32;
-        if defender.dizzy > 0.0 {
-            defender.dizzy = 0.0;
-        } else if defender.daze >= DAZE_AT && !defender.dazed
-            && defender.health > 0 {
-            defender.dazed = true;
-            defender.daze = 0.0;
-            defender.dizzy = DIZZY_SECS;
-            defender.stun = DIZZY_SECS;
-        }
-        // A heavy clean blow rocks them: a stagger once the hitstun is over.
-        if damage >= STAGGER_FROM && defender.dizzy <= 0.0 && defender.health > 0 {
-            if defender.stagger <= 0.0 { blip::bot::add("staggers", 1.0); }
-            defender.stagger = STAGGER_SECS;
-        }
+    if floored || defender.airborne() { floor(attacker, defender); } else { rock(defender, m, damage, counter); }
+    (damage, floored)
+}
+
+/// Knocked down (anyone hit in the air is too).
+fn floor(attacker: &mut Fighter, defender: &mut Fighter) {
+    defender.act = Act::Knockdown;
+    // Somebody DRAKE put down gets the thumb across the nose while they lie there (1.4 s, about their time down).
+    if formless(attacker.who) { attacker.taunt = 1.4; }
+    let one_inch = attacker.mv == MoveId::Special && attacker.special() == Special::OneInch;
+    defender.downed_by = if defender.airborne() { MoveId::LowPunch } else { attacker.mv };
+    defender.t = 0.0;
+    defender.vy = 0.0;
+    // The one-inch punch throws them back across the stage: 560 px/s bleeding off at 6 a second is about
+    // 90 px of slide, on top of the push every knockdown gets.
+    defender.vx = if one_inch { attacker.facing * 560.0 } else { 0.0 };
+    defender.y = FLOOR_Y;
+}
+
+/// Rocked on their feet: hitstun (longer for a counter), the daze measure filling toward dizzy, and a stagger after
+/// a heavy clean blow.
+fn rock(defender: &mut Fighter, m: &MoveData, damage: i32, counter: bool) {
+    defender.act = Act::Hitstun;
+    defender.struck(if m.level == Level::Overhead { defender.height() } else { m.height }, damage);
+    defender.stun = m.hitstun * F + if counter { COUNTER_STUN } else { 0.0 };
+    defender.t = 0.0;
+    // The blow that finds a dizzy fighter wakes them; the one that fills
+    // the measure sends them off.
+    defender.daze += damage as f32;
+    if defender.dizzy > 0.0 {
+        defender.dizzy = 0.0;
+    } else if defender.daze >= DAZE_AT && !defender.dazed && defender.health > 0 {
+        defender.dazed = true;
+        defender.daze = 0.0;
+        defender.dizzy = DIZZY_SECS;
+        defender.stun = DIZZY_SECS;
     }
-    (damage, false, floored)
+    if damage >= STAGGER_FROM && defender.dizzy <= 0.0 && defender.health > 0 {
+        if defender.stagger <= 0.0 { blip::bot::add("staggers", 1.0); }
+        defender.stagger = STAGGER_SECS;
+    }
 }
 
 /// Judge both blows before either can interrupt the other: active windows trade.

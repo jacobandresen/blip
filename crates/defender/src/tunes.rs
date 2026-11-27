@@ -6,7 +6,6 @@ use blip::song::{Groove, Song, H, R};
 use blip::Asset;
 use blip::song::chords::{EM, AM, DM, B, E, C, D, F, G};
 
-
 /// The invasion: E minor, a march, the flat sixth (F) for the alien touch.
 pub fn invasion_song() -> Song<'static> {
     Song {
