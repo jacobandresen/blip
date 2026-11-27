@@ -48,6 +48,34 @@ impl Image {
         self.px[off + 3] = a;
     }
 
+    /// Rings every solid shape one pixel round in `ink` (the blip look's outline, `crate::look::INK`), on the
+    /// clear pixels beside it; leave the shape a pixel of room at the image's edge.
+    pub fn outline(&mut self, ink: [u8; 3]) {
+        let solid = |img: &Self, x: i32, y: i32| img.get(x, y)[3] > 127;
+        let ring: Vec<(i32, i32)> = (0..self.h as i32)
+            .flat_map(|y| (0..self.w as i32).map(move |x| (x, y)))
+            .filter(|&(x, y)| !solid(self, x, y) && [(-1, 0), (1, 0), (0, -1), (0, 1)].iter().any(|(dx, dy)| solid(self, x + dx, y + dy)))
+            .collect();
+        for (x, y) in ring {
+            self.set(x, y, ink[0], ink[1], ink[2]);
+        }
+    }
+
+    /// The blip message box (`Blip::draw_panel` at runtime) at (x, y), `w` by `h`: ink with cut corners and a
+    /// cream rim two pixels in, for build-time art.
+    pub fn panel(&mut self, x: i32, y: i32, w: i32, h: i32) {
+        let (ink, cream) = (crate::look::INK, crate::look::CREAM);
+        for py in y..y + h {
+            for px in x..x + w {
+                let (dx, dy) = ((px - x).min(x + w - 1 - px), (py - y).min(y + h - 1 - py));
+                if dx + dy < 2 { continue; }
+                let rim = (dx == 2 || dx == 3 || dy == 2 || dy == 3) && dx >= 2 && dy >= 2 && dx + dy >= 5;
+                let c = if rim { cream } else { ink };
+                self.blend(px, py, [c[0], c[1], c[2], if rim { 255 } else { 240 }]);
+            }
+        }
+    }
+
     /// The pixel at (x, y); clear outside the image.
     pub fn get(&self, x: i32, y: i32) -> [u8; 4] {
         if x < 0 || y < 0 || x as u32 >= self.w || y as u32 >= self.h { return [0; 4]; }

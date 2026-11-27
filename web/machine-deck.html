@@ -7,8 +7,8 @@
   <!-- One game's control deck, built and styled exactly as on its game page; each cabinet in the aisle shows it.
        The coin mechanism is the cabinet's own door, below the deck. -->
   <script>window.BLIP_DECK_GAME = new URLSearchParams(location.search).get('game'); document.documentElement.setAttribute('data-deck-preview','');</script>
-  <script src="blip_core.js?v=20"></script>
-  <link rel="stylesheet" href="blip.css?v=186">
+  <script src="blip_core.js?v=22"></script>
+  <link rel="stylesheet" href="blip.css?v=194">
 </head>
 <body class="cabinet-page">
   <div id="topbar" class="kiosk-bar">
@@ -18,7 +18,9 @@
     <div id="paddle-dial-p2"><div class="dial-cap"><div id="dial-hand-p2"></div></div><div id="dial-label-p2">2P</div></div>
    </blip-deck>
   </div>
-  <script>if (window.BLIP_DECK_GAME === 'rally') document.documentElement.setAttribute('data-dials', ''); blipBuildDeck();</script>
+  <script>if (window.BLIP_DECK_GAME === 'rally') document.documentElement.setAttribute('data-dials', ''); blipBuildDeck();
+    // The cabinet's accent, as its game page sets it: the dials' pointers and the lamps.
+    if (BLIP_GAMES[window.BLIP_DECK_GAME]) document.documentElement.style.setProperty('--cab', BLIP_GAMES[window.BLIP_DECK_GAME].accent);</script>
   <script src="https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v2.0.0/dist/blip-deck.js"></script>
 </body>
 </html>

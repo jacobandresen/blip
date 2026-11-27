@@ -6,7 +6,7 @@
 //!    miss when the boxes part (`fun_near_pm`, a minute) or as a hit when they touch or the game reports one (a rise
 //!    in `deaths` or a `hit_*` stat; `fun_hits_pm`). Only games whose bot reports hit boxes ([`super::near`]).
 //! 3. Busy: `fun_dead`, the share of the run in stretches of more than [`DEAD_SECS`] with the controls untouched.
-//! 4. Variety: `fun_variety`, how evenly the player's position spreads over an 8 x 8 grid of the canvas (entropy over
+//! 4. Variety: `fun_variety`, how evenly the player's position spreads over an 8 x 8 grid of the play area (entropy over
 //!    the most it could be on the axes the player moves along), from [`super::near`] or [`super::at`].
 //! 5. Calm: `fun_quick_deaths`, lives lost within [`QUICK_DEATH_SECS`] of the one before (clustered deaths).
 //! 6. Difficulty: deaths a minute at a person's reaction time; `fun_deaths_l<n>` counts them per level. Scored by
@@ -64,8 +64,9 @@ pub(crate) struct Meter {
     export: Option<String>,
     dir: Option<String>,
     saved: [u32; 2],
-    /// The canvas size, the player's frames in each grid cell, and the cells' column and row ranges seen.
-    canvas: (f32, f32),
+    /// The play area (the canvas unless the game says otherwise: `bot::arena`), the player's frames in each grid cell,
+    /// and the cells' column and row ranges seen.
+    area: (f32, f32, f32, f32),
     cells: [[u32; GRID]; GRID],
     span: Option<[usize; 4]>,
     /// The clock of each life lost, and the quick deaths among them.
@@ -94,14 +95,15 @@ impl Meter {
         self.still = 0;
     }
 
-    pub(crate) fn canvas(&mut self, w: f32, h: f32) { self.canvas = (w, h); }
+    pub(crate) fn canvas(&mut self, w: f32, h: f32) { self.arena(0.0, 0.0, w, h); }
+    pub(crate) fn arena(&mut self, x: f32, y: f32, w: f32, h: f32) { self.area = (x, y, w, h); }
 
     /// Where the player is this frame, in canvas pixels.
     pub(crate) fn at(&mut self, x: f32, y: f32) {
-        let (w, h) = self.canvas;
+        let (x0, y0, w, h) = self.area;
         if w <= 0.0 || h <= 0.0 { return; }
         let cell = |v: f32, size: f32| ((v / size * GRID as f32) as isize).clamp(0, GRID as isize - 1) as usize;
-        let (c, r) = (cell(x, w), cell(y, h));
+        let (c, r) = (cell(x - x0, w), cell(y - y0, h));
         self.cells[r][c] += 1;
         let s = self.span.get_or_insert([c, c, r, r]);
         *s = [s[0].min(c), s[1].max(c), s[2].min(r), s[3].max(r)];

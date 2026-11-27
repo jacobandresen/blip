@@ -96,6 +96,7 @@ pub fn rand_int(lo: i32, hi: i32) -> i32 {
 /// Returns true if rectangle 1 and rectangle 2 share any area.
 /// Both rectangles are specified as (x, y, width, height) with origin at top-left.
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn rects_overlap(x1: f32, y1: f32, w1: f32, h1: f32, x2: f32, y2: f32, w2: f32, h2: f32) -> bool {
     x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2
 }
@@ -112,6 +113,7 @@ pub fn segment_circle_overlap(x0: f32, y0: f32, x1: f32, y1: f32, cx: f32, cy: f
 
 /// Whether a moving point segment touches an axis-aligned rectangle.
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn segment_rect_overlap(x0: f32, y0: f32, x1: f32, y1: f32, rx: f32, ry: f32, rw: f32, rh: f32) -> bool {
     let (dx, dy) = (x1 - x0, y1 - y0);
     let (mut enter, mut leave) = (0.0_f32, 1.0_f32);
@@ -174,6 +176,19 @@ pub fn hash(x: i32, y: i32, s: u32) -> f32 {
     (h & 0xffff) as f32 / 65535.0
 }
 
+/// Smooth value noise in `[0, 1]`: `hash` on the integer lattice, eased between its points. One unit is one lattice
+/// cell: divide the coordinates by the size the features should have.
+pub fn value_noise(x: f32, y: f32, seed: u32) -> f32 {
+    let (xi, yi) = (x.floor() as i32, y.floor() as i32);
+    let (xf, yf) = (x - x.floor(), y - y.floor());
+    let (u, v) = (smoothstep01(xf), smoothstep01(yf));
+    let a = hash(xi, yi, seed);
+    let b = hash(xi + 1, yi, seed);
+    let c = hash(xi, yi + 1, seed);
+    let d = hash(xi + 1, yi + 1, seed);
+    a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v
+}
+
 /// Whether (x, y) is inside the polygon `pts` (even-odd rule).
 pub fn in_polygon(pts: &[(f32, f32)], x: f32, y: f32) -> bool {
     let mut inside = false;
@@ -198,9 +213,21 @@ pub fn bounds(pts: &[(f32, f32)]) -> (f32, f32, f32, f32) {
 #[cfg(test)]
 mod tests {
     use super::{
-        angle_diff, bounds, ease_out_cubic, in_polygon, rand_range_f32, rand_seed, scatter, segment_circle_overlap,
-        segment_rect_overlap, smoothstep01, wrap,
+        angle_diff, bounds, ease_out_cubic, hash, in_polygon, rand_range_f32, rand_seed, scatter, segment_circle_overlap,
+        segment_rect_overlap, smoothstep01, value_noise, wrap,
     };
+
+    #[test]
+    fn value_noise_meets_the_lattice_and_stays_in_range() {
+        assert_eq!(value_noise(3.0, -2.0, 7), hash(3, -2, 7), "on a lattice point it is the point's hash");
+        let mut prev = value_noise(0.0, 0.5, 1);
+        for k in 1..400 {
+            let v = value_noise(k as f32 * 0.01, 0.5, 1);
+            assert!((0.0..=1.0).contains(&v));
+            assert!((v - prev).abs() < 0.05, "smooth: no jump between nearby points");
+            prev = v;
+        }
+    }
 
     #[test]
     fn point_distance_handles_coincident_negative_and_large_coordinates() {

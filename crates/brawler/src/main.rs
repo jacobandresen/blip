@@ -98,10 +98,16 @@ async fn main() {
     let (mut ambient, mut alarmed): (Option<usize>, bool) = (None, false);
     music.play(SELECT_TRACK);
     let mut shot_frame: u32 = 0;
+    // Player two's punch in a solo game away from the fight (choosing, the intro, a round's end): the challenge
+    // comes as the next fight starts.
+    let mut p2_waiting = false;
 
     loop {
         let dt = blip.delta_time;
         g.now += dt;
+        let solo_game = g.mode == Mode::Solo && !g.demo && !blip.screenshot_mode && !blip::bot::active();
+        if !solo_game || g.state == State::Title { p2_waiting = false; }
+        else if matches!(g.state, State::Select | State::Vs | State::RoundIntro | State::RoundEnd) && any_pressed(P2.punch) { p2_waiting = true; }
 
         if blip.screenshot_mode { shots::pose(&mut g, &mut shot_frame); }
         // The demo lasts one round, or until somebody wants the machine.
@@ -169,7 +175,7 @@ async fn main() {
                 // a game they are not in.
                 let solo = g.mode == Mode::Solo && !g.demo && !blip.screenshot_mode;
                 let solo = solo && !blip::bot::active();
-                if solo && any_pressed(P2.punch) { challenge(&mut g); } else { update_fight(&mut g, dt); }
+                if solo && (any_pressed(P2.punch) || p2_waiting) { p2_waiting = false; challenge(&mut g); } else { update_fight(&mut g, dt); }
             }
             State::Challenger => update_challenger(&mut g, dt),
             State::Bonus => {

@@ -13,7 +13,7 @@ wrappers. Do not publish or push unless asked.
 | Game list, controls, front ends, fullscreen, coins | `web/blip_core.js` (`BLIP_GAMES`) |
 | Game page | `web/game.html` (copied to each `web/<game>/index.html`), `web/game.js` |
 | Styles shared by the arcade, game pages and decks | `web/blip.css` |
-| The arcade room and its manual | `web/index.html`, `web/arcade.css`, `web/arcade.js`, `web/aisle.js`, `web/cabinet.js` |
+| The arcade room and its manual | `web/index.html`, `web/arcade.css`, `web/arcade.js`, `web/aisle.js`, `web/room.js`, `web/cabinet.js` |
 | The control deck (stick, pad, buttons) | `<blip-deck>` from jsDelivr (below), `web/controller.js`, `web/machine-deck.html` |
 | Home Screen and Guide | `web/home.*`, `web/guide.*` |
 | Manual pages | `web/controls.html`, `history.html`, `about.html` (read by both the arcade's manual and the Guide; `data-guide="cabinet"` or `"app"` marks copy for one) |
@@ -50,7 +50,8 @@ Copy the smallest similar game (Serpent is compact).
 
 1. Add `crates/<slug>` to the workspace, with `macroquad` and `blip` dependencies and `blip` (default features
    off) as a build dependency. `build.rs` is `blip::build_script!();`.
-2. Write `main.rs`, `gfx.rs`, `tunes.rs` and `bot.rs`; `levels.rs` for authored levels. Keep score, lives and
+2. Write `main.rs`, `gfx.rs`, `tunes.rs` and `bot.rs`; `levels.rs` for authored levels. Draw it in the blip look
+   (Conventions). Keep score, lives and
    level in `blip::Session` (`lose_life_after` starts the respawn or game-over wait and reports the score); name the
    effects once with `blip::sounds!`.
 3. Add it to `BLIP_GAMES` in `web/blip_core.js`; the build, the tests and the arcade read the list from there.
@@ -102,6 +103,14 @@ the measured reason; [FUN-LOG.md](crates/blip/src/bot/FUN-LOG.md) keeps the earl
 
 ## Conventions
 
+- The blip look, in every game (`crates/blip/src/look.rs`, `frame.rs`): the shared palette (`BLIP_INK`, `BLIP_CREAM`,
+  `BLIP_GOLD`, …), ink outlines on sprites (`Image::outline`), soft shadows (`draw_shadow`), `draw_hud` (coin, score,
+  hearts), `draw_logo` for titles and big calls, `draw_message`/`draw_panel` for every banner and box, and
+  `draw_attract_bar` on a title. Keep the arcade feel: score up front, fast readable play, space stays dark (`BLIP_NIGHT`).
+- The arcade's cabinet is its game page's machine seen from farther (`arcade.js` fitDecks, gameMachine): change the
+  game page's monitor or deck and the cabinet follows; starting a game walks the eye up to it (arcadeWalk) and the
+  pages cross-fade. Room props (`web/room.js`) are simple CSS solids with SVG textures, kept clear of the machines by
+  `test/room.test.mjs`.
 - Pixel text at whole-number sizes, 2 or more where it must read on a phone.
 - Generate changing details at runtime; PNGs are still images.
 - CSS: few, general rules. A one-line rule fits a screen line (`node tools/format_css.mjs <file>` expands

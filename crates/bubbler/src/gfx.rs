@@ -45,25 +45,14 @@ fn title_letter(ch: char, index: usize) -> Vec<u8> {
     image.encode_png()
 }
 
-fn title_panel(image: &mut Image, y: f32, width: f32, height: f32, edge: [u8; 4]) {
-    let radius = (height / 2.0).min(14.0);
-    for (grow, color) in [(1.6, edge), (0.0, [34, 14, 44, 188])] {
-        let (half_w, half_h, r) = (width / 2.0 + grow, height / 2.0 + grow, radius + grow);
-        for py in (y as i32 - 2)..(y as i32 + height as i32 + 2) {
-            for px in (312.0 - half_w).floor() as i32..(312.0 + half_w).ceil() as i32 {
-                let dx = (px as f32 + 0.5 - 312.0).abs() - half_w + r;
-                let dy = (py as f32 + 0.5 - y - height / 2.0).abs() - half_h + r;
-                let distance = dx.max(0.0).hypot(dy.max(0.0)) + dx.max(dy).min(0.0) - r;
-                let coverage = (0.5 - distance).clamp(0.0, 1.0);
-                image.blend(px, py, [color[0], color[1], color[2], (color[3] as f32 * coverage) as u8]);
-            }
-        }
-    }
+/// The blip message box, centred across the title.
+fn title_panel(image: &mut Image, y: f32, width: f32, height: f32) {
+    let (w, h) = (width.round() as i32 + 8, height.round() as i32 + 4);
+    image.panel(312 - w / 2, y as i32 - 2, w, h);
 }
 
 fn title_text(image: &mut Image, text: &str, y: i32, color: [u8; 4]) {
     let x = (624 - (text.len() as i32 * 12 - 2)) / 2;
-    image.text(text, x + 1, y + 1, 2, [60, 20, 70, 230]);
     image.text(text, x, y, 2, color);
 }
 
@@ -76,7 +65,7 @@ fn title_info(mode: usize) -> Vec<u8> {
         ["PAD MOVES   BUTTONS BUBBLE AND JUMP", "HOLD JUMP TO RIDE BUBBLES"],
         ["TOUCH TO BUBBLE   SLIDE TO RUN", "SWIPE UP TO JUMP"],
     ][mode];
-    title_panel(&mut image, 30.0, hints[0].len() as f32 * 12.0 + 34.0, 54.0, [255, 196, 150, 165]);
+    title_panel(&mut image, 30.0, hints[0].len() as f32 * 12.0 + 34.0, 54.0);
     title_text(&mut image, hints[0], 40, [255, 244, 222, 242]);
     title_text(&mut image, hints[1], 60, [255, 244, 222, 242]);
     image.encode_png()
@@ -84,8 +73,8 @@ fn title_info(mode: usize) -> Vec<u8> {
 
 fn title_start(mode: usize) -> Vec<u8> {
     let mut image = Image::new(624, 40);
-    let text = ["P1 PRESS SPACE", "P1 PRESS BUBBLE", "P1 TOUCH TO START"][mode];
-    title_panel(&mut image, 4.0, text.len() as f32 * 12.0 + 24.0, 32.0, [170, 240, 190, 230]);
+    let text = ["P1 PRESS START", "P1 PRESS START", "P1 TOUCH TO START"][mode];
+    title_panel(&mut image, 4.0, text.len() as f32 * 12.0 + 24.0, 32.0);
     title_text(&mut image, text, 13, [170, 240, 190, 255]);
     image.encode_png()
 }

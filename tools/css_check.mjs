@@ -309,7 +309,8 @@ function fold(file, write) {
     }
     for (const [k, R] of rules.entries()) {
       const target = merges.filter((m) => m.b === k);
-      if (!target.length) continue;
+      // a rule folded on into a later one is removed whole; that later rule takes what was moved into it
+      if (!target.length || removed.has(k)) continue;
       const original = css.slice(R.open + 1, R.end - 1);
       const multi = original.includes('\n');
       const indent = multi ? (original.match(/\n([ \t]*)\S/) || [, '  '])[1] : ' ';

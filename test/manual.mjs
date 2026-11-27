@@ -5,11 +5,17 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage, openPhone, DESKTOP } from './lib/harness.mjs';
+import { openPage, openPhone, playAnimationsAt, DESKTOP } from './lib/harness.mjs';
 import { GAME_SLUGS } from './lib/games.mjs';
+
+// The book's flights and page turns, four times as fast: these tests check where things go, not how long it takes.
+playAnimationsAt(4);
 
 for (const width of [1280, 390]) {
   test(`the book flies out of its pocket and back at ${width}px`, async (t) => {
+    // It reads the flight while it is in the air: at its own speed.
+    playAnimationsAt(1);
+    t.after(() => playAnimationsAt(4));
     const { page, origin } = await openPage(t, 'chromium', { viewport: { width, height: 900 } });
     await page.goto(`${origin}/index.html`);
     const book = page.locator('#manual-book');

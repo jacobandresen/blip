@@ -1,6 +1,7 @@
 //! Pong against the CPU.
 
 
+use blip::color::*;
 use blip::input::{
     any_key_pressed, btn1_pressed, key_active, key_pressed, Stick, BLIP_KEY_DOWN, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
 };
@@ -9,8 +10,8 @@ use blip::macroquad::math::Vec2;
 use blip::macroquad::rand::rand;
 use blip::{
     GAME_OVER_MIN_WAIT,
-    play_sfx, Jukebox, web, window_conf, Blip, BlipColor, Timer, BLIP_BLACK,
-    BLIP_GRAY, BLIP_WHITE, BLIP_YELLOW,
+    play_sfx, Jukebox, web, window_conf, Blip, BlipColor, Timer,
+    BLIP_GRAY, BLIP_WHITE,
 };
 
 // The effects and music are made by build.rs; the tests check them here.
@@ -22,9 +23,11 @@ mod bot;
 mod physics;
 use physics::*;
 
-const C_PAD: BlipColor = BlipColor { r: 210.0/255.0, g: 210.0/255.0, b: 210.0/255.0, a: 1.0 };
-const C_NET: BlipColor = BlipColor { r:  42.0/255.0, g:  42.0/255.0, b:  42.0/255.0, a: 1.0 };
-const C_HUD_LINE: BlipColor = BlipColor { r: 28.0/255.0, g: 28.0/255.0, b: 28.0/255.0, a: 1.0 };
+// The blip palette, nothing more: cream bats and ball on the ink court, the net a step lighter than the court.
+const C_PAD: BlipColor = BLIP_CREAM;
+const C_NET: BlipColor = BlipColor { r: 0.24, g: 0.20, b: 0.30, a: 1.0 };
+const C_HUD_LINE: BlipColor = C_NET;
+const C_COURT: BlipColor = BLIP_INK;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Serve, Play, Point, Over }
@@ -253,9 +256,9 @@ fn draw_net(blip: &Blip) {
 fn draw_scores(blip: &Blip, score_l: i32, score_r: i32) {
     blip.fill_rect(0.0, (HUD_H - 1) as f32, WIN_W as f32, 1.0, C_HUD_LINE);
     let buf_l = format!("{}:{}", score_l, SCORE_WIN);
-    blip.draw_text(&buf_l, (WIN_W / 2 - 72) as f32, 5.0, 2.0, BLIP_YELLOW);
+    blip.draw_text(&buf_l, (WIN_W / 2 - 72) as f32, 5.0, 2.0, BLIP_GOLD);
     let buf_r = format!("{}:{}", score_r, SCORE_WIN);
-    blip.draw_text(&buf_r, (WIN_W / 2 + 20) as f32, 5.0, 2.0, BLIP_YELLOW);
+    blip.draw_text(&buf_r, (WIN_W / 2 + 20) as f32, 5.0, 2.0, BLIP_GOLD);
 }
 
 fn draw_field(blip: &Blip, g: &Game) {
@@ -266,7 +269,7 @@ fn draw_field(blip: &Blip, g: &Game) {
 }
 
 fn draw_title(blip: &Blip) {
-    blip.clear(BLIP_BLACK);
+    blip.clear(C_COURT);
     draw_net(blip);
     draw_scores(blip, 0, 0);
     let py = PLAY_T + PLAY_H * 0.5 - PAD_H * 0.5;
@@ -284,38 +287,38 @@ fn draw_title(blip: &Blip) {
         blip.fill_rect(ball_x + offset, ball_y, BALL_SZ, BALL_SZ,
             BlipColor { r: 0.72, g: 0.92, b: 1.0, a: alpha });
     }
-    blip.fill_rect(ball_x, ball_y, BALL_SZ, BALL_SZ, BLIP_WHITE);
-    blip.draw_centered("RALLY", cy - 34.0, 5.0, BLIP_YELLOW);
+    blip.fill_rect(ball_x, ball_y, BALL_SZ, BALL_SZ, BLIP_CREAM);
+    blip.draw_logo("RALLY", (WIN_W / 2) as f32, cy - 40.0, 5.0, BLIP_GOLD);
     // Moving a paddle (dial or keys) picks the mode; there is no menu.
     blip.draw_centered("MOVE LEFT PADDLE: 1 PLAYER",   cy + 14.0, 2.0, BLIP_WHITE);
     blip.draw_centered("MOVE RIGHT PADDLE: 2 PLAYERS", cy + 36.0, 2.0, BLIP_WHITE);
 }
 
 fn draw_serve(blip: &Blip, g: &Game) {
-    blip.clear(BLIP_BLACK);
+    blip.clear(C_COURT);
     draw_field(blip, g);
-    blip.fill_rect(g.ball_x, g.ball_y, BALL_SZ, BALL_SZ, BLIP_WHITE);
-    let prompt = web::controls().pick("PRESS SPACE", "PRESS FIRE", "TAP TO SERVE");
+    blip.fill_rect(g.ball_x, g.ball_y, BALL_SZ, BALL_SZ, BLIP_CREAM);
+    let prompt = web::controls().pick("PRESS START", "PRESS START", "TAP TO SERVE");
     blip.draw_centered(prompt, PLAY_T + PLAY_H * 0.5 + 54.0, 2.0, BLIP_GRAY);
 }
 
 fn draw_play(blip: &Blip, g: &Game) {
-    blip.clear(BLIP_BLACK);
+    blip.clear(C_COURT);
     draw_field(blip, g);
-    blip.fill_rect(g.ball_x, g.ball_y, BALL_SZ, BALL_SZ, BLIP_WHITE);
+    blip.fill_rect(g.ball_x, g.ball_y, BALL_SZ, BALL_SZ, BLIP_CREAM);
 }
 
 fn draw_point(blip: &Blip, g: &Game) {
-    blip.clear(BLIP_BLACK);
+    blip.clear(C_COURT);
     draw_net(blip);
     draw_scores(blip, g.score_l, g.score_r);
     if (g.point_t.remaining() * 6.0) as i32 % 2 == 0 {
-        blip.draw_centered("POINT!", PLAY_T + PLAY_H * 0.5, 3.0, BLIP_YELLOW);
+        blip.draw_centered("POINT!", PLAY_T + PLAY_H * 0.5, 3.0, BLIP_GOLD);
     }
 }
 
 fn draw_over(blip: &Blip, g: &Game) {
-    blip.clear(BLIP_BLACK);
+    blip.clear(C_COURT);
     draw_net(blip);
     draw_scores(blip, g.score_l, g.score_r);
     let cy = PLAY_T + PLAY_H * 0.5;
@@ -324,7 +327,7 @@ fn draw_over(blip: &Blip, g: &Game) {
     } else {
         if g.score_l >= SCORE_WIN { "YOU WIN!" } else { "GAME OVER" }
     };
-    blip.draw_centered(msg, cy - 20.0, 3.0, BLIP_YELLOW);
+    blip.draw_centered(msg, cy - 20.0, 3.0, BLIP_GOLD);
     if !g.point_t.active() {
         blip.draw_centered("MOVE A PADDLE TO PLAY AGAIN", cy + 24.0, 2.0, BLIP_GRAY);
     }

@@ -5,6 +5,7 @@
 pub mod cosy;
 pub mod glyphs;
 pub mod image;
+pub mod look;
 pub mod song;
 pub mod techno;
 pub mod wav;
@@ -115,6 +116,7 @@ engine! {
     pub mod color;
     pub mod ctx;
     mod draw;
+    mod frame;
     pub mod font;
     pub mod fx;
     pub mod grid;
@@ -130,9 +132,9 @@ engine! {
         BlipSound, Jukebox,
     };
     pub use color::{
-        blend, hsv, shade, BLIP_BLACK, BLIP_BLUE, BLIP_CYAN, BLIP_DARKGRAY, BLIP_GRAY, BLIP_GREEN, BLIP_MAGENTA,
-        BLIP_ORANGE, BLIP_RED, BLIP_WHITE, BLIP_YELLOW, NEON_CYAN, NEON_GREEN, NEON_ORANGE, NEON_PINK,
-        NEON_PURPLE, NEON_YELLOW,
+        blend, hsv, shade, BLIP_BLACK, BLIP_BLUE, BLIP_CREAM, BLIP_CYAN, BLIP_DARKGRAY, BLIP_DUSK, BLIP_GOLD, BLIP_GRAY,
+        BLIP_GREEN, BLIP_HEART, BLIP_INK, BLIP_LEAF, BLIP_MAGENTA, BLIP_NIGHT, BLIP_ORANGE, BLIP_PLUM, BLIP_RED,
+        BLIP_SEA, BLIP_SHADOW, BLIP_WHITE, BLIP_YELLOW,
     };
     pub use ctx::{window_conf, Blip};
     pub use draw::{load_png, load_png_smooth};

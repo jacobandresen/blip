@@ -110,9 +110,10 @@ impl Controls {
 }
 
 /// The prompt to press on, for what the player holds: `fire_prompt("TO START")`
-/// is PRESS SPACE TO START on a keyboard, PRESS FIRE on a deck, TAP TO START on a touch screen.
+/// is PRESS START TO START on a keyboard (its Space is the machine's Start) and on a deck (its Start presses the
+/// game's first button), TAP TO START on a touch screen: what the arcade's cabinets print over their screens too.
 pub fn fire_prompt(then: &str) -> String {
-    let press = controls().pick("PRESS SPACE", "PRESS FIRE", "TAP");
+    let press = controls().pick("PRESS START", "PRESS START", "TAP");
     if then.is_empty() { press.to_string() } else { format!("{press} {then}") }
 }
 

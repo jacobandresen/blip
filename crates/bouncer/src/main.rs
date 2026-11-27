@@ -2,6 +2,7 @@
 
 use std::f32::consts::PI;
 
+use blip::color::*;
 use blip::input::{coin_start, key_pressed, Stick, BLIP_KEY_SPACE};
 use blip::macroquad::rand::rand;
 use blip::macroquad::texture::Texture2D;
@@ -9,7 +10,7 @@ use blip::{
     load_png, load_png_smooth,
     clamp, Fx, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, segment_rect_overlap, web,
     window_conf, Blip, BlipColor, LifeResult, Pooled, Session, Timer, rand_range_f32, BLIP_BLACK, BLIP_CYAN,
-    BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
+    BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
 
 // The effects and music are made by build.rs; the tests check them here.
@@ -107,12 +108,12 @@ const SEEK_RATE: f32 = 1.5; // radians/sec of bend at most
 const CHAIN_MAX: i32 = 5;
 
 const BRICK_COLORS: [BlipColor; 9] = [
-    BlipColor { r: 0.90, g: 0.25, b: 0.25, a: 1.0 },
-    BlipColor { r: 0.95, g: 0.55, b: 0.20, a: 1.0 },
-    BlipColor { r: 0.95, g: 0.85, b: 0.30, a: 1.0 },
-    BlipColor { r: 0.35, g: 0.80, b: 0.35, a: 1.0 },
-    BlipColor { r: 0.30, g: 0.50, b: 0.95, a: 1.0 },
-    BlipColor { r: 0.65, g: 0.35, b: 0.90, a: 1.0 },
+    BLIP_HEART,
+    BlipColor { r: 0.94, g: 0.54, b: 0.22, a: 1.0 },
+    BLIP_GOLD,
+    BLIP_LEAF,
+    BLIP_SEA,
+    BLIP_PLUM,
     BlipColor { r: 0.70, g: 0.72, b: 0.78, a: 1.0 },
     BlipColor { r: 0.70, g: 0.72, b: 0.78, a: 1.0 },
     BlipColor { r: 1.00, g: 0.60, b: 0.15, a: 1.0 },
@@ -991,7 +992,7 @@ fn update_over(g: &mut Game, dt: f32) {
 fn draw_shard(blip: &Blip, s: &Shard) {
     let (sn, cs) = s.turn.sin_cos();
     let pts: Vec<(f32, f32)> = s.pts.iter().map(|p| (s.x + p.0 * cs - p.1 * sn, s.y + p.0 * sn + p.1 * cs)).collect();
-    let edge = BlipColor { r: s.color.r * 0.5, g: s.color.g * 0.5, b: s.color.b * 0.5, a: 1.0 };
+    let edge = BLIP_INK;
     blip.fill_fan((s.x, s.y), &pts, s.color);
     for k in 0..pts.len() {
         let (a, b) = (pts[k], pts[(k + 1) % pts.len()]);
@@ -999,28 +1000,39 @@ fn draw_shard(blip: &Blip, s: &Shard) {
     }
 }
 
-/// A dark wash behind the bricks, a new hue each level, fading to black at the paddle.
+/// A tiled floor behind the bricks, a new hue each level: big dusky flagstones, each with a lit and a shaded edge
+/// and a small diamond inlay, after the adventure games' dungeon floors. Dim, so the bricks and ball stand out.
 fn draw_backdrop(blip: &Blip, level: i32) {
-    const HUES: [(f32, f32, f32); 5] = [(0.10, 0.14, 0.32), (0.26, 0.10, 0.28), (0.06, 0.22, 0.24), (0.28, 0.16, 0.08), (0.12, 0.20, 0.10)];
+    const HUES: [(f32, f32, f32); 5] = [(0.17, 0.19, 0.36), (0.30, 0.17, 0.32), (0.13, 0.27, 0.30), (0.32, 0.22, 0.17), (0.18, 0.27, 0.18)];
     let (r, g, b) = HUES[((level - 1).max(0) as usize) % HUES.len()];
-    const BANDS: i32 = 24;
-    let (top, h) = (HUD_H as f32, (WIN_H - HUD_H) as f32 / BANDS as f32);
-    for i in 0..BANDS {
-        let k = 1.0 - i as f32 / BANDS as f32;
-        let k = k * k * 0.6;
-        blip.fill_rect(0.0, top + i as f32 * h, WIN_W as f32, h + 1.0, BlipColor { r: r * k, g: g * k, b: b * k, a: 1.0 });
+    // Kept dim (0.6), so the floor never competes with the ball.
+    let tone = |k: f32| BlipColor { r: r * k * 0.6, g: g * k * 0.6, b: b * k * 0.6, a: 1.0 };
+    const TILE: i32 = 40;
+    blip.fill_rect(0.0, HUD_H as f32, WIN_W as f32, (WIN_H - HUD_H) as f32, tone(0.62));
+    for ty in 0..(WIN_H - HUD_H) / TILE + 1 {
+        for tx in 0..WIN_W / TILE {
+            let (x, y) = ((tx * TILE) as f32, (HUD_H + ty * TILE) as f32);
+            let s = TILE as f32;
+            blip.fill_rect(x + 1.0, y + 1.0, s - 2.0, s - 2.0, tone(if (tx + ty) % 2 == 0 { 0.9 } else { 0.82 }));
+            blip.fill_rect(x + 1.0, y + 1.0, s - 2.0, 1.0, tone(1.08));
+            let (cx, cy) = (x + s / 2.0, y + s / 2.0);
+            blip.fill_quad((cx, cy - 4.0), (cx + 4.0, cy), (cx, cy + 4.0), (cx - 4.0, cy), tone(0.76));
+        }
     }
 }
 
 fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9], drops: &[Texture2D; 5]) {
     draw_backdrop(blip, g.sess.level);
+    // The wall's shadow on the floor, then the wall.
+    for i in (0..BRICK_TOTAL).filter(|&i| g.bricks[i].alive) {
+        let (bx, by) = brick_rect(i);
+        blip.fill_rect(bx + 3.0, by + 5.0, BRICK_W as f32, BRICK_H as f32, BLIP_SHADOW);
+    }
     for i in 0..BRICK_TOTAL {
         if !g.bricks[i].alive { continue; }
-        let r = i as i32 / BRICK_COLS;
-        let c = i as i32 % BRICK_COLS;
         let w = g.bricks[i].wobble;
-        let bx = (BRICK_OX + c * (BRICK_W + BRICK_GAP)) as f32;
-        let by = (BRICK_OY + r * (BRICK_H + BRICK_GAP)) as f32 + (w * 22.0).sin() * w * 2.5;
+        let (bx, by0) = brick_rect(i);
+        let by = by0 + (w * 22.0).sin() * w * 2.5;
         blip.draw_texture(&brick[g.bricks[i].kind], bx, by, BRICK_W as f32, BRICK_H as f32);
     }
     for s in &g.shards { draw_shard(blip, s); }
@@ -1041,7 +1053,7 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
     let mut line_y = (PAD_Y - 20) as f32;
     for (_, label, color, left) in effects.iter().filter(|e| e.0) {
         if *left > EFFECT_WARN || (left * 6.0) as i32 % 2 == 0 {
-            blip.draw_centered(&format!("{label} {}", left.ceil() as i32), line_y, 2.0, *color);
+            blip.draw_centered_outlined(&format!("{label} {}", left.ceil() as i32), (WIN_W / 2) as f32, line_y, 2.0, *color, BLIP_INK);
         }
         line_y -= 18.0;
     }
@@ -1059,6 +1071,7 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
             blip.fill_rect(x + 2.0, py + 2.0, g.pad_w - 4.0, ph - 4.0, c);
         }
     }
+    blip.draw_shadow(g.pad_x + g.pad_w / 2.0 + 3.0, py + ph + 4.0, g.pad_w);
     blip.draw_texture_region(paddle, 0.0, 0.0, cap, 24.0, g.pad_x, py, cap_w, ph);
     blip.draw_texture_region(paddle, cap, 0.0, sw - 2.0 * cap, 24.0, g.pad_x + cap_w, py, g.pad_w - 2.0 * cap_w, ph);
     blip.draw_texture_region(paddle, sw - cap, 0.0, cap, 24.0, g.pad_x + g.pad_w - cap_w, py, cap_w, ph);
@@ -1088,7 +1101,7 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
         }
         blip.fill_circle(
             ball_cx + (b.vx / speed) * 4.0, ball_cy + (b.vy / speed) * 4.0 + 3.0, BALL_W as f32 * 0.42,
-            BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.35 },
+            BLIP_SHADOW,
         );
         if g.seeking() {
             blip.fill_glow_circle(ball_cx, ball_cy, BALL_W as f32 * 0.55, BlipColor { r: 1.0, g: 0.9, b: 0.5, a: 0.35 });
@@ -1103,7 +1116,7 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
-fn draw_title(blip: &Blip, hi: i32, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9]) {
+fn draw_title(blip: &Blip, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9]) {
     draw_backdrop(blip, 1);
     // A full wall of the game's bricks, a ripple running along it.
     let t0 = blip::now();
@@ -1116,9 +1129,9 @@ fn draw_title(blip: &Blip, hi: i32, paddle: &Texture2D, ball: &Texture2D, shade:
             blip.draw_texture(&brick[kind], x, y, BRICK_W as f32, BRICK_H as f32);
         }
     }
-    blip.draw_centered("BOUNCER",                 (WIN_H / 4) as f32,         6.0, BLIP_CYAN);
+    blip.draw_logo("BOUNCER", (WIN_W / 2) as f32, (WIN_H / 4) as f32, 6.0, BLIP_SEA);
     // BOUNCER is sz=6 (42px tall) — clear its bottom by a real margin.
-    blip.draw_hi(hi, (WIN_H / 4 + 50) as f32, BLIP_YELLOW);
+    blip.draw_attract_bar();
     let by = web::controls();
     blip.draw_start_prompt((WIN_H / 2) as f32);
     let lines = [
@@ -1126,8 +1139,11 @@ fn draw_title(blip: &Blip, hi: i32, paddle: &Texture2D, ball: &Texture2D, shade:
         by.pick("SPACE TO LAUNCH", "FIRE TO LAUNCH", "TAP TO LAUNCH"),
         by.pick("DOUBLE TAP TO DASH", "DOUBLE TAP TO DASH", ""),
     ];
+    let lines: Vec<&str> = lines.into_iter().filter(|l| !l.is_empty()).collect();
+    let top = (WIN_H * 2 / 3 - 14) as f32;
+    blip.draw_panel(WIN_W as f32 * 0.14, top, WIN_W as f32 * 0.72, 20.0 * lines.len() as f32 + 22.0, 1.0);
     for (i, line) in lines.iter().enumerate() {
-        blip.draw_centered(line, (WIN_H * 2 / 3 + 20 * i as i32) as f32, 2.0, BLIP_GRAY);
+        blip.draw_centered(line, top + 12.0 + 20.0 * i as f32, 2.0, BLIP_CREAM);
     }
     let t = blip::now();
     let cx = WIN_W as f32 * 0.5 + (t * 1.2).sin() * 132.0;
@@ -1151,8 +1167,8 @@ fn draw_clear(blip: &Blip, level: i32, t: f32) {
     draw_backdrop(blip, level);
     blip::draw_fireworks(blip, t, (60.0, (HUD_H + 50) as f32, (WIN_W - 120) as f32, 260.0), &BRICK_COLORS[..6]);
     let buf = format!("LEVEL {}", level + 1);  // level just incremented in next_level
-    blip.draw_centered("CLEARED", (WIN_H / 3) as f32, 5.0, BLIP_GREEN);
-    blip.draw_centered(&buf,      (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
+    blip.draw_logo("CLEARED", (WIN_W / 2) as f32, (WIN_H / 3) as f32, 5.0, BLIP_LEAF);
+    blip.draw_message(&buf, (WIN_W / 2) as f32, (WIN_H / 2 + 10) as f32, 3.0, BLIP_GOLD, 1.0);
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -1211,7 +1227,7 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title => draw_title(&blip, web::high_score(), &paddle, &ball, &ball_shade, &brick),
+            State::Title => draw_title(&blip, &paddle, &ball, &ball_shade, &brick),
             State::Win   => draw_clear(&blip, g.sess.level, 1.5 - g.dead_timer.remaining()),
             State::Over  => {
                 draw_backdrop(&blip, g.sess.level);

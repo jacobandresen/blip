@@ -9,6 +9,7 @@
 
 use super::*;
 use crate::magic::{Kind, Magic};
+use blip::color::*;
 use blip::math::hash;
 use blip::macroquad::color::Color;
 
@@ -199,6 +200,7 @@ impl Art {
         self.sprite_sized(col, row, x, y, SPR, flip, tint);
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn sprite_sized(&self, col: u32, row: u32, x: f32, y: f32, size: f32, flip: bool, tint: Color) {
         draw_texture_ex(
             &self.sprites,
@@ -214,6 +216,7 @@ impl Art {
         );
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn sprite_rot(&self, col: u32, row: u32, x: f32, y: f32, size: f32, rot: f32, tint: Color) {
         draw_texture_ex(
             &self.sprites,
@@ -1172,7 +1175,7 @@ impl Art {
         let w = (WIN_W as f32 * 0.7) * ink;
         draw_rectangle(WIN_W as f32 / 2.0 - w / 2.0, cy - 16.0, w, 1.0, with_a(gold, ink * 0.8));
         draw_rectangle(WIN_W as f32 / 2.0 - w / 2.0, cy + sz * 7.0 + 12.0, w, 1.0, with_a(gold, ink * 0.8));
-        blip.draw_centered_outlined(name, WIN_W as f32 / 2.0, cy, sz, gold, c(0.0, 0.0, 0.0, ink));
+        if ink >= 1.0 { blip.draw_logo(name, WIN_W as f32 / 2.0, cy, sz, BLIP_GOLD); } else { blip.draw_centered_outlined(name, WIN_W as f32 / 2.0, cy, sz, gold, c(0.0, 0.0, 0.0, ink)); }
         let sub = if g.double { "THIS CHAMBER PAYS DOUBLE".to_string() } else { format!("CHAMBER {}", g.sess.level) };
         blip.draw_centered_outlined(&sub, WIN_W as f32 / 2.0, cy + sz * 7.0 + 24.0, 2.0, c(0.7, 0.68, 0.65, ink), c(0.0, 0.0, 0.0, ink));
         self.additive(true);
@@ -1250,7 +1253,7 @@ impl Art {
 
         // the chamber's name above the glass
         let name = chamber_name(g);
-        blip.draw_centered_outlined(name, WIN_W as f32 / 2.0, y0 + 5.0, 2.0, c(0.85, 0.7, 0.4, 1.0), BLIP_BLACK);
+        blip.draw_centered_outlined(name, WIN_W as f32 / 2.0, y0 + 5.0, 2.0, BLIP_GOLD, BLIP_INK);
 
         // left: each wizard's hats (lives) and reveal charge
         for idx in 0..2 {
@@ -1549,13 +1552,13 @@ impl Art {
             self.glow(x + (p * 7.0 + k as f32).sin() * 3.0, y, 4.0 * (1.0 - p) + 1.0, c(0.7, 0.35, 1.0, (1.0 - p) * 0.7));
         }
         self.additive(false);
-        blip.draw_centered_outlined("WARLOCK", WIN_W as f32 / 2.0, ty0 + 3.0, 7.0, c(0.08, 0.02, 0.01, 0.9), c(0.0, 0.0, 0.0, 0.9));
-        blip.draw_centered_outlined("WARLOCK", WIN_W as f32 / 2.0, ty0, 7.0, c(0.86, 0.66, 0.3, 1.0), c(0.12, 0.05, 0.02, 1.0));
+        blip.draw_logo("WARLOCK", WIN_W as f32 / 2.0, ty0, 7.0, BLIP_GOLD);
         draw_rectangle(WIN_W as f32 / 2.0 - 150.0, ty0 + 56.0, 300.0, 2.0, c(1.0, 0.86, 0.5, 0.55));
         self.additive(true);
         self.streak(WIN_W as f32 / 2.0, ty0 + 57.0, 380.0, 14.0, 0.0, c(1.0, 0.6, 0.25, 0.35 + 0.1 * (t * 2.0).sin()));
         self.additive(false);
-        blip.draw_hi(web::high_score(), ty0 + 66.0, BLIP_YELLOW);
+        let hi = web::high_score();
+        if hi > 0 { blip.draw_message(&format!("HI {hi}"), WIN_W as f32 / 2.0, ty0 + 80.0, 2.0, BLIP_GOLD, 1.0); }
 
         // his greeting, on a scrap of parchment
         const SAYS: [(&str, &str); 4] = [
@@ -1569,13 +1572,14 @@ impl Art {
         let a = (show * 3.0).min(1.0).min((5.4 - show).max(0.0) * 3.0);
         if a > 0.0 {
             let (bx, by, bw, bh) = (118.0, 150.0, 164.0, 44.0);
-            draw_rectangle(bx, by, bw, bh, c(0.86, 0.8, 0.66, 0.92 * a));
-            draw_rectangle(bx, by, bw, 2.0, c(0.62, 0.5, 0.32, a));
-            draw_rectangle(bx, by + bh - 2.0, bw, 2.0, c(0.62, 0.5, 0.32, a));
-            blip::macroquad::shapes::draw_triangle(vec2(bx + bw, by + 12.0), vec2(bx + bw, by + 30.0), vec2(bx + bw + 44.0, by + 30.0), c(0.86, 0.8, 0.66, 0.92 * a));
-            let ink = c(0.22, 0.08, 0.06, a);
-            blip.draw_centered_outlined(say.0, bx + bw / 2.0, by + 6.0, 2.0, ink, c(0.0, 0.0, 0.0, 0.0));
-            blip.draw_centered_outlined(say.1, bx + bw / 2.0, by + 24.0, 2.0, ink, c(0.0, 0.0, 0.0, 0.0));
+            // In the blip message box, its tail toward him.
+            blip.draw_panel(bx, by - 4.0, bw, bh + 8.0, a);
+            blip.fill_triangle((bx + bw, by + 12.0), (bx + bw, by + 28.0), (bx + bw + 40.0, by + 28.0), with_a(BLIP_CREAM, a));
+            blip.fill_triangle((bx + bw - 2.0, by + 15.0), (bx + bw - 2.0, by + 26.0), (bx + bw + 30.0, by + 26.0), with_a(BLIP_INK, a));
+            let ink = with_a(BLIP_CREAM, a);
+            for (line, y) in [(say.0, by + 6.0), (say.1, by + 24.0)] {
+                blip.draw_text(line, (bx + bw / 2.0 - blip::font::text_width(line, 2.0) / 2.0 + 1.0).round(), y, 2.0, ink);
+            }
         }
 
         // the prompts, on a band of shadow along the bottom

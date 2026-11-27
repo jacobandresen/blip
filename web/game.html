@@ -10,10 +10,10 @@
   <title>BLIP ARCADE</title>
   <!-- The game's own folder: saved to a home screen, it is its own app. -->
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/x-icon" href="../favicon.ico?v=3">
-  <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png?v=3">
-  <link rel="icon" type="image/svg+xml" href="../favicon.svg?v=3">
-  <link rel="apple-touch-icon" href="icon-180.png?v=23">
+  <link rel="icon" type="image/x-icon" href="../favicon.ico?v=5">
+  <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png?v=5">
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg?v=5">
+  <link rel="apple-touch-icon" href="icon-180.png?v=26">
   <!-- Stepped into from the arcade: nothing is painted until game.js has laid the page out, so the browser keeps the
        arcade's last frame up meanwhile (data-launching, cleared by game.js). -->
   <script>
@@ -32,7 +32,7 @@
   </script>
   <style>:root[data-launching] body{visibility:hidden}</style>
   <script src="../howler.min.js"></script>
-  <script src="../blip_core.js?v=20"></script>
+  <script src="../blip_core.js?v=22"></script>
   <script>(function () {
     var g = blipGameFromPath(location.pathname);
     if (!g) return;
@@ -42,9 +42,9 @@
     document.querySelector('meta[name=apple-mobile-web-app-title]').content = name;
   }());</script>
   <script src="../cabinet.js?v=115"></script>
-  <link rel="stylesheet" href="../blip.css?v=186">
+  <link rel="stylesheet" href="../blip.css?v=194">
   <script src="../controller.js?v=2" defer></script>
-  <script src="../game.js?v=15" defer blocking="render"></script>
+  <script src="../game.js?v=22" defer blocking="render"></script>
 </head>
 <body class="cabinet-page">
 
@@ -81,7 +81,7 @@
   <script src="https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v2.0.0/dist/blip-deck.js"></script>
 
   <div id="need-coin-overlay">
-    <div class="nco-panel">
+    <div class="nco-panel blip-box">
       <div class="nco-msg">HOW TO PLAY</div>
       <div class="pc-legend nco-legend"></div>
       <div class="nco-sub nco-go"><span class="nco-pc">PRESS <kbd>SPACE</kbd> TO PLAY</span><span class="nco-touch">TAP HERE TO INSERT A COIN</span></div>

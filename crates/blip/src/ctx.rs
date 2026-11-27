@@ -52,6 +52,20 @@ fn crt_curve(p: macroquad::math::Vec2) -> macroquad::math::Vec2 {
     p * 0.5 + 0.5
 }
 
+/// The HUD bar's height, and its text's top: low enough in the bar that the curved-glass shader's barrel doesn't
+/// bow the top row off the top edge near the corners.
+const HUD_BAR: f32 = 28.0;
+const HUD_TEXT_Y: f32 = 7.0;
+/// The HUD: the score's place right of its coin, and the hearts' spacing and most shown.
+const HUD_SCORE_DX: f32 = 24.0;
+const HUD_HEART_STEP: f32 = 18.0;
+const HUD_HEARTS: i32 = 5;
+const HUD_SLOTS: i32 = 3;
+/// The digits `n` takes (anything below 1 counts as one).
+fn digits(n: i32) -> usize { n.max(0).checked_ilog10().map_or(1, |d| d as usize + 1) }
+/// The width of the best-score line "HI <n>" at size 2.
+fn hi_width(hi: i32) -> f32 { (3 + digits(hi)) as f32 * 12.0 }
+
 const SEAL_FRAGMENT: &str = r#"#version 100
 void main() { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); }
 "#;
@@ -314,9 +328,9 @@ impl Blip {
         macroquad::rand::srand(seed);
         let mut rng = Lcg(0xdead_beef);
         // Stagger initial cooldowns so effects don't all fire at once.
-        let tear_cd   = 20.0 + rng.next() * 30.0;
-        let roll_cd   = 60.0 + rng.next() * 60.0;
-        let chroma_cd = 15.0 + rng.next() * 15.0;
+        let tear_cd   = 90.0 + rng.next() * 90.0;
+        let roll_cd   = 240.0 + rng.next() * 240.0;
+        let chroma_cd = 60.0 + rng.next() * 60.0;
 
         #[cfg(not(target_arch = "wasm32"))]
         let (screenshot_mode, screenshot_path, screenshot_frame_target) = {
@@ -569,6 +583,8 @@ impl Blip {
     // Glitch state machine                                                 //
     // ------------------------------------------------------------------ //
 
+    /// The picture's faults: a line tear, a nudge and a colour fringe, each rare (minutes apart) and slight, a hint of
+    /// an old set rather than something to watch for.
     fn update_glitch(&mut self, dt: f32) {
         if !self.crt_look || !crate::web::glitches() { return; }
         let lh = self.height as f32;
@@ -581,8 +597,8 @@ impl Blip {
             if self.tear_cd <= 0.0 {
                 self.tear_t  = 0.025 + self.rng.next() * 0.035;
                 self.tear_y  = 0.15 + self.rng.next() * 0.70;
-                self.tear_dx = (self.rng.next() - 0.5) * 6.0;
-                self.tear_cd = 45.0 + self.rng.next() * 60.0;
+                self.tear_dx = (self.rng.next() - 0.5) * 3.0;
+                self.tear_cd = 150.0 + self.rng.next() * 150.0;
             }
         }
 
@@ -594,9 +610,9 @@ impl Blip {
             self.roll_cd -= dt;
             if self.roll_cd <= 0.0 {
                 self.roll_t   = 0.08 + self.rng.next() * 0.06;
-                self.roll_spd = 4.0 + self.rng.next() * 8.0;
+                self.roll_spd = 2.0 + self.rng.next() * 4.0;
                 self.roll_dy  = 0.0;
-                self.roll_cd  = 120.0 + self.rng.next() * 180.0;
+                self.roll_cd  = 360.0 + self.rng.next() * 360.0;
             }
         }
 
@@ -607,8 +623,8 @@ impl Blip {
             self.chroma_cd -= dt;
             if self.chroma_cd <= 0.0 {
                 self.chroma_t  = 0.025 + self.rng.next() * 0.05;
-                self.chroma_dx = 0.5 + self.rng.next() * 1.5;
-                self.chroma_cd = 30.0 + self.rng.next() * 45.0;
+                self.chroma_dx = 0.4 + self.rng.next() * 0.8;
+                self.chroma_cd = 120.0 + self.rng.next() * 120.0;
             }
         }
     }
@@ -833,7 +849,7 @@ impl Blip {
 
     /// The right edge of the HUD's SCORE cluster: the label and one digit cell per digit.
     fn hud_score_right(&self, score: i32) -> f32 {
-        self.hud_score_x() + 64.0 + score.max(0).to_string().len().max(1) as f32 * 12.0
+        self.hud_score_x() + HUD_SCORE_DX + digits(score) as f32 * 12.0
     }
 
     /// A score multiple (a streak's xN), just after the HUD's score, while there is one (`times` above 1). Call once a
@@ -857,30 +873,53 @@ impl Blip {
         }
     }
 
-    pub fn draw_hud(&self, score: i32, lives: i32) {
-        let hud_h = 28.0;
-        // Text baseline: low enough in the bar that the curved-glass shader's
-        // barrel doesn't bow the top row off the top edge near the corners.
-        let ty = 7.0;
-        self.fill_rect(0.0, 0.0, self.width as f32, hud_h, BLIP_BLACK);
-        self.draw_line(
-            0.0, hud_h - 1.0, self.width as f32, hud_h - 1.0, BLIP_DARKGRAY,
-        );
+    /// The HUD's bar, `h` tall: ink with a cream rim a pixel above its foot.
+    pub fn draw_hud_bar(&self, h: f32) {
+        let w = self.width as f32;
+        self.fill_rect(0.0, 0.0, w, h, BLIP_INK);
+        self.fill_rect(0.0, h - 3.0, w, 2.0, BLIP_CREAM);
+    }
 
-        // ---- SCORE, left ----
+    /// The HUD's bar on a title screen, the best score in its middle, as an arcade's attract mode shows it.
+    pub fn draw_attract_bar(&self) { self.draw_attract_bar_with(crate::web::high_score()); }
+
+    fn draw_attract_bar_with(&self, hi: i32) {
+        self.draw_hud_bar(HUD_BAR);
+        if hi <= 0 { return; }
+        self.draw_hi(((self.width as f32 - hi_width(hi)) / 2.0).round(), HUD_TEXT_Y, hi);
+    }
+
+    /// The best score in the HUD's bar: HI in gold, the number in cream.
+    fn draw_hi(&self, x: f32, y: f32, hi: i32) {
+        self.draw_text("HI", x, y, 2.0, BLIP_GOLD);
+        self.draw_text(&hi.to_string(), x + 36.0, y, 2.0, BLIP_CREAM);
+    }
+
+    /// The shared HUD, the same in every game: an ink bar with a cream rim, the coin and score left, the best in the
+    /// middle and a heart a life right (empty hearts for lives lost below three, a count past five).
+    pub fn draw_hud(&self, score: i32, lives: i32) {
+        let w = self.width as f32;
+        let ty = HUD_TEXT_Y;
+        self.draw_hud_bar(HUD_BAR);
+
+        // ---- the coin and the score, left ----
         let x0 = self.hud_score_x();
-        self.draw_text("SCORE", x0, ty, 2.0, BLIP_YELLOW);
-        self.draw_number(score, x0 + 64.0, ty, 2.0, BLIP_WHITE);
+        self.draw_coin(x0, 4.0, 2.0);
+        self.draw_number(score, x0 + HUD_SCORE_DX, ty, 2.0, BLIP_CREAM);
         let score_right = self.hud_score_right(score);
 
-        // ---- LIVES, right ----
-        // Inset from the right edge to clear the curved glass's black rim on
-        // every canvas width.
-        let edge_margin = (self.width as f32 * 0.085) as i32;
-        let lives_x = self.width - edge_margin - 24; // room for up to 2 digits
-        let lives_left = (lives_x - 64) as f32;
-        self.draw_text("LIVES", lives_left, ty, 2.0, BLIP_ORANGE);
-        self.draw_number(lives, lives_x as f32, ty, 2.0, BLIP_WHITE);
+        // ---- hearts, right ----
+        // Inset from the right edge to clear the curved glass's black rim on every canvas width.
+        let right = w - (w * 0.085).round();
+        // Three heart slots at least, so a life lost leaves an empty heart, as in the adventure games.
+        let shown = lives.clamp(HUD_SLOTS, HUD_HEARTS);
+        let count = if lives > HUD_HEARTS { format!("X{lives}") } else { String::new() };
+        let count_w = crate::font::text_width(&count, 2.0);
+        let hearts_left = right - count_w - shown as f32 * HUD_HEART_STEP;
+        for i in 0..shown {
+            self.draw_heart(hearts_left + i as f32 * HUD_HEART_STEP, 3.0, 2.0, i < lives);
+        }
+        self.draw_text(&count, right - count_w, ty, 2.0, BLIP_CREAM);
 
         // ---- HI <score>, centred in the gap ----
         let hi = crate::web::high_score();
@@ -888,30 +927,21 @@ impl Blip {
             return;
         }
         let lo = score_right + 16.0;
-        let avail = lives_left - 16.0 - lo;
-        let head = format!("HI {hi}");
-        let head_w = head.chars().count() as f32 * 12.0;
+        let avail = hearts_left - 16.0 - lo;
+        let head_w = hi_width(hi);
         // No clear room (a tiny canvas or a very long live score): no line.
         if head_w > avail {
             return;
         }
-        self.draw_text(&head, lo + (avail - head_w) / 2.0, ty, 2.0, BLIP_WHITE);
+        self.draw_hi(lo + (avail - head_w) / 2.0, ty, hi);
     }
 
-    /// The title screen's start prompt, the same in every game: PRESS SPACE TO
-    /// START, PRESS FIRE TO START or TAP TO START, white at size 3, outlined so
+    /// The title screen's start prompt, the same in every game: PRESS START TO
+    /// START or TAP TO START, white at size 3, outlined so
     /// it reads over artwork too.
     pub fn draw_start_prompt(&self, y: f32) {
         let prompt = crate::web::fire_prompt("TO START");
         self.draw_centered_outlined(&prompt, self.width as f32 / 2.0, y, 3.0, BLIP_WHITE, BLIP_BLACK);
-    }
-
-    /// Centred `HI 12345` line for a title screen, once there is a best.
-    /// `color` is the game's own accent.
-    pub fn draw_hi(&self, hi: i32, y: f32, color: Color) {
-        if hi > 0 {
-            self.draw_centered(&format!("HI {hi}"), y, 2.0, color);
-        }
     }
 
     /// Draw the shared game-over screen over the game's chosen backdrop.
@@ -925,11 +955,13 @@ impl Blip {
     #[allow(clippy::too_many_arguments)]
     pub fn draw_end_screen(&self, title: &str, score: i32, hi: i32, headline: Color, best: Color, prompt: Color, ready: bool) {
         let h = self.height as f32;
-        self.draw_centered(title, h / 4.0, 5.0, headline);
+        self.draw_attract_bar();
+        self.draw_end_panel();
+        self.draw_logo(title, self.width as f32 / 2.0, h / 4.0, 5.0, headline);
         self.draw_centered(&format!("SCORE {score}"), h / 2.0, 3.0, BLIP_WHITE);
         self.draw_best(score, hi, h / 2.0 + 28.0, best);
         if ready {
-            let again = crate::web::controls().pick("PRESS SPACE", "PRESS FIRE", "TAP TO PLAY");
+            let again = crate::web::controls().pick("PRESS START", "PRESS START", "TAP TO PLAY");
             self.draw_centered(again, Self::game_over_prompt_y(h), 3.0, prompt);
         }
     }
@@ -953,6 +985,15 @@ impl Blip {
         if cont.showing() { self.draw_game_over_prompt(&format!("CONTINUE? {}", cont.seconds()), color); }
     }
 
+    /// The end screen's message box, behind the title, the score and the prompt.
+    fn draw_end_panel(&self) {
+        let (w, h) = (self.width as f32, self.height as f32);
+        let top = h / 4.0 - 26.0;
+        let bottom = Self::game_over_prompt_y(h) + 21.0 + 22.0;
+        let margin = (w * 0.08).round().max(12.0);
+        self.draw_panel(margin, top, w - margin * 2.0, bottom - top, 1.0);
+    }
+
     /// Two thirds down, or lower on a short screen, to leave the note its line.
     fn game_over_prompt_y(h: f32) -> f32 {
         (h * 2.0 / 3.0).max(h / 2.0 + 80.0)
@@ -967,7 +1008,7 @@ impl Blip {
             let lit = crate::blink(4.0);
             self.draw_centered("NEW BEST!", y, 2.0, if lit { new_color } else { BLIP_WHITE });
         } else if hi > 0 {
-            self.draw_centered(&format!("BEST {hi}"), y, 2.0, BLIP_GRAY);
+            self.draw_centered(&format!("BEST {hi}"), y, 2.0, blend(BLIP_CREAM, BLIP_INK, 0.35));
         }
     }
 }

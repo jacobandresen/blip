@@ -1165,7 +1165,8 @@ impl Game {
                 }
             }
             match h.kind {
-                Hz::Car if h.oncoming => if h.phase == WAIT && ahead < 620.0 { h.phase = GO; },
+                Hz::Car if h.oncoming && h.phase == WAIT && ahead < 620.0 => h.phase = GO,
+                Hz::Car if h.oncoming => {}
                 Hz::Car => match h.phase {
                     WAIT if ahead < CAR_WAKE => { h.phase = TELL; h.t = 0.0; cues.push(Cue::Reverse); }
                     TELL if h.t > CAR_TELL && !h.held => { h.phase = GO; h.t = 0.0; }
@@ -1187,19 +1188,19 @@ impl Game {
                     if phase != GO { h.touched = false; }
                     h.phase = phase;
                 } else { h.t = 0.0; },
-                Hz::Blader | Hz::Cart | Hz::Walker | Hz::Cyclist | Hz::Tourist => if h.phase == WAIT && ahead < match h.kind {
+                Hz::Blader | Hz::Cart | Hz::Walker | Hz::Cyclist | Hz::Tourist if h.phase == WAIT && ahead < match h.kind {
                     Hz::Tourist => 480.0,
                     Hz::Blader => 560.0, Hz::Cart => 520.0, Hz::Cyclist if h.side == Side::Left => 600.0, Hz::Cyclist => 420.0,
-                    _ => 380.0 } { h.phase = GO; h.t = 0.0; },
-                Hz::Van => if h.side == Side::Right && h.phase == WAIT && ahead < 420.0 { h.phase = GO; },
+                    _ => 380.0 } => { h.phase = GO; h.t = 0.0; }
+                Hz::Van if h.side == Side::Right && h.phase == WAIT && ahead < 420.0 => h.phase = GO,
                 Hz::Bus => match h.phase {
                     WAIT if ahead < BUS_WAKE => { h.phase = TELL; h.t = 0.0; }
                     TELL if h.t > BUS_DWELL => { h.phase = AWAY; h.t = 0.0; }
                     _ => {}
                 },
-                Hz::Pigeons(_) => if h.phase == WAIT && ahead < 130.0 && (h.x - bx).abs() < 90.0 {
+                Hz::Pigeons(_) if h.phase == WAIT && ahead < 130.0 && (h.x - bx).abs() < 90.0 => {
                     h.phase = GO; h.t = 0.0; cues.push(Cue::Coo);
-                },
+                }
                 _ => {}
             }
             // move

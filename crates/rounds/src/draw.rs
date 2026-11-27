@@ -3,6 +3,7 @@
 
 use crate::game::*;
 use crate::levels::*;
+use blip::color::*;
 use blip::font::text_width;
 use blip::{scatter, Blip, BlipColor, BLIP_BLACK, BLIP_WHITE};
 use std::f32::consts::{PI, TAU};
@@ -10,7 +11,7 @@ use std::f32::consts::{PI, TAU};
 pub fn rgb(c: [u8; 3]) -> BlipColor { BlipColor::from_rgba(c[0], c[1], c[2], 255) }
 pub fn rgba(c: [u8; 3], a: f32) -> BlipColor { BlipColor { a, ..rgb(c) } }
 
-const INK: [u8; 3] = [34, 26, 40];
+const INK: [u8; 3] = blip::look::INK;
 const GRASS: [u8; 3] = [104, 160, 82];
 const PAVE: [u8; 3] = [196, 186, 170];
 const ROAD: [u8; 3] = [86, 90, 104];
@@ -125,6 +126,11 @@ fn heart(blip: &Blip, x: f32, y: f32, r: f32, c: BlipColor) {
 
 /// Text centred on `cx`, with an outline so it reads over the street.
 pub fn label(blip: &Blip, text: &str, cx: f32, y: f32, sz: f32, c: BlipColor) {
+    // Headings (GO!, a canal's name) in the blip logo lettering, when fully shown.
+    if sz >= 4.0 && c.a >= 1.0 {
+        blip.draw_logo(text, cx, y, sz, c);
+        return;
+    }
     blip.draw_text_outlined(text, (cx - text_width(text, sz) / 2.0).round(), y.round(), sz, c, rgb(INK));
 }
 
@@ -1191,6 +1197,7 @@ fn mix2(a: (f32, f32), b: (f32, f32), k: f32) -> (f32, f32) { (a.0 + (b.0 - a.0)
 
 /// A box standing on the ground, `hw` x `hh` either side of (`x`, `y`), `lo` to `hi` up: its walls that face the
 /// camera, then its top.
+#[allow(clippy::too_many_arguments)]
 pub fn block(x: f32, y: f32, hw: f32, hh: f32, lo: f32, hi: f32, wall: BlipColor, top: BlipColor) {
     let c = [(x - hw, y - hh), (x + hw, y - hh), (x + hw, y + hh), (x - hw, y + hh)];
     let b: Vec<_> = c.iter().map(|p| lift(p.0, p.1, lo)).collect();
@@ -2207,8 +2214,9 @@ const WEEKDAYS: [&str; 7] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 pub fn draw_bar(blip: &Blip, g: &Game, t: f32) {
     let y = WIN_H as f32 - BAR_H;
     let w = WIN_W as f32;
-    blip.fill_rect(0.0, y, w, BAR_H, rgb([28, 22, 34]));
-    blip.fill_rect(0.0, y, w, 2.0, rgb([200, 80, 90]));
+    // The shared HUD's bar, upside down: ink with a cream rim.
+    blip.fill_rect(0.0, y, w, BAR_H, BLIP_INK);
+    blip.fill_rect(0.0, y + 1.0, w, 2.0, BLIP_CREAM);
     let ty = y + 9.0;
     blip.draw_text(WEEKDAYS[g.day], 10.0, ty, 2.0, rgb([255, 236, 200]));
     weather_icon(blip, g.weather(), 64.0, y + 15.0, 0.55, t);
@@ -2217,8 +2225,10 @@ pub fn draw_bar(blip: &Blip, g: &Game, t: f32) {
     blip.fill_rect(96.0, ty + 2.0, 2.0, 8.0, rgb([200, 60, 60]));
     let low = g.stock <= 3 && (t * 4.0).fract() < 0.5;
     blip.draw_number(g.stock, 110.0, ty, 2.0, if low { rgb([255, 120, 110]) } else { BLIP_WHITE });
-    // the round: homes that take the paper
-    heart(blip, 166.0, ty + 4.0, 5.0, rgb(HEART));
+    // the round: homes that take the paper (a house: the hearts up top are lives)
+    blip.fill_rect(160.0, ty + 4.0, 12.0, 8.0, BLIP_CREAM);
+    tri((158.0, ty + 5.0), (174.0, ty + 5.0), (166.0, ty - 2.0), BLIP_HEART);
+    blip.fill_rect(165.0, ty + 7.0, 3.0, 5.0, BLIP_INK);
     blip.draw_number(g.subscribers() as i32, 178.0, ty, 2.0, BLIP_WHITE);
     if g.two_player {
         blip.draw_text("2P", 230.0, ty, 2.0, rgb([140, 230, 160]));
@@ -2318,10 +2328,7 @@ pub fn draw_banner(blip: &Blip, g: &Game) {
     if g.state == State::Play && g.place_t < 3.0 {
         let a = (3.0 - g.place_t).min(1.0) * (g.place_t * 3.0).min(1.0);
         let name = PLACES[g.place].1;
-        let wdt = text_width(name, 2.0) + 20.0;
-        blip.fill_rect(240.0 - wdt / 2.0, HUD_H + 8.0, wdt, 24.0, rgba([24, 40, 80], 0.85 * a));
-        blip.draw_rect(240.0 - wdt / 2.0 + 2.0, HUD_H + 10.0, wdt - 4.0, 20.0, rgba([240, 236, 220], a));
-        blip.draw_centered(name, HUD_H + 13.0, 2.0, rgba([250, 248, 240], a));
+        blip.draw_message(name, 240.0, HUD_H + 22.0, 2.0, BLIP_CREAM, a);
     }
     if let Some((text, left)) = &g.banner {
         label(blip, text, 240.0, 150.0, 2.0, rgba(GOLD, left.min(1.0)));
@@ -2336,11 +2343,12 @@ pub fn draw_title(blip: &Blip, g: &Game, hi: i32, t: f32) {
     draw_weather(blip, g, t);
     skyline(blip, t);
     let (cx, cy) = (240.0, 70.0);
-    label(blip, "ROUNDS", cx, cy, 7.0, rgb([255, 244, 220]));
-    label(blip, "A MORNING ROUND IN COPENHAGEN", cx, cy + 52.0, 2.0, rgb([255, 236, 210]));
-    blip.draw_hi(hi, cy + 74.0, rgb([255, 236, 200]));
+    blip.draw_logo("ROUNDS", cx, cy, 7.0, rgb([240, 120, 150]));
+    label(blip, "A MORNING ROUND IN COPENHAGEN", cx, cy + 60.0, 2.0, rgb([255, 236, 210]));
+    if hi > 0 { blip.draw_message(&format!("HI {hi}"), cx, cy + 96.0, 2.0, BLIP_GOLD, 1.0); }
     blip.draw_start_prompt(WIN_H as f32 * 0.52);
     let by = blip::web::controls();
+    blip.draw_panel(48.0, 318.0, WIN_W as f32 - 96.0, 82.0, 1.0);
     label(blip, by.pick("A D STEER  W S SPEED", "STICK STEERS AND PEDALS", "DRAG TO STEER AND PEDAL"), cx, 330.0, 2.0, BLIP_WHITE);
     label(blip, by.pick("F THROWS LEFT  G RIGHT", "A THROWS LEFT  B RIGHT", "TAP LEFT OR RIGHT TO THROW"), cx, 354.0, 2.0, BLIP_WHITE);
     label(blip, by.pick("J: TWO ON A TANDEM", "2P JOINS ON THE BACK", "2P JOINS ON THE BACK"), cx, 378.0, 2.0, rgb([160, 230, 170]));

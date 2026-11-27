@@ -170,8 +170,7 @@ impl Fx {
             let a = if k < 0.5 { 1.0 } else { 1.0 - (k - 0.5) * 2.0 };
             let w = font::text_width(&p.text, 2.0);
             let x = (p.x - w / 2.0).clamp(2.0, blip.width as f32 - w - 2.0);
-            blip.draw_text(&p.text, x + 1.0, y + 1.0, 2.0, Color { r: 0.0, g: 0.0, b: 0.0, a: a * 0.7 });
-            blip.draw_text(&p.text, x, y, 2.0, Color { a, ..p.c });
+            blip.draw_text_outlined(&p.text, x, y, 2.0, Color { a, ..p.c }, crate::color::BLIP_INK);
         }
     }
 }

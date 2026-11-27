@@ -1126,6 +1126,7 @@ pub(crate) fn hazed(c: BlipColor, sky: BlipColor, k: f32) -> BlipColor { blend(c
 /// A row of onlookers: small, dense, overlapping silhouettes below the
 /// fighters' heads, so they read as a crowd and not more fighters. They bob
 /// out of step and stand up for a big hit.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn draw_crowd(blip: &Blip, ground: f32, h: f32, c: BlipColor, t: f32, salt: u32, n: usize,
               roar: Roar) {
     let mass = ground - h * 0.42;

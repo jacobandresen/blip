@@ -136,7 +136,7 @@ function returnToCabinet(event) {
     try { departure.frame = canvas.toDataURL('image/png'); } catch (e) {}
     var screen = document.getElementById('arcade-bezel').getBoundingClientRect();
     departure.screen = { x:screen.left, y:screen.top, w:screen.width, h:screen.height };
-    departure.native = 'onpageswap' in window && 'onpagereveal' in window && CSS.supports('view-transition-name', 'machine-monitor');
+    departure.native = blipNativePageTransitions();
     try { sessionStorage.setItem('blip-cabinet-return', JSON.stringify(departure)); } catch (e) {}
   }
   location.href = blipFrontendUrl();
@@ -162,7 +162,7 @@ function returnToCabinet(event) {
   sign.dataset.title = game.name.charAt(0) + game.name.slice(1).toLowerCase();
   showBest(sign);
   // An app's launch screen shows its icon while the game loads.
-  document.documentElement.style.setProperty('--app-icon', 'url("' + new URL('icon-512.png?v=23', location.href).href + '")');
+  document.documentElement.style.setProperty('--app-icon', 'url("' + new URL('icon-512.png?v=27', location.href).href + '")');
   // The cabinet's own marquee (blip.css), as it stands in the arcade: the same machine.
   sign.classList.add('machine-marquee');
   sign.appendChild(Object.assign(document.createElement('b'), { className: 'machine-marquee-name', textContent: game.name }));
@@ -259,9 +259,10 @@ window.blipSpendCoin = function () {
 };
 
 // Called from WASM the moment a game ends (game-over or won): keep this
-// browser's best.
+// browser's best. The finish and the game-over screen stay in view; the coin
+// wall comes up only when the player starts again without a credit
+// (blipSpendCoin).
 window.blipGameOver = function (score) {
-  if (!FREE_PLAY && getCoins() <= 0) overlay.classList.add('visible');
   if (GAME && (score | 0) > blipHighScore()) {
     try { localStorage.setItem('blip-best-' + GAME.slug, String(score | 0)); } catch (e) {}
   }
@@ -416,7 +417,7 @@ function showInstallSheet() {
   var body = blipIOS()
     ? '<ol class="install-steps"><li>Tap ' + share + ' <b>Share</b> in Safari\'s toolbar.</li><li>Choose <b>Add to Home Screen</b>.</li></ol>'
     : '<p class="install-wait">Use your browser\'s menu: <b>Install app</b> or <b>Add to Home screen</b>.</p>';
-  sheet.innerHTML = '<div class="install-card"><img class="install-icon" src="icon-180.png?v=23" alt="">' +
+  sheet.innerHTML = '<div class="install-card"><img class="install-icon" src="icon-180.png?v=26" alt="">' +
     '<h2 id="install-title">Add ' + name + ' to your Home Screen</h2>' +
     '<p class="install-lede">Its icon opens ' + name + ' straight away, full screen, free to play.</p>' + body +
     '<div class="install-actions"><button type="button" class="install-go" hidden>INSTALL</button><button type="button" class="install-close">NOT NOW</button></div></div>';
@@ -629,6 +630,27 @@ function fillCanvas() {
     bezel.style.setProperty('--cabinet-panel-depth',
       TOPBAR_H + 'px');
     var frame = bezel.getBoundingClientRect();
+    // On a screen wider than the machine (the room shows beside it, blip.css) it is the arcade's cabinet seen near:
+    // its monitor the shape of the cabinet's (#game-grid .card-shot-wrap, 267 x 219 of its 300 x 660), as wide as
+    // that makes it for the height there is, so walking up to the machine ends on this one.
+    var rootStyle = document.documentElement.style, grille = document.querySelector('body > .machine-speaker');
+    if (matchMedia('(min-width:1017px)').matches && frame.height > 0) {
+      var cabinet = blipCabinetWidth(frame.height);
+      if (Math.abs(cabinet - frame.width) > 1 && fillCanvas.reshaped !== cabinet) {
+        fillCanvas.reshaped = cabinet;
+        rootStyle.setProperty('--cabinet-width', cabinet + 'px');
+        return fillCanvas();
+      }
+      // The speaker grille where the arcade's cabinet has it (36, 63, 228 x 13 of its 300 wide front, the monitor at
+      // 16.5, 84, 267 wide), at this monitor's scale.
+      var s = frame.width / 267;
+      if (grille) grille.style.cssText = 'left:' + (frame.left + 19.5 * s) + 'px;right:auto;width:' + (228 * s) + 'px;top:' + (frame.top - 21 * s) + 'px;height:' + (13 * s) + 'px';
+    } else if (rootStyle.getPropertyValue('--cabinet-width')) {
+      fillCanvas.reshaped = null;
+      if (grille) grille.removeAttribute('style');
+      rootStyle.removeProperty('--cabinet-width');
+      return fillCanvas();
+    }
     gl = frame.left + screenInset;
     screenTop = frame.top + screenInset;
     w = frame.width - screenInset * 2;
@@ -645,9 +667,13 @@ function fillCanvas() {
   canvas.style.setProperty('transform', 'none', 'important');
   // The controls position themselves off --topbar-h, the bar's real height.
   document.documentElement.style.setProperty('--topbar-h', TOPBAR_H + 'px');
-  // Where the screen is, for the arcade to zoom its cabinet's screen onto (openMachine in index.html).
+  // Where the screen is, for the arcade's walk up to its cabinet to end on (openMachine in arcade.js).
   if (!bare && document.documentElement.hasAttribute('data-machine')) {
-    try { localStorage.setItem('blip-screen-box', JSON.stringify({ w: innerWidth, h: innerHeight, box: [gl, screenTop, w, h], deck: TOPBAR_H })); } catch (e) {}
+    // And its monitor and deck, for the arcade to build its cabinet as this machine seen from farther (cabinet.js).
+    var monitor = bezel && bezel.getBoundingClientRect(), deck = tb && tb.getBoundingClientRect();
+    var box = function (r) { return r ? [r.left, r.top, r.width, r.height].map(Math.round) : null; };
+    try { localStorage.setItem('blip-screen-box', JSON.stringify({ w: innerWidth, h: innerHeight, box: [gl, screenTop, w, h], deck: TOPBAR_H,
+      monitor: box(monitor), panel: box(deck) })); } catch (e) {}
   }
   syncBuffer();
 }
@@ -666,10 +692,10 @@ function syncBuffer() {
   });
 }
 
-// A machine started from the arcade zooms into its screen; the game page opens on that same picture, where the
+// From the arcade the player walks up to the machine; this page opens on the picture its screen showed, where the
 // game will draw, and lets the first frame come up through it (blip-cabinet-launch, set by the arcade).
 var cabinetTransition = null;
-// Back to the arcade, the machine's parts are named as this page is captured, so they move back into its cabinet.
+// Back to the arcade the pages cross-fade (the arcade walks back from the machine), the fascia's fittings holding still.
 window.addEventListener('pageswap',function(event){
   if(!event.viewTransition)return;
   if(returningToCabinet&&document.documentElement.hasAttribute('data-machine'))document.documentElement.setAttribute('data-machine-leaving','');
@@ -680,11 +706,6 @@ window.addEventListener('pagereveal',function(event){
   fillCanvas();
   if(!event.viewTransition){document.documentElement.removeAttribute('data-machine-handoff');return;}
   if(!document.documentElement.hasAttribute('data-machine-handoff')){event.viewTransition.skipTransition();return;}
-  try {
-    var from=JSON.parse(sessionStorage.getItem('blip-machine-screen')||'null'),screen=document.getElementById('arcade-bezel').getBoundingClientRect();
-    sessionStorage.removeItem('blip-machine-screen');
-    if(from&&from.vw===innerWidth&&from.vh===innerHeight)blipMachineZoom(from,{x:screen.left,y:screen.top,w:screen.width,h:screen.height},false);
-  } catch(e) {}
   cabinetTransition=event.viewTransition.finished.catch(function(){});
   cabinetTransition.then(function(){document.documentElement.removeAttribute('data-machine-handoff');});
 });
@@ -728,8 +749,9 @@ function dropLaunchFrame() {
   }
   var frame = launchFrame;
   launchFrame = null;
-  frame.classList.add('launch-frame-out');
-  setTimeout(function () { frame.remove(); }, 400);
+  // Once the game's start-up has passed (it holds the page for a few frames), so the fade plays whole.
+  setTimeout(function () { frame.classList.add('launch-frame-out'); }, 150);
+  setTimeout(function () { frame.remove(); }, 850);
 }
 
 window.addEventListener('resize', fillCanvas);
@@ -901,7 +923,7 @@ window.addEventListener('keydown', function (e) {
       bubbles: true, cancelable: true, key: spec.key, code: spec.code
     }));
   }
-  // START taps the primary action — the title screen's "PRESS FIRE", the
+  // START taps the primary action — the title screen's "PRESS START", the
   // serve, the launch. SELECT leaves for the arcade's game grid (the trip
   // the BLIP logo makes) and is allowed even off the coin wall.
   function tapPrimary() {

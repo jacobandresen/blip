@@ -127,11 +127,17 @@ async fn main() {
         }
     }
 
+    // Player two's J on a card or a tally between rides: they climb on as the next ride starts.
+    let mut p2_waiting = false;
     loop {
         let dt = blip.delta_time;
         let t = blip::now();
         if blip::bot::active() { bot::drive(&g); }
         let was = g.state;
+        match g.state {
+            State::Title | State::Over => p2_waiting = false,
+            _ => if !g.two_player && key_pressed(BLIP_KEY_J) { p2_waiting = true; },
+        }
         match g.state {
             State::Title => {
                 // the street rolls by under the title
@@ -150,7 +156,8 @@ async fn main() {
             }
             State::Card => g.update_card(dt, skip()),
             State::Play => {
-                if !g.two_player && key_pressed(BLIP_KEY_J) {
+                if !g.two_player && p2_waiting {
+                    p2_waiting = false;
                     web::spend_coin();
                     web::set_mode(true);
                     g.join();

@@ -636,6 +636,7 @@ pub fn crowd_wav(long: bool) -> Vec<u8> {
 
 /// Noise through a resonant band-pass (state-variable filter) at `center`
 /// Hz, rising in `attack` and dying with time constant `decay` (seconds).
+#[allow(clippy::too_many_arguments)]
 fn band(buf: &mut [f32], at: f32, center: f32, q: f32, amp: f32, attack: f32, decay: f32, rng: &mut Rng) {
     let off = (at * SR) as usize;
     let n = ((attack + decay * 6.0) * SR) as usize;
@@ -688,6 +689,7 @@ fn knock(buf: &mut [f32], at: f32, f: f32, amp: f32, tau: f32) {
 }
 
 /// Synthesize a formant-shaped voice from `f0` to `f1`; `breath` controls the noise mix.
+#[allow(clippy::too_many_arguments)]
 fn voice(
     buf: &mut [f32],
     at: f32,

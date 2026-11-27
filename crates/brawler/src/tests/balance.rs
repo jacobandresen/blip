@@ -119,7 +119,8 @@ pub(crate) fn every_round_is_decided_by_something_that_happened() {
     // fighters largely untouched: that is a stalemate the rules cannot break.
     // Asserted as a rate over several seeds, since one seed is a coin flip in
     // a chaotic simulation (the rate held at 2-3% over 180 rounds).
-    let styles: [(&str, fn(usize, &[Fighter; 2]) -> Input); 3] =
+    type Style = fn(usize, &[Fighter; 2]) -> Input;
+    let styles: [(&str, Style); 3] =
         [("rusher", rusher), ("poker", poker), ("turtle", turtle)];
     let mut stalemates = vec![];
     let mut decided_fast = 0;

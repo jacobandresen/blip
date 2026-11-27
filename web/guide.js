@@ -136,10 +136,10 @@ function readGames(controls, history) {
       add({
         id: 'game-' + g.slug, group: 'Games', title: g.name, slug: g.slug,
         sub: past ? text(past, '.game-origin') : '',
-        icon: g.slug + '/icon-192.png?v=23',
+        icon: g.slug + '/icon-192.png?v=27',
         body: function () {
           var box = document.createDocumentFragment();
-          var meta = el('div', 'hero-meta', '<img src="' + g.slug + '/icon-192.png?v=23" alt=""><span><b>' + (past ? text(past, '.game-origin') : g.name) + '</b><span class="row-sub">' +
+          var meta = el('div', 'hero-meta', '<img src="' + g.slug + '/icon-192.png?v=27" alt=""><span><b>' + (past ? text(past, '.game-origin') : g.name) + '</b><span class="row-sub">' +
             (blipTwoPlayer(g.slug) ? '1 or 2 players' : '1 player') + '</span></span>');
           if (!EMBED && !OWN_APP) {
             var play = meta.appendChild(el('a', 'play', 'Play'));

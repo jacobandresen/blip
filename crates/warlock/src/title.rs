@@ -15,22 +15,7 @@ const HORIZON: f32 = 232.0;
 
 // ---- noise -----------------------------------------------------------------------
 
-fn lattice(x: i32, y: i32, seed: u32) -> f32 {
-    hash(x, y, seed)
-}
-
-/// Smooth value noise in `[0, 1]`.
-fn noise(x: f32, y: f32, seed: u32) -> f32 {
-    let (xi, yi) = (x.floor() as i32, y.floor() as i32);
-    let (xf, yf) = (x - x.floor(), y - y.floor());
-    let s = |t: f32| t * t * (3.0 - 2.0 * t);
-    let (u, v) = (s(xf), s(yf));
-    let a = lattice(xi, yi, seed);
-    let b = lattice(xi + 1, yi, seed);
-    let c = lattice(xi, yi + 1, seed);
-    let d = lattice(xi + 1, yi + 1, seed);
-    a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v
-}
+use blip::math::value_noise as noise;
 
 /// Fractal noise: `octaves` of value noise, each half as strong.
 fn fbm(x: f32, y: f32, octaves: u32, seed: u32) -> f32 {

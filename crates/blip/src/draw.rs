@@ -54,7 +54,7 @@ impl Blip {
         }
     }
 
-    /// Draw a neon glowing line: a soft wide halo under a bright hairline core. Use for vector silhouettes (ship
+    /// Draw a glowing line: a soft wide halo under a bright hairline core. Use for vector silhouettes (ship
     /// outlines, asteroid edges) that should read as "lit up" against a black background.
     pub fn draw_glow_line(&self, x1: f32, y1: f32, x2: f32, y2: f32, c: Color) {
         let (halo, mid) = glow_colors(c, 0.16);

@@ -1,5 +1,6 @@
 //! Space Invaders-inspired shooter.
 
+use blip::color::*;
 use blip::input::{coin_start, key_active, play_again, Stick, BLIP_KEY_SPACE};
 use blip::macroquad::rand::rand;
 use blip::macroquad::texture::Texture2D;
@@ -8,7 +9,7 @@ use blip::{
     load_png,
     clamp, lerp, play_sfx, Jukebox, rand_int, rects_overlap, web, window_conf, Blip, Fx,
     BlipColor, LifeResult, Session, Timer, segment_rect_overlap,
-    BLIP_BLACK, BLIP_CYAN, BLIP_GREEN, BLIP_MAGENTA, BLIP_ORANGE, BLIP_RED,
+    BLIP_BLACK, BLIP_GREEN, BLIP_ORANGE, BLIP_RED,
     BLIP_WHITE, BLIP_YELLOW,
 };
 
@@ -686,6 +687,7 @@ fn update_ufo(
 
 /// The saucer at `x`,`y`, `w` by `h`: its body, then its rim lights, yellow and
 /// white by turns, turned `frame` steps round the disc.
+#[allow(clippy::too_many_arguments)]
 fn draw_saucer(blip: &Blip, saucer: &Texture2D, x: f32, y: f32, w: f32, h: f32, frame: usize, tint: BlipColor) {
     blip.draw_texture_tinted(saucer, x, y, w, h, tint);
     let (sx, sy) = (w / UFO_W, h / UFO_H);
@@ -763,7 +765,7 @@ fn draw_ufo(blip: &Blip, g: &Game, saucer: &Texture2D) {
     }
     if g.ufo_score_timer.active() {
         let text = format!("{} PTS", g.ufo_score);
-        blip.draw_centered(&text, UFO_Y, 2.0, BLIP_YELLOW);
+        blip.draw_centered_outlined(&text, (WIN_W / 2) as f32, UFO_Y, 2.0, BLIP_GOLD, BLIP_INK);
     }
 }
 
@@ -775,9 +777,9 @@ fn update_title(g: &mut Game) {
 /// the same as the title screen's legend.
 fn alien_color(kind: usize) -> BlipColor {
     match kind {
-        0 => BLIP_MAGENTA, // squid   — 30 points
-        1 => BLIP_CYAN,    // crab    — 20 points
-        _ => BLIP_GREEN,   // octopus — 10 points
+        0 => BlipColor { r: 0.93, g: 0.42, b: 0.86, a: 1.0 }, // squid   — 30 points
+        1 => BLIP_SEA,                                       // crab    — 20 points
+        _ => BLIP_LEAF,                                      // octopus — 10 points
     }
 }
 
@@ -1494,35 +1496,45 @@ fn hash(n: u32) -> u32 {
     x ^ (x >> 12)
 }
 
-/// The night the cannon defends: twinkling stars, a low moon and a dark town on the horizon, lit window by window.
+/// The night the cannon defends: a deep blue sky lightening toward the horizon, twinkling stars, a cream moon and a
+/// town of rooftops lit window by window, on a strip of grass.
 fn draw_backdrop(blip: &Blip, now: f32) {
+    let (top, bottom) = (PLAY_Y as f32, GROUND_Y as f32);
+    blip.fill_bands(0.0, top, WIN_W as f32, bottom - top, 8, |k| blip::blend(BLIP_NIGHT, BLIP_DUSK, k * k));
     for i in 0..70u32 {
         let h = hash(i);
         let (x, y) = ((h % WIN_W as u32) as f32, PLAY_Y as f32 + ((h >> 10) % (GROUND_Y as u32 - 90 - PLAY_Y as u32)) as f32);
         let tw = 0.35 + 0.35 * (now * (0.8 + (h >> 20 & 7) as f32 * 0.3) + i as f32).sin();
         let s = if h >> 24 & 3 == 0 { 2.0 } else { 1.0 };
-        blip.fill_rect(x, y, s, s, BlipColor { r: 0.8, g: 0.85, b: 1.0, a: tw * 0.6 });
+        blip.fill_rect(x, y, s, s, BlipColor { a: tw * 0.8, ..BLIP_CREAM });
     }
-    blip.fill_circle(56.0, PLAY_Y as f32 + 52.0, 18.0, BlipColor { r: 0.22, g: 0.22, b: 0.28, a: 1.0 });
-    blip.fill_circle(62.0, PLAY_Y as f32 + 47.0, 16.0, BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 1.0 });
+    // A crescent: the cream moon with the sky's colour bitten out of it.
+    blip.fill_circle(56.0, PLAY_Y as f32 + 52.0, 19.0, BLIP_INK);
+    blip.fill_circle(56.0, PLAY_Y as f32 + 52.0, 18.0, BLIP_CREAM);
+    blip.fill_circle(63.0, PLAY_Y as f32 + 47.0, 16.0, BLIP_NIGHT);
     let mut x = 0.0;
     let mut i = 0u32;
+    let house = blip::blend(BLIP_DUSK, BLIP_INK, 0.45);
     while x < WIN_W as f32 {
         let h = hash(1000 + i);
         let (w, tall) = (18.0 + (h % 20) as f32, 14.0 + ((h >> 8) % 34) as f32);
         let top = GROUND_Y as f32 - 1.0 - tall;
-        blip.fill_rect(x, top, w - 2.0, tall, BlipColor { r: 0.05, g: 0.06, b: 0.12, a: 1.0 });
+        blip.fill_rect(x, top, w - 2.0, tall, house);
+        blip.fill_rect(x, top, w - 2.0, 2.0, blip::blend(house, BLIP_PLUM, 0.35));
         for wy in (0..(tall as i32 - 6)).step_by(7) {
             for wx in (3..(w as i32 - 5)).step_by(6) {
                 let lit = hash(h ^ (wy as u32 * 31 + wx as u32)).is_multiple_of(5);
-                if lit { blip.fill_rect(x + wx as f32, top + 4.0 + wy as f32, 2.0, 3.0, BlipColor { r: 0.55, g: 0.45, b: 0.18, a: 0.7 }); }
+                if lit { blip.fill_rect(x + wx as f32, top + 4.0 + wy as f32, 2.0, 3.0, BlipColor { a: 0.8, ..BLIP_GOLD }); }
             }
         }
         x += w;
         i += 1;
     }
+    // The grass the cannon rolls on, below the ground line.
+    blip.fill_rect(0.0, GROUND_Y as f32 + 1.0, WIN_W as f32, (WIN_H - GROUND_Y) as f32, blip::blend(BLIP_LEAF, BLIP_INK, 0.55));
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_play(blip: &Blip, g: &Game,
              player: &Texture2D, alien: &[[Texture2D; 2]; 3],
              explosion: &Texture2D, shield: &Texture2D, bullet: &Texture2D,
@@ -1531,8 +1543,9 @@ fn draw_play(blip: &Blip, g: &Game,
     // The ground line pulses red while the invaders are close to landing.
     let lowest = g.aliens.iter().filter(|a| a.alive).map(|a| a.y + ALIEN_H as f32).fold(0.0, f32::max);
     let ground = if g.state == State::Play && lowest > (GROUND_Y - LANDING_WARN) as f32
-        && blip::blink(4.0) { BLIP_RED } else { BLIP_GREEN };
-    blip.fill_rect(0.0, GROUND_Y as f32 - 1.0, WIN_W as f32, 2.0, ground);
+        && blip::blink(4.0) { BLIP_HEART } else { BLIP_LEAF };
+    blip.fill_rect(0.0, GROUND_Y as f32 - 1.0, WIN_W as f32, 3.0, ground);
+    blip.fill_rect(0.0, GROUND_Y as f32 + 2.0, WIN_W as f32, 1.0, BLIP_INK);
 
     for s in 0..SHIELDS {
         for r in 0..SHIELD_ROWS {
@@ -1605,7 +1618,7 @@ fn draw_play(blip: &Blip, g: &Game,
         if b.y > (GROUND_Y - 60) as f32 {
             blip.fill_glow_circle(b.x + 2.0, (GROUND_Y - 28) as f32, 8.0, BlipColor { r: 0.8, g: 0.95, b: 1.0, a: 0.6 });
         }
-        blip.draw_texture_tinted(bullet, b.x, b.y, 4.0, 12.0, BLIP_WHITE);
+        blip.draw_texture_tinted(bullet, b.x, b.y, 4.0, 12.0, BLIP_CREAM);
     }
 
     for e in g.explosions.iter() {
@@ -1635,11 +1648,11 @@ fn draw_play(blip: &Blip, g: &Game,
     if g.streak.count > 0 {
         let label = streak_label(&g.streak);
         let x = blip.text_cx(&label, 2) as f32;
-        blip.draw_text(&label, x, (GROUND_Y + 10) as f32, 2.0, BLIP_YELLOW);
+        blip.draw_text_outlined(&label, x, (GROUND_Y + 10) as f32, 2.0, BLIP_GOLD, BLIP_INK);
     } else if g.lost_run.1 > 0.0 {
         let label = format!("{} IN A ROW", g.lost_run.0);
         let x = blip.text_cx(&label, 2) as f32;
-        blip.draw_text(&label, x, (GROUND_Y + 10) as f32, 2.0, BLIP_RED);
+        blip.draw_text_outlined(&label, x, (GROUND_Y + 10) as f32, 2.0, BLIP_HEART, BLIP_INK);
     }
 }
 
@@ -1655,11 +1668,11 @@ fn streak_label(s: &blip::Streak) -> String {
     }
 }
 
-fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: i32) {
+fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3]) {
     draw_backdrop(blip, blip::now());
-    blip.draw_centered("DEFENDER", (WIN_H / 5 + 14) as f32, 6.0, BLIP_MAGENTA);
+    blip.draw_logo("DEFENDER", (WIN_W / 2) as f32, (WIN_H / 5 + 14) as f32, 6.0, alien_color(0));
     // The title is 6 x 7 = 42px tall: the high score clears it by a real margin.
-    blip.draw_hi(hi, (WIN_H / 5 + 93) as f32, BLIP_YELLOW);
+    blip.draw_attract_bar();
 
     let dw = (ALIEN_W / 2) as f32;
     let dh = (ALIEN_H / 2) as f32;
@@ -1670,6 +1683,7 @@ fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: i32) {
     let row1 = (WIN_H / 2 - 20) as f32;
     let row2 = (WIN_H / 2) as f32;
 
+    blip.draw_panel((WIN_W / 2 - 110) as f32, row0 - 16.0, 220.0, 84.0, 1.0);
     // The invaders' two-frame shuffle, one beat every half second.
     let beat = (blip::now() * 2.0) as i64;
     let frame = beat.rem_euclid(2) as usize;
@@ -1677,9 +1691,9 @@ fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: i32) {
     blip.draw_texture_tinted(&alien[1][frame], ax, row1 + voff, dw, dh, alien_color(1));
     blip.draw_texture_tinted(&alien[2][frame], ax, row2 + voff, dw, dh, alien_color(2));
 
-    blip.draw_centered("30 PTS",        row0,                 2.0, BLIP_MAGENTA);
-    blip.draw_centered("20 PTS",        row1,                 2.0, BLIP_CYAN);
-    blip.draw_centered("10 PTS",        row2,                 2.0, BLIP_GREEN);
+    blip.draw_centered("30 PTS",        row0,                 2.0, alien_color(0));
+    blip.draw_centered("20 PTS",        row1,                 2.0, alien_color(1));
+    blip.draw_centered("10 PTS",        row2,                 2.0, alien_color(2));
     blip.draw_start_prompt((WIN_H * 2 / 3) as f32);
     // A patrol steps across the foot of the screen, a stride per beat.
     let sweep = 5i64;
@@ -1696,10 +1710,10 @@ fn draw_clear(blip: &Blip, level: i32, t: f32) {
     // Fireworks over the town the cannon kept safe.
     draw_backdrop(blip, blip::now());
     blip::draw_fireworks(blip, t, (60.0, (PLAY_Y + 60) as f32, (WIN_W - 120) as f32, 220.0),
-        &[BLIP_MAGENTA, BLIP_CYAN, BLIP_GREEN, BLIP_YELLOW]);
+        &[alien_color(0), BLIP_SEA, BLIP_LEAF, BLIP_GOLD]);
     let buf = format!("LEVEL {}", level);
-    blip.draw_centered("WAVE CLEAR", (WIN_H / 3) as f32, 4.0, BLIP_CYAN);
-    blip.draw_centered(&buf,         (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
+    blip.draw_logo("WAVE CLEAR", (WIN_W / 2) as f32, (WIN_H / 3) as f32, 5.0, BLIP_SEA);
+    blip.draw_message(&buf, (WIN_W / 2) as f32, (WIN_H / 2 + 10) as f32, 3.0, BLIP_GOLD, 1.0);
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -1758,7 +1772,7 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title => draw_title(&blip, &alien, web::high_score()),
+            State::Title => draw_title(&blip, &alien),
             State::Win   => draw_clear(&blip, g.sess.level, 1.5 - g.dead_timer.remaining()),
             State::Over  => {
                 draw_backdrop(&blip, blip::now());

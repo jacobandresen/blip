@@ -767,10 +767,9 @@
   --cabinet-bottom-bar-height:56px;
 }
 
-html { height: 100%; }
 /* Kill rubber-band overscroll so the fixed bottom bar can't appear to
    peel off the bottom edge during a bounce on iOS. */
-html { overflow-x: hidden; overscroll-behavior: none; }
+html { height: 100%; overflow-x: hidden; overscroll-behavior: none; }
 
 body {
   height:auto;
@@ -833,7 +832,6 @@ header {
   text-decoration: none;
   color: inherit;
 }
-
 
 .card-serpent    { --c: var(--green);   }
 .card-bouncer    { --c: var(--cyan);    }
@@ -1103,12 +1101,8 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
 }
 /* Safari can paint coplanar front details behind the cabinet background. */
 #game-grid .card > :is(.card-title,.machine-speaker,.card-shot-wrap) {transform:translateZ(1px)}
-.machine-launching .jukebox-front {
-  transition:transform .76s cubic-bezier(.45,0,.25,1);
-  transform:translate(var(--launch-x),var(--launch-y)) scale(var(--launch-zoom));
-}
 /* The screen being stepped into shows the game's picture, which the game page opens on. */
-#game-grid .card.card-launching .card-loop {visibility:hidden}
+#game-grid .card.card-launching[data-loop] .card-loop {visibility:hidden}
 #game-grid .card.card-launching :is(.machine-attract,.machine-instructions) {opacity:0;transition:opacity .25s}
 
 /* A phone on its side: the player stands close, the coin door below the frame. */
@@ -1142,13 +1136,14 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
 /* Monitor: a CRT behind black bezel glass with a printed pinstripe and the game's instructions. */
 #game-grid .card-shot-wrap {
   position:absolute;z-index:2;left:5.5%;right:5.5%;top:12.8%;height:33.2%;width:auto;max-width:none;margin:0;padding:0;align-self:auto;aspect-ratio:auto;
-  border:0;border-radius:6px;
-  background:var(--machine-monitor);box-shadow:var(--machine-monitor-ring);
+  border:0;border-radius:var(--monitor-radius,6px);
+  background:var(--machine-monitor);box-shadow:var(--monitor-ring,var(--machine-monitor-ring));
 }
 #game-grid .card-shot-wrap::before {content:none}
 #game-grid .card-shot-wrap::after {content:none}
-#game-grid .game-rom {position:absolute;inset:13px 14px 22px;display:block;padding:0;border:0;border-radius:16px/20px;overflow:hidden;background:#000;
-  box-shadow:0 0 0 3px #000}
+/* Where the arcade knows the game page's machine (arcade.js fitDecks), the tube sits in its monitor as there. */
+#game-grid .game-rom {position:absolute;inset:var(--rom-inset,13px 14px 22px);display:block;padding:0;border:0;border-radius:var(--rom-radius,16px/20px);overflow:hidden;background:#000;
+  box-shadow:var(--rom-ring,0 0 0 3px #000)}
 /* Letterboxed, as the game draws itself. No filter or opacity: inside the turned cabinets iOS Safari drew a filtered or fading screen black. */
 #game-grid .game-rom .card-shot,#game-grid .card-shot-wrap img.card-shot {
   position:absolute;
@@ -1179,12 +1174,13 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
   transition:opacity .3s;
 }
 .card-focused .machine-attract {opacity:1}
-.machine-attract b {padding:5px 7px 4px;background:#000b;color:#fff;font:400 11px/1 'Press Start 2P','Courier New',monospace;letter-spacing:.04em;white-space:nowrap;
-  text-shadow:0 0 6px color-mix(in srgb,var(--trim) 80%,#fff)}
+/* In the games' message box (.blip-box's look, scaled to the small screen). */
+.machine-attract b {padding:8px 10px 7px;background:var(--blip-ink);box-shadow:inset 0 0 0 1px var(--blip-ink),inset 0 0 0 3px var(--blip-cream);border-radius:2px;
+  color:var(--blip-cream);font:400 11px/1 var(--blip-pixel);letter-spacing:.04em;white-space:nowrap}
 .card-focused .machine-attract b {animation:machine-blink 1.1s steps(1) infinite}
 @keyframes machine-blink {60% {visibility:hidden}}
-.machine-credit {position:static;transform:none;min-width:0;padding:3px 5px 2px;border:0;border-radius:0;background:#000b;box-shadow:none;
-  color:#ffe066;font:400 7px/1 'Press Start 2P','Courier New',monospace;letter-spacing:.06em;text-shadow:none;white-space:nowrap}
+.machine-credit {position:static;transform:none;min-width:0;padding:3px 5px 2px;border:0;border-radius:0;background:var(--blip-ink);box-shadow:none;
+  color:var(--blip-gold);font:400 7px/1 var(--blip-pixel);letter-spacing:.06em;text-shadow:none;white-space:nowrap}
 
 .card-pick {left:calc(14px + env(safe-area-inset-left,0px));right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:70;width:auto;max-width:none;justify-content:space-between;transform:none;
   padding:0;border:0;background:none;box-shadow:none;pointer-events:none;}
@@ -1198,20 +1194,21 @@ body.cabinet-page {padding-bottom:0!important;--cabinet-bottom-bar-height:0px}
 body.cabinet-page .screen-bezel {bottom:0!important}
 :root[data-layout="landscape"] body.cabinet-page .screen-bezel {bottom:env(safe-area-inset-bottom,0px)!important}
 
-/* The shared deck slopes out from the monitor; its front apron faces the player. It is the game page's deck as a
-   computer shows it (a 1000 × 800 page), scaled to the cabinet's width, so it keeps the game page's proportions. */
-.machine-controls {position:absolute;z-index:5;left:-4%;right:-4%;top:48%;height:calc(var(--deck-height,42px) + 10px);border:0;border-radius:0;clip-path:none;
-  background:none;box-shadow:none;transform-style:preserve-3d;transform-origin:50% 0;transform:rotateX(32deg) scaleX(.98);}
+/* The shared deck below the monitor, its front apron facing the player. It is the game page's deck as a computer
+   shows it (a 1000 × 800 page), scaled to the cabinet's width, so it keeps the game page's proportions, and its tilt:
+   it is drawn sloping as the game page draws it, so it slopes the same from across the room as up close. */
+.machine-controls {position:absolute;z-index:5;left:var(--deck-x,-4%);width:var(--deck-w,108%);top:var(--deck-y,48%);height:calc(var(--deck-height,42px) + 10px);border:0;border-radius:0;clip-path:none;
+  background:none;box-shadow:none;transform-style:preserve-3d;transform-origin:50% 0;transform:scaleX(var(--deck-squeeze,.98));}
 .machine-controls::before {content:'';position:absolute;left:0;right:0;top:0;height:var(--deck-height,42px);border-radius:7px 7px 0 0;
   background:#1b181b;box-shadow:0 -3px 5px #000b,inset 1px 0 #fff3,inset -1px 0 #000b;transform:translateZ(-1px)}
-.machine-controls::after {content:'';position:absolute;left:0;right:0;top:var(--deck-height,42px);height:22px;transform-origin:50% 0;transform:rotateX(-32deg);border-radius:0 0 4px 4px;
+.machine-controls::after {content:'';position:absolute;left:0;right:0;top:var(--deck-height,42px);height:10px;transform-origin:50% 0;border-radius:0 0 4px 4px;
 
   box-shadow:inset 1px 0 #fff2,inset -1px 0 #0009,0 8px 10px #000b}
 .machine-deck {position:absolute;left:0;right:0;top:0;height:var(--deck-height,42px);overflow:hidden;}
 .machine-deck iframe[data-loaded] {opacity:1}
 /* blip-deck 2.0 on an 800px page: its panel spans y 614–800, so 1400px wide (the cap lifted) keeps the cabinet deck 42px tall. */
-.machine-deck iframe {transition:opacity .35s;position:absolute;left:0;top:0;width:1400px;height:800px;border:0;background:transparent;
-  transform-origin:0 0;transform:scale(var(--deck-scale,.2314)) translateY(-614px)}
+.machine-deck iframe {transition:opacity .35s;position:absolute;left:0;top:0;width:var(--deck-page-w,1400px);height:var(--deck-page-h,800px);border:0;background:transparent;
+  transform-origin:0 0;transform:scale(var(--deck-scale,.2314)) translate(var(--deck-shift-x,0px),var(--deck-shift,-614px))}
 .machine-deck-cheek {position:absolute;top:0;left:0;width:calc(var(--deck-height,42px) * .45);height:var(--deck-height,42px);transform-origin:0 0;transform:rotateY(90deg);
   clip-path:polygon(0 0,0 100%,100% 72%);background:linear-gradient(90deg,#393039,#17131a 35%,#0b090e);}
 .machine-deck-cheek.right {left:100%;background:linear-gradient(90deg,#211c24,#0b090e 80%)}
@@ -1258,7 +1255,15 @@ body.cabinet-page .screen-bezel {bottom:0!important}
   background:#d9a640;opacity:0;transform:translateX(-50%);pointer-events:none}
 .machine-coinbox.coin-inserting .machine-coin-slot::after {animation:machine-coin-drop .3s ease-in both}
 @keyframes machine-coin-drop {0%{opacity:1;transform:translate(-50%,-6px)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,10px)}}
-.machine-coin-price {position:absolute;left:0;right:0;bottom:12%;color:#ffe8c6;font:400 7px/1 'Press Start 2P','Courier New',monospace;text-shadow:0 1px #5a0705}
+.machine-coin-price {
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:12%;
+  color:#ffe8c6;
+  font:400 7px/1 'Press Start 2P','Courier New',monospace;
+  text-shadow:0 1px #5a0705;
+}
 .machine-coinbox.coin-inserting .machine-coin-mech::before {filter:brightness(1.4)}
 #game-grid .card .machine-coinbox,#game-grid .card .machine-start {pointer-events:auto!important;cursor:pointer}
 .machine-coinbox:focus-visible,.machine-start:focus-visible {outline:2px solid #ffe0a1;outline-offset:3px}
@@ -1271,11 +1276,34 @@ body.cabinet-page .screen-bezel {bottom:0!important}
   .machine-coinbox.coin-inserting .machine-coin-slot::after {animation:none}
 }
 
-/* The room: a plain wall meeting a plain floor at --room-floor-y (arcade.js), and each machine's shadow on the wall.
-   The colours are blip.css's --room-*, which the game page's wall shares. */
-#game-grid {background:var(--room-light),linear-gradient(180deg,var(--room-wall-top),var(--room-wall) var(--room-floor-y,68%),var(--room-floor) var(--room-floor-y,68%),var(--room-floor-low))}
-#game-grid .card-backlight {position:absolute;left:-30%;right:-30%;top:0;bottom:0;transform:translateZ(-214px);
-  background:radial-gradient(ellipse 45% 60% at 50% 70%,rgb(0 0 0 / .45),transparent 80%)}
+/* The room (blip.css's --room, which the game page's wall shares), its floor at --room-floor-y (arcade.js): a wall
+   and a floor that slide with the walk (arcade.js slideRoom), standing 288px (the patterns' repeat) out past the
+   right side, under the light; and each machine's shadow on the wall. */
+#game-grid {background:#0c090f}
+#game-grid::after {content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:var(--room-light),linear-gradient(180deg,transparent 82%,rgb(20 10 6 / .4))}
+.room-wall,.room-floor {position:absolute;z-index:-1;pointer-events:none}
+/* While the eye walks in (arcade.js), the room's patterns keep their raster rather than redrawing every frame. */
+#game-grid[data-walking] :is(.room-wall,.room-floor) {will-change:transform}
+.room-wall {top:0;bottom:0;left:0;right:-288px;background:var(--room)}
+/* The floor, lying from the wall (its top edge) out past the player (its bottom edge, FLOOR_FRONT in front of the
+   machines): honey boards, darker where they meet the wall. */
+.room-floor {left:-100%;width:300%;transform-origin:50% 100%;
+  background:linear-gradient(180deg,rgb(20 10 10 / .55),rgb(20 10 10 / .18) 30px,transparent 90px),var(--room-boards) 0 0 / 288px 60px}
+/* The light hangs above and to the left, as in the games: each machine's shadow falls on the wall behind it a little
+   right and down, and pools on the floor round its foot. */
+#game-grid .card-backlight {position:absolute;left:4%;right:-10%;top:6%;bottom:0;transform:translateZ(-214px);border-radius:14px;
+  background:rgb(16 8 20 / .5);box-shadow:0 0 30px 16px rgb(16 8 20 / .5)}
+#game-grid .card-floorshadow {position:absolute;left:-3%;right:-9%;bottom:0;height:236px;border-radius:24px;
+  transform-origin:50% 100%;transform:translateZ(26px) rotateX(90deg);background:rgb(30 14 6 / .8);box-shadow:0 0 26px 20px rgb(30 14 6 / .62)}
+/* Things in the room (web/room.js): solids of flat faces in a machine's 3D space, from the floor at its left edge. */
+#game-grid .room-thing {position:absolute;left:0;bottom:0;width:0;height:0;transform-style:preserve-3d}
+#game-grid .room-face {position:absolute;left:0;top:0;backface-visibility:hidden}
 
 /* On a computer the room fills the window: the frame is the window less its margins, not a fixed 960px. */
 :root {--cabinet-width:calc(100vw - 32px)}
+
+/* Walking up to a machine, the top bar takes its marquee as the game page shows it (arcade.js nearing). */
+.walk-marquee {position:absolute;inset:0;z-index:0;opacity:0;pointer-events:none;display:flex;align-items:center;justify-content:center}
+.walk-marquee b {font:400 20px/20px 'Press Start 2P','Courier New',monospace;color:#fff7d6;
+  text-shadow:-2px -2px 0 var(--blip-ink),2px -2px 0 var(--blip-ink),-2px 2px 0 var(--blip-ink),2px 2px 0 var(--blip-ink)}

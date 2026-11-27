@@ -118,6 +118,7 @@ pub(crate) struct MoveData {
 }
 
 /// A `MoveData`, positionally: what the move table is written in.
+#[allow(clippy::too_many_arguments)]
 pub(crate) const fn mv(startup: f32, active: f32, recovery: f32, damage: i32, hitstun: f32, blockstun: f32,
             reach: f32, height: f32, thickness: f32, level: Level, knockdown: bool) -> MoveData {
     MoveData { startup, active, recovery, damage, hitstun, blockstun, reach, height, thickness,

@@ -33,9 +33,9 @@ pub const PLAYTHROUGHS: &[Playthrough] = &[
         ..Playthrough::DEFAULT
     },
     Playthrough {
-        name: "it survives the frenzy from level 5",
-        level: FRENZY_LEVEL as u32,
-        goals: &[AtLeast("level", FRENZY_LEVEL as f64 + 1.0)],
+        name: "it survives the fast levels from level 5",
+        level: FAST_LEVEL as u32,
+        goals: &[AtLeast("level", FAST_LEVEL as f64 + 1.0)],
         ..Playthrough::DEFAULT
     },
 ];

@@ -594,8 +594,6 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
 :root[data-machine]:not([data-appstyle])[data-layout="upright"] #topbar .deck-housing::before {
   left:0;right:0;top:auto;bottom:0;height:12px;background:var(--machine-apron);border-radius:0;
 }
-:root[data-machine-leaving] #topbar {view-transition-name:machine-deck}
-:root[data-machine-handoff] #topbar {view-transition-name:machine-deck}
 :root:not([data-appstyle])[data-layout="upright"] body.cabinet-page .deck-housing {
   background:linear-gradient(90deg,#0007,#0000 12% 88%,#0007),var(--cabinet-shell);
   border:1px solid #ffffff14;border-bottom:0;
@@ -686,7 +684,7 @@ body.cabinet-page :is(.ts-tag,.ts-hint) {color:#c2b49c;font-family:'Courier New'
   display:flex;align-items:center;justify-content:center;box-sizing:border-box;
   font:400 20px/1 'Press Start 2P','Courier New',monospace;letter-spacing:.02em;font-style:normal;text-align:center;text-decoration:none;white-space:nowrap;
   color:var(--marquee-ink,#fff7d6)!important;-webkit-text-fill-color:currentColor;
-  text-shadow:-2px -2px #120c18,2px -2px #120c18,-2px 2px #120c18,2px 2px #120c18,0 4px #120c18;
+  text-shadow:-2px -2px var(--blip-ink),2px -2px var(--blip-ink),-2px 2px var(--blip-ink),2px 2px var(--blip-ink),0 4px var(--blip-ink);
   background:var(--machine-marquee)!important;
   border:3px solid #09080c;border-radius:4px 4px 2px 2px;
   box-shadow:inset 0 0 0 1px #ffffff55,inset 0 -5px 9px #0006,0 0 24px color-mix(in srgb,var(--trim) 45%,transparent),0 5px 0 #050407;
@@ -1182,11 +1180,10 @@ canvas {
 }
 
 #status {
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 13px;
-  letter-spacing: 6px;
-  color: #32c832;
-  text-shadow: 0 0 10px #e6dc32;
+  font-family: var(--blip-pixel);
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--blip-cream);
   text-transform: uppercase;
   animation: blink 1s step-end infinite;
 }
@@ -1203,8 +1200,7 @@ canvas {
 #bar-inner {
   height: 100%;
   width: 0%;
-  background: #32c832;
-  box-shadow: 0 0 8px #32c832;
+  background: var(--blip-gold);
   transition: width .12s linear;
 }
 
@@ -1232,19 +1228,19 @@ canvas {
   position:fixed;right:0;
   bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px));
   z-index:150;display:none;place-items:center;padding:24px;
-  color:#c6b89d;background:#000;pointer-events:auto;touch-action:none;
+  color:var(--blip-cream);background:var(--blip-ink);pointer-events:auto;touch-action:none;
 }
 #need-coin-overlay.visible {display:grid}
-.nco-panel {text-align:center;font-family:'Courier New',monospace;text-transform:uppercase;letter-spacing:.14em}
-.nco-msg {color:#e8b04a;font-size:clamp(16px,3vw,24px);font-weight:900;letter-spacing:.2em}
+.nco-panel {padding:26px 28px;text-align:center;font-family:var(--blip-pixel);text-transform:uppercase;letter-spacing:.06em}
+.nco-msg {color:var(--blip-gold);font-size:clamp(14px,2.6vw,20px);letter-spacing:.12em}
 .nco-legend {max-width:560px;margin:18px auto 0}
-.nco-legend .pc-label {color:#c6b89d}
-.nco-legend .pc-keys i {color:#8d7a5c}
+.nco-legend .pc-label {color:var(--blip-cream)}
+.nco-legend .pc-keys i {color:#a89c84}
 .nco-sub {margin-top:13px;font-weight:700}
-.nco-how {color:#777064;letter-spacing:.08em}
-.nco-go {margin-top:22px;color:#f1e3c0;font-size:clamp(13px,2.2vw,18px);animation:nco-blink 1.2s steps(2,jump-none) infinite}
-.nco-go kbd {padding:2px 8px;border:1px solid #c6b89d;border-radius:4px;background:#2a2218;font:inherit}
-.nco-how {font-size:11px}
+.nco-how {color:#a89c84;letter-spacing:.04em}
+.nco-go {margin-top:22px;color:var(--blip-cream);font-size:clamp(11px,1.8vw,14px);animation:nco-blink 1.2s steps(2,jump-none) infinite}
+.nco-go kbd {padding:3px 8px;border:2px solid var(--blip-cream);border-radius:3px;background:var(--blip-ink);color:var(--blip-gold);font:inherit}
+.nco-how {font-size:8px;line-height:1.6}
 :root[data-has-touch] .nco-pc, :root:not([data-has-touch]) .nco-touch {display:none}
 #need-coin-overlay.visible {cursor:pointer}
 @keyframes nco-blink {50% {opacity:.35}}
@@ -1566,17 +1562,17 @@ canvas {
 }
 :root:not([data-appstyle]):where(.game-page) .machine-marquee-name {
   font:400 20px/1 'Press Start 2P','Courier New',monospace;letter-spacing:.02em;color:var(--marquee-ink,#fff7d6);-webkit-text-fill-color:currentColor;
-  text-shadow:-2px -2px #120c18,2px -2px #120c18,-2px 2px #120c18,2px 2px #120c18,0 4px #120c18;
+  text-shadow:-2px -2px var(--blip-ink),2px -2px var(--blip-ink),-2px 2px var(--blip-ink),2px 2px var(--blip-ink),0 4px var(--blip-ink);
 }
 @media (max-width:520px) {
   :root:not([data-appstyle]) #marquee-bar.jukebox-marquee #marquee-name.machine-marquee {padding:0 4px 0 14px}
   :root:not([data-appstyle]):where(.game-page) .machine-marquee-name {
     font-size:12px;
-    text-shadow:-1px -1px #120c18,1px -1px #120c18,-1px 1px #120c18,1px 1px #120c18,0 2px #120c18;
+    text-shadow:-1px -1px var(--blip-ink),1px -1px var(--blip-ink),-1px 1px var(--blip-ink),1px 1px var(--blip-ink),0 2px var(--blip-ink);
   }
 }
 
-/* The arcade's zoom ends on the machine's screen; the game page opens on the same picture, where the game will
+/* The arcade's walk ends at the machine's screen; the game page opens on the same picture, where the game will
    draw, and fades it as the first frame comes up (#launch-frame, from game.js). */
 #launch-frame {
   position: fixed;
@@ -1585,7 +1581,7 @@ canvas {
   image-rendering: pixelated;
   clip-path: inset(0 round 10px);
   pointer-events: none;
-  transition: opacity .35s ease-out;
+  transition: opacity .6s ease-in-out;
 }
 #launch-frame.launch-frame-out { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { #launch-frame { transition: none; } }
@@ -1594,11 +1590,27 @@ body:has(#launch-frame:not(.launch-frame-out)) #loader { visibility: hidden; }
 
 /* In the arcade the game page is its machine up close (data-machine, from game.js); its surfaces are the machine's (below). */
 
+/* ==== The blip look ==== The games' palette (crates/blip/src/look.rs) and their message box (blip::frame's
+   draw_panel: ink, a cream rim two pixels in, cut corners), for the words the pages print over and around them. */
+:root {--blip-ink:#221a2e;--blip-cream:#faf0d4;--blip-gold:#fac43c;--blip-heart:#e8404c;
+  --blip-pixel:'Press Start 2P','Courier New',monospace}
+.blip-box {background:var(--blip-ink);box-shadow:inset 0 0 0 2px var(--blip-ink),inset 0 0 0 4px var(--blip-cream);border-radius:3px}
+
 /* ==== The machine ==== Physical surfaces shared by the arcade's cabinets and the game pages (data-machine). */
-/* The room the machines stand in: a plain wall over a plain floor, on both pages. */
-:root {--room-wall-top:#3a2e29;--room-wall:#241c19;--room-floor:#16110f;--room-floor-low:#0c0908;
+/* The room the machines stand in, after a house in Link's Awakening (the 2019 remake): wood-planked walls between
+   dark posts under a stone cap, a skirting board and honey floorboards. --room-floor-at is where the wall meets the floor. Every pattern repeats in 288px (arcade.js slideRoom). */
+:root {--room-paper:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='pl' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23a06e42'/%3E%3Cstop offset='0.12' stop-color='%238e5e36'/%3E%3Cstop offset='0.88' stop-color='%237c4e2c'/%3E%3Cstop offset='1' stop-color='%235a361e'/%3E%3C/linearGradient%3E%3ClinearGradient id='pl2' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%239a6a40'/%3E%3Cstop offset='0.12' stop-color='%23885a34'/%3E%3Cstop offset='0.88' stop-color='%2376482a'/%3E%3Cstop offset='1' stop-color='%2356341c'/%3E%3C/linearGradient%3E%3ClinearGradient id='post' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%237e4c2a'/%3E%3Cstop offset='.25' stop-color='%23603a20'/%3E%3Cstop offset='1' stop-color='%233e2414'/%3E%3C/linearGradient%3E%3Cpattern id='w' width='288' height='60' patternUnits='userSpaceOnUse'%3E%3Crect x='0' y='0' width='288' height='30' fill='url(%23pl)'/%3E%3Crect x='0' y='30' width='288' height='30' fill='url(%23pl2)'/%3E%3Crect x='0' y='29' width='288' height='1.5' fill='%233a2214'/%3E%3Crect x='0' y='59' width='288' height='1' fill='%233a2214'/%3E%3Crect x='80' y='12' width='70' height='1' fill='%236a4026' opacity='.45'/%3E%3Crect x='170' y='44' width='60' height='1' fill='%236a4026' opacity='.45'/%3E%3Crect x='120' y='6' width='40' height='1' fill='%23b07a4c' opacity='.3'/%3E%3Crect x='0' y='0' width='26' height='60' fill='url(%23post)'/%3E%3Crect x='26' y='0' width='4' height='60' fill='rgba(20,10,10,.3)'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23w)'/%3E%3C/svg%3E");
+  --room-beam:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='288' height='34'%3E%3Cdefs%3E%3ClinearGradient id='c' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23b4b89c'/%3E%3Cstop offset='1' stop-color='%238e927a'/%3E%3C/linearGradient%3E%3ClinearGradient id='cs' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='rgba(20,10,10,.45)'/%3E%3Cstop offset='1' stop-color='rgba(20,10,10,0)'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='288' height='26' fill='url(%23c)'/%3E%3Crect x='0' y='0' width='288' height='3' fill='%23c8ccb0'/%3E%3Crect x='0' y='26' width='288' height='8' fill='url(%23cs)'/%3E%3Crect x='143' y='0' width='2' height='26' fill='%237e826c'/%3E%3C/svg%3E");
+  --room-dado:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='288' height='26'%3E%3Cdefs%3E%3ClinearGradient id='s' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%235a361e'/%3E%3Cstop offset='1' stop-color='%233a2214'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='288' height='26' fill='url(%23s)'/%3E%3Crect x='0' y='0' width='288' height='3' fill='%238a5a34'/%3E%3Crect x='0' y='23' width='288' height='3' fill='%232a160c'/%3E%3C/svg%3E");
+  --room-boards:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='288' height='60'%3E%3Cdefs%3E%3ClinearGradient id='f1' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f2c470'/%3E%3Cstop offset='0.2' stop-color='%23e0aa54'/%3E%3Cstop offset='1' stop-color='%23c88c3c'/%3E%3C/linearGradient%3E%3ClinearGradient id='f2' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ecbc66'/%3E%3Cstop offset='0.2' stop-color='%23d8a24c'/%3E%3Cstop offset='1' stop-color='%23c08436'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='0' y='0' width='288' height='30' fill='url(%23f1)'/%3E%3Crect x='0' y='30' width='288' height='30' fill='url(%23f2)'/%3E%3Crect x='0' y='28.5' width='288' height='1.5' fill='%238a5424'/%3E%3Crect x='0' y='58.5' width='288' height='1.5' fill='%238a5424'/%3E%3Crect x='40' y='0' width='1.5' height='28.5' fill='%239a6028'/%3E%3Crect x='184' y='30' width='1.5' height='28.5' fill='%239a6028'/%3E%3Crect x='90' y='12' width='80' height='1' fill='%23b07a36' opacity='.45'/%3E%3Crect x='210' y='44' width='60' height='1' fill='%23b07a36' opacity='.45'/%3E%3C/svg%3E");
   /* Light from the ceiling, falling off towards the floor and the room's sides. */
-  --room-light:radial-gradient(ellipse 70% 45% at 50% 0,rgb(255 214 170 / .14),transparent 75%),linear-gradient(90deg,rgb(0 0 0 / .35),transparent 18% 82%,rgb(0 0 0 / .35))}
+  --room-light:radial-gradient(ellipse 70% 45% at 50% 0,rgb(255 214 170 / .14),transparent 75%),linear-gradient(90deg,rgb(0 0 0 / .4),transparent 18% 82%,rgb(0 0 0 / .4))}
+#game-grid,body,.room-wall,.room-floor {
+  --room:linear-gradient(180deg,transparent var(--room-floor-at),rgb(0 0 0 / .2) var(--room-floor-at),rgb(0 0 0 / .6)),
+    var(--room-dado) 0 calc(var(--room-floor-at) - 26px) / 288px 26px repeat-x,
+    var(--room-beam) 0 0 / 288px 34px repeat-x,var(--room-paper) 0 0 / 100% var(--room-floor-at) no-repeat,var(--room-boards) 0 var(--room-floor-at) / 288px 60px repeat}
+body {--room-floor-at:91vh}
+#game-grid {--room-floor-at:var(--room-floor-y,68%)}
 /* Physical surfaces shared by the overview cabinet and its game page. Layout stays with each view. */
 [data-machine] {
   --trim:var(--machine-trim,#9a9aa6);
@@ -1649,41 +1661,16 @@ body > .machine-speaker {
 :is(:root[data-bare],:root[data-fullscreen]:not([data-has-touch])) body {box-shadow:none}
 :is(:root[data-bare],:root[data-fullscreen]:not([data-has-touch])) canvas {clip-path:none}
 
-/* The browser matches these physical parts across navigation using their actual rendered bounds. */
+/* Between the arcade and a game page the player walks up to the machine (arcade.js arcadeWalk) until it stands as
+   the game page shows it, so the pages simply cross-fade; only the fascia's fittings, at the same pixels on both,
+   are named, to hold still. */
 @view-transition {navigation:auto}
-.card-launching .card-shot-wrap {view-transition-name:machine-monitor}
-.card-launching .game-rom {view-transition-name:machine-picture}
-.card-launching .card-title {view-transition-name:machine-title}
-.card-launching .machine-marquee-name {view-transition-name:machine-name}
-.card-launching .machine-controls {view-transition-name:machine-deck}
-/* The way back is the same move reversed: the game page names the same parts as it leaves (data-machine-leaving)
-   and the arcade names its machine's (.card-launching) as it comes back. */
-:root[data-machine-leaving] #arcade-bezel {view-transition-name:machine-monitor}
-:root[data-machine-leaving] #glcanvas {view-transition-name:machine-picture}
-:root[data-machine-leaving] #marquee-bar {view-transition-name:machine-title}
-:root[data-machine-leaving] .machine-marquee-name {view-transition-name:machine-name}
-:root[data-machine-handoff] #arcade-bezel {view-transition-name:machine-monitor}
-:root[data-machine-handoff] #launch-frame {view-transition-name:machine-picture}
-:root[data-machine-handoff] #marquee-bar {view-transition-name:machine-title}
-:root[data-machine-handoff] .machine-marquee-name {view-transition-name:machine-name}
 /* The fascia's fittings stand at the same pixels on both pages: named, they hold still over the moving sign. */
 :is(:root:has(.card-launching),:root[data-machine-handoff],:root[data-machine-leaving]) body > .blip-logo {view-transition-name:fascia-logo}
 :is(:root:has(.card-launching),:root[data-machine-handoff],:root[data-machine-leaving]) #home-switch-btn {view-transition-name:fascia-home}
 :is(:root:has(.card-launching),:root[data-machine-handoff],:root[data-machine-leaving]) .manual-pocket {view-transition-name:fascia-manual}
 :is(:root:has(.card-launching),:root[data-machine-handoff],:root[data-machine-leaving]) .blip-power-indicator {view-transition-name:fascia-power}
 :is(:root[data-machine-handoff],:root[data-machine-leaving]) #card-button {view-transition-name:fascia-card}
-/* One picture through the move: both ends are letterboxed alike. Going in, the frozen frame is the same on both
-   sides, so it does not cross-fade; coming back, the game's last frame holds until the machine has settled. */
-::view-transition-old(machine-picture),::view-transition-new(machine-picture) {width:100%;height:100%;object-fit:contain}
-:root[data-machine-handoff]::view-transition-old(machine-picture) {animation:none;opacity:0}
-:root[data-machine-handoff]::view-transition-new(machine-picture) {animation:none;opacity:1}
-:root:has(.card-launching)::view-transition-old(machine-picture) {animation:machine-picture-hold 900ms both}
-:root:has(.card-launching)::view-transition-new(machine-picture) {animation:machine-picture-show 900ms both}
-@keyframes machine-picture-hold {0%,75% {opacity:1} 100% {opacity:0}}
-@keyframes machine-picture-show {0%,75% {opacity:0} 100% {opacity:1}}
-::view-transition-group(machine-monitor),::view-transition-group(machine-picture),::view-transition-group(machine-title),::view-transition-group(machine-name),::view-transition-group(machine-deck) {
-  animation-duration:900ms;animation-timing-function:cubic-bezier(.45,0,.2,1);
-}
 ::view-transition-old(root),::view-transition-new(root) {animation-duration:900ms;animation-timing-function:ease-in-out}
 @media (prefers-reduced-motion:reduce) {
   @view-transition {navigation:none}
@@ -1727,43 +1714,19 @@ body > .machine-speaker {
    column in its own laminate and trim. */
 @media (min-width:1017px) {
   :root[data-machine]:not([data-appstyle],[data-deck-preview],[data-bare]) body {
-    --column:calc(var(--cabinet-width) + 56px);
+    --column:calc(var(--cabinet-width) * 300 / 267);
     box-shadow:none;
     background:
       linear-gradient(90deg,var(--trim) 0 6px,#0008 6px 8px,transparent 8px calc(100% - 8px),#0008 calc(100% - 8px) calc(100% - 6px),var(--trim) calc(100% - 6px)) center top / var(--column) 100% no-repeat,
       linear-gradient(90deg,#ffffff10,transparent 7% 93%,#00000040) center top / var(--column) 100% no-repeat,
       linear-gradient(180deg,#24212b,#131117 38%,#0d0c11) center top / var(--column) 100% no-repeat,
       linear-gradient(90deg,transparent calc(50% - var(--column) / 2 - 56px),#0008 calc(50% - var(--column) / 2),#0008 calc(50% + var(--column) / 2),transparent calc(50% + var(--column) / 2 + 56px)),
-      var(--room-light),
-      linear-gradient(180deg,var(--room-wall-top),var(--room-wall) 91vh,var(--room-floor) 91vh,var(--room-floor-low));
+      var(--room-light),var(--room);
   }
 }
 
 /* Rally: the spinners stand a fifth of the way in from each end of the panel, where hands fall, with their
    lamps under them. */
 
-/* The room moves with the machine: the page being left and the page arriving are scaled about the machine's
-   screen (blipMachineZoom), so the wall, the neighbours and the deck travel with the cabinet as one place
-   seen nearer or farther, rather than one picture fading into another. */
-:is(:root[data-machine-handoff],:root[data-machine-return])::view-transition-old(root) {
-  transform-origin:0 0;animation:machine-room-leave 900ms cubic-bezier(.45,0,.2,1) both;
-}
-:is(:root[data-machine-handoff],:root[data-machine-return])::view-transition-new(root) {
-  transform-origin:0 0;animation:machine-room-arrive 900ms cubic-bezier(.45,0,.2,1) both;
-}
-@keyframes machine-room-leave {
-  0% {transform:none;opacity:1}
-  45% {opacity:1}
-  100% {transform:var(--machine-zoom-old,none);opacity:0}
-}
-@keyframes machine-room-arrive {
-  0% {transform:var(--machine-zoom-new,none);opacity:0}
-  40% {opacity:.6}
-  100% {transform:none;opacity:1}
-}
-@media (prefers-reduced-motion:reduce) {
-  :is(:root[data-machine-handoff],:root[data-machine-return])::view-transition-old(root),
-  :is(:root[data-machine-handoff],:root[data-machine-return])::view-transition-new(root) {animation-duration:.01ms}
-}
 :root[data-deck-preview] body {background:transparent!important;overflow:hidden}
 :root[data-deck-preview] body::before,:root[data-deck-preview] body::after {display:none!important}

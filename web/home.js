@@ -38,7 +38,7 @@ function gameApp(slug, inDock) {
   button.className = 'app-button';
   button.dataset.slug = slug;
   button.setAttribute('aria-label', name + (blipTwoPlayer(slug) ? ', 1 or 2 players' : ''));
-  button.innerHTML = '<span class="app-icon"><img src="' + slug + '/icon-192.png?v=23" alt="" draggable="false"></span>' +
+  button.innerHTML = '<span class="app-icon"><img src="' + slug + '/icon-192.png?v=27" alt="" draggable="false"></span>' +
     '<span class="app-label">' + name + '</span>';
   if (blipTwoPlayer(slug) && !inDock) {
     var badge = document.createElement('span');
@@ -93,7 +93,7 @@ var WIDE = '(min-width: 700px) and (min-height: 600px)';
 function buildDock() {
   dockRow.textContent = '';
   var wide = matchMedia(WIDE).matches;
-  dockRow.appendChild(systemApp('arcade', 'BLIP Home', '<img src="icon.svg?v=2" alt="">', toCabinet));
+  dockRow.appendChild(systemApp('arcade', 'BLIP Home', '<img src="icon.svg?v=3" alt="">', toCabinet));
   // The Guide's icon is the one it has as an app of its own.
   dockRow.appendChild(systemApp('guide', 'Guide', '<img src="guide-icon-192.png?v=1" alt="">', toGuide));
   if (wide) {
@@ -269,7 +269,7 @@ function launchFrames(slug, button) {
   var atIcon = 'translate(' + icon.left + 'px,' + icon.top + 'px) scale(' + s + ')';
   var atMiddle = 'translate(' + cx + 'px,' + cy + 'px) scale(1)';
   var img = zoom.querySelector('img');
-  img.src = slug + '/icon-512.png?v=23';
+  img.src = slug + '/icon-512.png?v=27';
   img.style.transformOrigin = '0 0';
   zoom.style.width = W + 'px';
   zoom.style.height = H + 'px';
@@ -354,7 +354,7 @@ function openActions(slug, from) {
   var game = BLIP_GAMES[slug];
   document.getElementById('action-title').textContent = blipTitleCase(game.name) + ' \u00b7 ' + (blipTwoPlayer(slug) ? '1 or 2 players' : '1 player');
   var icon = from.querySelector('.app-icon').getBoundingClientRect();
-  lift.querySelector('img').src = slug + '/icon-192.png?v=23';
+  lift.querySelector('img').src = slug + '/icon-192.png?v=27';
   Object.assign(lift.style, { left: icon.left + 'px', top: icon.top + 'px', width: icon.width + 'px', height: icon.height + 'px' });
   lift.hidden = false;
   showSheet(actionSheet, from);
@@ -491,7 +491,7 @@ function renderSearch() {
     return !q || BLIP_GAMES[slug].name.toLowerCase().indexOf(q) >= 0 || slug.replace('_', ' ').indexOf(q) >= 0;
   });
   searchResults.innerHTML = hits.length ? hits.map(function (slug, i) {
-    return '<li><button type="button" data-slug="' + slug + '"' + (i === 0 && q ? ' class="first"' : '') + '><img src="' + slug + '/icon-192.png?v=23" alt=""><span>' +
+    return '<li><button type="button" data-slug="' + slug + '"' + (i === 0 && q ? ' class="first"' : '') + '><img src="' + slug + '/icon-192.png?v=27" alt=""><span>' +
       blipTitleCase(BLIP_GAMES[slug].name) + '<small>' + genreOf(slug) + '</small></span></button></li>';
   }).join('') : '<li class="search-none">No games match “' + escapeHtml(searchInput.value.trim()) + '”.</li>';
 }

@@ -1,34 +1,30 @@
-// Launches a browser engine through Playwright and returns a CDP-shaped
-// handle, so harness.mjs helpers (which only call Runtime.evaluate) drive
-// WebKit and Firefox as well as Chromium, unattended.
+// Launches Chromium through Playwright and returns a CDP-shaped handle, so harness.mjs helpers (which only call
+// Runtime.evaluate) drive it unattended.
 
 import { readFileSync } from 'node:fs';
-import { chromium, webkit, firefox } from 'playwright';
+import { chromium } from 'playwright';
 import { chromiumBinary } from './chromium-binary.mjs';
 
-const ENGINES = { chromium, webkit, firefox };
+const ENGINES = { chromium };
 
-/**
- * @param {'chromium'|'webkit'|'firefox'} engineName
- * @param {{ headless?: boolean }} opts
- */
-export async function launchEngine(engineName, { headless = true, hasTouch = false, viewport, deviceScaleFactor, userAgent, isMobile } = {}) {
-  const engine = ENGINES[engineName];
-  if (!engine) throw new Error(`unknown engine ${engineName}`);
+// One browser per set of launch flags, shared by every test of a test file (a process): launching Chromium for each
+// test was most of the suites' time. Each test still gets a context of its own, so storage never leaks between
+// tests; the browsers close after the file's last test.
+const browsers = new Map();
 
-  const args = [];
-  if (engineName === 'chromium') {
-    // Same flag test/lib/harness.mjs passes its own Chromium:
-    // background throttling off, so a headless page that is never
-    // "visible" keeps running the game loop.
-    args.push('--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding', '--disable-background-timer-throttling');
-    args.push('--mute-audio');
-    args.push(hasTouch ? '--touch-events=enabled' : '--touch-events=disabled');
-    if (!hasTouch) args.push('--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=1,availablePointerTypes=1');
-  }
+// How fast the pages' CSS and web animations play, for suites that only wait out transitions (playAnimationsAt).
+let animationRate = 1;
 
-  const browser = await engine.launch({ headless, args, ...(engineName === 'chromium' ? { executablePath: chromiumBinary() } : {}) });
+/** Play every animation in the pages this test file opens `rate` times as fast: for suites whose waits are a shell's
+ * transitions, not frames they measure. */
+export function playAnimationsAt(rate) { animationRate = rate; }
+if (process.env.NODE_TEST_CONTEXT) {
+  const { after } = await import('node:test');
+  after(() => Promise.all([...browsers.values()].map(async (browser) => (await browser).close().catch(() => {}))));
+}
+
+async function launchBrowser(engine, headless, args) {
+  const browser = await engine.launch({ headless, args, executablePath: chromiumBinary() });
   // BLIP_DECK names a local build of blip-deck (its dist/blip-deck.js): every context the tests open uses it in place
   // of the tagged one from jsDelivr, to try a new deck before it is released. No service worker, which would fetch
   // the deck itself, past the route.
@@ -40,16 +36,40 @@ export async function launchEngine(engineName, { headless = true, hasTouch = fal
       return context;
     };
   }
+  return browser;
+}
+
+/**
+ * A fresh context and page on the shared browser. `close()` closes the context; `browser` is the shared one.
+ * @param {'chromium'} engineName
+ */
+export async function launchEngine(engineName, { headless = true, hasTouch = false, viewport, deviceScaleFactor, userAgent, isMobile } = {}) {
+  const engine = ENGINES[engineName];
+  if (!engine) throw new Error(`unknown engine ${engineName}`);
+
+  // Background throttling off, so a headless page that is never "visible" keeps running the game loop.
+  const args = ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
+    '--disable-background-timer-throttling', '--mute-audio'];
+  // BLIP_TEST_GPU=1 draws WebGL on the machine's GPU instead of in software (SwiftShader).
+  if (process.env.BLIP_TEST_GPU === '1') args.push('--use-gl=angle', '--use-angle=gl-egl', '--ignore-gpu-blocklist', '--enable-gpu');
+  args.push(hasTouch ? '--touch-events=enabled' : '--touch-events=disabled');
+  if (!hasTouch) args.push('--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=1,availablePointerTypes=1');
+
+  // Outside node --test (a tool such as css_check), a browser of its own, closed with the page.
+  const shared = Boolean(process.env.NODE_TEST_CONTEXT);
+  const key = JSON.stringify([engineName, headless, args]);
+  if (shared && !browsers.has(key)) browsers.set(key, launchBrowser(engine, headless, args));
+  const browser = shared ? await browsers.get(key) : await launchBrowser(engine, headless, args);
   const context = await browser.newContext({ hasTouch, ...(viewport ? { viewport } : {}),
     ...(deviceScaleFactor === undefined ? {} : { deviceScaleFactor }), ...(userAgent ? { userAgent } : {}),
     ...(isMobile === undefined ? {} : { isMobile }) });
-  // WebKit now and then fails a load with "WebKit encountered an internal error": mark the page, so a wait for
-  // the game can tell that fault from a game that did not start (harness.mjs gameReady).
-  context.on('requestfailed', (request) => {
-    if (/internal error/i.test(request.failure()?.errorText || '')) { const page = request.frame()?.page(); if (page) page.webkitFault = true; }
-  });
   const page = await context.newPage();
-  return { browser, page, cdp: wrapPage(page, engineName) };
+  if (animationRate !== 1) {
+    const session = await context.newCDPSession(page);
+    await session.send('Animation.enable');
+    await session.send('Animation.setPlaybackRate', { playbackRate: animationRate });
+  }
+  return { browser, context, page, cdp: wrapPage(page, engineName), close: () => (shared ? context : browser).close().catch(() => {}) };
 }
 
 /** A CDP-shaped adapter over a Playwright page, for the suites that drive pages through send(). */

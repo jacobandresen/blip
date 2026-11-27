@@ -1935,14 +1935,14 @@ fn draw_taunt(blip: &Blip, g: &Game) {
     let banner_up = g.banner.as_ref().is_some_and(|(_, t)| *t > 0.0);
     if let Some((text, t)) = &g.taunt {
         if *t > 0.0 && !banner_up {
-            blip.draw_centered_outlined(text, WIN_W as f32 / 2.0, HUD_H as f32 + 10.0, 2.0, WARLOCK_C, BLIP_BLACK);
+            blip.draw_message(text, WIN_W as f32 / 2.0, HUD_H as f32 + 18.0, 2.0, WARLOCK_C, 1.0);
         }
     }
     if let Some((text, t)) = &g.banner {
         if *t > 0.0 {
             let k = (*t * 3.0).min(1.0);
             let sz = if text.chars().count() * 18 <= WIN_W as usize - 16 { 3.0 } else { 2.0 };
-            blip.draw_centered_outlined(text, WIN_W as f32 / 2.0, (HUD_H + ROWS as i32 * CELL / 2 - 10) as f32, sz, BlipColor { a: k, ..RUNE_CLEAN }, BlipColor { a: k, ..BLIP_BLACK });
+            blip.draw_message(text, WIN_W as f32 / 2.0, (HUD_H + ROWS as i32 * CELL / 2) as f32, sz, RUNE_CLEAN, k);
         }
     }
 }

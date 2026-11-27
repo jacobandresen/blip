@@ -6,30 +6,38 @@ const ALIEN_H: i32 = 28;
 const UFO_W: i32 = 36;
 const UFO_H: i32 = 20;
 
-// Dimensions match the Rust game's sprite constants.
+/// The cannon: a round sea-blue turret on treads with a cream barrel, lit from the top left and ringed in ink.
 fn player_ship() -> Vec<u8> {
-    let w: i32 = 32;
-    let h: i32 = 28;
+    let (w, h) = (32i32, 28i32);
     let mut img = Image::new(w as u32, h as u32);
-    let cx = w / 2;
-    for y in 0..h {
-        for x in 0..w {
-            let top_half = y as f32 / h as f32;
-            let half_w = (1.0 + top_half * (w as f32 / 2.0 - 1.0)) as i32;
-            if (x - cx).abs() <= half_w && y > h / 4 {
-                img.set(x, y, 0, 200, 200);
-            }
-            if (x - cx).abs() <= 2 && y <= h / 4 + 2 {
-                img.set(x, y, 0, 220, 255);
-            }
-            if y == h - 1 && (x - cx).abs() <= 4 && (x - cx).abs() >= 2 {
-                img.set(x, y, 255, 100, 0);
-            }
+    let sea = blip::look::SEA;
+    let shade = |c: [u8; 3], k: f32| [(c[0] as f32 * k).min(255.0) as u8, (c[1] as f32 * k).min(255.0) as u8, (c[2] as f32 * k).min(255.0) as u8];
+    let put = |img: &mut Image, x: i32, y: i32, c: [u8; 3]| img.set(x, y, c[0], c[1], c[2]);
+    // Treads: a dark band with lit links.
+    for y in 21..26 {
+        for x in 2..30 {
+            let c = if y == 21 { [96, 96, 120] } else if (x + y) % 4 == 0 { [120, 120, 150] } else { [70, 68, 92] };
+            put(&mut img, x, y, c);
         }
     }
-    img.set(cx, h / 2 - 2, 180, 230, 255);
-    img.set(cx - 1, h / 2 - 1, 100, 180, 255);
-    img.set(cx + 1, h / 2 - 1, 100, 180, 255);
+    // Hull: a dome over the treads.
+    for y in 10..21 {
+        for x in 3..29 {
+            let (dx, dy) = ((x as f32 + 0.5 - 16.0) / 13.0, (y as f32 + 0.5 - 21.0) / 11.0);
+            if dx * dx + dy * dy > 1.0 { continue; }
+            let lit = (x as f32 - 11.0).hypot(y as f32 - 13.0) < 5.0;
+            put(&mut img, x, y, if lit { shade(sea, 1.35) } else if y > 18 { shade(sea, 0.72) } else { sea });
+        }
+    }
+    // Barrel, with its muzzle.
+    for y in 2..11 {
+        for x in 14..18 {
+            put(&mut img, x, y, if x == 14 { blip::look::CREAM } else if x == 17 { [200, 186, 160] } else { [236, 224, 196] });
+        }
+    }
+    for x in 13..19 { put(&mut img, x, 2, [200, 186, 160]); }
+    img.set(11, 13, 255, 255, 255);
+    img.outline(blip::look::INK);
     img.encode_png()
 }
 
@@ -49,11 +57,8 @@ fn alien(kind: usize, frame: usize) -> Vec<u8> {
     let w: i32 = ALIEN_W;
     let h: i32 = ALIEN_H;
     let mut img = Image::new(w as u32, h as u32);
-    let (r, g, b) = match kind {
-        0 => (255u8, 80, 255),
-        1 => (0, 230, 230),
-        _ => (110, 255, 110),
-    };
+    // A white base, which alien_color tints at runtime.
+    let (r, g, b) = (255u8, 255, 255);
     // [frame A, frame B] — rows 0..4 (head/eyes/mandibles) stay put, rows
     // 5..7 (legs / claws / tentacles) swap between frames.
     let patterns: [[u16; 8]; 2] = match kind {
@@ -141,6 +146,9 @@ fn alien(kind: usize, frame: usize) -> Vec<u8> {
             if pattern[ry as usize] & (1 << (cols - 1 - cx)) != 0 {
                 let px_x = ox + cx * cell;
                 let px_y = oy + ry * cell;
+                // Lit on the top rows, shaded on the bottom one: the tint (alien_color) multiplies these greys.
+                let k = if ry < 2 { 1.0 } else if ry == rows - 1 { 0.62 } else { 0.84 };
+                let (r, g, b) = ((r as f32 * k) as u8, (g as f32 * k) as u8, (b as f32 * k) as u8);
                 for dy in 0..cell {
                     for dx in 0..cell {
                         img.set(px_x + dx, px_y + dy, r, g, b);
@@ -157,7 +165,7 @@ fn alien(kind: usize, frame: usize) -> Vec<u8> {
     for ex in [ox + 3 * cell - eye_dx, ox + 5 * cell + eye_dx] {
         for dy in -1..=eye_size {
             for dx in -1..=eye_size {
-                img.set(ex + dx, eye_y + dy, 10, 10, 10);
+                img.set(ex + dx, eye_y + dy, blip::look::INK[0], blip::look::INK[1], blip::look::INK[2]);
             }
         }
         for dy in 0..eye_size {
@@ -168,10 +176,11 @@ fn alien(kind: usize, frame: usize) -> Vec<u8> {
         let pupil_ox = 1 + eye_dx;
         for dy in 1..=2 {
             for dx in 0..=1 {
-                img.set(ex + pupil_ox + dx, eye_y + dy, 15, 15, 20);
+                img.set(ex + pupil_ox + dx, eye_y + dy, blip::look::INK[0], blip::look::INK[1], blip::look::INK[2]);
             }
         }
     }
+    img.outline(blip::look::INK);
     img.encode_png()
 }
 
@@ -182,7 +191,7 @@ fn ufo_saucer() -> Vec<u8> {
     let mut img = Image::new(w as u32, h as u32);
     let cx = w as f32 / 2.0;
     let cy = h as f32 * 0.62;
-    let disc_rx = w as f32 / 2.0 - 1.0;
+    let disc_rx = w as f32 / 2.0 - 2.0;
     let disc_ry = h as f32 * 0.30;
 
     // Disc body — a squashed metallic-red ellipse with a darker underside band.
@@ -220,7 +229,7 @@ fn ufo_saucer() -> Vec<u8> {
         250,
         255,
     );
-
+    img.outline(blip::look::INK);
     img.encode_png()
 }
 
@@ -259,17 +268,16 @@ fn explosion() -> Vec<u8> {
     img.encode_png()
 }
 
+/// A block of the bunkers: a leafy hedge cube, lit on top and shaded at the foot.
 fn shield_block() -> Vec<u8> {
-    let w: i32 = 12;
-    let h: i32 = 12;
+    let (w, h) = (12i32, 12i32);
     let mut img = Image::new(w as u32, h as u32);
+    let leaf = blip::look::LEAF;
     for y in 0..h {
         for x in 0..w {
-            img.set(x, y, 0, 180, 0);
+            let k = if y < 2 { 1.3 } else if y > h - 3 { 0.62 } else if (x * 5 + y * 3) % 7 == 0 { 0.8 } else { 1.0 };
+            img.set(x, y, (leaf[0] as f32 * k).min(255.0) as u8, (leaf[1] as f32 * k).min(255.0) as u8, (leaf[2] as f32 * k).min(255.0) as u8);
         }
-    }
-    for x in 0..w {
-        img.set(x, 0, 100, 255, 100);
     }
     img.encode_png()
 }

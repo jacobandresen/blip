@@ -1,5 +1,6 @@
 //! Raider — a 1942-style vertical dogfighting shoot-'em-up.
 
+use blip::color::*;
 use blip::input::{coin_start, key_active, play_again, Stick, BLIP_KEY_SPACE};
 use blip::macroquad::audio::{play_sound, set_sound_volume, stop_sound, PlaySoundParams};
 use blip::macroquad::math::vec2;
@@ -2526,8 +2527,9 @@ fn update_over(g: &mut Game, dt: f32) {
 /// octaves of wave lines (swell and chop) scrolling with `sea_scroll`, sun
 /// glitter in a diagonal band, and each cloud's shadow drifting on the water.
 fn draw_sea(blip: &Blip, g: &Game) {
-    let far  = (0.10, 0.24, 0.46); // hazy, sun-bleached blue at the horizon (top)
-    let near = (0.03, 0.11, 0.30); // deep, saturated blue close up (bottom)
+    // The blip look's sea: bright and clear, so the ink-rimmed planes stand out on it.
+    let far  = (0.30, 0.58, 0.78); // hazy, sun-bleached blue at the horizon (top)
+    let near = (0.16, 0.38, 0.64); // deeper blue close up (bottom)
     blip.fill_bands(0.0, 0.0, WIN_W as f32, WIN_H as f32, 14, |t| {
         BlipColor::new(far.0 + (near.0 - far.0) * t, far.1 + (near.1 - far.1) * t, far.2 + (near.2 - far.2) * t, 1.0)
     });
@@ -2543,14 +2545,17 @@ fn draw_sea(blip: &Blip, g: &Game) {
         // Long swell + short chop layered together (two frequencies, not
         // one) — a single sine reads as a uniform ripple; two makes it look
         // like real, irregular open water.
-        let alpha = 0.22 + depth * 0.30;
-        let color = BlipColor::new(0.55 + depth * 0.15, 0.72 + depth * 0.12, 0.92, alpha);
+        // Chunky wavelets, a crest and its two shoulders, in staggered rows: pixel-art water.
+        let alpha = 0.35 + depth * 0.30;
+        let color = BlipColor { a: alpha, ..BLIP_CREAM };
         for s in 0..segs {
-            let x0 = s as f32 * seg_w;
-            let x1 = x0 + seg_w;
-            let w0 = (x0 * 0.045 + y * 0.05).sin() * 3.2 + (x0 * 0.11 - y * 0.14).sin() * 1.1;
-            let w1 = (x1 * 0.045 + y * 0.05).sin() * 3.2 + (x1 * 0.11 - y * 0.14).sin() * 1.1;
-            blip.draw_line(x0, y + w0, x1, y + w1, color);
+            let x0 = s as f32 * seg_w + if i % 2 == 0 { 0.0 } else { seg_w / 2.0 };
+            let wob = ((x0 * 0.045 + y * 0.05).sin() * 3.2).round();
+            if (s + i as usize * 7).is_multiple_of(3) { continue; }
+            let (cx, cy) = (x0.round(), (y + wob).round());
+            blip.fill_rect(cx - 4.0, cy, 8.0, 2.0, color);
+            blip.fill_rect(cx - 8.0, cy + 2.0, 4.0, 2.0, color);
+            blip.fill_rect(cx + 4.0, cy + 2.0, 4.0, 2.0, color);
         }
     }
 
@@ -2571,7 +2576,8 @@ fn draw_sea(blip: &Blip, g: &Game) {
             (1.1, 0.20 + twinkle * 0.10)
         };
         if r > 0.2 {
-            blip.fill_circle(x, y, r, BlipColor::new(0.85, 0.94, 1.0, a));
+            let s = (r * 1.6).round().max(1.0);
+            blip.fill_rect(x.round(), y.round(), s, s, BlipColor { a, ..BLIP_CREAM });
         }
     }
 
@@ -2581,14 +2587,14 @@ fn draw_sea(blip: &Blip, g: &Game) {
     for c in g.clouds.iter() {
         let sx = c.x + PLANE_SHADOW_DX * 1.5;
         let sy = c.y + PLANE_SHADOW_DY * 1.5;
-        blip.fill_circle(sx, sy, c.r * 0.75, BlipColor::new(0.0, 0.0, 0.0, 0.10));
+        blip.fill_circle(sx, sy, c.r * 0.75, BlipColor { a: 0.14, ..BLIP_INK });
     }
 }
 
 /// The sprite again, dark and translucent, offset toward the sea
 /// (PLANE_SHADOW_DX / DY). Drawn after sea and clouds, before the entity.
 fn draw_shadow(tex: &Texture2D, x: f32, y: f32, w: f32, h: f32, rotation: f32) {
-    draw_texture_ex(tex, x + PLANE_SHADOW_DX, y + PLANE_SHADOW_DY, BlipColor::new(0.0, 0.0, 0.0, 0.30), DrawTextureParams {
+    draw_texture_ex(tex, x + PLANE_SHADOW_DX, y + PLANE_SHADOW_DY, BlipColor { a: 0.32, ..BLIP_INK }, DrawTextureParams {
         dest_size: Some(vec2(w, h)),
         rotation,
         ..Default::default()
@@ -2731,6 +2737,7 @@ fn draw_flak_bursts(blip: &Blip, g: &Game) {
 
 /// A round in flight: a slug laid along its velocity, a dark jacket with a
 /// lighter tip, and a faint streak of its motion. No tracers.
+#[allow(clippy::too_many_arguments)]
 fn draw_slug(blip: &Blip, x: f32, y: f32, vx: f32, vy: f32, len: f32, wid: f32, body: BlipColor) {
     let v = vx.hypot(vy).max(1.0);
     let (dx, dy) = (vx / v, vy / v);
@@ -2742,6 +2749,7 @@ fn draw_slug(blip: &Blip, x: f32, y: f32, vx: f32, vy: f32, len: f32, wid: f32, 
 }
 
 /// Draw a bank-foreshortened aircraft; nose-down sprites rotate by `-heading`.
+#[allow(clippy::too_many_arguments)]
 fn draw_plane(tex: &Texture2D, x: f32, y: f32, w: f32, h: f32, heading: f32, bank: f32, tint: BlipColor) {
     let ww = w * (0.55 + 0.45 * bank.cos());
     draw_texture_ex(tex, x + (w - ww) / 2.0, y, tint, DrawTextureParams {
@@ -2844,6 +2852,7 @@ fn draw_launch(
     blip.draw_hud_multiple(g.sess.score, g.streak.multiple());
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_play(
     blip: &Blip, g: &Game,
     player_tex: &Texture2D, enemy_tex: &[Texture2D; 3], boss_tex: &[Texture2D; 7], pow_tex: &Texture2D,
@@ -3101,7 +3110,7 @@ fn draw_play(
     draw_enemy_rounds(blip, g);
     blip.draw_hud(g.sess.score, g.sess.lives);
     blip.draw_hud_multiple(g.sess.score, g.streak.multiple());
-    draw_bottom_hud(blip, g, player_tex);
+    draw_bottom_hud(blip, g);
 
     if g.max_power_banner.active() {
         let flash = ((g.max_power_banner.remaining() * 14.0) as i32 % 2) == 0;
@@ -3267,55 +3276,40 @@ fn draw_enemy_rounds(blip: &Blip, g: &Game) {
     }
 }
 
-fn draw_bottom_hud(blip: &Blip, g: &Game, player_tex: &Texture2D) {
-    let y = (WIN_H - 30) as f32;
-    // Kept in from the edges, clear of the curved glass's rim.
-    let corner_margin = 24.0;
-
-    // Lives, bottom-left.
-    let mini_w = PLAYER_W as f32 * 0.6;
-    let mini_h = PLAYER_H as f32 * 0.6;
-    blip.draw_texture(player_tex, corner_margin, y, mini_w, mini_h);
-    // Outlined, and the bar backed: white on a passing cloud was unreadable.
-    let ink = BlipColor::new(0.0, 0.05, 0.15, 0.8);
-    blip.draw_text_outlined(&format!("x{}", g.sess.lives.max(0)), corner_margin + mini_w + 3.0, y + 3.0, 2.0, BLIP_WHITE, ink);
-
-    // Health, bottom-right: empties with hits, full again each life; pickups
-    // restore some.
-    let bar_w = 64.0;
-    let bar_h = 9.0;
-    let bar_x = (WIN_W as f32) - bar_w - corner_margin;
-    let bar_y = y + (mini_h - bar_h) / 2.0;
+fn draw_bottom_hud(blip: &Blip, g: &Game) {
+    // Lives are the HUD's hearts; here only the health, bottom-right, in a blip box. It empties with hits, is full
+    // again each life, and pickups restore some. Kept in from the edge, clear of the curved glass's rim.
+    let (bar_w, bar_h) = (64.0, 8.0);
+    let bar_x = WIN_W as f32 - bar_w - 30.0;
+    let bar_y = (WIN_H - 22) as f32;
     let hp_frac = (g.health as f32 / PLAYER_HEALTH_MAX as f32).clamp(0.0, 1.0);
-    let hp_color = if hp_frac > 0.6 { BLIP_GREEN } else if hp_frac > 0.3 { BLIP_YELLOW } else { BLIP_RED };
-    blip.draw_text_outlined("HP", bar_x - 26.0, y + 3.0, 2.0, BLIP_WHITE, ink);
-    blip.fill_rect(bar_x - 1.0, bar_y - 1.0, bar_w + 2.0, bar_h + 2.0, ink);
-    blip.draw_rect(bar_x, bar_y, bar_w, bar_h, BLIP_GRAY);
+    let hp_color = if hp_frac > 0.6 { BLIP_LEAF } else if hp_frac > 0.3 { BLIP_GOLD } else { BLIP_HEART };
+    blip.draw_panel(bar_x - 40.0, bar_y - 9.0, bar_w + 50.0, bar_h + 18.0, 1.0);
+    blip.draw_text("HP", bar_x - 30.0, bar_y - 3.0, 2.0, BLIP_CREAM);
+    blip.fill_rect(bar_x, bar_y, bar_w, bar_h, blip::shade(BLIP_HEART, 0.35));
     blip.fill_rect(bar_x, bar_y, bar_w * hp_frac, bar_h, hp_color);
+    blip.fill_rect(bar_x, bar_y, bar_w * hp_frac, 2.0, blip::blend(hp_color, BLIP_CREAM, 0.5));
 }
 
 fn draw_title(
-    blip: &Blip, backdrop: &Texture2D, player_tex: &Texture2D, hi: i32,
+    blip: &Blip, backdrop: &Texture2D, player_tex: &Texture2D,
 ) {
     blip.draw_texture(backdrop, 0.0, 0.0, WIN_W as f32, WIN_H as f32);
-    blip.draw_centered_outlined(
-        "RAIDER", (WIN_W / 2) as f32, (WIN_H / 4) as f32, 5.0, BlipColor::new(0.38, 0.72, 1.0, 1.0),
-        BlipColor::new(0.015, 0.045, 0.12, 1.0),
-    );
-    // RAIDER is sz=5 (35px tall) — clear its bottom by a real margin.
-    blip.draw_hi(hi, (WIN_H / 4 + 43) as f32, BLIP_YELLOW);
+    blip.draw_logo("RAIDER", (WIN_W / 2) as f32, (WIN_H / 4 - 10) as f32, 6.0, BLIP_GOLD);
+    // RAIDER is sz=6 (42px tall) — clear its bottom by a real margin.
+    blip.draw_attract_bar();
     let px = (WIN_W as f32 - PLAYER_W as f32 * 2.0) / 2.0;
     blip.draw_texture(player_tex, px, (WIN_H / 2 - 70) as f32, PLAYER_W as f32 * 2.0, PLAYER_H as f32 * 2.0);
     blip.draw_start_prompt((WIN_H * 2 / 3) as f32);
-    let hint = BlipColor::new(0.68, 0.76, 0.9, 1.0);
-    blip.draw_centered("UP THROTTLE  DOWN SLOW", (WIN_H * 2 / 3 + 30) as f32, 2.0, hint);
-    blip.draw_centered("TOO SLOW AND YOU STALL", (WIN_H * 2 / 3 + 48) as f32, 2.0, hint);
+    blip.draw_panel(WIN_W as f32 * 0.17, (WIN_H * 2 / 3 + 30) as f32, WIN_W as f32 * 0.66, 56.0, 1.0);
+    blip.draw_centered("UP THROTTLE  DOWN SLOW", (WIN_H * 2 / 3 + 42) as f32, 2.0, BLIP_CREAM);
+    blip.draw_centered("TOO SLOW AND YOU STALL", (WIN_H * 2 / 3 + 60) as f32, 2.0, BLIP_CREAM);
 }
 
 fn draw_win(blip: &Blip, level: i32) {
     let buf = format!("WAVE {level}");
-    blip.draw_centered("STAGE CLEAR", (WIN_H / 3) as f32, 5.0, BLIP_GREEN);
-    blip.draw_centered(&buf,          (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
+    blip.draw_logo("STAGE CLEAR", (WIN_W / 2) as f32, (WIN_H / 3) as f32, 5.0, BLIP_LEAF);
+    blip.draw_message(&buf, (WIN_W / 2) as f32, (WIN_H / 2 + 10) as f32, 3.0, BLIP_GOLD, 1.0);
 }
 
 fn draw_won(blip: &Blip, score: i32, hi: i32, waiting: bool) {
@@ -3432,7 +3426,7 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title  => draw_title(&blip, &title_backdrop, &player_tex, web::high_score()),
+            State::Title  => draw_title(&blip, &title_backdrop, &player_tex),
             State::Launch => draw_launch(&blip, &g, &player_tex, &enemy_tex, &carrier_tex, &boat_tex, &cloud_tex),
             State::Win    => draw_win(&blip, g.sess.level),
             State::Won    => draw_won(&blip, g.sess.score, web::high_score(), g.over_timer.active()),

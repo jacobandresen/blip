@@ -164,7 +164,7 @@ impl Snake {
 
 pub fn seat_colour(seat: usize) -> BlipColor {
     match seat {
-        0 => BlipColor { r: 0.62, g: 0.73, b: 0.28, a: 1.0 },
+        0 => BlipColor { r: 0.41, g: 0.75, b: 0.30, a: 1.0 }, // the blip look's leaf
         1 => BlipColor { r: 0.45, g: 0.85, b: 1.0, a: 1.0 },
         2 => BlipColor { r: 0.78, g: 0.55, b: 1.0, a: 1.0 },
         3 => BlipColor { r: 0.45, g: 0.95, b: 0.55, a: 1.0 },

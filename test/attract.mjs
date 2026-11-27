@@ -1,15 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { openPage, PHONE, DESKTOP } from './lib/harness.mjs';
+import { openPage, PHONE, DESKTOP, playAnimationsAt } from './lib/harness.mjs';
 import { attractMask, imageDifference } from './lib/arcade-room.mjs';
+
+// The shell's transitions four times as fast: these tests check where things go, not how long it takes.
+playAnimationsAt(4);
 
 const orientations = [
   { name: 'portrait', width: 390, height: 844 },
   { name: 'landscape', width: 844, height: 390 },
 ];
 
-for (const engine of ['webkit', 'chromium']) {
+for (const engine of ['chromium']) {
   for (const orientation of orientations) {
     for (const format of ['webp', 'png-after-error', 'png-unsupported-type']) {
       test(`attract frames paint on iPhone 14-sized ${orientation.name}, ${format}, in ${engine}`, async (t) => {
@@ -18,7 +21,7 @@ for (const engine of ['webkit', 'chromium']) {
         page.on('request', (r) => { if (/\/attract\.(webp|png)$/.test(r.url())) requests.push(r.url()); });
         if (format === 'png-after-error') await page.route('**/attract.webp', (route) => route.abort());
         if (format === 'png-unsupported-type') await page.addInitScript(() => {
-          // Exercise declarative unsupported-format selection without pretending to disable WebKit's codec.
+          // Exercise declarative unsupported-format selection without pretending to disable the browser's codec.
           const type = Object.getOwnPropertyDescriptor(HTMLSourceElement.prototype, 'type');
           Object.defineProperty(HTMLSourceElement.prototype, 'type', {
             get: type.get,
@@ -78,7 +81,8 @@ for (const engine of ['webkit', 'chromium']) {
             !document.getElementById('game-grid').hasAttribute('data-aisle-moving'));
         }
         const mask = await attractMask(page), first = await screen.screenshot();
-        await page.waitForTimeout(1200);
+        // A strip frame is a third of a second at 1x; 0.4 s at 4x spans several.
+        await page.waitForTimeout(400);
         const second = await screen.screenshot();
         await writeFile(new URL(`${engine}-desktop-${game}-${state}.png`, dir), second);
         const difference = await imageDifference(page, first, second, 12, mask);

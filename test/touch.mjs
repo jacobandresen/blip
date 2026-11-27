@@ -246,6 +246,23 @@ test('on a PC a click on the coin wall inserts a coin and leaves the game focuse
   assert.equal(await page.evaluate(() => document.activeElement.id), 'glcanvas');
 });
 
+test('the end of a game stays in view; starting again without a credit brings up the coin wall', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: DESKTOP });
+  await page.goto(`${origin}/serpent/index.html`);
+  await gameReady(page);
+  const wall = () => page.evaluate(() => document.getElementById('need-coin-overlay').classList.contains('visible'));
+  await page.evaluate(() => document.getElementById('insert-coin-btn').click());
+  await page.waitForFunction(() => !document.getElementById('need-coin-overlay').classList.contains('visible'));
+  // The credit goes on a game, which ends: won or lost, its last screen shows.
+  assert.equal(await page.evaluate(() => window.blipSpendCoin()), 1);
+  await page.evaluate(() => window.blipGameOver(120));
+  await page.waitForTimeout(300);
+  assert.equal(await wall(), false, 'the game-over screen is not covered');
+  // Start again: no credit, so the wall asks for one.
+  assert.equal(await page.evaluate(() => window.blipSpendCoin()), 0);
+  assert.equal(await wall(), true, 'starting again without a credit warns');
+});
+
 /** Resolves once the controls card has stopped sliding. */
 async function cardSettled(page) {
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
