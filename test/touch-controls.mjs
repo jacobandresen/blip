@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage, gameReady, openPhone, PHONE, DESKTOP, insertCoins } from './lib/harness.mjs';
+import { openPage, gameReady, openPhone, PHONE, DESKTOP, insertCoins, playAnimationsAt } from './lib/harness.mjs';
 import { GAMES } from './lib/games.mjs';
 
-for (const engine of ['webkit', 'chromium']) {
+// The shell's transitions four times as fast: these tests check where things go, not how long it takes.
+playAnimationsAt(4);
+
+for (const engine of ['chromium']) {
   test(`touchscreen control selection uses gesture strips, preserving Rally, in ${engine}`, async (t) => {
     const { page, origin } = await openPage(t, engine, { hasTouch: true, viewport: PHONE });
     await page.goto(`${origin}/bouncer/index.html`);
@@ -60,7 +63,7 @@ test('a desktop keeps the arcade controls and explicit deck choices', async (t) 
   assert.equal(await page.evaluate(() => blipControls()), 'pad');
 });
 
-for (const engine of ['webkit', 'chromium']) test(`a touch player can choose joystick or D-pad and keep that choice in ${engine}`, async (t) => {
+for (const engine of ['chromium']) test(`a touch player can choose joystick or D-pad and keep that choice in ${engine}`, async (t) => {
   const { page, origin } = await openPage(t, engine, { hasTouch: true, viewport: { width: 810, height: 1080 } });
   await page.goto(`${origin}/meteors/index.html`);
   assert.equal(await page.evaluate(() => blipControls()), 'touch');

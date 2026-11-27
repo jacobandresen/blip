@@ -76,9 +76,9 @@ pub(crate) fn head_r(bulk: f32) -> f32 { 12.0 + 1.5 * (bulk - 1.0) }
 
 /// The line around everything, and its width. A fighter without one dissolves
 /// into whichever stage happens to be a similar colour.
-pub(crate) const INK: BlipColor = BlipColor { r: 0.07, g: 0.06, b: 0.09, a: 1.0 };
+pub(crate) const INK: BlipColor = blip::BLIP_INK;
 /// Lettering that is not the headline: a white with the glare taken off.
-pub(crate) const PALE: BlipColor = BlipColor { r: 0.92, g: 0.92, b: 0.96, a: 1.0 };
+pub(crate) const PALE: BlipColor = blip::BLIP_CREAM;
 pub(crate) const LINE: f32 = 2.0;
 
 /// How much darker the far arm and leg are: the one shadow tone.
@@ -156,7 +156,9 @@ std::thread_local! {
 /// the temple. Highlights lean to the first and shadows to the second, so a fighter stands in the scene's own
 /// light rather than a studio's. `None` is white light, for the menus.
 pub(crate) fn tint_light(stage: Option<usize>) {
-    const LIGHTS: [((f32, f32, f32), (f32, f32, f32)); 11] = [
+    /// (key light, shade): the light falling on the fighters and the colour of their shadows.
+    type Light = ((f32, f32, f32), (f32, f32, f32));
+    const LIGHTS: [Light; 11] = [
         ((1.00, 0.78, 0.52), (0.36, 0.18, 0.42)), // docks at sunset
         ((0.72, 0.82, 1.00), (0.10, 0.12, 0.32)), // temple by moonlight
         ((1.00, 0.97, 0.90), (0.22, 0.30, 0.46)), // air base, noon
@@ -288,6 +290,7 @@ pub(crate) fn turn(at: V, pivot: V, ang: f32, fwd: f32) -> V {
 /// A leg and its foot. `heel` is how far the heel is raised, in radians: on
 /// the floor the foot bends at the ball and the toes stay down, the way a
 /// fighter stands on the back foot; in the air the whole foot points.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn draw_leg(blip: &Blip, l: &Look, hip: V, knee: V, ankle: V, fwd: f32, ground: f32, heel: f32) {
     let b = l.bulk;
     let ink = l.ink();
@@ -725,6 +728,7 @@ pub(crate) fn draw_torso(blip: &Blip, l: &Look, hip: V, neck: V, fwd: f32) {
 /// The cape: pinned across the shoulders and lying down the back before it
 /// hangs, so it trails behind a body that leans instead of dropping between
 /// the legs; in flight (`level`) it streams straight back along the body.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn draw_cape(blip: &Blip, l: &Look, hip: V, neck: V, fwd: f32, level: f32, now: f32, floor: f32) {
     let b = l.bulk;
     let (sx, sy) = unit(hip, neck);

@@ -1,6 +1,5 @@
-//! The blip colour palette — eleven named constants, matching the original C macros.
-//! Use these for a consistent retro look. You can always define your own colours
-//! with `macroquad::color::Color { r, g, b, a }` (all values 0.0–1.0).
+//! The blip colour palette: the original eleven named constants, and the blip look's (`crate::look`), which every
+//! game draws its outlines, HUD and boxes in. Define a game's own colours with `Color { r, g, b, a }` (0.0–1.0).
 
 use macroquad::color::Color;
 
@@ -20,15 +19,19 @@ pub const BLIP_ORANGE: Color = rgb(230, 130, 20); // HUD "LIVES" label, fire
 pub const BLIP_GRAY: Color = rgb(120, 120, 120); // inactive / dim text
 pub const BLIP_DARKGRAY: Color = rgb(50, 50, 50); // separator lines, shadows
 
-// ---- neon accents — saturated, high-voltage versions for glow effects and modern accents.
-// Use sparingly against BLIP_BLACK: a neon-outlined player ship, a synthwave horizon line,
-// a title-screen highlight. Pair with `Blip::draw_glow_line` / `fill_glow_circle` for the halo.
-pub const NEON_CYAN: Color = rgb(0, 255, 255); // player craft, glow trails
-pub const NEON_PINK: Color = rgb(255, 20, 147); // hit flashes, UI highlights
-pub const NEON_PURPLE: Color = rgb(170, 60, 255); // horizon grids, background accents
-pub const NEON_GREEN: Color = rgb(140, 255, 60); // pickups, go signals
-pub const NEON_ORANGE: Color = rgb(255, 120, 0); // thrust, fire, explosions
-pub const NEON_YELLOW: Color = rgb(255, 230, 0); // score pops, bullets
+// ---- the blip look (`crate::look`): the palette every game draws its outlines, HUD and boxes in.
+const fn pal(c: [u8; 3]) -> Color { rgb(c[0], c[1], c[2]) }
+pub const BLIP_INK: Color = pal(crate::look::INK);
+pub const BLIP_CREAM: Color = pal(crate::look::CREAM);
+pub const BLIP_HEART: Color = pal(crate::look::HEART);
+pub const BLIP_GOLD: Color = pal(crate::look::GOLD);
+pub const BLIP_LEAF: Color = pal(crate::look::LEAF);
+pub const BLIP_SEA: Color = pal(crate::look::SEA);
+pub const BLIP_PLUM: Color = pal(crate::look::PLUM);
+pub const BLIP_NIGHT: Color = pal(crate::look::NIGHT);
+pub const BLIP_DUSK: Color = pal(crate::look::DUSK);
+/// A soft round shadow under things that stand on the ground.
+pub const BLIP_SHADOW: Color = Color { a: 0.32, ..BLIP_INK };
 
 /// A colour from hue (0..1, wrapping round the rainbow), saturation and
 /// value (0..1), and alpha.

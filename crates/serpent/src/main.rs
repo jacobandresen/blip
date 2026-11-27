@@ -6,7 +6,7 @@ use blip::{
     GAME_OVER_MIN_WAIT,
     load_png,
     lerp, play_sfx, Jukebox, rand_int, web, window_conf, Blip, BlipColor, Fx, LifeResult, Session,
-    Timer, BLIP_BLACK, BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
+    Timer, BLIP_BLACK, BLIP_GRAY, BLIP_CREAM, BLIP_GOLD, BLIP_GREEN, BLIP_INK, BLIP_LEAF, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
 
 // The effects and music are made by build.rs; the tests check them here.
@@ -18,12 +18,14 @@ mod levels;
 use levels::*;
 
 // ---- layout -----------------------------------------------------------
-const COLS: i32 = 20;
-const ROWS: i32 = 20;
-const CELL: i32 = 24;
+mod field;
+use field::{CELL, CHEST, COLS, FOREST, ROWS};
 const HUD_H: i32 = 28;
-const WIN_W: i32 = COLS * CELL;
-const WIN_H: i32 = ROWS * CELL + HUD_H;
+/// The board's top left corner.
+const BOARD_X: i32 = FOREST;
+const BOARD_Y: i32 = HUD_H + FOREST;
+const WIN_W: i32 = COLS * CELL + 2 * FOREST;
+const WIN_H: i32 = ROWS * CELL + 2 * FOREST + HUD_H;
 const MAX_LEN: usize = (COLS * ROWS) as usize;
 
 // ---- tuning -----------------------------------------------------------
@@ -46,14 +48,21 @@ const STREAK_MAX: i32 = 5;
 
 const GOLD: BlipColor = BlipColor { r: 1.0, g: 0.84, b: 0.20, a: 1.0 };
 
+/// The shadow things cast on the lawn (opaque, so the snake's overlapping strokes do not darken where they meet).
+const LAWN_SHADOW: BlipColor = BlipColor { r: 0.38, g: 0.60, b: 0.22, a: 1.0 };
+
+/// The head, a lighter emerald than the body behind it.
+const HEAD_GREEN: BlipColor = BlipColor { r: 0.26, g: 0.78, b: 0.46, a: 1.0 };
+
 /// The snake's scales, `k` of the way from head (0) to tail (1).
 fn scale_green(k: f32) -> BlipColor {
-    blip::blend(BlipColor { r: 0.36, g: 0.86, b: 0.36, a: 1.0 }, BlipColor { r: 0.16, g: 0.50, b: 0.20, a: 1.0 }, k)
+    // An emerald darker than the sunny lawn, so it stands out on it.
+    blip::blend(BlipColor { r: 0.16, g: 0.66, b: 0.38, a: 1.0 }, BlipColor { r: 0.06, g: 0.38, b: 0.24, a: 1.0 }, k)
 }
 
 /// The pixel centre of a board cell.
 fn cell_centre(c: Cell) -> (f32, f32) {
-    ((c.c * CELL + CELL / 2) as f32, (HUD_H + c.r * CELL + CELL / 2) as f32)
+    ((BOARD_X + c.c * CELL + CELL / 2) as f32, (BOARD_Y + c.r * CELL + CELL / 2) as f32)
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -156,12 +165,10 @@ impl Game {
         }
     }
 
-    /// The music for where the game is: the calm tune, then the fast one.
+    /// The tune for where the game is: the title's, then one for each stretch of levels (TUNE_FROM).
     fn track(&self) -> usize {
-        if self.state == State::Title { 0 }
-        else if self.sess.level >= FRENZY_LEVEL { 2 }
-        else if self.sess.level >= PROWL_LEVEL { 1 }
-        else { 0 }
+        if self.state == State::Title { return 0; }
+        TUNE_FROM.iter().filter(|&&from| self.sess.level >= from).count()
     }
 
     #[inline]
@@ -598,24 +605,126 @@ fn update_over(g: &mut Game, dt: f32) {
     if play_again(&mut g.dead_timer, dt) { g.start_game(); }
 }
 
-/// A dark lawn of two-tone squares, so the eye can count cells without grid lines.
-fn draw_board(blip: &Blip) {
-    let tiles = [BlipColor { r: 0.035, g: 0.075, b: 0.045, a: 1.0 }, BlipColor { r: 0.05, g: 0.10, b: 0.06, a: 1.0 }];
-    for r in 0..ROWS {
-        for c in 0..COLS {
-            blip.fill_rect((c * CELL) as f32, (HUD_H + r * CELL) as f32, CELL as f32, CELL as f32, tiles[((c + r) & 1) as usize]);
+/// The field (gfx.rs): a sunny lawn in a ring of trees, the board's cells a shade apart so the eye can count them,
+/// and two butterflies about it, as in Mabe Village.
+fn draw_board(blip: &Blip, field: &Texture2D) {
+    blip.draw_texture(field, 0.0, HUD_H as f32, field.width(), field.height());
+    draw_cloud_shadow(blip, blip::now());
+    draw_butterflies(blip, blip::now());
+    draw_owl(blip, blip::now());
+    // Now and then the chest in the glade below the lawn (field.rs CHEST) twinkles at its lock.
+    let k = (blip::now() * 0.5).rem_euclid(5.0);
+    if k < 0.6 {
+        let (sx, sy) = ((CHEST.0 + 16) as f32, (HUD_H + CHEST.1 + 1) as f32);
+        let s = 3.5 * (1.0 - (k / 0.3 - 1.0).abs());
+        blip.draw_line_ex(sx - s, sy, sx + s, sy, 1.0, BLIP_WHITE);
+        blip.draw_line_ex(sx, sy - s, sx, sy + s, 1.0, BLIP_WHITE);
+    }
+}
+
+/// A wise old owl of our own on a treetop in the wood above the lawn, watching: brown feathers, a cream face, round
+/// eyes that blink now and then and look toward the snake's half of the field.
+fn draw_owl(blip: &Blip, t: f32) {
+    let (x, y) = (WIN_W as f32 * 0.68, HUD_H as f32 + 13.0);
+    let brown = BlipColor { r: 0.55, g: 0.36, b: 0.20, a: 1.0 };
+    let dark = BlipColor { r: 0.36, g: 0.22, b: 0.12, a: 1.0 };
+    let cream = BlipColor { r: 0.98, g: 0.92, b: 0.76, a: 1.0 };
+    blip.fill_circle(x + 2.0, y + 9.0, 7.0, BlipColor { a: 0.3, ..BLIP_INK });
+    blip.fill_circle(x, y + 2.0, 8.5, BLIP_INK);
+    blip.fill_circle(x, y + 2.0, 7.5, brown);
+    blip.fill_circle(x, y + 5.0, 4.5, BlipColor { r: 0.80, g: 0.64, b: 0.42, a: 1.0 });
+    // ear tufts
+    for s in [-1.0f32, 1.0] { blip.fill_triangle((x + s * 3.0, y - 5.0), (x + s * 7.0, y - 3.0), (x + s * 6.5, y - 9.0), dark); }
+    for s in [-1.0f32, 1.0] { blip.fill_circle(x + s * 3.0, y - 1.0, 3.2, cream); }
+    let blink = t.rem_euclid(4.3) < 0.14;
+    let look = (t * 0.3).sin() * 0.9;
+    for s in [-1.0f32, 1.0] {
+        if blink { blip.fill_rect(x + s * 3.0 - 2.0, y - 1.5, 4.0, 1.0, BLIP_INK); }
+        else { blip.fill_circle(x + s * 3.0 + look, y - 0.5, 1.5, BLIP_INK); }
+    }
+    blip.fill_triangle((x - 1.0, y + 1.5), (x + 1.0, y + 1.5), (x, y + 3.5), BlipColor { r: 0.95, g: 0.70, b: 0.20, a: 1.0 });
+}
+
+/// A cloud's shadow drifting slowly over the field, once a minute or so: faint, soft-edged, by the clock.
+fn draw_cloud_shadow(blip: &Blip, t: f32) {
+    let span = WIN_W as f32 + 400.0;
+    let x = (t * 9.0).rem_euclid(span) - 200.0;
+    let y = HUD_H as f32 + (WIN_H - HUD_H) as f32 * (0.35 + 0.2 * (t * 0.013).sin());
+    for (dx, dy, r) in [(0.0, 0.0, 90.0), (70.0, 20.0, 70.0), (-80.0, 25.0, 65.0), (20.0, -40.0, 60.0)] {
+        for k in 0..4 {
+            blip.fill_circle(x + dx, y + dy, r * (1.0 - k as f32 * 0.12), BlipColor { a: 0.025, ..BLIP_INK });
         }
     }
-    // Visible wall border — shows the snake's movement boundary
-    let wall = BlipColor { r: 0.20, g: 0.42, b: 0.20, a: 1.0 };
-    let x0 = 0.0_f32;
-    let y0 = HUD_H as f32;
-    let w  = WIN_W as f32;
-    let h  = (WIN_H - HUD_H) as f32;
-    blip.fill_rect(x0,         y0,         w,   2.0, wall); // top
-    blip.fill_rect(x0,         y0 + h - 2.0, w,   2.0, wall); // bottom
-    blip.fill_rect(x0,         y0,         2.0, h,   wall); // left
-    blip.fill_rect(x0 + w - 2.0, y0,         2.0, h,   wall); // right
+}
+
+/// The day passing over the meadow as the levels go by: the fresh morning of the first levels, a golden afternoon,
+/// sunset, then dusk with fireflies. A wash over the field only; the snake, the food and the stones keep their colours,
+/// so play reads the same at any hour.
+fn draw_daylight(blip: &Blip, level: i32, t: f32) {
+    let (tint, a) = match level {
+        ..=3 => return,
+        4..=6 => ((1.0, 0.84, 0.40), 0.16),
+        7..=9 => ((1.0, 0.42, 0.50), 0.22),
+        _ => ((0.16, 0.20, 0.50), 0.34),
+    };
+    let (y, w, h) = (HUD_H as f32, WIN_W as f32, (WIN_H - HUD_H) as f32);
+    blip.fill_rect(0.0, y, w, h, BlipColor { r: tint.0, g: tint.1, b: tint.2, a });
+    if level < 10 { return; }
+    // Fireflies: a dozen soft lights drifting and pulsing, by the clock.
+    for k in 0..12 {
+        let kf = k as f32;
+        let x = w * (0.5 + 0.46 * (t * 0.07 * (1.0 + kf * 0.13) + kf * 1.9).sin());
+        let fy = y + h * (0.5 + 0.44 * (t * 0.05 * (1.0 + kf * 0.11) + kf * 2.7).cos());
+        let glow = 0.5 + 0.5 * (t * (1.3 + kf * 0.2) + kf).sin();
+        if glow < 0.25 { continue; }
+        blip.fill_glow_circle(x, fy, 2.4, BlipColor { r: 0.95, g: 1.0, b: 0.55, a: glow });
+    }
+}
+
+/// Two butterflies wandering over the lawn and the wood's edge on slow looping paths, wings beating: by the clock,
+/// not the game's random numbers, so play is the same with them. Small and pale, so nobody takes them for food.
+fn draw_butterflies(blip: &Blip, t: f32) {
+    let (w, h) = (WIN_W as f32, (WIN_H - HUD_H) as f32);
+    for (k, wing, body) in [(0.0f32, BlipColor { r: 0.62, g: 0.84, b: 1.0, a: 1.0 }, BLIP_INK),
+                            (1.0, BlipColor { r: 1.0, g: 0.97, b: 0.86, a: 1.0 }, BLIP_INK)] {
+        let s = t * 0.11 + k * 2.7;
+        let x = w * (0.5 + 0.42 * (s * 1.3).sin() * (s * 0.37 + k).cos());
+        let y = HUD_H as f32 + h * (0.5 + 0.40 * (s * 0.9 + 1.0).sin() * (s * 0.53).sin()) + (t * 5.0 + k).sin() * 3.0;
+        let beat = (t * 22.0 + k * 3.0).sin().abs();
+        let span = 1.5 + 3.0 * beat;
+        blip.fill_circle(x + 3.0, y + 9.0, 2.0, BlipColor { a: 0.18, ..BLIP_INK });
+        for side in [-1.0f32, 1.0] {
+            blip.fill_circle(x + side * span, y - 1.0, 2.3, wing);
+            blip.fill_circle(x + side * span * 0.8, y + 1.8, 1.6, wing);
+        }
+        blip.fill_rect(x - 0.5, y - 2.0, 1.0, 4.5, body);
+    }
+}
+
+/// A snake's body through `pts` (head first), each drawn joint (`joint(i)`, from point i to the one before it) a
+/// tapering capsule: its shadow on the lawn, the ink outline, the body, then (with `marks`) a highlight lit from the
+/// upper left like everything on the field and a scale mark on every other segment.
+fn draw_body(blip: &Blip, pts: &[(f32, f32)], joint: impl Fn(usize) -> bool, radius: &dyn Fn(usize) -> f32,
+    shade: &dyn Fn(usize) -> BlipColor, marks: bool) {
+    let n = pts.len();
+    // Each point's radius and colour once, for the four passes over the body.
+    let rs: Vec<f32> = (0..n).map(radius).collect();
+    let cs: Vec<BlipColor> = (0..n).map(shade).collect();
+    let joints: Vec<usize> = (1..n).rev().filter(|&i| joint(i)).collect();
+    let seg = |i: usize, dx: f32, dy: f32, k: f32, add: f32, c: BlipColor| {
+        let ((x0, y0), (x1, y1)) = (pts[i], pts[i - 1]);
+        blip.fill_capsule(x0 + dx, y0 + dy, x1 + dx, y1 + dy, rs[i] * k + add, rs[i - 1] * k + add, c);
+    };
+    for &i in &joints { seg(i, 2.0, 4.0, 1.0, 0.0, LAWN_SHADOW); }
+    for &i in &joints { seg(i, 0.0, 0.0, 1.0, 1.5, BLIP_INK); }
+    for &i in &joints { seg(i, 0.0, 0.0, 1.0, 0.0, cs[i]); }
+    if !marks { return; }
+    for &i in &joints {
+        let c = cs[i];
+        let hi = BlipColor { r: (c.r + 0.25).min(1.0), g: (c.g + 0.12).min(1.0), b: (c.b + 0.2).min(1.0), a: 1.0 };
+        seg(i, -rs[i] * 0.3, -rs[i] * 0.3, 0.36, 0.0, hi);
+        if i % 2 == 0 && i + 2 < n { blip.fill_circle(pts[i].0, pts[i].1, rs[i] * 0.5, blip::shade(c, 0.6)); }
+    }
 }
 
 /// The snake drawn as one body: thick strokes between segment centres,
@@ -641,8 +750,8 @@ fn draw_snake(blip: &Blip, g: &Game) {
             let ahead = g.snake_at(i - 1);
             Cell { c: 2 * cur.c - ahead.c, r: 2 * cur.r - ahead.r }
         };
-        let x = lerp(prev.c as f32, cur.c as f32, f) * CELL as f32 + half;
-        let y = HUD_H as f32 + lerp(prev.r as f32, cur.r as f32, f) * CELL as f32 + half;
+        let x = BOARD_X as f32 + lerp(prev.c as f32, cur.c as f32, f) * CELL as f32 + half;
+        let y = BOARD_Y as f32 + lerp(prev.r as f32, cur.r as f32, f) * CELL as f32 + half;
         (x, y)
     };
     let n = g.snake_len;
@@ -658,27 +767,10 @@ fn draw_snake(blip: &Blip, g: &Game) {
         let bulge = g.gulps.iter().map(|&k| (1.0 - (k - i as f32).abs()).max(0.0)).fold(0.0, f32::max);
         base_r * taper.min(1.0) + bulge * 3.5
     };
-    let ink = BlipColor { r: 0.02, g: 0.12, b: 0.04, a: 1.0 };
     let pts: Vec<(f32, f32)> = (0..n).map(seg_px).collect();
-    // Outline first, then the body, then the belly stripe and a scale mark on every other segment.
-    for i in (first + 1..n).rev() {
-        let ((x0, y0), (x1, y1)) = (pts[i], pts[i - 1]);
-        blip.fill_capsule(x0, y0, x1, y1, radius(i) + 1.5, radius(i - 1) + 1.5, ink);
-    }
-    for i in (first + 1..n).rev() {
-        let ((x0, y0), (x1, y1)) = (pts[i], pts[i - 1]);
-        blip.fill_capsule(x0, y0, x1, y1, radius(i), radius(i - 1), shade(i));
-    }
-    if !flash {
-        for i in (first + 1..n).rev() {
-            let ((x0, y0), (x1, y1)) = (pts[i], pts[i - 1]);
-            let c = shade(i);
-            let hi = BlipColor { r: (c.r + 0.25).min(1.0), g: (c.g + 0.12).min(1.0), b: (c.b + 0.2).min(1.0), a: 1.0 };
-            blip.fill_capsule(x0, y0, x1, y1, radius(i) * 0.32, radius(i - 1) * 0.32, hi);
-            if i % 2 == 0 && i + 2 < n {
-                blip.fill_circle(x0, y0, radius(i) * 0.5, blip::shade(c, 0.6));
-            }
-        }
+    draw_body(blip, &pts, |i| i > first, &radius, &shade, !flash);
+    if first == 0 {
+        blip.fill_circle(pts[0].0 + 2.0, pts[0].1 + 4.0, CELL as f32 / 2.0 - 1.0, LAWN_SHADOW);
     }
     // A new level: a sparkle runs down the body from head to tail.
     if g.state == State::Play && g.banner_t < 0.9 && g.sess.level > 1 {
@@ -694,11 +786,11 @@ fn draw_snake(blip: &Blip, g: &Game) {
     let (hx, hy) = pts[0];
     let (fx, fy) = match g.cur_dir { Dir::Up => (0.0, -1.0), Dir::Down => (0.0, 1.0), Dir::Left => (-1.0, 0.0), Dir::Right => (1.0, 0.0) };
     let hr = CELL as f32 / 2.0 - 1.0;
-    let head = if flash { BLIP_RED } else { BlipColor { r: 0.45, g: 0.95, b: 0.45, a: 1.0 } };
+    let head = if flash { BLIP_RED } else { HEAD_GREEN };
     // A round head, longer than wide: a capsule from the neck to the snout.
     let (nx, ny) = (hx - fx * 3.0, hy - fy * 3.0);
     let (sx, sy) = (hx + fx * 3.0, hy + fy * 3.0);
-    blip.fill_capsule(nx, ny, sx, sy, hr + 1.5, hr * 0.8 + 1.5, ink);
+    blip.fill_capsule(nx, ny, sx, sy, hr + 1.5, hr * 0.8 + 1.5, BLIP_INK);
     blip.fill_capsule(nx, ny, sx, sy, hr, hr * 0.8, head);
     // A forked tongue flicks out now and then, in the direction of travel.
     if g.state == State::Play && blip::now().rem_euclid(1.6) < 0.18 {
@@ -719,12 +811,13 @@ fn draw_snake(blip: &Blip, g: &Game) {
     for side in [-1.0f32, 1.0] {
         let (ex, ey) = (hx + fx * 3.0 - fy * side * 5.5, hy + fy * 3.0 + fx * side * 5.5);
         blip.fill_circle(ex, ey, 3.6, BLIP_WHITE);
-        blip.fill_circle(ex + fx * 1.4, ey + fy * 1.4, 1.8, BLIP_BLACK);
+        blip.fill_circle(ex + fx * 1.4, ey + fy * 1.4, 1.8, BLIP_INK);
     }
 }
 
-fn draw_play(blip: &Blip, g: &Game, food: &Texture2D) {
-    draw_board(blip);
+fn draw_play(blip: &Blip, g: &Game, food: &Texture2D, field: &Texture2D) {
+    draw_board(blip, field);
+    draw_daylight(blip, g.sess.level, blip::now());
     draw_pickups(blip, g, food);
     draw_obstacles(blip, g);
     draw_snake(blip, g);
@@ -732,8 +825,8 @@ fn draw_play(blip: &Blip, g: &Game, food: &Texture2D) {
     if g.banner_t < BANNER_SECS && g.state == State::Play {
         let a = (1.0 - g.banner_t / BANNER_SECS).min(1.0) * 1.5;
         // Row 5 is clear in every obstacle layout.
-        blip.draw_centered(&format!("LEVEL {}", g.sess.level), (HUD_H + 5 * CELL + 2) as f32, 4.0,
-            BlipColor { a: a.min(1.0), ..BLIP_YELLOW });
+        blip.draw_message(&format!("LEVEL {}", g.sess.level), (WIN_W / 2) as f32, (BOARD_Y + 5 * CELL + 16) as f32, 3.0,
+            BLIP_GOLD, a.min(1.0));
     }
     blip.draw_hud(g.sess.score, g.sess.lives);
     blip.draw_hud_multiple(g.sess.score, g.streak.multiple());
@@ -744,22 +837,21 @@ fn draw_obstacles(blip: &Blip, g: &Game) {
     let solid = g.obs_fade >= 1.0;
     let a = if solid { 1.0 } else if (g.obs_fade * 8.0) as i32 % 2 == 0 { 0.55 } else { 0.25 };
     for i in 0..g.obstacle_count {
-        let obs = g.obstacles[i];
-        let (x, y) = ((obs.c * CELL) as f32, (HUD_H + obs.r * CELL) as f32);
-        // A bevelled stone: lit top-left, shadowed bottom-right, a crack for texture. A new one rises out of the lawn
-        // as it blinks in.
-        let full = CELL as f32 - 2.0;
-        let s = if solid { full } else { full * (0.4 + 0.6 * g.obs_fade) };
-        let (x, y) = (x + (full - s) / 2.0, y + (full - s) / 2.0);
-        blip.fill_rect(x + 1.0, y + 1.0, s, s, BlipColor { r: 0.30, g: 0.32, b: 0.36, a });
-        blip.fill_rect(x + 4.0, y + 4.0, s - 6.0, s - 6.0, BlipColor { r: 0.46, g: 0.48, b: 0.52, a });
-        blip.fill_rect(x + 1.0, y + 1.0, s, 3.0, BlipColor { r: 0.72, g: 0.74, b: 0.78, a });
-        blip.fill_rect(x + 1.0, y + 1.0, 3.0, s, BlipColor { r: 0.62, g: 0.64, b: 0.68, a });
-        let k = (obs.c * 7 + obs.r * 3) % 4;
-        if k < 2 && solid {
-            let cx = x + 8.0 + k as f32 * 6.0;
-            blip.draw_line_ex(cx, y + 6.0, cx + 3.0, y + 12.0, 1.5, BlipColor { r: 0.25, g: 0.26, b: 0.30, a });
-            blip.draw_line_ex(cx + 3.0, y + 12.0, cx + 1.0, y + 17.0, 1.5, BlipColor { r: 0.25, g: 0.26, b: 0.30, a });
+        let (cx, cy) = cell_centre(g.obstacles[i]);
+        // A round grey boulder as on Koholint: lit from the upper left, darker underneath, a soft shadow to the lower
+        // right, a nick or two in it. A new one rises out of the lawn as it blinks in.
+        let r = (CELL as f32 / 2.0 - 1.0) * if solid { 1.0 } else { 0.4 + 0.6 * g.obs_fade };
+        let tint = |c: (f32, f32, f32)| BlipColor { r: c.0, g: c.1, b: c.2, a };
+        blip.fill_circle(cx + 3.0, cy + 4.0, r, BlipColor { a: a * 0.35, ..BLIP_INK });
+        blip.fill_circle(cx, cy, r + 1.0, BlipColor { a, ..BLIP_INK });
+        blip.fill_circle(cx, cy, r, tint((0.30, 0.31, 0.36)));
+        blip.fill_circle(cx - r * 0.12, cy - r * 0.16, r * 0.82, tint((0.46, 0.47, 0.52)));
+        blip.fill_circle(cx - r * 0.26, cy - r * 0.32, r * 0.48, tint((0.62, 0.63, 0.68)));
+        blip.fill_circle(cx - r * 0.36, cy - r * 0.42, r * 0.18, tint((0.84, 0.85, 0.88)));
+        let k = g.obstacles[i].c * 7 + g.obstacles[i].r * 3;
+        if solid && k % 3 != 0 {
+            let s = if k % 2 == 0 { 1.0 } else { -1.0 };
+            blip.draw_line_ex(cx + s * r * 0.2, cy + r * 0.1, cx + s * r * 0.5, cy + r * 0.45, 1.5, tint((0.22, 0.23, 0.27)));
         }
     }
 }
@@ -768,7 +860,8 @@ fn draw_obstacles(blip: &Blip, g: &Game) {
 fn draw_pickups(blip: &Blip, g: &Game, food: &Texture2D) {
     let breathe = 1.0 + 0.08 * (blip::now() * 5.0).sin();
     let fs = CELL as f32 * breathe;
-    let (fcx, fcy) = ((g.food.c * CELL) as f32 + CELL as f32 / 2.0, (HUD_H + g.food.r * CELL) as f32 + CELL as f32 / 2.0);
+    let (fcx, fcy) = cell_centre(g.food);
+    blip.fill_circle(fcx + 2.0, fcy + 8.0, 7.0, LAWN_SHADOW);
     blip.draw_texture(food, fcx - fs / 2.0, fcy - fs / 2.0, fs, fs);
     draw_bonus(blip, g);
     draw_shears(blip, g);
@@ -782,8 +875,7 @@ fn draw_bonus(blip: &Blip, g: &Game) {
     let expiring = g.bonus_ttl <= BONUS_WARN;
     if expiring && (g.bonus_ttl * 6.0) as i32 % 3 == 0 { return; }
 
-    let cx = (g.bonus.c * CELL) as f32 + CELL as f32 / 2.0;
-    let cy = (HUD_H + g.bonus.r * CELL) as f32 + CELL as f32 / 2.0;
+    let (cx, cy) = cell_centre(g.bonus);
     let life = g.bonus_ttl / BONUS_TTL;
     let r = CELL as f32 * (0.26 + 0.20 * life);
     let gold = GOLD;
@@ -818,20 +910,18 @@ fn draw_shears(blip: &Blip, g: &Game) {
     blip.fill_circle(cx, cy, 2.0, BLIP_WHITE);
 }
 
-fn draw_title(blip: &Blip, hi: i32) {
-    draw_board(blip);
-    // A dark band behind the words, so they read over the lawn.
-    blip.fill_rect(0.0, (WIN_H / 4 - 24) as f32, WIN_W as f32, 140.0, BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.55 });
-    blip.fill_rect(0.0, (WIN_H * 2 / 3 - 10) as f32, WIN_W as f32, 36.0, BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.55 });
-    blip.draw_centered_outlined("SERPENT", (WIN_W / 2) as f32, (WIN_H / 4) as f32, 6.0, BLIP_GREEN,
-        BlipColor { r: 0.02, g: 0.12, b: 0.04, a: 1.0 });
+fn draw_title(blip: &Blip, field: &Texture2D, wood: &Texture2D) {
+    draw_board(blip, field);
+    blip.draw_logo("SERPENT", (WIN_W / 2) as f32, (WIN_H / 4) as f32, 6.0, BLIP_LEAF);
     // SERPENT is sz=6 (42px tall) — clear its bottom by a real margin.
-    blip.draw_hi(hi, (WIN_H / 4 + 50) as f32, BLIP_YELLOW);
     let by = web::controls();
     blip.draw_start_prompt((WIN_H / 2) as f32);
-    blip.draw_centered(by.pick("ARROW KEYS OR WASD", "STEER WITH THE PAD", "SWIPE TO STEER"),
-        (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
+    blip.draw_message(by.pick("ARROW KEYS OR WASD", "STEER WITH THE PAD", "SWIPE TO STEER"), (WIN_W / 2) as f32,
+        (WIN_H * 2 / 3 + 7) as f32, 2.0, BLIP_CREAM, 1.0);
     draw_title_snake(blip, blip::now());
+    // the snake and the mouse run in under the trees at the sides
+    blip.draw_texture(wood, 0.0, HUD_H as f32, wood.width(), wood.height());
+    blip.draw_attract_bar();
 }
 
 /// A snake winding across the title screen after a golden mouse, wrapping round: drawn as in play, an outlined body
@@ -843,7 +933,6 @@ fn draw_title_snake(blip: &Blip, t: f32) {
         let x = (t * 90.0 - d).rem_euclid(span) - 160.0;
         (x, WIN_H as f32 * 0.83 + ((t * 90.0 - d) * 0.035).sin() * 22.0)
     };
-    let ink = BlipColor { r: 0.02, g: 0.12, b: 0.04, a: 1.0 };
     let shade = |i: usize| {
         let k = i as f32 / SEGS as f32;
         scale_green(k)
@@ -851,20 +940,10 @@ fn draw_title_snake(blip: &Blip, t: f32) {
     let r = |i: usize| 11.0 * if i + 5 >= SEGS { 0.5 + 0.5 * (SEGS - 1 - i) as f32 / 5.0 } else { 1.0 };
     let pts: Vec<(f32, f32)> = (0..SEGS).map(|i| at(i as f32 * 10.0)).collect();
     // Skip a joint that wraps across the screen edge.
-    let joined = |i: usize| (pts[i].0 - pts[i - 1].0).abs() < 40.0;
-    for i in (1..SEGS).rev().filter(|&i| joined(i)) {
-        blip.fill_capsule(pts[i].0, pts[i].1, pts[i - 1].0, pts[i - 1].1, r(i) + 1.5, r(i - 1) + 1.5, ink);
-    }
-    for i in (1..SEGS).rev().filter(|&i| joined(i)) {
-        blip.fill_capsule(pts[i].0, pts[i].1, pts[i - 1].0, pts[i - 1].1, r(i), r(i - 1), shade(i));
-        let c = shade(i);
-        let hi = BlipColor { r: (c.r + 0.25).min(1.0), g: (c.g + 0.12).min(1.0), b: (c.b + 0.2).min(1.0), a: 1.0 };
-        blip.fill_capsule(pts[i].0, pts[i].1, pts[i - 1].0, pts[i - 1].1, r(i) * 0.32, r(i - 1) * 0.32, hi);
-        if i % 2 == 0 && i + 3 < SEGS { blip.fill_circle(pts[i].0, pts[i].1, r(i) * 0.5, blip::shade(c, 0.6)); }
-    }
+    draw_body(blip, &pts, |i| (pts[i].0 - pts[i - 1].0).abs() < 40.0, &r, &shade, true);
     let (hx, hy) = pts[0];
-    blip.fill_circle(hx + 2.0, hy, 13.5, ink);
-    blip.fill_circle(hx + 2.0, hy, 12.0, BlipColor { r: 0.45, g: 0.95, b: 0.45, a: 1.0 });
+    blip.fill_circle(hx + 2.0, hy, 13.5, BLIP_INK);
+    blip.fill_circle(hx + 2.0, hy, 12.0, HEAD_GREEN);
     for side in [-1.0f32, 1.0] {
         blip.fill_circle(hx + 5.0, hy + side * 5.5, 3.6, BLIP_WHITE);
         blip.fill_circle(hx + 6.4, hy + side * 5.5, 1.8, BLIP_BLACK);
@@ -885,12 +964,12 @@ fn draw_title_snake(blip: &Blip, t: f32) {
     blip.fill_circle(mx + 9.0, my - 2.0, 1.1, BLIP_BLACK);
 }
 
-fn draw_over(blip: &Blip, g: &Game, hi: i32) {
+fn draw_over(blip: &Blip, g: &Game, hi: i32, field: &Texture2D) {
     // The field as it ended, dimmed under the score.
-    draw_board(blip);
+    draw_board(blip, field);
     draw_obstacles(blip, g);
     draw_snake(blip, g);
-    blip.fill_rect(0.0, HUD_H as f32, WIN_W as f32, (WIN_H - HUD_H) as f32, BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.68 });
+    blip.fill_rect(0.0, HUD_H as f32, WIN_W as f32, (WIN_H - HUD_H) as f32, BlipColor { a: 0.45, ..BLIP_INK });
     let (title, colour) = if g.snake_len + g.obstacle_count == MAX_LEN { ("FIELD CLEARED", BLIP_GREEN) } else { ("GAME OVER", BLIP_RED) };
     blip.draw_end_screen(title, g.sess.score, hi, colour, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active());
     blip.draw_game_over_note(&format!("LEVEL {}   LENGTH {}", g.sess.level, g.snake_len), BLIP_GRAY);
@@ -904,12 +983,19 @@ fn conf() -> blip::macroquad::window::Conf {
 async fn main() {
     blip::bot::playthroughs(bot::PLAYTHROUGHS);
     let mut blip = Blip::new(WIN_W, WIN_H);
+    // A bright lawn: the bloom tuned for lines on black would wash it out.
+    blip.set_bloom(0.2);
+    // and the interlace's dark rows, tuned for lines on black, would halve it and twitter (as Bubbler and Brawler).
+    blip.set_interlace(0.6);
+    blip::bot::arena(BOARD_X as f32, BOARD_Y as f32, (COLS * CELL) as f32, (ROWS * CELL) as f32);
     let mut g = Game::new();
 
     let food = load_png(blip::png!("food"));
+    let field = load_png(blip::png!("field"));
+    let wood = load_png(blip::png!("wood"));
 
     let sfx = Sounds::load().await;
-    let mut music = Jukebox::new("serpent", &["SLITHER", "PROWL", "FRENZY"]);
+    let mut music = Jukebox::new("serpent", &["ELISE", "MORNING", "MOUNTAIN", "ODE", "MARCH", "CANCAN"]);
 
     if blip.screenshot_mode {
         g.start_game();
@@ -932,9 +1018,9 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title => draw_title(&blip, web::high_score()),
-            State::Over  => draw_over(&blip, &g, web::high_score()),
-            State::Play | State::Dead => blip.shaken(g.shake, CRASH_SHAKE, 5.0, || draw_play(&blip, &g, &food)),
+            State::Title => draw_title(&blip, &field, &wood),
+            State::Over  => draw_over(&blip, &g, web::high_score(), &field),
+            State::Play | State::Dead => blip.shaken(g.shake, CRASH_SHAKE, 5.0, || draw_play(&blip, &g, &food, &field)),
         }
         g.shake = (g.shake - dt).max(0.0);
 

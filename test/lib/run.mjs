@@ -15,7 +15,7 @@ export function run(command, args, { env = process.env, heading = null } = {}) {
     child.once('close', (code) => {
       if (heading) {
         const lines = out.split('\n'), failing = lines.findIndex((l) => l.startsWith('✖ failing tests:'));
-        process.stdout.write(`\n== ${heading}\n` + lines.filter((l) => /^(✖|ℹ (tests|pass|fail))|^\s+✖/.test(l)).join('\n') + '\n' +
+        process.stdout.write(`\n== ${heading}\n` + lines.filter((l) => /^(✖|ℹ (tests|pass|fail|duration_ms))|^\s+✖/.test(l)).join('\n') + '\n' +
           (failing >= 0 ? lines.slice(failing, failing + 40).join('\n') + '\n' : ''));
       }
       resolve(code ?? 1);

@@ -1,9 +1,12 @@
-// The arcade room behind the cabinets (web/arcade.css): a plain wall and floor, a shadow behind each machine,
-// nothing in the cabinets' way, still at rest, and a walk that counts on round the loop without a jump.
+// The arcade room behind the cabinets (web/arcade.css): a wall and floor with things between the machines, a shadow
+// behind each machine, nothing in the cabinets' way, still at rest, and a walk that counts on round the loop without a jump.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openArcade } from './lib/harness.mjs';
+import { openArcade, playAnimationsAt } from './lib/harness.mjs';
+
+// The shell's transitions four times as fast: these tests check where things go, not how long it takes.
+playAnimationsAt(4);
 
 const CONFIGS = [
   { name: 'phone portrait', width: 390, height: 844, touch: true },
@@ -17,12 +20,13 @@ const settled = (page) => page.waitForFunction(() => !document.getElementById('g
 const roomTravel = (page) => page.evaluate(() => Number(document.getElementById('game-grid').dataset.roomTravel));
 
 for (const config of CONFIGS) {
-  test(`the room is a wall, a floor and the machines' shadows on ${config.name}`, async (t) => {
+  test(`the room is a wall, a floor, scenery and the machines' shadows on ${config.name}`, async (t) => {
     const { page } = await openArcade(t, config);
     const room = await page.evaluate(() => {
       const grid = document.getElementById('game-grid'), r = grid.getBoundingClientRect();
       const floor = parseFloat(grid.style.getPropertyValue('--room-floor-y'));
       const extras = [...grid.children].filter((el) => !el.classList.contains('card') && getComputedStyle(el).display !== 'none')
+        .filter((el) => !(/^room-/.test(el.className) && el.getAttribute('aria-hidden') === 'true' && getComputedStyle(el).pointerEvents === 'none'))
         .map((el) => el.className || el.tagName);
       const shadows = [...grid.querySelectorAll('.card-backlight')].map((el) => ({
         hidden: el.getAttribute('aria-hidden'), pointer: getComputedStyle(el).pointerEvents }));
@@ -30,7 +34,7 @@ for (const config of CONFIGS) {
     });
     // Close up (a phone on its side) the machines are cut off below Start, and the floor with them.
     assert.ok(room.floor > 0 && (room.close || room.floor < room.height), `the floor meets the wall inside the room (${room.floor} of ${room.height})`);
-    assert.deepEqual(room.extras, [], 'nothing but machines stands in the room');
+    assert.deepEqual(room.extras, [], 'nothing but the machines and the scenery stands in the room');
     assert.equal(room.shadows.length, room.cards, 'each machine casts a shadow');
     for (const s of room.shadows) assert.deepEqual(s, { hidden: 'true', pointer: 'none' });
   });

@@ -31,9 +31,13 @@ const TITLE = { warlock: 4 };
 const args = process.argv.slice(2), fallbacksOnly = args.includes('--fallbacks-only');
 const only = args.filter((arg) => arg !== '--fallbacks-only');
 
+// The PNG fallback in 128 colours, or fewer for a detailed picture until it fits the 256 KB the aisle allows.
 function writeFallback(inputs, out, width) {
-  execFileSync('magick', [...inputs, ...(width ? ['-filter', 'Box', '-resize', `${width}x`, '-append'] : []),
-    '-dither', 'None', '-colors', '128', '-strip', `PNG8:${out}`]);
+  for (const colors of [128, 96, 64, 48]) {
+    execFileSync('magick', [...inputs, ...(width ? ['-filter', 'Box', '-resize', `${width}x`, '-append'] : []),
+      '-dither', 'None', '-colors', String(colors), '-strip', `PNG8:${out}`]);
+    if (statSync(out).size <= 256 * 1024) break;
+  }
   console.log(`${path.relative(ROOT, out)}: ${(statSync(out).size / 1024).toFixed(1)} KB`);
 }
 

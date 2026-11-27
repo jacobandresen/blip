@@ -3,6 +3,7 @@
 
 import { evaluate, waitFor, sleep } from './playwright-utils.mjs';
 import { launchEngine } from './engine.mjs';
+export { playAnimationsAt } from './engine.mjs';
 import { createFileServer, listenOn, WEB_DIR } from './server.mjs';
 
 export { evaluate, waitFor, sleep, createFileServer, listenOn, WEB_DIR };
@@ -17,38 +18,14 @@ export async function loadRally(cdp) {
   await creditIfNeeded(cdp);
 }
 
-/** Wait for the game's first frame. A minute: a game boots slowly while the other test lane loads the machine.
- * When WebKit's internal load error hit the page (engine.mjs), it is loaded again, once. */
-export async function gameReady(page, timeout = 60000) {
-  const ready = (t) => page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), null, { timeout: t });
-  const started = Date.now();
-  while (true) {
-    try { return await ready(Math.min(5000, timeout - (Date.now() - started))); } catch (error) {
-      if (page.webkitFault) { page.webkitFault = false; await page.reload(); return ready(timeout); }
-      if (Date.now() - started >= timeout) throw error;
-    }
-  }
+/** Wait for the game's first frame. A minute: a game boots slowly while the other test lane loads the machine. */
+export function gameReady(page, timeout = 60000) {
+  return page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), null, { timeout });
 }
 
-/** Wait for a navigation (from a click, say) to reach `url`. WebKit sometimes fails a navigation with an internal
- * error; then the page is loaded directly, as gotoPage does. */
-export async function arrivedAt(page, url, opts) {
-  try {
-    return await page.waitForURL(url, opts);
-  } catch (error) {
-    if (typeof url !== 'string' || !/WebKit encountered an internal error/.test(error.message)) throw error;
-    return page.goto(url, opts);
-  }
-}
-
-/** Navigate, retrying once when WebKit reports its intermittent "internal error" for a page that loads fine. */
-export async function gotoPage(page, url, opts) {
-  try {
-    return await page.goto(url, opts);
-  } catch (error) {
-    if (!/WebKit encountered an internal error/.test(error.message)) throw error;
-    return page.goto(url, opts);
-  }
+/** Wait for a navigation (from a click, say) to reach `url`. */
+export function arrivedAt(page, url, opts) {
+  return page.waitForURL(url, opts);
 }
 
 /** Game controls stay gated until a credit enters through the coin button: drop one if the page asks. */
@@ -117,7 +94,7 @@ export async function openPage(t, engine = 'chromium', opts = {}) {
 
 export async function openBrowser(t, engine = 'chromium', opts = {}) {
   const handle = await launchEngine(engine, opts);
-  t.after(() => handle.browser.close().catch(() => {}));
+  t.after(() => handle.close());
   return handle;
 }
 
@@ -131,7 +108,7 @@ export async function startPage(engine = 'chromium', opts = {}) {
   return {
     ...handle, server, origin: `http://127.0.0.1:${HTTP_PORT}`,
     async close() {
-      await handle.browser.close().catch(() => {});
+      await handle.close();
       await new Promise((r) => server.close(r));
     },
   };

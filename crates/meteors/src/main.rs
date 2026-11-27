@@ -2,13 +2,14 @@
 
 use std::f32::consts::PI;
 
+use blip::color::*;
 use blip::input::{coin_start, key_active, key_pressed, play_again, Stick, BLIP_KEY_BUTTON2, BLIP_KEY_SPACE};
 use blip::macroquad::texture::Texture2D;
 use blip::{
     hsv,
     Jukebox, pool_iter, pool_iter_mut, pool_spawn, play_sfx, rand_int, rand_range_f32, web, window_conf, Blip, Fx,
-    BlipColor, LifeResult, Session, Timer, segment_circle_overlap, wrap, BLIP_BLACK, BLIP_GRAY, BLIP_WHITE, NEON_CYAN,
-    NEON_GREEN, NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
+    BlipColor, LifeResult, Session, Timer, segment_circle_overlap, wrap, BLIP_WHITE, BLIP_SEA,
+    BLIP_LEAF, BLIP_HEART, BLIP_PLUM, BLIP_GOLD,
 };
 
 // The effects and music are made by build.rs; the tests check them here.
@@ -335,6 +336,7 @@ fn split_rock(g: &mut Game, x: f32, y: f32, size: ASize, pvx: f32, pvy: f32) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn burst(g: &mut Game, x: f32, y: f32, vx: f32, vy: f32, n: usize, len: f32, speed: f32, color: BlipColor) {
     for _ in 0..n {
         let dir = rand_range_f32(0.0, PI * 2.0);
@@ -459,7 +461,7 @@ fn kill_ship(g: &mut Game, sfx: &Sounds) {
     g.ship_alive = false;
     g.streak.miss();
     let (sx, sy, svx, svy) = (g.ship.x, g.ship.y, g.ship.vx, g.ship.vy);
-    burst(g, sx, sy, svx, svy, 7, 12.0, 110.0, NEON_CYAN);
+    burst(g, sx, sy, svx, svy, 7, 12.0, 110.0, BLIP_SEA);
     g.state = match g.sess.lose_life_after(&mut g.respawn_t, RESPAWN_DELAY) {
         LifeResult::StillAlive => State::Dead,
         LifeResult::GameOver => {
@@ -477,8 +479,8 @@ fn award(g: &mut Game, sfx: &Sounds, pts: i32) {
         g.next_life_score += EXTRA_LIFE_SCORE;
         play_sfx(&sfx.extra_life);
         let (x, y) = if g.ship_alive { (g.ship.x, g.ship.y - 24.0) } else { field_centre() };
-        g.fx.popup(x, y, "EXTRA LIFE", NEON_CYAN);
-        g.fx.ring(x, y + 24.0, 60.0, 0.6, NEON_CYAN);
+        g.fx.popup(x, y, "EXTRA LIFE", BLIP_SEA);
+        g.fx.ring(x, y + 24.0, 60.0, 0.6, BLIP_SEA);
     }
 }
 
@@ -624,7 +626,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
         if hit {
             g.saucer.active = false;
             let (sx, sy) = (g.saucer.x, g.saucer.y);
-            burst(g, sx, sy, g.saucer.vx, 0.0, 6, r, 90.0, NEON_PINK);
+            burst(g, sx, sy, g.saucer.vx, 0.0, 6, r, 90.0, BLIP_HEART);
             blip::bot::add("death_saucer_ram", 1.0);
             kill_ship(g, sfx);
         }
@@ -731,7 +733,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
                 burst(g, a.x, a.y, a.vx, a.vy, 5, size.radius() * 0.5, 60.0, c);
                 let times = g.streak.hit();
                 let pts = size.points() * times;
-                if times > 1 { g.fx.popup(a.x, a.y - 10.0, &format!("{pts} X{times}"), NEON_YELLOW); }
+                if times > 1 { g.fx.popup(a.x, a.y - 10.0, &format!("{pts} X{times}"), BLIP_GOLD); }
                 award(g, sfx, pts);
                 blip::bot::add(if size == ASize::Small { "rocks_dust" } else { "rocks_split" }, 1.0);
                 match size {
@@ -772,10 +774,10 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
                 g.saucer.active = false;
                 blip::bot::add("saucers", 1.0);
                 let (sx, sy, svx) = (g.saucer.x, g.saucer.y, g.saucer.vx);
-                burst(g, sx, sy, svx, 0.0, 6, r, 90.0, NEON_PINK);
+                burst(g, sx, sy, svx, 0.0, 6, r, 90.0, BLIP_HEART);
                 let times = g.streak.hit();
                 let pts = if g.saucer.big { 200 } else { 1000 } * times;
-                g.fx.popup(sx, sy - 14.0, &if times > 1 { format!("{pts} X{times}") } else { format!("{pts}") }, NEON_YELLOW);
+                g.fx.popup(sx, sy - 14.0, &if times > 1 { format!("{pts} X{times}") } else { format!("{pts}") }, BLIP_GOLD);
                 award(g, sfx, pts);
                 if g.saucer.big { play_sfx(&sfx.saucer_big); } else { play_sfx(&sfx.saucer_small); }
                 break;
@@ -793,7 +795,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.start_wave();
         // A wave cleared: a ring pulses out from the ship.
         if g.ship_alive {
-            g.fx.ring(g.ship.x, g.ship.y, 160.0, 0.7, NEON_CYAN);
+            g.fx.ring(g.ship.x, g.ship.y, 160.0, 0.7, BLIP_SEA);
             g.fx.ring(g.ship.x, g.ship.y, 90.0, 0.5, BLIP_WHITE);
         }
     }
@@ -818,8 +820,8 @@ fn collect_crystals(g: &mut Game, dt: f32, sfx: &Sounds) {
     for (x, y) in taken {
         play_sfx(&sfx.crystal);
         blip::bot::add("crystals", 1.0);
-        g.fx.popup(x, y - 12.0, &format!("{CRYSTAL_POINTS}"), NEON_CYAN);
-        g.fx.ring(x, y, 28.0, 0.35, NEON_CYAN);
+        g.fx.popup(x, y - 12.0, &format!("{CRYSTAL_POINTS}"), BLIP_SEA);
+        g.fx.ring(x, y, 28.0, 0.35, BLIP_SEA);
         award(g, sfx, CRYSTAL_POINTS);
     }
 }
@@ -875,23 +877,37 @@ fn draw_ship(blip: &Blip, ship: &Ship, invuln_t: f32, level: i32, color: BlipCol
             smear_line(blip, (p, q), ((p.0 - dx, p.1 - dy), (q.0 - dx, q.1 - dy)), age, color);
         }
     }
-    let dark = BlipColor { r: color.r * 0.18, g: color.g * 0.18, b: color.b * 0.18, a: 1.0 };
-    for (p, q, r) in [(nose, left, tail), (nose, tail, right)] {
-        blip.fill_triangle(p, q, r, dark);
-    }
-    for (p, q) in hull { blip.draw_glow_line(p.0, p.1, q.0, q.1, color); }
-
     if ship.thrusting {
         let flick = rand_range_f32(0.5, 1.0);
         let flame = (ship.x - fwd.0 * (10.0 + 10.0 * flick), ship.y - fwd.1 * (10.0 + 10.0 * flick));
-        blip.draw_glow_line(left.0, left.1, flame.0, flame.1, NEON_ORANGE);
-        blip.draw_glow_line(right.0, right.1, flame.0, flame.1, NEON_ORANGE);
+        let (l, r) = ((tail.0 * 0.4 + left.0 * 0.6, tail.1 * 0.4 + left.1 * 0.6), (tail.0 * 0.4 + right.0 * 0.6, tail.1 * 0.4 + right.1 * 0.6));
+        outlined_shape(blip, tail, &[l, flame, r], BLIP_GOLD, 1.5);
     }
+    outlined_shape(blip, (ship.x, ship.y), &[nose, left, tail, right], color, 2.0);
+    // The canopy.
+    blip.fill_circle(ship.x + fwd.0 * 3.0, ship.y + fwd.1 * 3.0, 2.5, BLIP_INK);
+    blip.fill_circle(ship.x + fwd.0 * 3.0 - 0.5, ship.y + fwd.1 * 3.0 - 0.5, 1.5, BLIP_SEA);
 }
 
 // Line smearing and rock colours increase by wave; flowers appear from wave 3.
 
 type Seg = ((f32, f32), (f32, f32));
+
+/// A filled shape in the blip look: an ink rim `rim` thick (round at the corners), the body, and a lit patch
+/// toward the top left. `pts` go round `centre` in order.
+fn outlined_shape(blip: &Blip, centre: (f32, f32), pts: &[(f32, f32)], fill: BlipColor, rim: f32) {
+    let n = pts.len();
+    for i in 0..n {
+        let (p, q) = (pts[i], pts[(i + 1) % n]);
+        blip.draw_line_ex(p.0, p.1, q.0, q.1, rim * 2.0, BLIP_INK);
+        blip.fill_circle(p.0, p.1, rim, BLIP_INK);
+    }
+    // The shaded side, then the face shifted toward the light, which leaves a dark crescent at the bottom right.
+    blip.fill_fan(centre, pts, blip::shade(fill, 0.68));
+    let lit: Vec<(f32, f32)> = pts.iter()
+        .map(|&(x, y)| (centre.0 + (x - centre.0) * 0.82 - 1.5, centre.1 + (y - centre.1) * 0.82 - 1.5)).collect();
+    blip.fill_fan((centre.0 - 1.5, centre.1 - 1.5), &lit, fill);
+}
 
 /// The echoes a moving line leaves, oldest first: how many seconds back each
 /// one stands, and how bright it is for its age. Both grow with the wave.
@@ -918,10 +934,10 @@ fn rock_seed(a: &Asteroid, k: usize) -> f32 { (a.jag[k] * 7.13).fract() }
 /// A rock's colour: wave 1's purple, fanning out round the rainbow wave by
 /// wave, and drifting from wave 4.
 fn rock_color(a: &Asteroid, level: i32, t: f32) -> BlipColor {
-    if level <= 1 { return NEON_PURPLE; }
+    if level <= 1 { return BLIP_PLUM; }
     let spread = (0.18 * (level - 1) as f32).min(1.0);
     let drift = if level >= 4 { t * 0.04 * (level - 3) as f32 } else { 0.0 };
-    hsv(0.76 + (rock_seed(a, 3) - 0.5) * spread + drift, 0.75, 1.0, 1.0)
+    hsv(0.76 + (rock_seed(a, 3) - 0.5) * spread + drift, 0.5, 0.82, 1.0)
 }
 
 /// From wave 3 a growing share of the rocks are flowers: a quarter, half,
@@ -980,6 +996,7 @@ fn draw_mushroom(blip: &Blip, x: f32, y: f32, w: f32, lean: f32, c: BlipColor) {
 
 /// A thread from `p` to `q`, shading from `c0` to `c1`: a faint bowed line
 /// with a brighter pulse `pulse` of the way along it.
+#[allow(clippy::too_many_arguments)]
 fn draw_thread(blip: &Blip, p: (f32, f32), q: (f32, f32), bow: f32, pulse: f32, c0: BlipColor, c1: BlipColor, a: f32) {
     const N: usize = 14;
     let (dx, dy) = (q.0 - p.0, q.1 - p.1);
@@ -1009,7 +1026,7 @@ fn draw_haze(blip: &Blip, blot: &Texture2D, rocks: &[Asteroid], level: i32, t: f
         let r = 200.0 + 70.0 * (k * 1.3).sin();
         // squared, so on the early waves each is gone a while between showings
         let fade = (0.5 + 0.5 * (t * (0.21 + 0.03 * k) + k * 1.9).sin()).powi(2);
-        (x, y, r, 0.7 * full + (1.0 - 0.7 * full) * fade, if i.is_multiple_of(2) { NEON_GREEN } else { NEON_PURPLE })
+        (x, y, r, 0.7 * full + (1.0 - 0.7 * full) * fade, if i.is_multiple_of(2) { BLIP_LEAF } else { BLIP_PLUM })
     };
     for i in 0..HAZES {
         let (x, y, r, fade, c) = patch(i);
@@ -1071,17 +1088,28 @@ fn draw_rock(blip: &Blip, a: &Asteroid, level: i32, t: f32) {
         }
     }
     if !flower {
-        // A dark body inside the outline, so a rock reads as a solid lump, not a wire ring.
-        let body = BlipColor { r: c.r * 0.14, g: c.g * 0.14, b: c.b * 0.14, a: 0.9 };
-        for &(p, q) in &lines { blip.fill_triangle((a.x, a.y), at(p), at(q), body); }
-    }
-    for &(p, q) in &lines {
-        let (p, q) = (at(p), at(q));
-        blip.draw_glow_line(p.0, p.1, q.0, q.1, c);
-    }
-    if flower {
-        let heart = hsv(0.14 + rock_seed(a, 2) * 0.1, 0.8, 1.0, 1.0);
-        blip.fill_glow_circle(a.x, a.y, a.size.radius() * 0.2, heart);
+        // A solid lump: ink rim, stone body, a lit face and two craters.
+        let pts: Vec<(f32, f32)> = lines.iter().map(|&(p, _)| at(p)).collect();
+        outlined_shape(blip, (a.x, a.y), &pts, c, 2.0);
+        let r = a.size.radius();
+        for (k, (dx, dy)) in [(0.3f32, 0.25f32), (-0.2, -0.35)].into_iter().enumerate() {
+            let (s, co) = (a.rot + k as f32).sin_cos();
+            let (x, y) = (a.x + (dx * co - dy * s) * r, a.y + (dx * s + dy * co) * r);
+            blip.fill_circle(x, y, r * 0.16, blip::shade(c, 0.7));
+        }
+    } else {
+        for &(p, q) in &lines {
+            let (p, q) = (at(p), at(q));
+            blip.draw_line_ex(p.0, p.1, q.0, q.1, 4.0, BLIP_INK);
+        }
+        for &(p, q) in &lines {
+            let (p, q) = (at(p), at(q));
+            blip.draw_line_ex(p.0, p.1, q.0, q.1, 2.0, c);
+        }
+        let heart = hsv(0.14 + rock_seed(a, 2) * 0.1, 0.7, 1.0, 1.0);
+        let hr = a.size.radius() * 0.2;
+        blip.fill_circle(a.x, a.y, hr + 2.0, BLIP_INK);
+        blip.fill_circle(a.x, a.y, hr, heart);
     }
 }
 
@@ -1090,7 +1118,7 @@ fn draw_saucer(blip: &Blip, s: &Saucer, level: i32) {
     // A shot is coming: the core lights up and swells just before it fires.
     if s.fire_t < SAUCER_TELL {
         let k = 1.0 - s.fire_t / SAUCER_TELL;
-        blip.fill_glow_circle(s.x, s.y, 2.0 + 4.0 * k, NEON_PINK);
+        blip.fill_glow_circle(s.x, s.y, 2.0 + 4.0 * k, BLIP_HEART);
     }
     let w = r * 2.6;
     let dw = r * 1.1;
@@ -1108,30 +1136,25 @@ fn draw_saucer(blip: &Blip, s: &Saucer, level: i32) {
         let was = hull(s.x - s.vx * back, s.y - (s.wave_t * 2.0).sin() * 24.0 * back);
         for i in 0..pts.len() {
             let j = (i + 1) % pts.len();
-            smear_line(blip, (pts[i], pts[j]), (was[i], was[j]), age, NEON_PINK);
+            smear_line(blip, (pts[i], pts[j]), (was[i], was[j]), age, BLIP_HEART);
         }
     }
-    for i in 0..pts.len() {
-        let p0 = pts[i];
-        let p1 = pts[(i + 1) % pts.len()];
-        blip.draw_glow_line(p0.0, p0.1, p1.0, p1.1, NEON_PINK);
+    blip.fill_circle(s.x, s.y - h, dw * 0.45 + 2.0, BLIP_INK);
+    blip.fill_circle(s.x, s.y - h, dw * 0.45, BLIP_SEA);
+    outlined_shape(blip, (s.x, s.y), &pts, BLIP_HEART, 2.0);
+    for k in [-1.0f32, 0.0, 1.0] {
+        blip.fill_rect(s.x + k * w * 0.25 - 1.0, s.y - 1.0, 2.0, 2.0, BLIP_GOLD);
     }
 }
 
-/// A receding synthwave horizon grid — used only on the title/game-over menu
-/// screens so the vector gameplay itself stays clean and readable.
 /// A crystal: a turning diamond with a bright heart, blinking as it fades.
 fn draw_crystal(blip: &Blip, c: &Crystal, t: f32) {
     if c.ttl < CRYSTAL_WARN && (c.ttl * 8.0) as i32 % 2 == 0 { return; }
     let k = (t * 2.0).cos();
     let pts: Vec<(f32, f32)> = [(0.0, -1.3), (1.0, 0.0), (0.0, 1.3), (-1.0, 0.0)].iter()
         .map(|&(x, y)| (c.x + (x * k * 0.6 + 0.4 * x) * CRYSTAL_R, c.y + y * CRYSTAL_R)).collect();
-    blip.fill_fan((c.x, c.y), &pts, BlipColor { r: 0.1, g: 0.35, b: 0.45, a: 0.8 });
-    for i in 0..4 {
-        let (p, q) = (pts[i], pts[(i + 1) % 4]);
-        blip.draw_glow_line(p.0, p.1, q.0, q.1, NEON_CYAN);
-    }
-    blip.fill_glow_circle(c.x, c.y, 2.5 + (t * 6.0).sin().abs() * 1.5, BLIP_WHITE);
+    outlined_shape(blip, (c.x, c.y), &pts, BLIP_SEA, 1.5);
+    blip.fill_circle(c.x - 1.0, c.y - 2.0, 1.5 + (t * 6.0).sin().abs() * 1.0, BLIP_CREAM);
 }
 
 /// Three layers of stars drifting at different speeds, the near ones brighter, each twinkling: depth and motion
@@ -1146,13 +1169,13 @@ fn draw_stars(blip: &Blip, t: f32) {
         let tw = 0.6 + 0.4 * (t * (1.0 + layer) + i as f32 * 1.7).sin();
         let a = (0.28 + layer * 0.2) * tw;
         let s = if layer == 2.0 { 2.0 } else { 1.0 };
-        blip.fill_rect(x, y, s, s, BlipColor { r: 0.75, g: 0.8, b: 1.0, a });
+        blip.fill_rect(x, y, s, s, BlipColor { a, ..BLIP_CREAM });
     }
 }
 
 fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
     let t = blip::now();
-    blip.clear(BLIP_BLACK);
+    blip.clear(BLIP_NIGHT);
     draw_stars(blip, t);
     draw_haze(blip, blot, &g.asteroids, g.sess.level, t);
     for a in pool_iter(&g.asteroids) { draw_rock(blip, a, g.sess.level, t); }
@@ -1169,19 +1192,19 @@ fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
         for (back, age) in smear_echoes(blip, g.sess.level).filter(|e| e.0 < d.ttl0 - d.ttl) {
             smear_line(blip, (p, q), shard(back), age, col);
         }
-        blip.draw_line(p.0, p.1, q.0, q.1, col);
+        blip.draw_line_ex(p.0, p.1, q.0, q.1, 2.0, col);
     }
     if g.saucer.active { draw_saucer(blip, &g.saucer, g.sess.level); }
     for c in &g.crystals { draw_crystal(blip, c, t); }
     g.fx.draw(blip);
     if g.wave_t < WAVE_BANNER_SECS && g.state == State::Play {
         let a = (1.0 - g.wave_t / WAVE_BANNER_SECS).min(0.5) * 2.0;
-        blip.draw_centered(&format!("WAVE {}", g.sess.level), PLAY_Y0 + 120.0, 4.0, BlipColor { a, ..NEON_CYAN });
+        blip.draw_message(&format!("WAVE {}", g.sess.level), (WIN_W / 2) as f32, PLAY_Y0 + 134.0, 3.0, BLIP_GOLD, a);
     }
     for b in pool_iter(&g.bullets) {
         // from wave 3 the ship's shots run through the rainbow
-        let c = if !b.from_player { NEON_PINK }
-            else if g.sess.level >= 3 { hsv(t * 0.8 + b.x * 0.004, 0.6, 1.0, 1.0) } else { NEON_YELLOW };
+        let c = if !b.from_player { BLIP_HEART }
+            else if g.sess.level >= 3 { hsv(t * 0.8 + b.x * 0.004, 0.6, 1.0, 1.0) } else { BLIP_GOLD };
         // a shot's echoes are dots, back to the muzzle and no further
         for (back, age) in smear_echoes(blip, g.sess.level).filter(|e| e.0 < BULLET_TTL - b.ttl) {
             let (ex, ey) = (b.x - b.vx * back, b.y - b.vy * back);
@@ -1192,49 +1215,51 @@ fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
             blip.fill_circle(ex, ey, 1.0, BlipColor { a: SMEAR_ALPHA * age, ..c });
         }
         if b.from_player {
-            blip.fill_glow_circle(b.x, b.y, 2.0, c);
+            blip.fill_circle(b.x, b.y, 3.5, BLIP_INK);
+            blip.fill_circle(b.x, b.y, 2.0, c);
         } else {
             // The saucer's shot is the one thing here that kills from afar:
-            // bigger, with a white heart, so it reads over the purple haze.
-            blip.fill_glow_circle(b.x, b.y, 3.0, c);
-            blip.fill_circle(b.x, b.y, 1.5, BLIP_WHITE);
+            // bigger, with a cream heart, so it reads over the haze.
+            blip.fill_circle(b.x, b.y, 5.0, BLIP_INK);
+            blip.fill_circle(b.x, b.y, 3.5, BLIP_HEART);
+            blip.fill_circle(b.x, b.y, 1.5, BLIP_CREAM);
         }
     }
     if g.ship_alive {
-        draw_ship(blip, &g.ship, g.invuln_t, g.sess.level, NEON_CYAN);
+        draw_ship(blip, &g.ship, g.invuln_t, g.sess.level, BLIP_CREAM);
     }
     blip.draw_hud(g.sess.score, g.sess.lives);
     blip.draw_hud_multiple(g.sess.score, g.streak.multiple());
     // x=12 clears the shell's 3px canvas clip, which eats more of this wider canvas's units.
     let lvl = format!("LEVEL {}", g.sess.level);
-    blip.draw_text(&lvl, 12.0, WIN_H as f32 - 22.0, 2.0, BLIP_GRAY);
+    blip.draw_text_outlined(&lvl, 12.0, WIN_H as f32 - 22.0, 2.0, BLIP_CREAM, BLIP_INK);
 }
 
-fn draw_title(blip: &Blip, hi: i32, art: &[Texture2D; 4]) {
-    blip.clear(BLIP_BLACK);
-    blip.draw_texture(&art[0], 0.0, 0.0, WIN_W as f32, WIN_H as f32);
+fn draw_title(blip: &Blip, art: &[Texture2D; 3]) {
+    blip.clear(BLIP_NIGHT);
     draw_stars(blip, blip::now());
-    blip.draw_centered("METEORS", (WIN_H / 4) as f32, 6.0, NEON_CYAN);
+    blip.draw_logo("METEORS", (WIN_W / 2) as f32, (WIN_H / 4) as f32, 6.0, BLIP_PLUM);
     // METEORS is sz=6 (42px tall) — clear its bottom by a real margin.
-    blip.draw_hi(hi, (WIN_H / 4) as f32 + 50.0, NEON_YELLOW);
+    blip.draw_attract_bar();
     // No touch surface here: a phone plays on the pad.
     let keys = web::controls() == web::Controls::Keys;
     blip.draw_start_prompt((WIN_H / 2) as f32);
     let (l1, l2) = if keys { ("ARROWS/WASD ROTATE+THRUST", "SPACE FIRE  ·  Z HYPERSPACE") }
         else { ("PAD TURNS   UP THRUSTS", "BUTTONS FIRE AND HYPERSPACE") };
-    blip.draw_centered(l1, (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
-    blip.draw_centered(l2, (WIN_H * 2 / 3) as f32 + 24.0, 2.0, BLIP_GRAY);
+    blip.draw_panel(WIN_W as f32 * 0.12, (WIN_H * 2 / 3) as f32 - 14.0, WIN_W as f32 * 0.76, 66.0, 1.0);
+    blip.draw_centered(l1, (WIN_H * 2 / 3) as f32, 2.0, BLIP_CREAM);
+    blip.draw_centered(l2, (WIN_H * 2 / 3) as f32 + 24.0, 2.0, BLIP_CREAM);
     let t = blip::now();
-    blip.draw_texture_cell(&art[1], 0, 1, 0, 1, 72.0, 558.0, 96.0, 96.0, t * 0.16);
-    blip.draw_texture_cell(&art[2], 0, 1, 0, 1, 528.0, 572.0, 64.0, 64.0, -t * 0.22);
-    blip.draw_texture_cell(&art[3], 0, 1, 0, 1,
+    blip.draw_texture_cell(&art[0], 0, 1, 0, 1, 72.0, 558.0, 96.0, 96.0, t * 0.16);
+    blip.draw_texture_cell(&art[1], 0, 1, 0, 1, 528.0, 572.0, 64.0, 64.0, -t * 0.22);
+    blip.draw_texture_cell(&art[2], 0, 1, 0, 1,
         316.0 + (t * 0.5).sin() * 12.0, 584.0, 48.0, 48.0, (t * 0.35).sin() * 0.12);
 }
 
-fn draw_over(blip: &Blip, score: i32, hi: i32, waiting: bool, grid: &Texture2D) {
-    blip.clear(BLIP_BLACK);
-    blip.draw_texture(grid, 0.0, 0.0, WIN_W as f32, WIN_H as f32);
-    blip.draw_game_over(score, hi, NEON_PINK, NEON_CYAN, NEON_YELLOW, !waiting);
+fn draw_over(blip: &Blip, score: i32, hi: i32, waiting: bool) {
+    blip.clear(BLIP_NIGHT);
+    draw_stars(blip, blip::now());
+    blip.draw_game_over(score, hi, BLIP_HEART, BLIP_SEA, BLIP_GOLD, !waiting);
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -1249,7 +1274,6 @@ async fn main() {
     let blot = blip::load_png_smooth(blip::png!("soft_glow"));
 
     let title_art = [
-        blip::png!("title_grid"),
         blip::png!("title_rock_large"),
         blip::png!("title_rock_medium"),
         blip::png!("title_ship"),
@@ -1290,8 +1314,8 @@ async fn main() {
         }
 
         match g.state {
-            State::Title => draw_title(&blip, web::high_score(), &title_art),
-            State::Over  => draw_over(&blip, g.sess.score, web::high_score(), g.respawn_t.active(), &title_art[0]),
+            State::Title => draw_title(&blip, &title_art),
+            State::Over  => draw_over(&blip, g.sess.score, web::high_score(), g.respawn_t.active()),
             State::Play | State::Dead => blip.shaken(g.shake, SHIP_SHAKE, 6.0, || draw_play(&blip, &g, &blot)),
         }
         g.shake = (g.shake - dt).max(0.0);

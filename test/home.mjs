@@ -10,8 +10,11 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { createFileServer, openPage, WEB_DIR, listenOn, arrivedAt, gameReady, PHONE, DESKTOP } from './lib/harness.mjs';
+import { createFileServer, openPage, WEB_DIR, listenOn, arrivedAt, gameReady, PHONE, DESKTOP, playAnimationsAt } from './lib/harness.mjs';
 import { chromiumBinary } from './lib/chromium-binary.mjs';
+
+// The shell's transitions four times as fast: these tests check where things go, not how long it takes.
+playAnimationsAt(4);
 
 
 /** A phone with the games' wasm held back: these tests read the pages, not play them. */

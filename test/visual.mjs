@@ -68,14 +68,15 @@ async function snakeRows(page, image) {
       const canvas = document.createElement('canvas'); canvas.width = source.naturalWidth; canvas.height = source.naturalHeight;
       const context = canvas.getContext('2d'); context.drawImage(source, 0, 0);
       const { data, width, height } = context.getImageData(0, 0, canvas.width, canvas.height);
-      // The rows the snake fills: five bright green pixels or more. The grid and border are dim,
-      // and the apple's leaf never fills a row like that.
+      // The rows the snake fills: five of its emerald pixels or more. The lawn is a yellower green (red at 0.6 of its
+      // green, the snake's 0.45 at most), the trees round it a greener one (blue under half their green, the snake's
+      // more), and the apple's leaf never fills a row like that.
       let rows = 0;
       for (let y = Math.floor(height * bounds.y0); y < height * bounds.y1; y++) {
         let green = 0;
         for (let x = Math.floor(width * bounds.x0); x < width * bounds.x1; x++) {
           const i = (y * width + x) * 4, r = data[i], g = data[i + 1], b = data[i + 2];
-          if (g > 110 && r < g * .72 && b < g * .82) green++;
+          if (g > 110 && r < g * .52 && b > g * .5 && b < g * .82) green++;
         }
         if (green >= 5) rows++;
       }

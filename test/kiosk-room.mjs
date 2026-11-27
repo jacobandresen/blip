@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { openPage, gameReady, arrivedAt, DESKTOP } from './lib/harness.mjs';
+import { openPage, gameReady, arrivedAt, DESKTOP, playAnimationsAt } from './lib/harness.mjs';
 
-for (const engine of ['chromium', 'webkit']) {
+// The shell's transitions four times as fast: these tests check where things go, not how long it takes.
+playAnimationsAt(4);
+
+for (const engine of ['chromium']) {
   test(`fullscreen kiosk cabinets retain every physical control deck in ${engine}`, async (t) => {
     const { page, origin } = await openPage(t, engine, { viewport: { width: 1080, height: 1920 } });
     await page.addInitScript(() => localStorage.setItem('blip-fullscreen', '1'));

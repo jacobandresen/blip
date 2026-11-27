@@ -7,25 +7,6 @@ pub(crate) fn select_info_size(text: &str, width: f32) -> f32 {
     if text_w(text, 2.0) <= width { 2.0 } else { 1.0 }
 }
 
-/// Text as a lit tube: this blooms outward in colour over several passes, lays
-/// fattened glass, and puts a near-white core inside.
-pub(crate) fn neon(blip: &Blip, text: &str, y: f32, sz: f32, c: BlipColor, lit: f32) {
-    let x = blip.text_cx(text, sz as i32) as f32;
-    const RING: [(f32, f32); 8] = [(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0),
-                                   (-0.7, -0.7), (0.7, -0.7), (-0.7, 0.7), (0.7, 0.7)];
-    for (r, a) in [(1.05f32, 0.09f32), (0.7, 0.13), (0.42, 0.20)] {
-        let col = BlipColor { a: a * lit, ..c };
-        for (dx, dy) in RING {
-            blip.draw_text(text, x + dx * r * sz, y + dy * r * sz, sz, col);
-        }
-    }
-    let glass = BlipColor { a: lit, ..c };
-    for (dx, dy) in RING {
-        blip.draw_text(text, x + dx * 0.3 * sz, y + dy * 0.3 * sz, sz, glass);
-    }
-    blip.draw_text(text, x, y, sz, BlipColor { a: lit, ..blend(c, BLIP_WHITE, 0.78) });
-}
-
 /// A tube's glow: a slow swell of a few percent, so a sign reads as lit
 /// rather than as coloured text. No dropouts: on a sign this size they strobe.
 pub(crate) fn tube(t: f32, phase: f32) -> f32 {
@@ -94,12 +75,12 @@ pub(crate) fn draw_title(blip: &Blip, g: &Game) {
     for (r, a) in [(150.0f32, 0.045f32), (96.0, 0.05)] {
         blip.fill_glow_circle(cx, cy + 6.0, r, BlipColor { a: a * glow, ..sign });
     }
-    neon(blip, "BRAWLER", 22.0, 9.0, sign, glow);
+    blip.draw_logo("BRAWLER", cx, 22.0, 9.0, blip::BLIP_HEART);
     // Counted off the roster, so the sign is never a fighter behind (it said FIFTEEN after DRAKE joined).
     const WORDS: [&str; 21] = ["NO", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN",
         "ELEVEN", "TWELVE", "THIRTEEN", "FOURTEEN", "FIFTEEN", "SIXTEEN", "SEVENTEEN", "EIGHTEEN", "NINETEEN", "TWENTY"];
     let tag = format!("{} FIGHTERS   ONE CHAMPION", WORDS[FIGHTERS.len().min(20)]);
-    neon(blip, &tag, 100.0, 2.0, BlipColor { r: 0.35, g: 0.95, b: 1.0, a: 1.0 }, tube(now, 2.1));
+    blip.draw_centered_outlined(&tag, cx, 100.0, 2.0, blip::BLIP_SEA, INK);
 
     // The roster, one face each, with the pair on stage lit.
     let gap = 38.0;
@@ -119,8 +100,7 @@ pub(crate) fn draw_title(blip: &Blip, g: &Game) {
     for (i, label) in ["1 PLAYER", "2 PLAYERS"].iter().enumerate() {
         let y = 176.0 + i as f32 * 32.0;
         if g.menu == i {
-            neon(blip, label, y, 3.0, BlipColor { r: 1.0, g: 0.85, b: 0.25, a: 1.0 },
-                0.9 + 0.1 * (now * 2.0).sin());
+            blip.draw_centered_outlined(label, cx, y, 3.0, blip::BLIP_GOLD, INK);
         } else {
             blip.draw_centered(label, y, 3.0, dark);
         }
@@ -142,6 +122,7 @@ pub(crate) fn draw_title(blip: &Blip, g: &Game) {
         ("P2", "THE SAME ON THE SECOND PAD", false),
     ]};
     let x = (WIN_W as f32 - 32.0 * 12.0) / 2.0;
+    blip.draw_panel(x - 18.0, 236.0, 32.0 * 12.0 + 36.0, 86.0, 0.9);
     for (i, (tag, body, one)) in rows.iter().enumerate() {
         let y = 250.0 + i as f32 * 22.0;
         // Player two greys out on the one-player line: the row is still
@@ -159,13 +140,12 @@ pub(crate) fn draw_title(blip: &Blip, g: &Game) {
 
     // The prompt, on the boards: the one line that has to be found. It
     // breathes with the menu line; a sign this size blinking is a strobe.
-    neon(blip, "PRESS PUNCH TO START", 348.0, 3.0,
-        BlipColor { r: 1.0, g: 0.85, b: 0.25, a: 1.0 }, 0.9 + 0.1 * (now * 2.0).sin());
+    blip.draw_centered_outlined("PRESS PUNCH TO START", cx, 348.0, 3.0, blip::BLIP_GOLD, INK);
     blip.draw_centered(if keys { "W S CHOOSE     F OR SPACE START" } else { "UP DOWN CHOOSE     PUNCH START" }, 376.0, 2.0, dim);
     // The record to beat, when the kiosk knows of one.
     let hi = web::high_score();
     if hi > 0 {
-        blip.draw_centered(&format!("HI {hi}"), 320.0, 2.0, BlipColor { r: 0.98, g: 0.90, b: 0.40, a: 1.0 });
+        blip.draw_centered_outlined(&format!("HI {hi}"), cx, 328.0, 2.0, blip::BLIP_GOLD, INK);
     }
 }
 
@@ -307,6 +287,7 @@ pub(crate) fn draw_poster(blip: &Blip, g: &Game) {
 
 /// A framed head and shoulders, `pw` square with its top-left at
 /// (`cx - pw / 2`, `py`), looking away from `side`.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn draw_bust(blip: &Blip, a: &Archetype, cx: f32, py: f32, pw: f32, side: f32, back: BlipColor, mood: Mood) {
     let z = pw / 128.0;
     blip.fill_rect(cx - pw / 2.0 - 4.0, py - 4.0, pw + 8.0, pw + 8.0, INK);
@@ -605,7 +586,7 @@ pub(crate) fn draw_ending(blip: &Blip, g: &Game) {
     stamp(blip, ENDINGS[g.pick], 162.0, 1.0, BLIP_WHITE);
     stamp(blip, &run, 148.0, 1.0, if g.continues == 0 { BLIP_YELLOW } else { BlipColor { r: 0.8, g: 0.8, b: 0.86, a: 1.0 } });
     if !g.phase.active() && (g.now * 2.0) as i32 % 2 == 0 {
-        stamp(blip, web::controls().pick("PRESS SPACE", "PRESS PUNCH", "PRESS PUNCH"), 372.0, 2.0, BLIP_YELLOW);
+        stamp(blip, web::controls().pick("PRESS START", "PRESS START", "PRESS PUNCH"), 372.0, 2.0, BLIP_YELLOW);
     }
 }
 

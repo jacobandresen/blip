@@ -5,7 +5,10 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage, HTTP_PORT, evaluate, waitFor, sleep, gameReady, insertCoins, creditIfNeeded } from './lib/harness.mjs';
+import { openPage, HTTP_PORT, evaluate, waitFor, sleep, gameReady, insertCoins, creditIfNeeded, playAnimationsAt } from './lib/harness.mjs';
+
+// The shell's transitions four times as fast: these tests check where things go, not how long it takes.
+playAnimationsAt(4);
 
 // The deck's documented parts, as '<station> <part> [n]': '2 station', '1 stick', '1 dpad', '2 buttons', '1 button 2'.
 const PART = `window.deckPart = function (spec) {

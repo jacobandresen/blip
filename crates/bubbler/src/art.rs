@@ -206,8 +206,10 @@ pub(super) struct Live {
     pub blink: bool,
 }
 
+/// A toy's (body, limb) colours.
+type ToyColours = ((u8, u8, u8), (u8, u8, u8));
 /// Each toy's (body, limb) colours, calm and cross: the same as gfx.rs paints them.
-const TOY_COLOURS: [[((u8, u8, u8), (u8, u8, u8)); 2]; 3] = [
+const TOY_COLOURS: [[ToyColours; 2]; 3] = [
     [((150, 190, 215), (138, 175, 198)), ((245, 110, 175), (225, 101, 161))],
     [((245, 165, 85), (225, 152, 78)), ((240, 105, 85), (221, 97, 78))],
     [((246, 244, 250), (70, 62, 80)), ((255, 200, 222), (70, 62, 80))],

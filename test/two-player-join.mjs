@@ -1,4 +1,6 @@
-// A second player joins: on Adder's title by touch, on Warlock's title or mid-game with J. Each costs a credit.
+// A second player joins: on Adder's title by touch, on Warlock's title or mid-game with J. Each costs a credit. A
+// press when the game cannot take a second player yet (between rounds, on a card, choosing fighters) is kept until
+// it can.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -60,3 +62,34 @@ test('Warlock: J in play joins a second wizard', async (t) => {
   await page.waitForFunction(() => document.documentElement.hasAttribute('data-versus'), undefined, { timeout: 5000 });
   await page.waitForFunction(() => sessionStorage.getItem('blip-coins') === '2');
 });
+
+// Station two's button (J) pressed on the title, or just after player one starts, when the game is between rounds,
+// on a card or choosing a fighter: player two is in by the time play goes on, for one credit each.
+async function joinAt(t, game, before, after = async () => {}) {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
+  await page.addInitScript(() => sessionStorage.setItem('blip-coins', '4'));
+  await page.goto(`${origin}/${game}/index.html`);
+  await gameReady(page);
+  await page.locator('#glcanvas').focus();
+  await page.waitForTimeout(1500);
+  await before(page);
+  await page.keyboard.down('KeyJ'); await page.waitForTimeout(120); await page.keyboard.up('KeyJ');
+  await after(page);
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-versus'), undefined, { timeout: 12000 });
+  await page.waitForFunction(() => sessionStorage.getItem('blip-coins') === '2');
+}
+test('Adder: J on the title starts with player two', (t) => joinAt(t, 'adder', async () => {}));
+test('Adder: J before the first round starts joins as it does', (t) => joinAt(t, 'adder', async (page) => {
+  await page.keyboard.press('Space'); await page.waitForTimeout(500);
+}));
+test('Rounds: J on the day card climbs on as the ride starts', (t) => joinAt(t, 'rounds', async (page) => {
+  await page.keyboard.press('Space'); await page.waitForTimeout(300);
+}));
+test('Brawler: player two\'s punch while player one chooses is a challenge at the first fight', (t) => joinAt(t, 'brawler',
+  async (page) => { await page.keyboard.press('Space'); await page.waitForTimeout(800); },
+  // player one picks a fighter and the fight starts (pressed until it has, however slow the machine)
+  async (page) => {
+    for (let i = 0; i < 30 && !(await page.evaluate(() => document.documentElement.hasAttribute('data-versus'))); i++) {
+      await page.keyboard.press('KeyF'); await page.waitForTimeout(700);
+    }
+  }));

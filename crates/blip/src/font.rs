@@ -21,11 +21,14 @@ impl Blip {
     /// Draw a single character at pixel position (`x`, `y`). Unknown characters are silently skipped.
     fn draw_char(&self, c: char, x: f32, y: f32, sz: f32, color: Color) {
         let Some(idx) = glyph_index(c) else { return };
+        // A rectangle per run of lit pixels in a row: the same pixels as one a pixel, in fewer draws.
         for (row, bits) in FONT[idx].iter().enumerate() {
-            for col in 0..5 {
-                if bits & (1 << (4 - col)) != 0 {
-                    draw_rectangle(x + col as f32 * sz, y + row as f32 * sz, sz, sz, color);
-                }
+            let mut col = 0;
+            while col < 5 {
+                if bits & (1 << (4 - col)) == 0 { col += 1; continue; }
+                let start = col;
+                while col < 5 && bits & (1 << (4 - col)) != 0 { col += 1; }
+                draw_rectangle(x + start as f32 * sz, y + row as f32 * sz, (col - start) as f32 * sz, sz, color);
             }
         }
     }
@@ -57,6 +60,39 @@ impl Blip {
     /// Draw an outlined string centred on `cx`.
     pub fn draw_centered_outlined(&self, text: &str, cx: f32, y: f32, sz: f32, color: Color, ink: Color) {
         self.draw_text_outlined(text, cx - text_width(text, sz) / 2.0, y, sz, color, ink);
+    }
+
+    /// A game's name on its title screen, the same lettering in every game: bold, `color` lit toward the top and
+    /// shaded toward the foot like a toy's plastic, ringed in ink and standing on an ink shadow.
+    pub fn draw_logo(&self, text: &str, cx: f32, y: f32, sz: f32, color: Color) {
+        let ink = crate::color::BLIP_INK;
+        // Bold: every glyph pixel is half a pixel wider, so the strokes stay strong inside the ring.
+        let bold = (sz * 0.5).round();
+        let x = (cx - (text_width(text, sz) - sz + bold) / 2.0).round();
+        let y = y.round();
+        let ring = (sz * 0.5).round().max(1.0);
+        let lit = crate::color::blend(color, crate::color::BLIP_CREAM, 0.5);
+        let dark = crate::color::shade(color, 0.7);
+        let glyphs = |pass: &dyn Fn(f32, f32, usize)| {
+            let mut gx = x;
+            for c in text.chars() {
+                if let Some(idx) = glyph_index(c) {
+                    for (row, bits) in FONT[idx].iter().enumerate() {
+                        for col in 0..5 {
+                            if bits & (1 << (4 - col)) != 0 { pass(gx + col as f32 * sz, y + row as f32 * sz, row); }
+                        }
+                    }
+                }
+                gx += 6.0 * sz;
+            }
+        };
+        let (w, h) = (sz + bold, sz);
+        glyphs(&|px, py, _| draw_rectangle(px - ring, py - ring + sz * 0.75, w + ring * 2.0, h + ring * 2.0, ink));
+        glyphs(&|px, py, _| draw_rectangle(px - ring, py - ring, w + ring * 2.0, h + ring * 2.0, ink));
+        glyphs(&|px, py, row| {
+            let c = match row { 0 | 1 => lit, 5 | 6 => dark, _ => color };
+            draw_rectangle(px, py, w, h, c);
+        });
     }
 
     /// Draw an integer as text.

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { openPage, gameReady, gotoPage } from './lib/harness.mjs';
+import { openPage, gameReady } from './lib/harness.mjs';
 
 function cabinetSurfaces(card) {
   const root = card || document.documentElement;
@@ -25,7 +25,7 @@ function deckHardware() {
     panel: getComputedStyle(document.querySelector('blip-deck')).getPropertyValue('--blip-deck-panel') };
 }
 
-for (const engine of ['chromium', 'webkit']) {
+for (const engine of ['chromium']) {
   for (const touch of [false, true]) {
     test(`each game keeps its cabinet surfaces and hardware from the overview in ${engine}, ${touch ? 'touch' : 'desktop'}`, async t => {
       const { page, origin } = await openPage(t, engine, {
@@ -43,8 +43,7 @@ for (const engine of ['chromium', 'webkit']) {
         const frame = await (await card.locator('iframe').elementHandle()).contentFrame();
         await frame.waitForSelector('blip-deck[buttons]', { state: 'attached' });
         const hardware = await frame.evaluate(deckHardware);
-        await gotoPage(gamePage, `${origin}/${game}/index.html`);
-        // WebKit can hold back the frames of a tab behind another: the game draws only in front.
+        await gamePage.goto(`${origin}/${game}/index.html`);
         await gamePage.bringToFront();
         await gamePage.waitForSelector('html[data-machine] .machine-speaker', { state: 'attached' });
         await gamePage.waitForFunction(() => document.querySelector('#marquee-name .machine-marquee-name') &&

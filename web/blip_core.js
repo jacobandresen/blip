@@ -70,16 +70,15 @@ function blipApplyControls() {
   if (touch) root.setAttribute('data-touch', game.touch.kind);
   else root.removeAttribute('data-touch');
 }
-/* The whole room moves with a machine between the arcade and its page: scaled about its screen, so the cabinet's
- * screen (from) lands on the game page's (to). The arcade grows onto the game going in, and shrinks from it
- * coming back. Read by blip.css's root view-transition animations. */
-function blipMachineZoom(from, to, leaving) {
-  var k = to.w / from.w, fx = from.x + from.w / 2, fy = from.y + from.h / 2, tx = to.x + to.w / 2, ty = to.y + to.h / 2;
-  var grow = 'translate(' + (tx - k * fx) + 'px,' + (ty - k * fy) + 'px) scale(' + k + ')';
-  var shrink = 'translate(' + (fx - tx / k) + 'px,' + (fy - ty / k) + 'px) scale(' + (1 / k) + ')';
-  var style = document.documentElement.style;
-  style.setProperty('--machine-zoom-old', leaving ? shrink : grow);
-  style.setProperty('--machine-zoom-new', leaving ? grow : shrink);
+/* Pages cross-fade between the arcade and a game where the browser has cross-document view transitions. */
+function blipNativePageTransitions() {
+  return 'onpageswap' in window && 'onpagereveal' in window && CSS.supports('view-transition-name', 'none');
+}
+/* The game page's machine on a computer: its monitor the shape of the arcade's cabinet's (267 x 219), as wide as the
+ * height there is allows, at most 960 and inside the window's 16px margins. arcade.js aims its walk-up by it. */
+var BLIP_MONITOR_ASPECT = 267 / 219;
+function blipCabinetWidth(monitorHeight) {
+  return Math.round(Math.min(960, innerWidth - 32, monitorHeight * BLIP_MONITOR_ASPECT));
 }
 function blipSetControls(choice) {
   if (!blipHasTouch() || !/^(touch|stick|pad)$/.test(choice)) return;

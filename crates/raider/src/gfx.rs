@@ -1435,8 +1435,9 @@ fn title_backdrop(clouds: &[Vec<u8>; 3]) -> Vec<u8> {
     let mut image = Image::new(480, 540);
     for y in 0..540 {
         let t = (((y as f32 + 0.5) * 14.0 / 540.0).floor() / 13.0).min(1.0);
+        // The play's sea (draw_sea): far (0.30, 0.58, 0.78) to near (0.16, 0.38, 0.64).
         let color =
-            (((0.10 - 0.07 * t) * 255.0) as u8, ((0.24 - 0.13 * t) * 255.0) as u8, ((0.46 - 0.16 * t) * 255.0) as u8);
+            (((0.30 - 0.14 * t) * 255.0) as u8, ((0.58 - 0.20 * t) * 255.0) as u8, ((0.78 - 0.14 * t) * 255.0) as u8);
         for x in 0..480 {
             image.set(x, y, color.0, color.1, color.2);
         }
@@ -1444,16 +1445,19 @@ fn title_backdrop(clouds: &[Vec<u8>; 3]) -> Vec<u8> {
     for row in -1..20 {
         let y = row as f32 * 30.0;
         let depth = (y / 540.0).clamp(0.0, 1.0);
-        let color = [
-            ((0.55 + depth * 0.15) * 255.0) as u8,
-            ((0.72 + depth * 0.12) * 255.0) as u8,
-            235,
-            ((0.22 + depth * 0.30) * 255.0) as u8,
-        ];
-        let wave = |x: f32| y + (x * 0.045 + y * 0.05).sin() * 3.2 + (x * 0.11 - y * 0.14).sin() * 1.1;
-        for segment in 0..12 {
-            let x = segment as f32 * 40.0;
-            image.line((x, wave(x)), (x + 40.0, wave(x + 40.0)), 1.0, color);
+        let cream = blip::look::CREAM;
+        let color = [cream[0], cream[1], cream[2], ((0.35 + depth * 0.30) * 255.0) as u8];
+        // The play's chunky wavelets: a crest and its two shoulders.
+        for segment in 0..12i32 {
+            if (segment + (row + 1) * 7) % 3 == 0 { continue; }
+            let x = segment as f32 * 40.0 + if row % 2 == 0 { 0.0 } else { 20.0 };
+            let cy = (y + ((x * 0.045 + y * 0.05).sin() * 3.2).round()) as i32;
+            let cx = x as i32;
+            for (dx, dy, w) in [(-4, 0, 8), (-8, 2, 4), (4, 2, 4)] {
+                for px in cx + dx..cx + dx + w {
+                    for py in cy + dy..cy + dy + 2 { image.blend(px, py, color); }
+                }
+            }
         }
     }
     for i in 0..26 {
@@ -1467,7 +1471,8 @@ fn title_backdrop(clouds: &[Vec<u8>; 3]) -> Vec<u8> {
             (1.1, 0.20 + twinkle * 0.10)
         };
         if radius > 0.2 {
-            image.circle(x, y, radius, [217, 240, 255, (alpha * 255.0) as u8]);
+            let c = blip::look::CREAM;
+            image.circle(x, y, radius, [c[0], c[1], c[2], (alpha * 255.0) as u8]);
         }
     }
     for i in 0..8 {
@@ -1483,10 +1488,17 @@ fn title_backdrop(clouds: &[Vec<u8>; 3]) -> Vec<u8> {
     }
     for y in 0..540 {
         for x in 0..480 {
-            image.blend(x, y, [3, 6, 20, 97]);
+            image.blend(x, y, blip::look::rgba(blip::look::INK, 48));
         }
     }
     image.encode_png()
+}
+
+/// A sprite ringed in the blip look's ink.
+fn inked(png: Vec<u8>) -> Vec<u8> {
+    let mut img = Image::from_png(&png);
+    img.outline(blip::look::INK);
+    img.encode_png()
 }
 
 pub fn generate() -> Vec<Asset> {
@@ -1495,17 +1507,17 @@ pub fn generate() -> Vec<Asset> {
     let [cloud1, cloud2, cloud3] = clouds;
     vec![
         ("images/title_backdrop.png", title),
-        ("images/player_plane.png", player_plane()),
-        ("images/enemy_grunt.png", enemy_plane(0)),
-        ("images/enemy_weaver.png", enemy_plane(1)),
-        ("images/enemy_ace.png", enemy_plane(2)),
-        ("images/boss_1.png", boss_plane(0)),
-        ("images/boss_2.png", boss_plane(1)),
-        ("images/boss_3.png", boss_plane(2)),
-        ("images/boss_4.png", boss_plane(3)),
-        ("images/boss_5.png", boss_plane(4)),
-        ("images/boss_6.png", boss_plane(5)),
-        ("images/boss_7.png", boss_plane(6)),
+        ("images/player_plane.png", inked(player_plane())),
+        ("images/enemy_grunt.png", inked(enemy_plane(0))),
+        ("images/enemy_weaver.png", inked(enemy_plane(1))),
+        ("images/enemy_ace.png", inked(enemy_plane(2))),
+        ("images/boss_1.png", inked(boss_plane(0))),
+        ("images/boss_2.png", inked(boss_plane(1))),
+        ("images/boss_3.png", inked(boss_plane(2))),
+        ("images/boss_4.png", inked(boss_plane(3))),
+        ("images/boss_5.png", inked(boss_plane(4))),
+        ("images/boss_6.png", inked(boss_plane(5))),
+        ("images/boss_7.png", inked(boss_plane(6))),
         ("images/boss_name_ja_1.png", boss_name_ja(0)),
         ("images/boss_name_ja_2.png", boss_name_ja(1)),
         ("images/boss_name_ja_3.png", boss_name_ja(2)),
@@ -1513,10 +1525,10 @@ pub fn generate() -> Vec<Asset> {
         ("images/boss_name_ja_5.png", boss_name_ja(4)),
         ("images/boss_name_ja_6.png", boss_name_ja(5)),
         ("images/boss_name_ja_7.png", boss_name_ja(6)),
-        ("images/powerup.png", powerup_capsule()),
-        ("images/health_pack.png", health_pack()),
-        ("images/carrier.png", carrier_ship()),
-        ("images/boat.png", boat()),
+        ("images/powerup.png", inked(powerup_capsule())),
+        ("images/health_pack.png", inked(health_pack())),
+        ("images/carrier.png", inked(carrier_ship())),
+        ("images/boat.png", inked(boat())),
         ("images/cloud_1.png", cloud1),
         ("images/cloud_2.png", cloud2),
         ("images/cloud_3.png", cloud3),

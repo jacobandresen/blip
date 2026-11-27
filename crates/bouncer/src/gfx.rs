@@ -46,7 +46,8 @@ fn paddle() -> Vec<u8> {
             c = (c.0 * 0.35, c.1 * 0.35, c.2 * 0.35);
         }
         if d > -1.3 {
-            c = (0.05, 0.07, 0.12);
+            let ink = blip::look::INK;
+            c = (ink[0] as f32 / 255.0, ink[1] as f32 / 255.0, ink[2] as f32 / 255.0);
         }
         Some(c)
     });
@@ -167,41 +168,41 @@ fn ball_shade() -> Vec<u8> {
     img.encode_png()
 }
 
-fn brick(color: (u8, u8, u8)) -> Vec<u8> {
-    let w: i32 = 72;
-    let h: i32 = 22;
+/// Bricks are drawn at their size on screen, one image pixel a screen pixel, so they stay crisp.
+const BRICK_W: i32 = 44;
+const BRICK_H: i32 = 18;
+
+/// A brick in the blip look: a rounded ink rim, a lit top and left edge, a shaded foot and a glint, round a face
+/// `fill` paints (x, y inside the brick).
+fn block(fill: impl Fn(i32, i32) -> (f32, f32, f32)) -> Image {
+    let (w, h) = (BRICK_W, BRICK_H);
     let mut img = Image::new(w as u32, h as u32);
-    let (br, bg, bb) = color;
-    for y in 1..h - 1 {
-        for x in 1..w - 1 {
-            let mut shade = 1.0_f32;
-            if y < 3 {
-                shade = 1.3;
+    let ink = blip::look::INK;
+    for y in 0..h {
+        for x in 0..w {
+            let corner = (x == 0 || x == w - 1) && (y == 0 || y == h - 1);
+            if corner { continue; }
+            if x == 0 || y == 0 || x == w - 1 || y == h - 1 {
+                img.set(x, y, ink[0], ink[1], ink[2]);
+                continue;
             }
-            if y > h - 4 {
-                shade = 0.6;
-            }
-            if x < 2 {
-                shade *= 1.2;
-            }
-            if x > w - 3 {
-                shade *= 0.7;
-            }
-            let r = ((br as f32 * shade).min(255.0)) as u8;
-            let g = ((bg as f32 * shade).min(255.0)) as u8;
-            let b = ((bb as f32 * shade).min(255.0)) as u8;
-            img.set(x, y, r, g, b);
+            let (r, g, b) = fill(x, y);
+            let k = if y == 1 || x == 1 { 1.35 } else if y >= h - 3 { 0.68 } else if x == w - 2 { 0.82 } else { 1.0 };
+            let lift = if y == 1 && x > 1 { 40.0 } else { 0.0 };
+            let c = |v: f32| (v * k + lift).clamp(0.0, 255.0) as u8;
+            img.set(x, y, c(r), c(g), c(b));
         }
     }
-    for x in 0..w {
-        img.set(x, 0, 20, 20, 20);
-        img.set(x, h - 1, 20, 20, 20);
+    let cream = blip::look::CREAM;
+    for (x, y) in [(3, 3), (4, 3), (5, 3), (3, 4)] {
+        img.set(x, y, cream[0], cream[1], cream[2]);
     }
-    for y in 0..h {
-        img.set(0, y, 20, 20, 20);
-        img.set(w - 1, y, 20, 20, 20);
-    }
-    img.encode_png()
+    img
+}
+
+fn brick(color: [u8; 3]) -> Vec<u8> {
+    let c = (color[0] as f32, color[1] as f32, color[2] as f32);
+    block(|_, _| c).encode_png()
 }
 
 /// Falling pickups: glossy capsules, drawn at 56x32 and shown at half size.
@@ -226,12 +227,12 @@ pub fn generate() -> Vec<Asset> {
         ("images/drop_life.png", pickup(Pickup::Life)),
         ("images/drop_multi.png", pickup(Pickup::Multi)),
         ("images/ball_shade.png", ball_shade()),
-        ("images/brick_red.png", brick((220, 60, 60))),
-        ("images/brick_orange.png", brick((220, 140, 40))),
-        ("images/brick_yellow.png", brick((200, 200, 50))),
-        ("images/brick_green.png", brick((50, 200, 80))),
-        ("images/brick_blue.png", brick((50, 100, 220))),
-        ("images/brick_purple.png", brick((160, 50, 220))),
+        ("images/brick_red.png", brick(blip::look::HEART)),
+        ("images/brick_orange.png", brick([240, 138, 56])),
+        ("images/brick_yellow.png", brick(blip::look::GOLD)),
+        ("images/brick_green.png", brick(blip::look::LEAF)),
+        ("images/brick_blue.png", brick(blip::look::SEA)),
+        ("images/brick_purple.png", brick(blip::look::PLUM)),
         ("images/brick_steel.png", brick_steel(false)),
         ("images/brick_steel_cracked.png", brick_steel(true)),
         ("images/brick_bomb.png", brick_bomb()),
@@ -323,94 +324,36 @@ fn pickup(kind: Pickup) -> Vec<u8> {
 /// The bomb brick: a dark casing with a lit fuse-coloured burst on it, so
 /// it reads as "this one goes off" among the plain colours.
 fn brick_bomb() -> Vec<u8> {
-    let (w, h): (i32, i32) = (72, 22);
-    let mut img = Image::new(w as u32, h as u32);
-    let (cx, cy) = (w as f32 / 2.0, h as f32 / 2.0);
-    for y in 1..h - 1 {
-        for x in 1..w - 1 {
-            let mut shade = 1.0_f32;
-            if y < 3 {
-                shade = 1.4;
-            }
-            if y > h - 4 {
-                shade = 0.6;
-            }
-            let (mut r, mut g, mut b) = (46.0 * shade, 42.0 * shade, 52.0 * shade);
-            // an eight-pointed burst: orange, with a yellow heart
-            let (dx, dy) = ((x as f32 + 0.5 - cx) / 1.5, y as f32 + 0.5 - cy);
-            let d = dx.hypot(dy);
-            let ang = dy.atan2(dx);
-            let reach = 6.5 + 2.5 * (ang * 8.0).cos();
-            if d < reach {
-                (r, g, b) = (255.0, 140.0, 30.0);
-            }
-            if d < 3.4 {
-                (r, g, b) = (255.0, 235.0, 120.0);
-            }
-            img.set(x, y, r.min(255.0) as u8, g.min(255.0) as u8, b.min(255.0) as u8);
-        }
-    }
-    for x in 0..w {
-        img.set(x, 0, 15, 15, 18);
-        img.set(x, h - 1, 15, 15, 18);
-    }
-    for y in 0..h {
-        img.set(0, y, 15, 15, 18);
-        img.set(w - 1, y, 15, 15, 18);
-    }
-    img.encode_png()
+    let (cx, cy) = (BRICK_W as f32 / 2.0, BRICK_H as f32 / 2.0);
+    block(|x, y| {
+        // an eight-pointed burst: orange, with a yellow heart
+        let (dx, dy) = ((x as f32 + 0.5 - cx) / 1.5, y as f32 + 0.5 - cy);
+        let d = dx.hypot(dy);
+        let reach = 4.5 + 2.0 * (dy.atan2(dx) * 8.0).cos();
+        if d < 2.4 { (255.0, 235.0, 120.0) } else if d < reach { (250.0, 140.0, 40.0) } else { (62.0, 54.0, 74.0) }
+    })
+    .encode_png()
 }
 
 /// Two-hit brick; the cracked variant shows its remaining hit with a darker, fractured surface.
 fn brick_steel(cracked: bool) -> Vec<u8> {
-    let w: i32 = 72;
-    let h: i32 = 22;
-    let mut img = Image::new(w as u32, h as u32);
-    let base: (u8, u8, u8) = if cracked { (108, 122, 136) } else { (150, 170, 190) };
-    for y in 1..h - 1 {
-        for x in 1..w - 1 {
-            let mut shade = 1.0_f32;
-            if y < 3 {
-                shade = 1.3;
-            }
-            if y > h - 4 {
-                shade = 0.6;
-            }
-            if x < 2 {
-                shade *= 1.2;
-            }
-            if x > w - 3 {
-                shade *= 0.7;
-            }
-            let r = ((base.0 as f32 * shade).min(255.0)) as u8;
-            let g = ((base.1 as f32 * shade).min(255.0)) as u8;
-            let b = ((base.2 as f32 * shade).min(255.0)) as u8;
-            img.set(x, y, r, g, b);
-        }
-    }
+    let base = if cracked { (112.0, 124.0, 140.0) } else { (156.0, 174.0, 194.0) };
+    let mut img = block(|_, _| base);
+    let (w, h) = (BRICK_W, BRICK_H);
     // corner rivets sell the "reinforced plate" look
-    for &(rx, ry) in &[(6, 6), (w - 7, 6), (6, h - 7), (w - 7, h - 7)] {
-        img.set(rx, ry, 55, 60, 65);
-        img.set(rx + 1, ry, 225, 230, 235);
+    for (rx, ry) in [(w - 6, 5), (5, h - 6), (w - 6, h - 6)] {
+        img.set(rx, ry, 70, 74, 86);
+        img.set(rx, ry - 1, 235, 238, 242);
     }
     if cracked {
-        let mut x = 5;
-        let mut toggle = 0i32;
-        while x < w - 5 {
+        let ink = blip::look::INK;
+        let mut toggle = 0;
+        for x in (6..w - 6).step_by(3) {
             let y = h / 2 + toggle;
-            img.set(x, y, 18, 18, 22);
-            img.set(x, (y + 1).min(h - 2), 18, 18, 22);
-            toggle = if toggle <= 0 { 3 } else { -3 };
-            x += 4;
+            img.set(x, y, ink[0], ink[1], ink[2]);
+            img.set(x + 1, y, ink[0], ink[1], ink[2]);
+            toggle = if toggle <= 0 { 2 } else { -2 };
         }
-    }
-    for x in 0..w {
-        img.set(x, 0, 15, 15, 18);
-        img.set(x, h - 1, 15, 15, 18);
-    }
-    for y in 0..h {
-        img.set(0, y, 15, 15, 18);
-        img.set(w - 1, y, 15, 15, 18);
     }
     img.encode_png()
 }

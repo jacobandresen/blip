@@ -10,6 +10,7 @@ mod cpu;
 mod levels;
 mod bot;
 
+use blip::color::*;
 use blip::input::{
     coin_start, play_again, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D,
     BLIP_KEY_J, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE,
@@ -40,6 +41,8 @@ struct Game {
     state: State,
     timer: Timer,
     humans: usize,
+    /// Player two pressed J and joins at the first moment the pit lets them (not between rounds).
+    p2_waiting: bool,
     /// Seconds of screen shake left after a person's viper goes out (see OUT_SHAKE).
     shake: f32,
 }
@@ -55,6 +58,7 @@ impl Game {
             state: State::Title,
             timer: Timer::default(),
             humans: 1,
+            p2_waiting: false,
             shake: 0.0,
         }
     }
@@ -64,6 +68,7 @@ impl Game {
         self.world = World::at_round(self.humans, 1 + blip::bot::level(i32::MAX as usize) as i32);
         blip::bot::reached_level(self.world.round);
         self.state = State::Play;
+        self.p2_waiting = false;
     }
 
     /// The music for where the game is: the slow coil, then the hunt.
@@ -129,12 +134,19 @@ fn update_title(g: &mut Game, dt: f32) {
     g.demo.step(dt, &cpu_steers(&g.demo));
     g.demo.events.clear();
     if blip::bot::active() { bot::title(); }
-    if coin_start() { g.start_game(); }
+    // J on the title is player two too: player one's coin starts the game, and player two's goes in as they join.
+    if key_pressed(seat_keys(1)[2]) {
+        web::spend_coin();
+        g.start_game();
+        g.p2_waiting = true;
+    } else if coin_start() { g.start_game(); }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    // J joins player two and lights the kiosk's second station.
-    if key_pressed(seat_keys(1)[2]) && g.world.join_human(1) {
+    // J joins player two and lights the kiosk's second station; pressed between rounds, as the next round starts.
+    if key_pressed(seat_keys(1)[2]) { g.p2_waiting = true; }
+    if g.p2_waiting && g.world.join_human(1) {
+        g.p2_waiting = false;
         g.humans = 2;
         web::spend_coin();
         web::set_mode(true);
@@ -223,9 +235,12 @@ fn draw_viper(blip: &Blip, s: &arena::Snake) {
     let thick = arena::BODY_R * 2.0;
     let pts = || s.path.iter().enumerate().rev().map(|(i, p)| (p.x, p.y, s.in_hole(i)));
     // A dark edge under the body and a light stripe along its back; gaps keep only their dim stroke.
-    let ink = blip::shade(c, 0.3);
+    let ink = BLIP_INK;
     let none = BlipColor { a: 0.0, ..c };
-    blip.draw_polyline(pts(), thick + 2.0, ink, none);
+    // Its shadow on the floor, then the ink rim.
+    let shadow = || s.path.iter().rev().map(|p| (p.x + 2.0, p.y + 3.0, false));
+    blip.draw_polyline(shadow(), thick, BLIP_SHADOW, none);
+    blip.draw_polyline(pts(), thick + 3.0, ink, none);
     blip.draw_polyline(pts(), thick, c, gap);
     let back = BlipColor { r: (c.r + 0.3).min(1.0), g: (c.g + 0.3).min(1.0), b: (c.b + 0.3).min(1.0), ..c };
     blip.draw_polyline(pts(), (thick * 0.3).max(1.0), back, none);
@@ -246,7 +261,7 @@ fn draw_viper(blip: &Blip, s: &arena::Snake) {
     for side in [-2.6f32, 2.6] {
         let e = at(1.0, side);
         blip.fill_rect(e.x - 1.0, e.y - 1.0, 2.0, 2.0, BLIP_WHITE);
-        blip.fill_rect(e.x - 0.5, e.y - 0.5, 1.0, 1.0, BLIP_BLACK);
+        blip.fill_rect(e.x - 0.5, e.y - 0.5, 1.0, 1.0, BLIP_INK);
     }
     let t = blip::now();
     if (t * 1.3 + s.seat as f32 * 0.37).fract() < 0.18 {
@@ -261,7 +276,7 @@ fn draw_viper(blip: &Blip, s: &arena::Snake) {
         let label = if s.seat == 0 { "YOU" } else { "P2" };
         let x = (s.head.x - 10.0).clamp(arena::PIT_X + 2.0, arena::PIT_X + arena::PIT_W - 24.0);
         let y = (s.head.y - 16.0).clamp(arena::PIT_Y + 2.0, arena::PIT_Y + arena::PIT_H - 4.0);
-        blip.draw_text_outlined(label, x, y, 2.0, BLIP_WHITE, BLIP_BLACK);
+        blip.draw_text_outlined(label, x, y, 2.0, BLIP_CREAM, BLIP_INK);
     }
 }
 
@@ -274,7 +289,7 @@ fn draw_standings(blip: &Blip, w: &World) {
         let c = if s.alive { s.colour() } else { BlipColor { r: 0.36, g: 0.36, b: 0.36, a: 1.0 } };
         blip.fill_rect(arena::PIT_X + arena::PIT_W - 8.0, y + 2.0, 5.0, 10.0, c);
         blip.draw_text_outlined(&format!("{} {}", s.name(), s.score),
-            arena::PIT_X + arena::PIT_W - 92.0, y, 2.0, c, BLIP_BLACK);
+            arena::PIT_X + arena::PIT_W - 92.0, y, 2.0, c, BLIP_INK);
         y += 16.0;
     }
 }
@@ -296,12 +311,12 @@ fn draw_play(blip: &Blip, g: &Game, pit: &Texture2D) {
             blip::draw_fireworks(blip, arena::ROUND_WAIT - g.world.round_wait,
                 (arena::PIT_X + 40.0, arena::PIT_Y + 40.0, arena::PIT_W - 80.0, arena::PIT_H * 0.45), &colours);
         }
-        blip.draw_centered(if won { "YOU WIN" } else { "ROUND LOST" },
-            arena::PIT_Y + arena::PIT_H / 2.0, 4.0, if won { HOLE } else { BLIP_RED });
+        blip.draw_message(if won { "YOU WIN" } else { "ROUND LOST" }, WIN_W as f32 / 2.0,
+            arena::PIT_Y + arena::PIT_H / 2.0 + 14.0, 4.0, if won { HOLE } else { BLIP_HEART }, 1.0);
     } else if g.world.banner_t < BANNER {
         let a = (1.0 - g.world.banner_t / BANNER).min(1.0);
-        blip.draw_centered(&format!("ROUND {}", g.world.round), arena::PIT_Y + arena::PIT_H / 2.0, 4.0,
-            BlipColor { a, ..HOLE });
+        blip.draw_message(&format!("ROUND {}", g.world.round), WIN_W as f32 / 2.0, arena::PIT_Y + arena::PIT_H / 2.0 + 14.0,
+            4.0, HOLE, a);
     }
     blip.draw_hud(g.world.score_of(0), g.world.lives_of(0));
 }
@@ -311,17 +326,15 @@ fn draw_play(blip: &Blip, g: &Game, pit: &Texture2D) {
 fn draw_title(blip: &Blip, g: &Game, pit: &Texture2D) {
     draw_world(blip, &g.demo, pit);
     draw_standings(blip, &g.demo);
-    let veil = BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.55 };
-    blip.fill_rect(0.0, 46.0, WIN_W as f32, 92.0, veil);
-    blip.fill_rect(0.0, 384.0, WIN_W as f32, 136.0, veil);
-    blip.draw_text_outlined("ADDER", 96.0, 62.0, 6.0, arena::seat_colour(0), BLIP_BLACK);
-    blip.draw_hi(web::high_score(), 116.0, HOLE);
+    blip.draw_logo("ADDER", WIN_W as f32 / 2.0, 62.0, 6.0, arena::seat_colour(0));
+    blip.draw_attract_bar();
     let by = web::controls();
-    blip.draw_start_prompt(404.0);
+    blip.draw_start_prompt(392.0);
+    blip.draw_panel(36.0, 420.0, WIN_W as f32 - 72.0, 108.0, 1.0);
     blip.draw_centered(by.pick("GREEN VIPER: A/D TURN", "GREEN VIPER: STICK LEFT/RIGHT", "GREEN VIPER: DRAG LEFT/RIGHT"),
-        430.0, 2.0, SAND);
-    blip.draw_centered("CONSTANT MOVEMENT", 450.0, 2.0, SAND);
-    blip.draw_centered("GROWING TRAILS STAY ALL ROUND", 468.0, 2.0, SAND);
+        430.0, 2.0, BLIP_CREAM);
+    blip.draw_centered("CONSTANT MOVEMENT", 450.0, 2.0, BLIP_CREAM);
+    blip.draw_centered("GROWING TRAILS STAY ALL ROUND", 468.0, 2.0, BLIP_CREAM);
     blip.draw_centered("DIM GAPS ARE PASSABLE", 486.0, 2.0, HOLE);
     blip.draw_centered("P2: LEFT/RIGHT TURN, J TO JOIN", 504.0, 2.0, arena::seat_colour(1));
 }

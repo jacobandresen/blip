@@ -2,8 +2,16 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage, gameReady, arcadeArranged, arrivedAt, openArcade, machineReady, emulatePhone, PHONE } from './lib/harness.mjs';
+import { openPage, gameReady, arcadeArranged, arrivedAt, openArcade, machineReady, emulatePhone, PHONE, playAnimationsAt } from './lib/harness.mjs';
 import { AISLE, GAMES as ALL_GAMES } from './lib/games.mjs';
+
+// The shell's transitions four times as fast: these tests check where things go, not how long it takes.
+playAnimationsAt(4);
+/** For a test that times the aisle's own walk: its pages play at their own pace. */
+function atOwnPace(t) {
+  playAnimationsAt(1);
+  t.after(() => playAnimationsAt(4));
+}
 
 const GAMES_BY_SLUG = Object.fromEntries(ALL_GAMES.map((game) => [game.slug, game]));
 
@@ -297,6 +305,7 @@ const aislePos = (page) => page.evaluate(() => Number(document.getElementById('g
 const aisleStill = (page) => page.waitForFunction(() => !document.getElementById('game-grid').hasAttribute('data-aisle-moving'), null, { timeout: 8000 });
 
 test('holding an arrow walks the aisle, and letting go stops on a machine', async (t) => {
+  atOwnPace(t);
   const { page } = await openArcade(t, DESK);
   await page.keyboard.down('ArrowRight');
   await page.waitForTimeout(1200);
@@ -312,6 +321,7 @@ test('holding an arrow walks the aisle, and letting go stops on a machine', asyn
 });
 
 test('a drag moves the aisle with the pointer and lets go on a machine; a short one springs back', async (t) => {
+  atOwnPace(t);
   const { page } = await openArcade(t, DESK);
   await page.mouse.move(640, 300);
   await page.mouse.down();
@@ -333,6 +343,7 @@ test('a drag moves the aisle with the pointer and lets go on a machine; a short 
 });
 
 test('a quick portrait swipe stops at the next machine', async (t) => {
+  atOwnPace(t);
   const { page } = await openArcade(t, PHONE);
   await page.mouse.move(310, 300);
   await page.mouse.down();
@@ -359,6 +370,7 @@ test('a portrait touch swipe advances one machine without skipping', async (t) =
 });
 
 test('a gamepad stick walks at the pace it is pushed', async (t) => {
+  atOwnPace(t);
   const walk = async (push) => {
     const { page, origin } = await openPage(t, 'chromium', { viewport: DESK });
     await page.addInitScript((x) => {
@@ -563,13 +575,13 @@ test('the step into a machine ends on the screen of its game page, which is that
   await page.goto(`${origin}/bouncer/index.html`);
   await page.waitForFunction(() => typeof BlipController === 'object');
   const screen = await page.evaluate(() => {
-    const r = document.getElementById('glcanvas').getBoundingClientRect();
+    const r = document.getElementById('arcade-bezel').getBoundingClientRect();
     return { box: [r.left, r.top, r.width, r.height], machine: document.documentElement.getAttribute('data-machine'),
       trim: getComputedStyle(document.getElementById('arcade-bezel')).borderTopColor };
   });
   assert.equal(screen.machine, 'bouncer', 'the game page wears its machine\'s colours');
   await page.goto(`${origin}/index.html`);
   await machineReady(page);
-  const aim = await page.evaluate(() => { const b = launchScreen(); return [b.left, b.top, b.width, b.height]; });
-  aim.forEach((v, i) => assert.ok(Math.abs(v - screen.box[i]) < 1, `the zoom aims at ${aim}, the screen is at ${screen.box}`));
+  const aim = await page.evaluate(() => { const m = gameMachine().monitor; return [m.x, m.y, m.w, m.h]; });
+  aim.forEach((v, i) => assert.ok(Math.abs(v - screen.box[i]) < 1, `the walk aims at ${aim}, the monitor is at ${screen.box}`));
 });

@@ -189,6 +189,7 @@ impl Magic {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn wave(&mut self, x: f32, y: f32, r: f32, life: f32, width: f32, c: BlipColor, glyphs: bool) {
         self.waves.push(Wave { x, y, t: 0.0, life, r, width, c, glyphs });
     }

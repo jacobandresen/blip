@@ -555,6 +555,7 @@ impl Game {
 
     /// Integrate a body with one-way platforms: it passes up through
     /// blocks and lands on their tops. Returns (on_ground, hit_wall).
+    #[allow(clippy::too_many_arguments)]
     fn move_body(&self, x: &mut f32, y: &mut f32, vx: &mut f32, vy: &mut f32, w: f32, h: f32, dt: f32) -> (bool, bool) {
         *vy = (*vy + GRAV * dt).min(MAX_FALL);
         *x += *vx * dt;
@@ -641,6 +642,7 @@ blip::sounds!(Sounds { blow, pop, trap, kill = "defeated", fruit, jump, lose = "
 
 // ---- update ------------------------------------------------------------
 
+#[allow(clippy::too_many_arguments)]
 fn player_dust(g: &mut Game, x: f32, y: f32, speed: (f32, f32), lift: (f32, f32), life: f32, alpha: f32, size: f32) {
     for side in [-1.0, 1.0] {
         g.parts.push(blip::EffectParticle {
@@ -1987,29 +1989,8 @@ fn text_w(text: &str, sz: f32) -> f32 {
     text.chars().count() as f32 * 6.0 * sz - sz
 }
 
-/// A rounded panel: the pill every banner sits on.
-fn pill(cx: f32, y: f32, w: f32, h: f32, edge: BlipColor, a: f32) {
-    use blip::macroquad::shapes::{draw_circle, draw_rectangle};
-    let r = (h / 2.0).min(14.0);
-    let x = cx - w / 2.0;
-    let fill = col((34, 14, 44), 0.82 * a);
-    let rim = BlipColor { a: edge.a * a * 0.9, ..edge };
-    // border: the same shape one pixel-and-a-half bigger, underneath
-    for (grow, c) in [(1.6f32, rim), (0.0, fill)] {
-        let (xx, yy, ww, hh, rr) = (x - grow, y - grow, w + grow * 2.0, h + grow * 2.0, r + grow);
-        draw_rectangle(xx + rr, yy, ww - rr * 2.0, hh, c);
-        draw_rectangle(xx, yy + rr, ww, hh - rr * 2.0, c);
-        for (px, py) in
-            [(xx + rr, yy + rr), (xx + ww - rr, yy + rr), (xx + rr, yy + hh - rr), (xx + ww - rr, yy + hh - rr)]
-        {
-            draw_circle(px, py, rr, c);
-        }
-    }
-    draw_rectangle(x + r, y + 2.0, w - r * 2.0, 1.5, rgba(1.0, 1.0, 1.0, 0.08 * a));
-}
-
-/// Text on its own pill, centred on the screen, popping in with `pop`.
-fn cosy(blip: &Blip, text: &str, y: f32, sz: f32, c: (u8, u8, u8), edge: (u8, u8, u8), pop: f32, a: f32) {
+/// Text in the blip message box, centred on the screen, popping in with `pop`.
+fn cosy(blip: &Blip, text: &str, y: f32, sz: f32, c: (u8, u8, u8), pop: f32, a: f32) {
     if a <= 0.01 {
         return;
     }
@@ -2018,10 +1999,8 @@ fn cosy(blip: &Blip, text: &str, y: f32, sz: f32, c: (u8, u8, u8), edge: (u8, u8
     let (px, py) = (8.0 + s * 2.5, 6.0 + s * 1.5);
     let cx = WIN_W as f32 / 2.0;
     let top = y + (7.0 * sz - h) / 2.0;
-    pill(cx, top - py, w + px * 2.0, h + py * 2.0, col(edge, 1.0), a);
-    let x = cx - w / 2.0;
-    blip.draw_text(text, x + s * 0.5, top + s * 0.6, s, col(PLUM, 0.9 * a));
-    blip.draw_text(text, x, top, s, col(c, a));
+    blip.draw_panel(cx - w / 2.0 - px, top - py, w + px * 2.0, h + py * 2.0, a);
+    blip.draw_text(text, cx - w / 2.0 + s * 0.5, top, s, col(c, a));
 }
 
 /// Plain text with the soft plum shadow, left-aligned (HUD, small print).
@@ -2032,14 +2011,12 @@ fn soft(blip: &Blip, text: &str, x: f32, y: f32, sz: f32, c: (u8, u8, u8), a: f3
 
 fn draw_scores(blip: &Blip, g: &Game) {
     // one row: P1 on the left, the round in the middle, P2 on the right
-    blip.fill_rect(0.0, 0.0, WIN_W as f32, HUD, col((26, 10, 34), 0.92));
-    blip.fill_rect(0.0, HUD - 2.0, WIN_W as f32, 2.0, col(PINK, 0.25));
+    blip.draw_hud_bar(HUD);
     // A whole-pixel size: at 1.5 the font's rows were uneven, and a phone
     // (the picture at 0.57) showed 6px text that could not be read.
     let sz = 2.0;
     let y = (HUD - 7.0 * sz) / 2.0 - 1.0;
-    use blip::macroquad::shapes::draw_circle;
-    for (i, colr, life) in [(0usize, MINT, (110, 220, 130)), (1, SKY, (110, 180, 255))] {
+    for (i, colr) in [(0usize, MINT), (1, SKY)] {
         let p = &g.p[i];
         if !p.joined {
             // player two's seat, waiting: a gentle pulse, not a blink
@@ -2050,17 +2027,13 @@ fn draw_scores(blip: &Blip, g: &Game) {
         }
         let score = format!("{}", p.score);
         let (sw, lives) = (text_w(&score, sz), p.lives.max(0));
-        let lw = lives as f32 * 11.0;
-        let x0 = if i == 0 { 10.0 } else { WIN_W as f32 - 10.0 - sw - 8.0 - lw };
+        let lw = lives as f32 * 12.0;
+        let x0 = if i == 0 { 22.0 } else { WIN_W as f32 - 10.0 - sw - 8.0 - lw };
+        blip.draw_coin(x0 - 12.0, (HUD / 2.0 - 6.0).round(), 1.0);
         soft(blip, &score, x0, y, sz, colr, 1.0);
         for k in 0..lives {
-            // a little heart per life, in the player's colour
-            let (hx, hy) = (x0 + sw + 11.0 + k as f32 * 11.0, HUD / 2.0 - 2.0);
-            let c = col(life, 1.0);
-            draw_circle(hx - 2.0, hy, 2.6, c);
-            draw_circle(hx + 2.0, hy, 2.6, c);
-            draw_triangle(vec2(hx - 4.5, hy + 0.8), vec2(hx + 4.5, hy + 0.8), vec2(hx, hy + 5.5), c);
-            draw_circle(hx - 2.6, hy - 0.8, 0.9, rgba(1.0, 1.0, 1.0, 0.7));
+            // the blip heart, a life each
+            blip.draw_heart(x0 + sw + 6.0 + k as f32 * 12.0, (HUD / 2.0 - 5.0).round(), 1.0, true);
         }
     }
     let round = format!("ROUND {}", g.round + 1);
@@ -2429,7 +2402,6 @@ fn draw(blip: &Blip, art: &art::Art, g: &Game, hi: i32) {
                         170.0 + DY,
                         3.5,
                         PEACH,
-                        PEACH,
                         st * 3.0,
                         (st * 4.0).min(1.0),
                     );
@@ -2440,7 +2412,6 @@ fn draw(blip: &Blip, art: &art::Art, g: &Game, hi: i32) {
                             236.0 + DY,
                             2.2,
                             CREAM,
-                            MINT,
                             (st - 0.7) * 3.0,
                             ((st - 0.7) * 4.0).min(1.0),
                         );
@@ -2448,13 +2419,13 @@ fn draw(blip: &Blip, art: &art::Art, g: &Game, hi: i32) {
                 }
                 State::Play if g.hurry && g.round_t < hurry_at(g.round) + 2.4 => {
                     let a = 0.6 + 0.4 * (g.round_t * 8.0).sin().abs();
-                    cosy(blip, "HURRY UP!", 196.0 + DY, 3.2, (255, 150, 150), (255, 110, 120), 1.0, a);
+                    cosy(blip, "HURRY UP!", 196.0 + DY, 3.2, (255, 150, 150), 1.0, a);
                 }
                 _ => {}
             }
             if g.chain.1 > 0.0 {
                 let text = format!("{} CHAIN!", g.chain.0);
-                cosy(blip, &text, 262.0 + DY, 2.6, CREAM, PINK, (1.2 - g.chain.1) * 5.0, g.chain.1.min(1.0));
+                cosy(blip, &text, 262.0 + DY, 2.6, CREAM, (1.2 - g.chain.1) * 5.0, g.chain.1.min(1.0));
             }
             if g.state == State::Clear { draw_confetti(g.state_t); }
             // bubble wipe: out at the end of a round, back in at the start of the next
@@ -2476,7 +2447,7 @@ fn draw(blip: &Blip, art: &art::Art, g: &Game, hi: i32) {
             }
             match g.state {
                 State::Clear => {
-                    cosy(blip, "CLEAR!", 186.0 + DY, 4.0, CREAM, MINT, st * 3.0, (st * 4.0).min(1.0));
+                    cosy(blip, "CLEAR!", 186.0 + DY, 4.0, CREAM, st * 3.0, (st * 4.0).min(1.0));
                     if g.extend && st > 0.6 {
                         cosy(
                             blip,
@@ -2484,21 +2455,19 @@ fn draw(blip: &Blip, art: &art::Art, g: &Game, hi: i32) {
                             246.0 + DY,
                             1.8,
                             PEACH,
-                            PINK,
                             (st - 0.6) * 3.0,
                             ((st - 0.6) * 4.0).min(1.0),
                         );
                     }
                 }
                 State::Over => {
-                    cosy(blip, "GAME OVER", 160.0 + DY, 3.8, PINK, PINK, st * 2.0, (st * 3.0).min(1.0));
+                    cosy(blip, "GAME OVER", 160.0 + DY, 3.8, PINK, st * 2.0, (st * 3.0).min(1.0));
                     if hi > 0 {
                         cosy(
                             blip,
                             &format!("HI {hi}"),
                             222.0 + DY,
                             1.5,
-                            PEACH,
                             PEACH,
                             1.0,
                             (st - 1.0).clamp(0.0, 1.0),
@@ -2511,21 +2480,19 @@ fn draw(blip: &Blip, art: &art::Art, g: &Game, hi: i32) {
                             276.0 + DY,
                             2.0,
                             CREAM,
-                            MINT,
                             1.0,
                             0.65 + 0.35 * (st * 2.5).sin().abs(),
                         );
                     }
                 }
                 State::Won => {
-                    cosy(blip, "ALL ROUNDS CLEAR!", 120.0 + DY, 2.6, CREAM, MINT, st * 2.0, (st * 3.0).min(1.0));
+                    cosy(blip, "ALL ROUNDS CLEAR!", 120.0 + DY, 2.6, CREAM, st * 2.0, (st * 3.0).min(1.0));
                     cosy(
                         blip,
                         "HAPPY END",
                         192.0 + DY,
                         3.8,
                         PEACH,
-                        PINK,
                         (st - 0.5) * 2.0,
                         ((st - 0.5) * 3.0).clamp(0.0, 1.0),
                     );
@@ -2536,7 +2503,6 @@ fn draw(blip: &Blip, art: &art::Art, g: &Game, hi: i32) {
                             276.0 + DY,
                             2.0,
                             CREAM,
-                            MINT,
                             1.0,
                             0.65 + 0.35 * (st * 2.5).sin().abs(),
                         );

@@ -414,7 +414,7 @@ function updateCreditsDisplay() {
 updateCreditsDisplay(); // initialise dimming to match coins on page load
 
 // Start opens the selected machine; its credit is spent by the game after the first frame.
-var cardInFlight = false, pendingCard = null, focusArcadeCard = null, arcadeStepBack = null, arcadeStepIn = null;
+var cardInFlight = false, pendingCard = null, focusArcadeCard = null, arcadeStepBack = null, arcadeStepIn = null, arcadeWalk = null, arcadeWalkOut = null;
 document.querySelectorAll('#game-grid .card').forEach(function(card){var tray=card.querySelector('.card-shot-wrap'),image=tray.querySelector('.card-shot'),rom=document.createElement('div');rom.className='game-rom';rom.append(image);tray.appendChild(rom);});
 document.querySelectorAll('#game-grid .card').forEach(function(card){
   var title=card.querySelector('.card-title'),slug=(card.getAttribute('data-game-url')||'').split('/')[0];
@@ -869,47 +869,29 @@ async function openMachine(card,machineSlug) {
     try {await shot.decode();} catch(e) {}
   }
   card.classList.add('card-launching');
-  var nativeTransition='onpageswap' in window&&'onpagereveal' in window&&CSS.supports('view-transition-name','machine-monitor');
+  var nativeTransition=blipNativePageTransitions();
   try { sessionStorage.setItem('blip-cabinet-launch',JSON.stringify({slug:machineSlug,at:Date.now(),art:new URL(art,location.href).href,native:nativeTransition})); } catch(e) {}
-  // Cross-document transitions snapshot the same cabinet parts on both pages, with no estimated endpoint.
-  if(nativeTransition){
-    // Lean in at once while the game page loads; the move carries on from wherever the lean has got to.
-    if(typeof arcadeStepIn==='function')arcadeStepIn();
-    requestAnimationFrame(function(){window.location.href=gameCardUrl(card);});
-    return;
-  }
-  // The player steps in until the picture on this screen is where the game page will show it, then the page
-  // takes over: the same machine, near.
-  var room=document.getElementById('jukebox-front'),frame=room.getBoundingClientRect(),glass=card.querySelector('.game-rom').getBoundingClientRect();
-  var aspect=shot&&shot.naturalWidth?shot.naturalWidth/shot.naturalHeight:480/540;
-  var from=fitPicture(glass,aspect),to=fitPicture(launchScreen(),aspect),zoom=to.width/from.width;
-  room.style.transformOrigin=(from.left+from.width/2-frame.left)+'px '+(from.top+from.height/2-frame.top)+'px';
-  room.style.setProperty('--launch-x',(to.left+to.width/2-from.left-from.width/2)+'px');
-  room.style.setProperty('--launch-y',(to.top+to.height/2-from.top-from.height/2)+'px');
-  room.style.setProperty('--launch-zoom',zoom.toFixed(3));
-  document.body.classList.add('machine-launching');
-  var navigated=false;
-  function navigate(){if(navigated)return;navigated=true;window.location.href=gameCardUrl(card);}
-  room.addEventListener('transitionend',function(event){if(event.target===room&&event.propertyName==='transform')navigate();},{once:true});
-  window.setTimeout(navigate,LAUNCH_MS+100);
+  // The player walks up to the machine until its picture is where the game page shows it, then the page takes
+  // over: the same machine, near (a cross-document transition's crossfade, or straight on without one).
+  // The machine's monitor onto the game page's.
+  prerender(gameCardUrl(card));
+  arcadeWalk(card,gameMachine().monitor,cardMonitor,WALK_MS,false).then(function(){window.location.href=gameCardUrl(card);});
 }
-var LAUNCH_MS=760;
+var WALK_MS=1400;
 window.addEventListener('pageswap',function(event){
   if(!event.viewTransition)return;
-  var launching=document.querySelector('#game-grid .card-launching .card-shot-wrap');
-  if(!launching){event.viewTransition.skipTransition();return;}
-  var r=launching.getBoundingClientRect();
-  try{sessionStorage.setItem('blip-machine-screen',JSON.stringify({x:r.left,y:r.top,w:r.width,h:r.height,vw:innerWidth,vh:innerHeight}));}catch(e){}
+  if(!document.querySelector('#game-grid .card-launching'))event.viewTransition.skipTransition();
 });
-// Back from a game: the machine's parts are named, its screen holds the game's last frame, and the page's
-// view steps back from it into the aisle.
+// Back from a game: the machine's screen holds the game's last frame, and the player walks back from it into the
+// aisle while the pages cross-fade.
 window.addEventListener('pagereveal',function(event){
   var back=window.blipMachineReturn;window.blipMachineReturn=null;
   if(!event.viewTransition){document.documentElement.removeAttribute('data-machine-return');return;}
   var card=back&&document.querySelector('#game-grid .card[data-game-url^="'+back.slug+'/"]');
   if(!card){document.documentElement.removeAttribute('data-machine-return');event.viewTransition.skipTransition();return;}
   card.classList.add('card-launching');
-  if(back.screen){var r=card.querySelector('.card-shot-wrap').getBoundingClientRect();blipMachineZoom({x:r.left,y:r.top,w:r.width,h:r.height},back.screen,true);}
+  // Stand where the game page's screen was, in front of the machine, then walk back from it into the aisle.
+  if(back.screen&&typeof arcadeWalk==='function')arcadeWalk(card,back.screen,cardMonitor,WALK_MS,true);
   var shot=card.querySelector('.card-shot');
   if(shot&&/^data:image\/png;base64,/.test(back.frame||'')){shot.dataset.still=shot.getAttribute('src');shot.src=back.frame;}
   event.viewTransition.finished.catch(function(){}).then(function(){
@@ -918,26 +900,35 @@ window.addEventListener('pagereveal',function(event){
     if(shot&&shot.dataset.still){shot.src=shot.dataset.still;delete shot.dataset.still;}
   });
 });
-// A picture of this shape, letterboxed in a box, as the game draws itself.
-function fitPicture(box,aspect) {
-  var width=Math.min(box.width,box.height*aspect),height=width/aspect;
-  return {left:box.left+(box.width-width)/2,top:box.top+(box.height-height)/2,width:width,height:height};
+// The game page made ready while the player walks up to it, so it is there when they arrive (where the browser
+// can: speculation rules).
+function prerender(url) {
+  if(!(HTMLScriptElement.supports&&HTMLScriptElement.supports('speculationrules')))return;
+  var rules=document.createElement('script');rules.type='speculationrules';
+  rules.textContent=JSON.stringify({prerender:[{source:'list',urls:[new URL(url,location.href).href]}]});
+  document.head.appendChild(rules);
 }
-// Where the game page's screen will be: as it last measured itself at this window size (game.js,
-// blip-screen-box), or else inside this window's frame above a deck of the depth it last had.
-function launchScreen() {
+// The game page's machine at this window size: its monitor and deck, as it last measured itself here (game.js,
+// blip-screen-box), or else as it lays itself out on a computer: the deck as deep as it last was (180 at first)
+// along the bottom, the marquee bar's 78 above, and between them the monitor: on a computer in the cabinet's shape, at
+// most 960; on a phone the width less 16 each side.
+function gameMachine() {
   var saved=null;
   try { saved=JSON.parse(localStorage.getItem('blip-screen-box')||'null'); } catch(e) {}
-  if(saved&&saved.w===innerWidth&&saved.h===innerHeight&&saved.box)return {left:saved.box[0],top:saved.box[1],width:saved.box[2],height:saved.box[3]};
-  var bezel=document.getElementById('screen-bezel').getBoundingClientRect(),inset=15;
-  var deck=saved&&saved.deck>0?saved.deck:Math.min(170,Math.round(innerHeight*.16));
-  return {left:bezel.left+inset,top:bezel.top+inset,width:bezel.width-inset*2,height:innerHeight-deck-bezel.top-inset*2};
+  if(saved&&saved.w===innerWidth&&saved.h===innerHeight&&saved.monitor&&saved.panel)
+    return {monitor:{x:saved.monitor[0],y:saved.monitor[1],w:saved.monitor[2],h:saved.monitor[3]},panel:{x:saved.panel[0],y:saved.panel[1],w:saved.panel[2],h:saved.panel[3]}};
+  // A deck depth that could not be the page's (a stale record) is not taken.
+  var wide=innerWidth>=1017,deck=saved&&saved.deck>=100&&saved.deck<=innerHeight*.4?saved.deck:(wide?180:150);
+  var top=78,h=innerHeight-top-deck,w=wide?blipCabinetWidth(h):innerWidth-32,x=(innerWidth-w)/2;
+  return {monitor:{x:x,y:top,w:w,h:h},panel:{x:x,y:top+h,w:w,h:deck}};
 }
+// A cabinet's monitor where it is drawn now: what the walks in and back measure.
+function cardMonitor(card) {return card.querySelector('.card-shot-wrap').getBoundingClientRect();}
 // Back from a game through the browser's page cache: stand back from the machine.
 window.addEventListener('pageshow',function(event){
   if(!event.persisted)return;
   if(typeof arcadeStepBack==='function')arcadeStepBack();
-  document.body.classList.remove('machine-launching');
+  if(typeof arcadeWalkOut==='function')arcadeWalkOut();
   document.querySelectorAll('#game-grid .card-launching').forEach(function(card){
     card.classList.remove('card-launching');
     var shot=card.querySelector('.card-shot');
@@ -1005,12 +996,70 @@ document.getElementById('manual-book').addEventListener('click',function(event){
   var held={},walked=0,stride=0,pendingStart=false;
   // Stepped up to the faced machine: lean 0 standing in the aisle, 1 at the machine.
   var steppedUp=false,lean=0,LEAN_Z=150,LEAN_LIFT=60;
+  // #game-grid's eye, 1100px in front of the room (arcade.css perspective), and the wall 215 behind the machines'
+  // fronts (room.js WALL).
+  var EYE=1100,WALL_BACK=-BlipRoom.WALL;
   // How far the walk has gone, in machines. The aisle's own position wraps round the loop when it settles;
   // this keeps counting (tests and captures read it).
   var roomTravel=aisle.pos,roomFrom=aisle.pos;
+  // The wall and the floor (arcade.css .room-wall, .room-floor) slide past with the machines as the walk goes.
+  var roomWall=document.createElement('div'),roomFloor=document.createElement('div');
+  roomWall.className='room-wall';roomFloor.className='room-floor';
+  roomWall.setAttribute('aria-hidden','true');roomFloor.setAttribute('aria-hidden','true');
+  grid.insertBefore(roomFloor,grid.firstChild);grid.insertBefore(roomWall,roomFloor);
+  // Each cabinet is the game page's machine seen from farther: where that page's monitor has the cabinet's shape
+  // (267 x 219, at 16.5, 84 on its 300 wide front), its deck is the page's deck, as wide and deep and where it is
+  // under the monitor, scaled as the monitor is; the deck's page is laid out at the game page's size and cropped to it.
+  function fitDecks(){
+    var machine=gameMachine(),style=grid.style;
+    var names=['--deck-x','--deck-y','--deck-w','--deck-height','--deck-page-w','--deck-page-h','--deck-shift','--deck-shift-x','--deck-scale','--deck-squeeze',
+      '--monitor-ring','--monitor-radius','--rom-inset','--rom-radius','--rom-ring'];
+    if(Math.abs(machine.monitor.w/machine.monitor.h-BLIP_MONITOR_ASPECT)>.02){names.forEach(function(n){style.removeProperty(n);});return;}
+    var m=machine.monitor,p=machine.panel,k=267/m.w;
+    // With its housing, which stands 8 out each side and 10 above the deck (blip.css .deck-housing).
+    var sx=8,sy=10;
+    style.setProperty('--deck-x',(16.5+(p.x-sx-m.x)*k).toFixed(2)+'px');
+    style.setProperty('--deck-y',(84+(p.y-sy-m.y)*k).toFixed(2)+'px');
+    style.setProperty('--deck-w',((p.w+2*sx)*k).toFixed(2)+'px');
+    style.setProperty('--deck-height',((p.h+sy)*k).toFixed(2)+'px');
+    // The deck's page is the game page's whole window (its dials are sized by it), its deck as wide as the game
+    // page's machine (deckWidth), cropped to the deck.
+    style.setProperty('--deck-page-w',innerWidth+'px');
+    style.setProperty('--deck-page-h',innerHeight+'px');
+    style.setProperty('--deck-shift',(p.h+sy-innerHeight)+'px');
+    style.setProperty('--deck-shift-x',(sx-p.x)+'px');
+    style.setProperty('--deck-scale',k.toFixed(4));
+    style.setProperty('--deck-squeeze','1');
+    deckWidth=p.w;
+    document.querySelectorAll('.machine-deck iframe').forEach(sizeDeck);
+    // The monitor's frame and tube in the game page's pixels (blip.css --machine-monitor-ring, game.js's 15px inset,
+    // the glass's 16/20 corners and 3px edge), scaled as the monitor is.
+    var px=function(n){return (n*k).toFixed(2)+'px';};
+    style.setProperty('--monitor-ring','inset 0 0 0 '+px(4)+' #000,inset 0 0 0 '+px(6)+' color-mix(in srgb,var(--trim) 70%,#fff),inset 0 0 0 '+px(8)+' #050507,0 4px 10px #000c');
+    style.setProperty('--monitor-radius',px(6));
+    style.setProperty('--rom-inset',px(15));
+    style.setProperty('--rom-radius',px(16)+' / '+px(20));
+    style.setProperty('--rom-ring','0 0 0 '+px(3)+' #000');
+  }
+  var deckWidth=0;
+  function sizeDeck(frame){
+    try{var root=frame.contentDocument&&frame.contentDocument.documentElement;if(!root)return;
+      if(deckWidth)root.style.setProperty('--cabinet-width',deckWidth+'px');else root.style.removeProperty('--cabinet-width');}catch(e){}
+  }
+  grid.addEventListener('load',function(e){if(e.target.tagName==='IFRAME')sizeDeck(e.target);},true);
+  fitDecks();
+  window.addEventListener('resize',fitDecks);
+  // A few things in the room (web/room.js), each standing in the gap to a machine's right, in its 3D space.
+  var THINGS={rally:'plant',raider:'pots',meteors:'shield',serpent:'sword'};
+  cards.forEach(function(c){
+    var name=THINGS[c.getAttribute('data-machine')];
+    if(name)BlipRoom.build(document,c,name);
+  });
   // Each machine's shadow on the wall behind it (arcade.css).
   function shadow(c){
-    var el=document.createElement('span');el.className='card-backlight';el.setAttribute('aria-hidden','true');c.appendChild(el);
+    ['card-backlight','card-floorshadow'].forEach(function(name){
+      var el=document.createElement('span');el.className=name;el.setAttribute('aria-hidden','true');c.appendChild(el);
+    });
   }
   // Living screens: a machine within two plays a few seconds of its game (tools/make_attract_strips.mjs, 12 frames),
   // farther ones show their still.
@@ -1069,26 +1118,53 @@ document.getElementById('manual-book').addEventListener('click',function(event){
     var scale=Math.max(.3,Math.min(close?closeScale:h*.78/660,(w-56)/300));
     // The wall stands 215px behind the machines' fronts (a cabinet is 200 deep), seen through #game-grid's
     // perspective, 1100px from 38% of its height: --room-floor-y is where the floor meets it.
-    var feet=close?h*.03+660*scale:h*.97,origin=h*.38,rate=1100/(1100+215*scale);
+    var feet=close?h*.03+660*scale:h*.97,origin=h*.38,rate=EYE/(EYE+WALL_BACK*scale);
     var floorY=Math.round(origin+(feet-origin)*rate)+'px';
     if(track.style.getPropertyValue('--room-floor-y')!==floorY)track.style.setProperty('--room-floor-y',floorY);
-    return {width:w,scale:scale};
+    return {width:w,scale:scale,rate:rate,feet:feet,eye:origin,height:h};
+  }
+  // The wall moves at its depth's rate, modulo its patterns' 288px repeat (the width it stands out past the room's
+  // right side). The floor lies flat in the room, from the wall to FLOOR_FRONT in front of the machines (far enough
+  // to pass under the room's bottom edge), so the perspective draws its boards going away; it moves with the machines.
+  var FLOOR_FRONT=250;
+  // Where the player has walked to from where they stand in the aisle: toward a machine's screen and back (walkTo).
+  var cam={x:0,y:0,z:0};
+  // While the eye walks in, what it has left behind is not drawn: machines two or more along once it is under way,
+  // the neighbours' decks once half-way (each costs a frame at this pace; all are out of view by then).
+  var walking=false;
+  function walkHides(distance){return walking&&distance>=1.5&&cam.z>150;}
+  function camera(){return 'translate3d('+cam.x.toFixed(1)+'px,'+cam.y.toFixed(1)+'px,'+cam.z.toFixed(1)+'px)';}
+  // cam3d: this frame's camera() (poseCards).
+  function slideRoom(room,cam3d) {
+    var walked=roomTravel*aisleSpacing(room),back=Math.round(WALL_BACK*room.scale);
+    // The wall stands back: the player's steps toward it bring it nearer by less (an element at z = 0 moved t toward
+    // the eye looks as near as one at -W moved t (EYE + W) / EYE).
+    var far=EYE/(EYE+back);
+    roomWall.style.transform='translate3d('+(cam.x*far).toFixed(1)+'px,'+(cam.y*far).toFixed(1)+'px,'+(cam.z*far).toFixed(1)+'px) translateX('+(-(((walked*room.rate)%288+288)%288)).toFixed(1)+'px)';
+    if(roomFloor.depth!==back){roomFloor.depth=back;roomFloor.style.height=(FLOOR_FRONT+back)+'px';}
+    // Where the machines' feet are: the bottom of the room, or below it close up.
+    var under=(room.height-room.feet).toFixed(1)+'px';
+    if(roomFloor.style.bottom!==under)roomFloor.style.bottom=under;
+    roomFloor.style.transform=cam3d+' translateX('+(-((walked%288+288)%288)).toFixed(1)+'px) translateZ('+FLOOR_FRONT+'px) rotateX(90deg)';
   }
   function aisleOffset(index) {
     return BlipAisle.offset(index,aisle.pos,cards.length);
   }
   // Every machine stands where the walk has got to. Transform and opacity only: this runs every frame.
   function poseCards(room,bob) {
-    var closer=lean*LEAN_Z,lift=-lean*LEAN_LIFT*room.scale;
+    var closer=lean*LEAN_Z,lift=-lean*LEAN_LIFT*room.scale,cam3d=camera();
     cards.forEach(function(c,i){
       if(!c.classList.contains('card'))return;
       var offset=aisleOffset(i),pose=cardPose(c,offset,room),distance=Math.abs(offset);
       var scale=room.scale;
-      c.style.transform='translateX(calc(-50% + '+pose.x.toFixed(1)+'px)) translateY('+((bob||0)+lift).toFixed(2)+'px) translateZ('+(pose.z+closer).toFixed(1)+'px) rotateY('+pose.turn.toFixed(2)+'deg) scale('+scale.toFixed(4)+')';
+      c.style.transform=cam3d+' translateX(calc(-50% + '+pose.x.toFixed(1)+'px)) translateY('+((bob||0)+lift).toFixed(2)+'px) translateZ('+(pose.z+closer).toFixed(1)+'px) rotateY('+pose.turn.toFixed(2)+'deg) scale('+scale.toFixed(4)+')';
       var z=String(30-Math.min(Math.round(distance*2),25));
       if(c.style.zIndex!==z)c.style.zIndex=z;
       // Past three and a half machines a cabinet is out of sight, and crosses to the aisle's other end unseen.
-      var away=distance>3.5;
+      var away=distance>3.5||walkHides(distance);
+      if(c.deckEl===undefined)c.deckEl=c.querySelector('.machine-deck');
+      var deck=c.deckEl;
+      if(deck){var hideDeck=walking&&distance>=.5&&cam.z>300;if(deck.walkHidden!==hideDeck){deck.walkHidden=hideDeck;deck.style.visibility=hideDeck?'hidden':'';}}
       if(c.aisleAway!==away){c.aisleAway=away;c.style.visibility=away?'hidden':'';}
       var screen=screens[i];
       if(!screen)return;
@@ -1105,6 +1181,7 @@ document.getElementById('manual-book').addEventListener('click',function(event){
     roomTravel+=BlipAisle.offset(aisle.pos,roomFrom,cards.length);roomFrom=aisle.pos;
     grid.dataset.aislePos=(((aisle.pos%cards.length)+cards.length)%cards.length).toFixed(2);
     grid.dataset.roomTravel=roomTravel.toFixed(3);
+    slideRoom(room,cam3d);
     blipArcadeSound.place(aisle.pos);
   }
   function highlight(force) {
@@ -1139,6 +1216,7 @@ document.getElementById('manual-book').addEventListener('click',function(event){
   }
   // Who is holding the aisle (a key, the deck's stick, a gamepad) and which way; the latest press leads.
   function hold(source,dir) {
+    if(dir)queuedUps=0;
     if(dir)held[source]={dir:dir,at:performance.now()};
     else delete held[source];
     if(dir)wakeAisle();
@@ -1240,16 +1318,92 @@ document.getElementById('manual-book').addEventListener('click',function(event){
 
   // Up steps up to the machine faced: the view leans in, its controls light and the room quietens. Up again
   // plays it; Down, or walking on, steps back.
+  // Pressed while the aisle is still settling or the room still arriving back from a game, Up waits for it rather
+  // than being lost: two presses always step up and play.
+  var queuedUps=0,upTimer=0;
   function stepUp() {
-    if(!canWalk()||!aisle.settled)return;
+    if(cardInFlight||!manualOverlay.hidden)return;
+    if(!canWalk()||!aisle.settled){queuedUps=Math.min(2,queuedUps+1);if(!upTimer)upTimer=setTimeout(retryUp,100);return;}
     if(steppedUp){activate();return;}
     setStepped(true);
+  }
+  function retryUp() {
+    upTimer=0;
+    if(!queuedUps||cardInFlight)return;
+    if(!canWalk()||!aisle.settled){upTimer=setTimeout(retryUp,100);return;}
+    var n=queuedUps;queuedUps=0;
+    while(n--)stepUp();
   }
   function stepBack() {
     if(steppedUp)setStepped(false);
   }
   arcadeStepBack=stepBack;
   arcadeStepIn=function(){if(!steppedUp)setStepped(true);};
+  // Walking up to a machine (or back from it): the eye moves through the room, so the machine, its neighbours, the
+  // floor and the wall each grow as near things do, with a step's dip of the head. The walk ends where the machine's
+  // screen covers the box 'to' (the game page's screen): #game-grid's eye is EYE out, level with 50% 38% of it,
+  // so a screen D away drawn w wide is drawn k w wide at D / k, and a point moves out from that level point as it nears.
+  // pick(card): the box on the machine that is to cover 'to', measured where the eye is now.
+  function walkTarget(card,to,pick){
+    var glass=pick(card),box=grid.getBoundingClientRect();
+    var ox=box.left+box.width*.5,oy=box.top+box.height*.38,k=to.w/glass.width;
+    var near=EYE-(lean*LEAN_Z+cam.z),nearer=near/k;
+    return {x:cam.x+((to.x+to.w/2-ox)*nearer-(glass.left+glass.width/2-ox)*near)/EYE,
+      y:cam.y+((to.y+to.h/2-oy)*nearer-(glass.top+glass.height/2-oy)*near)/EYE,
+      z:Math.min(cam.z+near-nearer,880)};
+  }
+  // back: start at the machine and walk away from it. Resolves when the walk ends.
+  arcadeWalk=function(card,to,pick,ms,back){
+    var end=walkTarget(card,to,pick),start={x:cam.x,y:cam.y,z:cam.z};
+    walkMarqueeFor(card);
+    return back?walkCam(end,start,ms,true):walkCam(start,end,ms,false);
+  };
+  // Nearing the machine, the controls printed on its bezel fade (the game page has none) and the top bar takes its
+  // marquee, title and all: set up once a walk (walkMarqueeFor), then only the two opacities change frame by frame.
+  var walkWords=null,walkMarquee=null;
+  function walkMarqueeFor(card){
+    if(!walkMarquee){
+      walkMarquee=document.createElement('div');walkMarquee.className='walk-marquee';walkMarquee.setAttribute('aria-hidden','true');
+      walkMarquee.appendChild(document.createElement('b'));
+      (document.querySelector('.top-marquee-bar')||document.body).appendChild(walkMarquee);
+    }
+    walkWords=card.querySelector('.machine-instructions');
+    walkMarquee.firstChild.textContent=(card.querySelector('.machine-marquee-name')||{}).textContent||'';
+    walkMarquee.style.background=getComputedStyle(card).getPropertyValue('--machine-marquee');
+  }
+  function nearing(near){
+    if(!walkMarquee)return;
+    if(walkWords){if(near)walkWords.style.opacity=(1-near).toFixed(3);else walkWords.removeAttribute('style');}
+    walkMarquee.style.opacity=near.toFixed(3);
+  }
+  // Back to where the player stood in the aisle, from wherever the eye is (a page restored from the cache).
+  arcadeWalkOut=function(){return walkCam({x:cam.x,y:cam.y,z:cam.z},{x:0,y:0,z:0},WALK_MS,true);};
+  function walkCam(start,end,ms,back){
+    var room=aisleRoomNow||aisleRoom();
+    cam=start;
+    walking=true;grid.setAttribute('data-walking','');
+    var nearZ=Math.max(start.z,end.z),near=function(){return nearZ?Math.max(0,Math.min(1,cam.z/nearZ)):0;};
+    function arrive(){cam=end;walking=false;grid.removeAttribute('data-walking');poseCards(room);nearing(near());}
+    if(stepWalk.matches||!nearZ){arrive();return Promise.resolve();}
+    // A step every 260px walked, at least two; each dips the head and sounds a footstep.
+    var steps=Math.max(2,Math.round(Math.abs(end.z-start.z)/260)),t0=performance.now(),heard=0;
+    return new Promise(function(done){
+      function frame(now){
+        var t=Math.min(1,(now-t0)/ms),e=t*t*(3-2*t);
+        // Each step lowers the head and raises it again smoothly (sin², no corner where steps meet).
+        var dip=-3.5*room.scale*Math.pow(Math.sin(Math.PI*steps*e),2)*(1-Math.abs(2*t-1)*.5);
+        cam={x:start.x+(end.x-start.x)*e,y:start.y+(end.y-start.y)*e+dip,z:start.z+(end.z-start.z)*e};
+        poseCards(room);
+        nearing(near());
+        var step=Math.floor(e*steps+.5);
+        if(step>heard&&step<=steps){heard=step;playMachineStep(back?-1:1,1);}
+        if(t<1)requestAnimationFrame(frame);
+        else{arrive();done();}
+      }
+      poseCards(room);
+      requestAnimationFrame(frame);
+    });
+  }
   function setStepped(on) {
     steppedUp=on;
     grid.toggleAttribute('data-stepped-up',on);

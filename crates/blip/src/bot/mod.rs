@@ -23,6 +23,7 @@
 //! `BLIP_BOT_REACT=<ms>` delays every control by a person's reaction time, to find hazards only a bot can dodge.
 //! `BLIP_BOT_NEAR=<dir>` saves each near miss and hit with its hit boxes drawn. Only one frame in
 //! `BLIP_BOT_DRAW` (30) is drawn, which plays the same and runs several times faster; 1 draws them all.
+//! `BLIP_BOT_LINGER=1` plays on past the outcome to the time limit, for frames of the end screen.
 //! `BLIP_BOT_CONTINUES=<n>` takes up to n continues (none by default, so a run ends at game over).
 //! `BLIP_BOT_PLAYTHROUGH=<name>` runs one of the game's playthroughs and
 //! `BLIP_BOT_LIST=1` lists them. `BLIP_BOT_SEED=<n>` fixes the random numbers
@@ -243,7 +244,13 @@ pub fn finish(outcome: &str) {
         Some(line)
     });
     if let Some(line) = line {
-        println!("{line}");
+        // BLIP_BOT_LINGER keeps the game running after its first outcome, until the time limit, so saved frames
+        // show the end screen too.
+        use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+        static LINGERED: AtomicBool = AtomicBool::new(false);
+        let first = !LINGERED.swap(true, Relaxed);
+        if first { println!("{line}"); }
+        if first && std::env::var_os("BLIP_BOT_LINGER").is_some() { return; }
         std::process::exit(0);
     }
 }
@@ -317,6 +324,12 @@ pub fn at(x: f32, y: f32) {
 /// The canvas size, which the variety grid divides; `Blip::new` sets it.
 pub(crate) fn canvas(w: f32, h: f32) {
     with(|r| r.fun.canvas(w, h));
+}
+
+/// The part of the canvas the player can reach, in canvas pixels, for a game drawn with a frame round its field: the
+/// variety grid divides it instead of the whole canvas.
+pub fn arena(x: f32, y: f32, w: f32, h: f32) {
+    with(|r| r.fun.arena(x, y, w, h));
 }
 
 /// Is this frame one nobody will see? A bot run draws one frame in `BLIP_BOT_DRAW` (30 by default; 1 draws every

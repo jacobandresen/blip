@@ -110,6 +110,7 @@ pub(crate) struct Style {
 }
 
 /// A `Style`, positionally: what `STYLES` is written in.
+#[allow(clippy::too_many_arguments)]
 pub(crate) const fn style(rate: f32, amp: f32, sink: f32, wide: f32, lean: f32, lead: P, rear: P,
                open: bool, win: Win) -> Style {
     Style { rate, amp, sink, wide, lean, lead, rear, open, win }
