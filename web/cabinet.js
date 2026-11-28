@@ -8,39 +8,6 @@
 // Free play keeps the cabinet lit with no coin in it.
 function blipPowered() { return getCoins()>0||document.documentElement.hasAttribute('data-freeplay'); }
 document.documentElement.toggleAttribute('data-credit',blipPowered());
-function buildPowerIndicators() {
-  if (!document.body || document.querySelector('.blip-power-indicator')) return;
-  var lamp=document.createElement('div');
-  lamp.className='blip-power-indicator';
-  lamp.setAttribute('role','status');
-  lamp.setAttribute('aria-live','polite');
-  lamp.innerHTML='<span class="power-label">POWER</span><i class="power-bulb" aria-hidden="true"><svg viewBox="0 0 10 16"><path d="M6.2 0 1 9h3.3L3.8 16 9 6.7H5.7z"/></svg></i>';
-  document.body.appendChild(lamp);
-  function place() {
-    var topBar=document.querySelector('.top-marquee-bar, #marquee-bar')||document.querySelector('.blip-logo');
-    if(!topBar)return;
-    var barBox=topBar.getBoundingClientRect();
-    lamp.style.left='';
-    lamp.style.right='max('+Math.max(8,innerWidth-barBox.right+8)+'px,calc(env(safe-area-inset-right,0px) + 8px))';
-    lamp.style.top=barBox.top+(barBox.height-lamp.offsetHeight)/2+'px';
-  }
-  function sync() {
-    var on=document.documentElement.hasAttribute('data-credit');
-    lamp.setAttribute('aria-label','Power '+(on?'on':'off'));
-    lamp.title='Power '+(on?'on':'off');
-    place();
-  }
-  sync();
-  window.addEventListener('resize',place);
-  if(typeof ResizeObserver==='function'){
-    var resizeObserver=new ResizeObserver(place);
-    var bar=document.querySelector('.top-marquee-bar, #marquee-bar')||document.querySelector('.blip-logo');
-    if(bar)resizeObserver.observe(bar);
-  }
-  new MutationObserver(sync).observe(document.documentElement,{attributes:true,attributeFilter:['data-credit']});
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',buildPowerIndicators,{once:true});
-else buildPowerIndicators();
 function updateCoinsHud() {
   document.documentElement.toggleAttribute('data-credit',blipPowered());
   blipUpdateCabinetHum();
@@ -692,7 +659,7 @@ function playArcadeDock() {
       ['left', 'width', 'transform', 'paddingLeft', 'visibility'].forEach(function (k) { sign.style[k] = ''; });
       name.style.fontSize = '';
       if (from) {
-        var next = ['#card-button', '.manual-pocket', '.blip-power-indicator'].map(function (q) { return shown(document.querySelector(q)); })
+        var next = ['#card-button', '.manual-pocket'].map(function (q) { return shown(document.querySelector(q)); })
           .filter(function (r) { return r && r.left > from; }).map(function (r) { return r.left; });
         var to = Math.min.apply(null, next.concat(innerWidth - 8)) - 6;
         sign.style.left = from + 'px'; sign.style.width = Math.max(40, to - from) + 'px';
@@ -718,7 +685,7 @@ function playArcadeDock() {
       if (sign) sign.style.removeProperty('visibility');
       var logo = document.querySelector('.blip-logo').getBoundingClientRect();
       var manual = shown(document.querySelector('.manual-pocket'));
-      var blockers = ['#card-button', '.manual-pocket', '#marquee-name', '.blip-power-indicator']
+      var blockers = ['#card-button', '.manual-pocket', '#marquee-name']
         .map(function (q) { return shown(document.querySelector(q)); }).filter(Boolean);
       var size = button.offsetWidth;
       var free = function (x) { return x > logo.right + 4 && x + size < innerWidth - 8 && !blockers.some(function (b) { return x < b.right + 8 && x + size > b.left - 8; }); };
@@ -747,8 +714,7 @@ function blipManualPocket() {
   var book = document.createElement(document.getElementById('manual-overlay') ? 'button' : 'a');
   book.className = 'cabinet-manual';
   book.id = 'manual-book';
-  book.innerHTML = '<span class="manual-book-spine" aria-hidden="true"></span><span class="manual-book-copy"><strong>MANUAL</strong></span>';
-  book.setAttribute('data-page-card', 'true');
+    book.setAttribute('data-page-card', 'true');
   book.setAttribute('aria-label', 'Lift the BLIP Arcade Manual');
   book.title = 'Open the BLIP manual';
   if (book.tagName === 'BUTTON') book.type = 'button';
@@ -758,6 +724,10 @@ function blipManualPocket() {
   }
   var pocket = document.createElement('div');
   pocket.className = 'manual-pocket';
-  pocket.appendChild(book);
+  var lip = document.createElement('span');
+  lip.className = 'manual-pocket-lip';
+  lip.textContent = 'MANUAL';
+  lip.setAttribute('aria-hidden', 'true');
+  pocket.append(book, lip);
   document.body.appendChild(pocket);
 }

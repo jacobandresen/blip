@@ -45,7 +45,6 @@ const PIECES = {
   manual: '.manual-pocket',
   cardButton: '#card-button',
   pick: '.card-pick',
-  lamp: '.blip-power-indicator',
   coin: '.deck-coin-slot',
   // the deck's documented parts, inside its shadow root (__all reaches them)
   dpad: '[part~="dpad"]',

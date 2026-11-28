@@ -3,8 +3,7 @@ name: Fun estimate
 # The games whose code the pull request changes (all of them when shared code changes) are played by their bots on
 # the pull request's base and its head with the same seeds, and the fun score
 # (tools/fun_report.mjs; crates/blip/src/bot/FUN.md) of every game is compared seed by seed. A game whose score
-# drops by more than TOLERANCE points and more than twice the drop's standard error fails its job, and with it the
-# `fun` check.
+# drops by more than TOLERANCE points and more than twice the drop's standard error fails the `fun` check.
 on:
   pull_request:
     paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', 'tools/fun_report.mjs', 'test/lib/games.mjs', 'web/blip_core.js', '.github/workflows/fun.yml']
@@ -22,64 +21,45 @@ env:
   SECS: 60
 
 jobs:
-  games:
+  # One job, so one check: the changed games are played one after another (passes when none changed).
+  fun:
     runs-on: ubuntu-latest
-    outputs:
-      list: ${{ steps.list.outputs.list }}
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
       - id: list
-        run: echo "list=$(node tools/fun_report.mjs --changed ${{ github.event.pull_request.base.sha }})" >> "$GITHUB_OUTPUT"
-
-  measure:
-    needs: games
-    if: needs.games.outputs.list != '[]'
-    runs-on: ubuntu-latest
-    timeout-minutes: 55
-    strategy:
-      fail-fast: false
-      matrix:
-        game: ${{ fromJSON(needs.games.outputs.list) }}
-    steps:
-      - uses: actions/checkout@v7
-        with: { fetch-depth: 0 }
+        run: echo "games=$(node tools/fun_report.mjs --changed ${{ github.event.pull_request.base.sha }} | node -p 'JSON.parse(require("fs").readFileSync(0)).join(" ")')" >> "$GITHUB_OUTPUT"
       - name: The base, beside the head
+        if: steps.list.outputs.games != ''
         run: git worktree add ../base ${{ github.event.pull_request.base.sha }}
       - name: Native build dependencies
+        if: steps.list.outputs.games != ''
         run: sudo apt-get update && sudo apt-get install -y xvfb libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev
       - uses: Swatinem/rust-cache@v2
+        if: steps.list.outputs.games != ''
         with:
           workspaces: |
             . -> target
             ../base -> target
-          key: ${{ matrix.game }}
       - name: Measure the base
+        if: steps.list.outputs.games != ''
         run: |
           if [ ! -f ../base/crates/blip/src/bot/fun.rs ]; then
             echo "The base has no fun meter yet: nothing to compare." >> "$GITHUB_STEP_SUMMARY"
             echo '{"report":{}}' > base.json
           else
-            node tools/fun_report.mjs ${{ matrix.game }} --root ../base --seeds "$SEEDS" --secs "$SECS" --json base.json
+            node tools/fun_report.mjs ${{ steps.list.outputs.games }} --root ../base --seeds "$SEEDS" --secs "$SECS" --json base.json
           fi
       - name: Measure the head and compare
-        run: node tools/fun_report.mjs ${{ matrix.game }} --seeds "$SEEDS" --secs "$SECS" --json head.json --against base.json --tolerance "$TOLERANCE" --near near
+        if: steps.list.outputs.games != ''
+        run: node tools/fun_report.mjs ${{ steps.list.outputs.games }} --seeds "$SEEDS" --secs "$SECS" --json head.json --against base.json --tolerance "$TOLERANCE" --near near
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.list.outputs.games != ''
         with:
-          name: fun-${{ matrix.game }}
+          name: fun
           path: |
             base.json
             head.json
             near/
           if-no-files-found: ignore
-
-  # The one check to require in branch protection: passes when every measured game passed, or none needed measuring.
-  fun:
-    needs: [games, measure]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          test "${{ needs.games.result }}" = success
-          case "${{ needs.measure.result }}" in success|skipped) ;; *) exit 1 ;; esac

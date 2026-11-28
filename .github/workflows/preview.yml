@@ -1,10 +1,10 @@
 name: PR preview
 
 # Each pull request is served at /blip/pr-preview/pr-<number>/ from the
-# gh-pages branch, and removed when it closes.
+# gh-pages branch. preview-cleanup.yml removes it once the pull request closes.
 on:
   pull_request:
-    types: [opened, reopened, synchronize, closed]
+    types: [opened, reopened, synchronize]
 
 permissions:
   contents: write

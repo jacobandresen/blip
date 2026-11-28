@@ -29,8 +29,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=5">
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=5">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
-  <link rel="stylesheet" href="blip.css?v=196">
-  <link rel="stylesheet" href="arcade.css?v=20">
+  <link rel="stylesheet" href="blip.css?v=197">
+  <link rel="stylesheet" href="arcade.css?v=21">
   <!-- Match the shared cabinet controls before first paint. -->
   <script>
     if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
@@ -170,12 +170,16 @@
           <ol class="manual-contents manual-chapter-contents">
             <li><button type="button" data-chapter="first-use" disabled><span>First time use<i></i></span><b>—</b></button></li>
             <li><button type="button" data-chapter="controls" disabled><span>1 &nbsp; Playing the games<i></i></span><b>—</b></button></li>
+            <li><button type="button" data-chapter="games" disabled><span>2 &nbsp; The games<i></i></span><b>—</b></button></li>
           </ol>
-          <h3 class="manual-game-index-title">Game index</h3>
           <ol class="manual-contents manual-game-contents" id="manual-game-contents"></ol>
+          <ol class="manual-contents manual-chapter-contents">
+            <li><button type="button" data-chapter="history" disabled><span>3 &nbsp; The golden age<i></i></span><b>—</b></button></li>
+          </ol>
+          <ol class="manual-contents manual-game-contents manual-studio-contents" id="manual-studio-contents"></ol>
           <ol class="manual-contents manual-back-contents">
-            <li><button type="button" data-chapter="history" disabled><span>2 &nbsp; The golden age of arcade games<i></i></span><b>—</b></button></li>
-            <li><button type="button" data-chapter="about" disabled><span>3 &nbsp; About Blip<i></i></span><b>—</b></button></li>
+            <li><button type="button" data-chapter="make" disabled><span>4 &nbsp; Make your own game<i></i></span><b>—</b></button></li>
+            <li><button type="button" data-chapter="about" disabled><span>5 &nbsp; About Blip<i></i></span><b>—</b></button></li>
             <li><button type="button" data-chapter="operators" disabled><span>&emsp;The operators<i></i></span><b>—</b></button></li>
           </ol>
           <div class="manual-stamp">BLIP<br><small>EST. 1981*</small></div>
@@ -219,17 +223,17 @@
     <p>Press Start on the machine. Its screen opens and play begins. Use the controls shown beneath the screen.</p>
     </section>
     </div>
-    <p>For a game’s own keys and playing notes, find it in the contents. To choose another game, press the BLIP logo, the game’s title or the docked ROM.</p>
+    <p>For a game’s own keys and playing notes, find it in the contents. To choose another game, press the BLIP logo or Escape.</p>
     </div>
     </div>
   </template>
 
   <script src="howler.min.js"></script>
   <script src="blip_core.js?v=23"></script>
-  <script src="cabinet.js?v=116"></script>
+  <script src="cabinet.js?v=117"></script>
   <script src="aisle.js?v=5"></script>
   <script src="room.js?v=8"></script>
-  <script src="arcade.js?v=15"></script>
+  <script src="arcade.js?v=16"></script>
 <i id="arcade-parsed" hidden></i>
 </body>
 </html>

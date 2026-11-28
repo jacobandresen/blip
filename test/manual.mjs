@@ -22,24 +22,27 @@ for (const width of [1280, 390]) {
     const pocket = await book.boundingBox();
     assert.ok(pocket.x > width / 2, 'the book is stored on the right of the fascia');
 
-    // A wide screen picks the book up: its spine rises from the pocket. A narrow one flies the book itself.
-    const flight = (keyframe) => page.evaluate((which) => {
-      const lift = document.querySelector('.manual-lift');
-      if (lift) return { left: lift.style.left, top: lift.style.top };
-      return document.querySelector('.manual-transit').getAnimations()[0].effect.getKeyframes().at(which);
-    }, keyframe);
+    // The book in flight, seen at its first or last frame: it starts and ends as the book standing in the holder.
+    const flight = (end) => page.evaluate((last) => {
+      const book = document.querySelector('.manual-transit'), flying = book.getAnimations()[0];
+      flying.pause();
+      flying.currentTime = last ? flying.effect.getComputedTiming().endTime - 1 : 0;
+      const box = book.getBoundingClientRect();
+      flying.play();
+      return { left: box.left, top: box.top, width: box.width };
+    }, end);
     const atPocket = (frame) =>
-      Math.abs(parseFloat(frame.left) - pocket.x) < 1 && Math.abs(parseFloat(frame.top) - pocket.y) < 1;
+      Math.abs(frame.left - pocket.x) < 1 && Math.abs(frame.top - pocket.y) < 1 && Math.abs(frame.width - pocket.width) < 1;
 
     await book.click();
     await page.waitForSelector('.manual-transit');
-    assert.ok(atPocket(await flight(0)), 'it leaves from the pocket');
+    assert.ok(atPocket(await flight(false)), 'it leaves from the pocket');
     await page.waitForFunction(() => !document.getElementById('manual-overlay').inert);
     assert.equal(await book.evaluate((el) => getComputedStyle(el).visibility), 'hidden', 'the pocket is empty while it is open');
 
     await page.getByRole('button', { name: 'Close manual', exact: true }).click();
-    await page.waitForSelector(width > 700 ? '.manual-lift' : '.manual-transit');
-    assert.ok(atPocket(await flight(-1)), 'it returns to the pocket');
+    await page.waitForSelector('.manual-transit');
+    assert.ok(atPocket(await flight(true)), 'it returns to the pocket');
     await page.waitForFunction(() => document.getElementById('manual-overlay').hidden);
     assert.equal(await book.evaluate((el) => getComputedStyle(el).visibility), 'visible');
     assert.equal(await book.evaluate((el) => document.activeElement === el), true, 'focus returns to the book');
@@ -250,13 +253,14 @@ test('the second notes page carries a handwritten note, taped near the foot and 
   });
 });
 
-test('chapter 2 is called The golden age of arcade games', async (t) => {
+test('chapter 3 is called The golden age, and lists each studio', async (t) => {
   const page = await openManual(t, 'history');
   const names = await page.evaluate(() => ({
-    contents: document.querySelector('.manual-back-contents [data-chapter="history"] span').textContent.replace(/\s+/g, ' '),
+    contents: document.querySelector('.manual-contents [data-chapter="history"] span').textContent.replace(/\s+/g, ' ').trim(),
     heading: document.querySelector('.manual-subchapter-title')?.textContent,
+    studios: document.querySelectorAll('#manual-studio-contents button').length,
   }));
-  assert.deepEqual(names, { contents: '2 The golden age of arcade games', heading: 'THE GOLDEN AGE OF ARCADE GAMES' });
+  assert.deepEqual(names, { contents: '3 The golden age', heading: 'THE GOLDEN AGE', studios: 6 });
 });
 
 for (const [width, height] of [[1920, 1080], [1440, 900], [1366, 768], [1280, 844], [1280, 720], [1180, 820], [1024, 600], [768, 1024], [390, 844], [360, 640], [320, 568]]) {
