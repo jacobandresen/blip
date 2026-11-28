@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="title">
+  <title id="title">BLIP</title>
+  <!-- The BLIP name plate (blip-logo.svg) as an app tile: black lacquer in a gold rim, gold letters, slim stripes. -->
+  <defs>
+    <linearGradient id="lacquer" x2="0" y2="1"><stop offset="0" stop-color="#2a2230"/><stop offset=".5" stop-color="#15101a"/><stop offset="1" stop-color="#0b080e"/></linearGradient>
+    <linearGradient id="gloss" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".12"/><stop offset=".48" stop-color="#fff" stop-opacity=".03"/><stop offset=".49" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2=".25" y2="1"><stop offset="0" stop-color="#fbe7a8"/><stop offset=".35" stop-color="#c9963c"/><stop offset=".6" stop-color="#7a5320"/><stop offset=".85" stop-color="#d9ac52"/><stop offset="1" stop-color="#8a6024"/></linearGradient>
+    <linearGradient id="gold" x2="0" y2="1"><stop offset="0" stop-color="#fff6d6"/><stop offset=".3" stop-color="#f7d888"/><stop offset=".5" stop-color="#e0ad4a"/><stop offset=".51" stop-color="#9c6a22"/><stop offset=".75" stop-color="#c8913a"/><stop offset="1" stop-color="#f3d27e"/></linearGradient>
+    <g id="letters" fill-rule="evenodd">
+      <path d="M7 6h10a5 5 0 0 1 0 10H7zM12 9.6v2.8h5a1.4 1.4 0 0 0 0-2.8z"/>
+      <path d="M7 15.2h11a5.4 5.4 0 0 1 0 10.8H7zM12 18.8v3.6h5.6a1.8 1.8 0 0 0 0-3.6z"/>
+      <path d="M26.6 6h5v16.4h8.4V26H26.6z"/>
+      <path d="M41.8 6h5v20h-5z"/>
+      <path d="M50 6h10a5.6 5.6 0 0 1 0 11.2h-5V26h-5zM55 9.6v4h4.8a2 2 0 0 0 0-4z"/>
+    </g>
+  </defs>
+  <rect width="512" height="512" fill="url(#lacquer)"/>
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="url(#rim)" stroke-width="10"/>
+  <rect x="34" y="34" width="444" height="444" rx="80" fill="none" stroke="#c9963c" stroke-opacity=".55" stroke-width="2.5"/>
+  <g transform="translate(58 136) scale(5.6)">
+    <g transform="translate(3.4 0) skewX(-12)">
+      <use href="#letters" transform="translate(1.2 1.4)" fill="#000" fill-opacity=".55"/><use href="#letters" transform="translate(.6 .7)" fill="#5a3a12"/>
+      <use href="#letters" fill="url(#gold)" stroke="#3a2408" stroke-width=".35" stroke-linejoin="round"/>
+    </g>
+  </g>
+  <g transform="translate(-10 0) skewX(-24)"><path d="M366 334h12v70h-12z" fill="#b8423c"/><path d="M392 334h12v70h-12z" fill="#c98a3a"/><path d="M418 334h12v70h-12z" fill="#d8b456"/><path d="M444 334h12v70h-12z" fill="#5d8fbf"/></g>
+  <rect x="16" y="16" width="480" height="240" rx="96" fill="url(#gloss)"/>
+</svg>

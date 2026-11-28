@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>MAKE YOUR OWN — BLIP ARCADE</title>
+  <!-- The book and the Guide read this page's words; a visitor is sent to the book. -->
+  <script>location.replace('index.html?manual=make')</script>
+</head>
+<body>
+<div class="manual-leaf">
+<div class="page">
+
+  <h1>MAKE YOUR OWN</h1>
+  <h2>A GAME OF YOUR OWN, BY HAND OR WITH AN AGENT</h2>
+
+  <section class="intro">
+    <p>Every machine in this arcade is a small Rust program standing on <b>Blip</b>, a kit the games share. Blip looks after the screen, the sound, the coins and the controls; the game keeps its rules and its personality. You can write a game yourself, or describe one to a coding agent such as Claude Code or Codex and build it together, which is how this arcade was made.</p>
+  </section>
+
+  <section>
+    <div class="section-label">&#x25BA; Switch on the cabinet</div>
+    <div class="section-body">
+      <p>You need Rust (from rustup.rs), Node.js and the source from GitHub. Then:</p>
+      <figure class="manual-code"><pre><code>git clone https://github.com/jacobandresen/blip
+cd blip
+cargo run --release -p serpent   # play natively
+rustup target add wasm32-unknown-unknown
+npm run build:web                # every game, for the web
+node tools/serve_web.mjs         # the arcade, locally</code></pre></figure>
+      <p>A game runs as a window on your computer while you work on it, and as WebAssembly in this cabinet. The code is the same.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">&#x25BA; One loop, one canvas</div>
+    <div class="section-body">
+      <p>A Blip game is a loop. Each turn it updates the game by the seconds since the last frame, clears a canvas of fixed size, draws, and waits for the next frame. Blip scales the canvas to the window or the phone.</p>
+      <figure class="manual-code"><pre><code>#[blip::macroquad::main(conf)]
+async fn main() {
+    let mut blip = Blip::new(480, 540);
+    let mut g = Game::new();
+    loop {
+        g.update(blip.delta_time);
+        blip.clear(BLIP_BLACK);
+        g.draw(&amp;blip);
+        blip.next_frame().await;
+    }
+}</code></pre><figcaption>The shape of every game in the cabinet.</figcaption></figure>
+      <p>The screens of a game are a list of states with an update and a draw for each. Serpent has four: <code>Title</code>, <code>Play</code>, <code>Dead</code> and <code>Over</code>.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">&#x25BA; Pictures and music are written</div>
+    <div class="section-body">
+      <p>Nearly every picture, and every sound and tune, is made by code. When a game is built, its <code>gfx.rs</code> paints its pictures and its <code>tunes.rs</code> writes its sound effects and music. Serpent’s title tune, a music-box lullaby, begins like this, one row to a bar:</p>
+      <figure class="manual-code"><pre><code>melody: &amp;[
+    [72, H, 76, 79, 77, H, 76, 74],
+    [72, H, 74, 76, 74, H, H, R],
+    …
+],
+lead: Voice::Glock,</code></pre><figcaption>Notes are MIDI numbers: 72 is the C above middle C. H holds the note, R rests.</figcaption></figure>
+      <p>Change a number, build again, and the tune changes. The same goes for the meadow, the bricks and the spaceships.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">&#x25BA; Score, lives, sound</div>
+    <div class="section-body">
+      <p>Blip keeps score, lives and level in a <code>Session</code>, and names a game’s sound effects in one line. These are Serpent’s:</p>
+      <figure class="manual-code"><pre><code>blip::sounds!(Sounds {
+    eat, game_over, bonus, bonus_eat, level, squeak });</code></pre></figure>
+      <p>When the snake crashes, one call takes a life and says what comes next:</p>
+      <figure class="manual-code"><pre><code>g.state = match g.sess.lose_life_after(
+        &amp;mut g.dead_timer, DEAD_SECS) {
+    LifeResult::StillAlive =&gt; State::Dead,
+    LifeResult::GameOver =&gt; State::Over,
+};</code></pre><figcaption>From Serpent, a little shortened.</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">&#x25BA; The controls belong to the cabinet</div>
+    <div class="section-body">
+      <p>Keyboard, gamepad, joystick and touch all arrive in the game as the same keys, so a game asks only whether a key is down or was just pressed:</p>
+      <figure class="manual-code"><pre><code>if key_active(BLIP_KEY_LEFT) { paddle.x -= SPEED * dt; }
+if key_pressed(BLIP_KEY_SPACE) { launch_ball(); }</code></pre></figure>
+      <p>What the cabinet shows (the name on the marquee, the labels on the buttons, the hints for touch) is one entry for the game in <code>web/blip_core.js</code>.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">&#x25BA; A robot that plays it</div>
+    <div class="section-body">
+      <p>Each game has a bot that plays it through the same controls a person uses, and a list of things it must be able to do. Serpent’s first:</p>
+      <figure class="manual-code"><pre><code>Playthrough {
+    name: "the snake eats food and grows into level 2",
+    goals: &amp;[AtLeast("food", 5.0), AtLeast("level", 2.0)],
+    ..Playthrough::DEFAULT
+},</code></pre></figure>
+      <p>Run a game with <code>BLIP_BOT=1</code> and the bot plays it and prints a line of results: score, deaths, level, and measures of how much fun the game is. Change one thing, run the same seeds again, and you can see whether the change helped. A tuning number in the code carries a note on why it is what it is; in Serpent, a quick meal raises the score multiple when it comes within 22 steps, “one board width and a turn”.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">&#x25BA; By hand</div>
+    <div class="section-body">
+      <p>Copy the smallest game that is like yours (Serpent is compact) into <code>crates/&lt;name&gt;</code> and add it to the workspace. Rewrite its <code>main.rs</code> for your rules and its <code>draw.rs</code>, <code>gfx.rs</code> and <code>tunes.rs</code> for its look and sound. Add your game to the list in <code>web/blip_core.js</code>, give it a bot and a playthrough, build it, and play. <code>AGENTS.md</code> in the repository has the full checklist.</p>
+      <p>Start with one screen, one control and one way to win or lose. Make that fun before adding anything.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">&#x25BA; With an agent</div>
+    <div class="section-body">
+      <p>Open the repository in Claude Code, Codex or another coding agent. It reads <code>AGENTS.md</code> first, which tells it how the arcade is laid out and what its rules are. Treat it as a teammate: give it a clear brief, point it at a game to learn from, and build in small steps you can play.</p>
+      <figure class="manual-code"><pre><code>Read AGENTS.md, docs/blip.md and crates/serpent.
+Make a new game, orbit_dash, with the blip crate:
+a title screen, one control, score and lives,
+and a short round worth replaying. Keep it small.
+Build it, run its checks, and tell me how to
+play it.</code></pre><figcaption>A first prompt.</figcaption></figure>
+      <p>Then play it, and ask for one change at a time: a new enemy, a sound, a touch control. When something feels off, ask the agent to measure it with the bot before and after. That is how the games in this cabinet were tuned.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">&#x25BA; Play fair with the originals</div>
+    <div class="section-body">
+      <p>Make a tribute, not a copy. Write the mechanics and the style from scratch, and never take code, pictures or sound from the original. Its name is a trademark, so give your game a name of its own, as this arcade does: Rally for Pong, Serpent for Snake, Raider for 1942. Then add something the original never had.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">&#x25BA; Learn more</div>
+    <div class="section-body">
+      <p><code>docs/blip.md</code> describes the whole Blip kit, and the <a class="inline-link" href="api.html">Blip API</a> page has illustrated examples. Blip is built on <a class="inline-link" href="https://macroquad.rs/" target="_blank" rel="noopener">Macroquad</a>.</p>
+      <p>To see how classic games work inside, read <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-I-2ed" target="_blank" rel="noopener">Code the Classics</a> (Raspberry Pi Press). It builds games inspired by Pong, Manic Miner and Frogger in Python and explains every decision along the way, with full source code. A second volume followed.</p>
+      <p>New games are welcome at <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>.</p>
+    </div>
+  </section>
+
+</div>
+</div>
+</body>
+</html>

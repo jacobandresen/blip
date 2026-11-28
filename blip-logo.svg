@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 32" role="img" aria-labelledby="title">
+  <title id="title">BLIP</title>
+  <!-- The BLIP name plate: an arcade marquee's slanted letters in polished gold, on black lacquer in a gold rim,
+       with four slim racing stripes. -->
+  <defs>
+    <linearGradient id="lacquer" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a2230"/><stop offset=".5" stop-color="#15101a"/><stop offset="1" stop-color="#0b080e"/>
+    </linearGradient>
+    <linearGradient id="gloss" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".13"/><stop offset=".48" stop-color="#fff" stop-opacity=".03"/><stop offset=".49" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2=".25" y2="1">
+      <stop offset="0" stop-color="#fbe7a8"/><stop offset=".35" stop-color="#c9963c"/><stop offset=".6" stop-color="#7a5320"/><stop offset=".85" stop-color="#d9ac52"/><stop offset="1" stop-color="#8a6024"/>
+    </linearGradient>
+    <linearGradient id="gold" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff6d6"/><stop offset=".3" stop-color="#f7d888"/><stop offset=".5" stop-color="#e0ad4a"/>
+      <stop offset=".51" stop-color="#9c6a22"/><stop offset=".75" stop-color="#c8913a"/><stop offset="1" stop-color="#f3d27e"/>
+    </linearGradient>
+    <g id="letters" fill-rule="evenodd">
+      <path d="M7 6h10a5 5 0 0 1 0 10H7zM12 9.6v2.8h5a1.4 1.4 0 0 0 0-2.8z"/>
+      <path d="M7 15.2h11a5.4 5.4 0 0 1 0 10.8H7zM12 18.8v3.6h5.6a1.8 1.8 0 0 0 0-3.6z"/>
+      <path d="M26.6 6h5v16.4h8.4V26H26.6z"/>
+      <path d="M41.8 6h5v20h-5z"/>
+      <path d="M50 6h10a5.6 5.6 0 0 1 0 11.2h-5V26h-5zM55 9.6v4h4.8a2 2 0 0 0 0-4z"/>
+    </g>
+  </defs>
+  <rect x=".75" y=".75" width="98.5" height="30.5" rx="5.5" fill="url(#lacquer)" stroke="url(#rim)" stroke-width="1.5"/>
+  <rect x="2.6" y="2.6" width="94.8" height="26.8" rx="3.9" fill="none" stroke="#c9963c" stroke-opacity=".55" stroke-width=".35"/>
+  <g transform="skewX(-24)">
+    <path d="M83 7.5h1.2v17H83z" fill="#b8423c"/>
+    <path d="M85.8 7.5h1.2v17h-1.2z" fill="#c98a3a"/>
+    <path d="M88.6 7.5h1.2v17h-1.2z" fill="#d8b456"/>
+    <path d="M91.4 7.5h1.2v17h-1.2z" fill="#5d8fbf"/>
+  </g>
+  <g transform="translate(3.4 0) skewX(-12)">
+    <use href="#letters" transform="translate(1.2 1.4)" fill="#000" fill-opacity=".55"/>
+    <use href="#letters" transform="translate(.6 .7)" fill="#5a3a12"/>
+    <use href="#letters" fill="url(#gold)" stroke="#3a2408" stroke-width=".35" stroke-linejoin="round"/>
+  </g>
+  <rect x="1.5" y="1.5" width="97" height="14.5" rx="4.8" fill="url(#gloss)"/>
+</svg>
