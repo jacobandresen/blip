@@ -608,7 +608,6 @@
   font-size:30px!important;
   box-shadow:none!important;
 }
-.manual-cover-book .manual-book-copy strong {font-size:inherit}
 
 /* No icons in the lower corners: the leaves turn by the arrow keys, a swipe, the contents, or a press on the corner itself. */
 .manual-turn::before {display:none}
@@ -712,6 +711,28 @@
 .manual-page-content .manual-operators .manual-operators-title {border-bottom-color:#5f5848;color:var(--head);font:800 1.7em/1.1 var(--display)}
 .manual-page-content .manual-operators td.operator {border-color:#8f8466;background:#fffaea80}
 .manual-page-content .manual-operators .operators-pitch {border-color:var(--red);background:#8f3a2e0d}
+
+/* A game's history and a studio's pages: an opener with a drop cap after it, photographs with their credit, code, and
+   the sources in small type. Running text is justified and hyphenated, as a printed book's. */
+.manual-page-content :is(.manual-game-history,.manual-studio,.section-body,.thoughts-body,.intro) > p {text-align:justify}
+.manual-opener {margin:0 0 14px;padding:0 0 10px;border-bottom:1px solid #8f846688}
+.manual-page-content .manual-kicker {margin:0 0 6px;color:var(--red);font:700 8.5px/1 var(--display);letter-spacing:.26em;text-transform:uppercase}
+.manual-page-content :is(.manual-opener h4.manual-original,.manual-studio > h3) {margin:0 0 6px;color:var(--head);font:800 24px/1.1 var(--display);letter-spacing:0;text-transform:none}
+.manual-page-content .manual-origin {margin:0 0 4px;color:var(--ink-soft);font:italic 13px/1.45 Georgia,serif}
+.manual-page-content :is(.manual-opener,.manual-studio > .manual-origin) + p::first-letter {float:left;padding:4px 7px 0 0;color:var(--red);font:800 2.7em/.8 var(--display)}
+.manual-page-content h4:not(.manual-controls-title) {margin:18px 0 6px;color:var(--blue);font:700 10px/1.2 var(--display);letter-spacing:.16em;text-transform:uppercase}
+.manual-photo {margin:14px 0 16px}
+/* A photo's box comes from its width and height attributes, so the pages are laid out the same before it loads. */
+.manual-page-content .manual-photo img {display:block;width:100%;height:auto;max-height:min(250px,32vh);margin:0 auto;object-fit:contain;filter:sepia(.12) saturate(.92) drop-shadow(0 1px 2px #0005)!important}
+.manual-photo figcaption,.manual-code figcaption {margin-top:6px;color:var(--ink-soft);font:italic 12px/1.4 Georgia,serif;text-align:center}
+.manual-credit {display:block;margin-top:3px;color:#8a7f66;font:700 7px/1.4 var(--display);font-style:normal;letter-spacing:.12em;text-transform:uppercase}
+.manual-code {margin:8px 0 14px}
+.manual-code pre {margin:0;padding:9px 11px;border-left:3px solid var(--red);background:#fffaea;color:#1d3550;font:12px/1.45 'Courier New',monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.manual-page-content code {color:#1d3550;font:.9em 'Courier New',monospace}
+.manual-page-content .manual-sources {margin-top:16px;padding-top:8px;border-top:1px dotted #8f846699;color:var(--ink-soft);font-size:12px;line-height:1.5;text-align:left}
+.manual-page-content .manual-games-here {padding:8px 10px;border-left:3px solid var(--red);background:#8f3a2e0d;text-align:left}
+.manual-credit-list {margin:0;padding:0;list-style:none}
+.manual-page-content .manual-credit-list li {margin:0 0 6px;font-size:11px;line-height:1.45;overflow-wrap:anywhere}
 
 /* Tabs and buttons: dark pills. */
 .manual-contents-tab,.manual-close {top:-14px;height:30px;padding:0 15px;border:1px solid #ffffff24;border-radius:15px;color:#eadcbb;background:#2b261f;
@@ -1189,7 +1210,7 @@ body.konami-shake { animation: konami-shake 0.55s ease; }
 .card-pick::before,.card-pick::after {display:none}
 .card-pick .pick-arrow {pointer-events:auto}
 :root:not([data-credit]) .card-pick {filter:none}
-/* The arcade's top bar stays whole in fullscreen too: logo, switches, manual and power. */
+/* The arcade's top bar stays whole in fullscreen too: logo, switches and manual. */
 :is(:root[data-fullscreen]:not([data-has-touch]),:root[data-bare]) body.cabinet-page .manual-pocket {display:flex}
 /* The controls and coin door are the machines' own: no deck along the bottom. */
 body.cabinet-page {padding-bottom:0!important;--cabinet-bottom-bar-height:0px}

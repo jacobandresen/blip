@@ -1,4 +1,4 @@
-var CACHE = "blip-v986";
+var CACHE = "blip-v987";
 
 // The control deck, from jsDelivr at a pinned tag (github.com/jacobandresen/blip-deck): cached like our own files.
 var DECK = "https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v2.0.0/";
@@ -25,6 +25,29 @@ var ASSETS = [
   "/blip/about.html",
   "/blip/api.html",
   "/blip/history.html",
+  "/blip/games.html",
+  "/blip/make.html",
+  "/blip/manual/alcorn-pong.jpg",
+  "/blip/manual/amiga-1200.jpg",
+  "/blip/manual/arcade-museum.jpg",
+  "/blip/manual/bubble-bobble-cabinet.jpg",
+  "/blip/manual/bushnell.jpg",
+  "/blip/manual/capcom-hq.jpg",
+  "/blip/manual/computer-space.jpg",
+  "/blip/manual/ed-logg.jpg",
+  "/blip/manual/gremlin-hustle.jpg",
+  "/blip/manual/gun-fight-ad.jpg",
+  "/blip/manual/idestam.jpg",
+  "/blip/manual/nishikado.jpg",
+  "/blip/manual/nokia-6110.jpg",
+  "/blip/manual/p38.jpg",
+  "/blip/manual/paperboy-row.jpg",
+  "/blip/manual/pong-prototype.jpg",
+  "/blip/manual/sf2-cabinet.jpg",
+  "/blip/manual/snake-museum.jpg",
+  "/blip/manual/space-invaders-cabinet.jpg",
+  "/blip/manual/taito-station.jpg",
+  "/blip/manual/wozniak-1983.jpg",
   "/blip/controls.html",
   "/blip/manifest.json",
   DECK + "dist/blip-deck.js",

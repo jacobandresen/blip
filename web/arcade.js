@@ -68,28 +68,29 @@ blipManualPocket();
       return;
     }
 
-    var slot = source.getBoundingClientRect();
+    var slot = source.getBoundingClientRect(), lip = source.parentElement.querySelector('.manual-pocket-lip');
+    var lipTop = lip ? lip.getBoundingClientRect().top : slot.bottom;
     var spreadRect = spread.getBoundingClientRect();
-    var width = spreadRect.width / 2, height = spreadRect.height;
-    var center = { left: spreadRect.left + width / 2, top: spreadRect.top };
-    var book = source.cloneNode(true);
-    book.removeAttribute('id');
-    book.removeAttribute('data-page-card');
-    book.className = 'cabinet-manual manual-transit';
+    var book = document.createElement('div');
+    book.className = 'manual-transit';
     book.setAttribute('aria-hidden', 'true');
-    book.tabIndex = -1;
     document.body.appendChild(book);
 
-    var seated = { left: slot.left + 'px', top: slot.top + 'px', width: slot.width + 'px', height: slot.height + 'px',
-      fontSize: getComputedStyle(source.querySelector('strong')).fontSize,
+    // The whole book at the holder's size, its foot cut off by the lip until it is drawn clear.
+    var tall = slot.width * 140 / 96, rise = Math.min(14, slot.height * .4);
+    var cut = function (top) { return 'inset(-80px -80px ' + Math.max(0, top + tall - lipTop) + 'px -80px)'; };
+    var free = 'inset(-80px -80px -80px -80px)';
+    var seated = { left: slot.left + 'px', top: slot.top + 'px', width: slot.width + 'px', height: tall + 'px', clipPath: cut(slot.top),
+      transform: 'perspective(900px) rotateX(0deg) rotate(0deg)', opacity: 1, boxShadow: '1px 0 0 #fbf4df,2px 1px 0 #b9a77c,0 2px 3px #000c' };
+    var lifted = Object.assign({}, seated, { top: slot.top - rise + 'px', clipPath: cut(slot.top - rise), transform: 'perspective(900px) rotateX(0deg) rotate(-2deg)' });
+    var tipped = Object.assign({}, seated, { left: slot.left - slot.width * .3 + 'px', top: slot.top + 10 + 'px', width: slot.width * 1.6 + 'px', height: tall * 1.6 + 'px',
+      clipPath: free, transform: 'perspective(900px) rotateX(-22deg) rotate(-4deg)', boxShadow: '2px 1px 0 #fbf4df,3px 2px 0 #b9a77c,0 10px 16px #0009' });
+    // Held up to read: the closed book at its own proportions, in the middle of the page it opens into.
+    var heldW = Math.min(spreadRect.width * .66, spreadRect.height * .72 * 96 / 140), heldH = heldW * 140 / 96;
+    var held = { left: spreadRect.left + (spreadRect.width - heldW) / 2 + 'px', top: spreadRect.top + (spreadRect.height - heldH) / 2 + 'px', width: heldW + 'px', height: heldH + 'px', clipPath: free,
       transform: 'perspective(900px) rotateX(0deg) rotate(0deg)', opacity: 1,
-      boxShadow: '0 2px 2px #000c, inset 0 1px #b9b38c33' };
-    var lifted = Object.assign({}, seated, { top: slot.top - 11 + 'px', transform: 'perspective(900px) rotateX(12deg) rotate(-3deg)',
-      boxShadow: '0 8px 8px #0009, inset 0 1px #b9b38c55' });
-    var held = { left: center.left + 'px', top: center.top + 'px', width: width + 'px', height: height + 'px',
-      fontSize: '20px', transform: 'perspective(900px) rotateX(0deg) rotate(0deg)', opacity: 1,
-      boxShadow: '0 24px 35px #0009, inset 0 1px #b9b38c55' };
-    var expanded = Object.assign({}, held, { left: spreadRect.left + 'px', width: spreadRect.width + 'px' });
+      boxShadow: '2px 1px 0 #fbf4df,3px 2px 0 #cdbf9a,4px 3px 0 #b9a77c,0 24px 35px #0009' };
+    var expanded = Object.assign({}, held, { left: spreadRect.left + 'px', top: spreadRect.top + 'px', width: spreadRect.width + 'px', height: spreadRect.height + 'px' });
     var animations = [];
     try {
       if (returning) {
@@ -98,12 +99,11 @@ blipManualPocket();
           { opacity: 0, transform: 'scaleX(.5) rotateX(0deg)' }
         ], { duration: 650, easing: 'ease-in-out', fill: 'both' }));
         animations.push(overlay.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1100, delay: 500, fill: 'both' }));
-        var settled = Object.assign({}, seated, { top: slot.top + 1 + 'px' });
         await book.animate([
           Object.assign({}, expanded, { opacity: 0, offset: 0, easing: 'ease-in-out' }),
           Object.assign({}, held, { offset: 650 / 1850, easing: 'cubic-bezier(.4,0,.25,1)' }),
-          Object.assign({}, lifted, { offset: .88, easing: 'ease-in-out' }),
-          Object.assign({}, settled, { offset: .97 }),
+          Object.assign({}, tipped, { offset: .78, easing: 'cubic-bezier(.4,0,.6,1)' }),
+          Object.assign({}, lifted, { offset: .9, easing: 'ease-in' }),
           Object.assign({}, seated, { offset: 1 })
         ], { duration: 1850, fill: 'forwards' }).finished;
       } else {
@@ -111,7 +111,8 @@ blipManualPocket();
         animations.push(overlay.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 1000, delay: 150, fill: 'both' }));
         await book.animate([
           Object.assign({}, seated, { offset: 0, easing: 'ease-in-out' }),
-          Object.assign({}, lifted, { offset: .2, easing: 'cubic-bezier(.3,0,.3,1)' }),
+          Object.assign({}, lifted, { offset: .15, easing: 'cubic-bezier(.4,0,.6,1)' }),
+          Object.assign({}, tipped, { offset: .32, easing: 'cubic-bezier(.3,.1,.3,1)' }),
           Object.assign({}, held, { offset: 1 })
         ], { duration: 1100, fill: 'forwards' }).finished;
         animations[0].cancel();
@@ -145,40 +146,36 @@ blipManualPocket();
     var leftPage = overlay.querySelector('.manual-open-left'), rightPage = overlay.querySelector('.manual-open-right');
     overlay.inert = true;
     source.classList.add('manual-away');
-    var slot = source.getBoundingClientRect();
+    var slot = source.getBoundingClientRect(), lip = source.parentElement.querySelector('.manual-pocket-lip');
+    var lipTop = lip ? lip.getBoundingClientRect().top : slot.bottom;
     var frame = spread.getBoundingClientRect(), box = rightPage.getBoundingClientRect();
     // The closed book has its printed cover's proportions (96 × 140), its spine at the spread's.
     var W = box.width, H = box.height, CW = Math.min(W, H * 96 / 140), hx = box.left + CW / 2, hy = box.top + H / 2;
-    var sx = slot.left + slot.width / 2, sy = slot.top + slot.height / 2, sc = slot.width / CW;
-    // Seen in its slot the book lies tipped far back: its foreshortened height is the slot's.
-    var tip = Math.acos(Math.min(1, slot.height / (H * sc))) * 180 / Math.PI;
+    // In the holder it is the same book at the holder's scale: its top where the shown top is, its foot behind the lip.
+    var sc = slot.width / CW, sx = slot.left + slot.width / 2, sy = slot.top + H * sc / 2, rise = Math.min(18, slot.height * .45);
     function pose(x, y, s, rx, rz) {
       return 'translate(' + (x - hx) + 'px,' + (y - hy) + 'px) perspective(1800px) rotateX(' + rx + 'deg) rotateZ(' + rz + 'deg) scale(' + s + ')';
     }
-    // Picked up: drawn up out of the slot by its top edge, tipped toward the reader as it comes closer,
-    // held a little above the table, then set down; the shadow follows the height.
+    // What of the book is below the lip, in the book's own pixels; free of the holder, nothing is cut.
+    function behindLip(y, s) { return 'inset(-160px -160px ' + Math.max(0, (y + H * s / 2 - lipTop) / s) + 'px -160px)'; }
+    var free = 'inset(-160px -160px -160px -160px)';
+    // The page block shows at the fore-edge and foot; the shadow beneath grows and softens with the height.
+    var edges = '1px 0 0 #fbf4df,2px 1px 0 #cdbf9a,3px 1px 0 #f7efda,4px 2px 0 #cdbf9a,5px 2px 0 #f7efda,6px 3px 0 #b9a77c';
+    function lift(y, blur, a) { return edges + ',0 ' + y + 'px ' + blur + 'px rgba(0,0,0,' + a + ')'; }
+    // Drawn up from behind the lip, tipped out toward the reader, carried over the table and set down on it.
     var path = [
-      { offset: 0, transform: pose(sx, sy, sc, tip, 0), opacity: 0, boxShadow: '0 1px 2px #0000' },
-      { offset: .12, transform: pose(sx, sy - 18, sc * 1.06, tip - 8, -2), opacity: 1, boxShadow: '0 4px 6px #0006', easing: 'cubic-bezier(.33,0,.2,1)' },
-      { offset: .5, transform: pose(sx + (hx - sx) * .6, Math.max(sy + (hy - sy) * .4, 14 + H * .58 * .45), .58, 26, -5), opacity: 1, boxShadow: '0 40px 60px #000a', easing: 'cubic-bezier(.3,.1,.3,1)' },
-      { offset: .84, transform: pose(hx, hy - 12, 1.035, -3, .6), opacity: 1, boxShadow: '0 46px 70px #000b', easing: 'cubic-bezier(.45,0,.55,1)' },
-      { offset: 1, transform: pose(hx, hy, 1, 0, 0), opacity: 1, boxShadow: '0 6px 14px #0009' }
+      { offset: 0, transform: pose(sx, sy, sc, 0, 0), clipPath: behindLip(sy, sc), boxShadow: lift(2, 4, .6), opacity: 1, easing: 'cubic-bezier(.35,0,.45,1)' },
+      { offset: .15, transform: pose(sx, sy - rise, sc * 1.02, 0, -1), clipPath: behindLip(sy - rise, sc * 1.02), boxShadow: lift(3, 6, .6), opacity: 1, easing: 'cubic-bezier(.4,0,.6,1)' },
+      // Drawn toward the reader it is soon as large as it will lie on the table, and a little larger while held up.
+      { offset: .3, transform: pose(sx - 30, Math.max(sy + H * sc * .4, 12 + H * .62 / 2), .62, -20, -4), clipPath: free, boxShadow: lift(16, 26, .55), opacity: 1, easing: 'cubic-bezier(.25,.1,.35,1)' },
+      { offset: .62, transform: pose(sx + (hx - sx) * .7, hy - 8, 1.04, 8, -3), clipPath: free, boxShadow: lift(48, 70, .6), opacity: 1, easing: 'cubic-bezier(.4,0,.5,1)' },
+      { offset: .88, transform: pose(hx, hy - 10, 1.03, -2, .5), clipPath: free, boxShadow: lift(40, 60, .62), opacity: 1, easing: 'cubic-bezier(.45,0,.55,1)' },
+      { offset: 1, transform: pose(hx, hy, 1, 0, 0), clipPath: free, boxShadow: lift(6, 14, .6), opacity: 1 }
     ];
     var book = document.createElement('div');
     book.className = 'manual-transit';
     book.setAttribute('aria-hidden', 'true');
     book.style.cssText = 'left:' + box.left + 'px;top:' + box.top + 'px;width:' + CW + 'px;height:' + H + 'px;transform-origin:50% 50%;opacity:0';
-    // The spine in the pocket rises as the book is drawn out, and gives way to the book itself.
-    var spine = source.cloneNode(true);
-    spine.removeAttribute('id'); spine.removeAttribute('data-page-card');
-    spine.className = 'cabinet-manual manual-lift';
-    spine.setAttribute('aria-hidden', 'true'); spine.tabIndex = -1;
-    spine.style.cssText = 'left:' + slot.left + 'px;top:' + slot.top + 'px;width:' + slot.width + 'px;height:' + slot.height + 'px';
-    var spineRise = [
-      { transform: 'translateY(0) perspective(400px) rotateX(0deg)', opacity: 1 },
-      { transform: 'translateY(-12px) perspective(400px) rotateX(-24deg)', opacity: 1, offset: .55 },
-      { transform: 'translateY(-20px) perspective(400px) rotateX(-40deg)', opacity: 0 }
-    ];
     // The cover swings on its own layer over the spread, so the spread can be cut back to what the open
     // cover uncovers; until then a closed book has no left-hand page.
     var stage = document.createElement('div');
@@ -284,19 +281,15 @@ blipManualPocket();
         animations.push(spread.animate([{ opacity: 1, clipPath: clip(spineX) }, { opacity: 0, clipPath: clip(spineX) }], { duration: 300, fill: 'both' }));
         animations.push(overlay.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 900, delay: 300, fill: 'both' }));
         var flight = book.animate(path.slice().reverse().map(function (k) { return Object.assign({}, k, { offset: 1 - k.offset }); }),
-          { duration: 1150, easing: 'linear', fill: 'forwards' });
-        document.body.appendChild(spine);
-        animations.push(spine.animate(spineRise.slice().reverse(), { duration: 380, delay: 1150 - 380 * .6, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'both' }));
+          { duration: 1300, easing: 'linear', fill: 'forwards' });
         await flight.finished;
         source.classList.remove('manual-away');
         await new Promise(requestAnimationFrame);
       } else {
-        document.body.append(book, spine);
-        animations.push(spread.animate([{ opacity: 0, clipPath: clip(spineX) }, { opacity: 0, clipPath: clip(spineX), offset: .8 }, { opacity: 1, clipPath: clip(spineX) }],
-          { duration: 1150, fill: 'both' }));
+        document.body.appendChild(book);
+        animations.push(spread.animate([{ opacity: 0, clipPath: clip(spineX) }, { opacity: 0, clipPath: clip(spineX) }], { duration: 1300, fill: 'both' }));
         animations.push(overlay.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 800, delay: 100, fill: 'both' }));
-        animations.push(spine.animate(spineRise, { duration: 380, easing: 'cubic-bezier(.3,0,.2,1)', fill: 'forwards' }));
-        await book.animate(path, { duration: 1150, easing: 'linear', fill: 'forwards' }).finished;
+        await book.animate(path, { duration: 1300, easing: 'linear', fill: 'forwards' }).finished;
         await reading;
         var opening = hinge(0);
         await new Promise(requestAnimationFrame);
@@ -318,7 +311,7 @@ blipManualPocket();
     } finally {
       animations.forEach(function (animation) { animation.cancel(); });
       leftPage.style.visibility = '';
-      stage.remove(); book.remove(); spine.remove();
+      stage.remove(); book.remove();
       source.classList.toggle('manual-away', !returning);
       overlay.inert = false;
     }
@@ -503,7 +496,9 @@ function rollOutArcade() {
   motionFrame = requestAnimationFrame(move);
   fallback = setTimeout(function () { finish(); }, reduced ? 50 : 1400);
 }
-var manualChapters=['controls.html','history.html','about.html'], manualPages=[], manualPageIndex=0, manualLoadPromise=null, manualChapterStarts=[],manualGameStarts={},manualGameNames={},manualGameNumbers={},manualMeasureSize='';
+var manualChapters=['controls.html','games.html','history.html','make.html','about.html'], manualPages=[], manualPageIndex=0, manualLoadPromise=null, manualChapterStarts=[],manualGameStarts={},manualGameNames={},manualGameNumbers={},manualStudioStarts={},manualStudioNames={},manualStudioNumbers={},manualMeasureSize='';
+// A game's or a studio's own sub-chapter: it opens on a fresh page, its name in the running head and the contents.
+var MANUAL_PART='[data-manual-game],[data-manual-studio]';
 var manualOverlay=document.getElementById('manual-overlay');
 // Handwriting is never quite level or quite even: each word sits a hair off the line, with its own tilt and pressure.
 function manualHand(text) {
@@ -537,7 +532,7 @@ function manualAtoms(node,parents,out) {
   if(node.tagName==='TABLE') {
     Array.from(node.rows).forEach(function(row){var table=node.cloneNode(false);table.appendChild(row.cloneNode(true));out.push({parents:parents,leaf:table});});return;
   }
-  if(/^(H1|H2|H3|P|IMG|UL|OL)$/.test(node.tagName)||node.matches('.studio,.profile,.game-section,.game-header,.game-title,.game-origin,.manual-first-step,[data-manual-game],[data-manual-sheet]')) {out.push({parents:parents,leaf:node.cloneNode(true)});return;}
+  if(/^(H1|H2|H3|H4|P|IMG|UL|OL|FIGURE|PRE|BLOCKQUOTE)$/.test(node.tagName)||node.matches('.manual-opener,.manual-first-step,[data-manual-sheet],'+MANUAL_PART)) {out.push({parents:parents,leaf:node.cloneNode(true)});return;}
   if(!node.children.length) {if(node.textContent.trim())out.push({parents:parents,leaf:node.cloneNode(true)});return;}
   var next=parents.concat(node.cloneNode(false));
   Array.from(node.children).forEach(function(child){manualAtoms(child,next,out);});
@@ -555,10 +550,13 @@ function prepareManualPages() {
       chapterIndex--;
       var doc=new DOMParser().parseFromString(markup,'text/html'),source=doc.querySelector('.manual-leaf .page');
       if(!source)return;
-      source.querySelectorAll('[data-manual-game]').forEach(function(game){var h3=game.querySelector('h3');if(!h3)return;var heading=h3.textContent,number=heading.match(/^\s*(\d+\.\d+)/);manualGameNumbers[game.dataset.manualGame]=number?number[1]:'';manualGameNames[game.dataset.manualGame]=heading.replace(/^\s*\d+\.\d+\s*/, '').trim();});
+      // A part is named by its first heading: "2.1 Adder".
+      [['manualGame',manualGameNumbers,manualGameNames,'[data-manual-game][data-side="left"]'],['manualStudio',manualStudioNumbers,manualStudioNames,'[data-manual-studio]']].forEach(function(kind){
+        source.querySelectorAll(kind[3]).forEach(function(part){var h3=part.querySelector('h3');if(!h3)return;var heading=h3.textContent,number=heading.match(/^\s*(\d+\.\d+)/),slug=part.dataset[kind[0]];kind[1][slug]=number?number[1]:'';kind[2][slug]=heading.replace(/^\s*\d+\.\d+\s*/, '').trim();});
+      });
       source.querySelectorAll('a').forEach(function(link){var print=document.createElement('span');print.className=link.className;print.innerHTML=link.innerHTML;link.replaceWith(print);});
-      var titles=['PLAYING THE GAMES','THE GOLDEN AGE OF ARCADE GAMES','ABOUT BLIP'];
-      var title=chapterIndex<0?'FIRST TIME USE':['CONTROLS','HISTORY','ABOUT BLIP'][chapterIndex], atoms=[];
+      var titles=['PLAYING THE GAMES','THE GAMES','THE GOLDEN AGE','MAKE YOUR OWN GAME WITH BLIP','ABOUT BLIP'];
+      var title=chapterIndex<0?'FIRST TIME USE':['CONTROLS','THE GAMES','HISTORY','MAKE YOUR OWN','ABOUT BLIP'][chapterIndex], atoms=[];
       var sourceHead=source.querySelector('h1');
       if(sourceHead)sourceHead.remove();
       var sourceSubhead=source.querySelector('h2');
@@ -573,10 +571,10 @@ function prepareManualPages() {
       Array.from(source.children).forEach(function(node){manualAtoms(node,[],atoms);});
       var sheet=document.createElement('div');sheet.className='page manual-leaf-sheet';measure.appendChild(sheet);var count=0;
       function appendAtom(atom){var wrapper=sheet;atom.parents.forEach(function(parent){var copy=parent.cloneNode(false);wrapper.appendChild(copy);wrapper=copy;});wrapper.appendChild(atom.leaf);}
-      function saveSheet(){if(sheet.childElementCount){var game=sheet.querySelector('[data-manual-game]'),slug=game?game.dataset.manualGame:null,sided=sheet.querySelector('[data-side]');result.push({chapter:chapterIndex,game:slug,side:sided?sided.dataset.side||'':'',operators:!!sheet.querySelector('.manual-operators'),title:slug?manualGameNames[slug]:title,html:sheet.innerHTML});}sheet.remove();}
+      function saveSheet(){if(sheet.childElementCount){var game=sheet.querySelector('[data-manual-game]'),slug=game?game.dataset.manualGame:null,house=sheet.querySelector('[data-manual-studio]'),studio=house?house.dataset.manualStudio:null,sided=sheet.querySelector('[data-side]');result.push({chapter:chapterIndex,game:slug,studio:studio,side:sided?sided.dataset.side||'':'',operators:!!sheet.querySelector('.manual-operators'),title:slug?manualGameNames[slug]:studio?manualStudioNames[studio]:title,html:sheet.innerHTML});}sheet.remove();}
       function newSheet(){sheet=document.createElement('div');sheet.className='page manual-leaf-sheet';measure.appendChild(sheet);count=0;}
       function placeAtom(atom){
-        if(count&&atom.leaf.matches('[data-manual-game],[data-manual-sheet]')){saveSheet();newSheet();}
+        if(count&&atom.leaf.matches('[data-manual-sheet],'+MANUAL_PART)){saveSheet();newSheet();}
         appendAtom(atom);var wrapper=sheet.lastElementChild;
         // A page made to stay whole (the operators) is never split: it is sized to fit.
         if(atom.leaf.matches('[data-manual-sheet]')) {
@@ -611,7 +609,7 @@ function prepareManualPages() {
       // A heading never ends a page alone: it moves with what follows unless a few lines of that fit.
       atoms.forEach(function(atom,i){
         var after=atoms[i+1];
-        if(count&&after&&atom.leaf.matches('h1,h2,h3,.section-label,.thoughts-label,.impl-label')&&!after.leaf.matches('[data-manual-game],[data-manual-sheet]')) {
+        if(count&&after&&atom.leaf.matches('h1,h2,h3,h4,.section-label,.thoughts-label,.impl-label')&&!after.leaf.matches('[data-manual-sheet],'+MANUAL_PART)) {
           appendAtom(atom);var headed=sheet.scrollHeight;appendAtom(after);
           var fits=sheet.scrollHeight<=height+1||height-headed>=72;
           sheet.lastElementChild.remove();sheet.lastElementChild.remove();
@@ -643,25 +641,34 @@ function prepareManualPages() {
     });
     // One leaf has lost its outer corner at the foot, as a well-read leaf will.
     // Its back is the next page, torn at the same place: the other foot corner as the leaf turns over.
-    var torn=aligned.filter(function(leaf){return leaf.game==='meteors'&&leaf.side==='right';})[0],tornAt=aligned.indexOf(torn);
+    // A right-hand leaf whose back is a blank notes page, so the tear takes no words with it.
+    // (A narrow screen skips the blank ones and shows one leaf at a time: there its back is the handwritten note.)
+    var wideBook=manualWide(),tornAt=aligned.findIndex(function(leaf,i){var back=aligned[i+1];return !leaf.filler&&back&&back.filler&&(wideBook?i%2===0&&!back.note:back.note);}),torn=aligned[tornAt];
     if(torn){torn.torn='br';if(aligned[tornAt+1])aligned[tornAt+1].torn='bl';}
     result=aligned;
     var operatorsAt=result.findIndex(function(page){return page.operators;}),operatorsEntry=document.querySelector('[data-chapter="operators"]');
     if(operatorsAt>=0){operatorsEntry.disabled=false;operatorsEntry.dataset.page=operatorsAt;operatorsEntry.querySelector('b').textContent=String(operatorsAt+1).padStart(2,'0');}
     var firstUse=document.querySelector('[data-chapter="first-use"]');firstUse.disabled=false;firstUse.dataset.page=0;firstUse.querySelector('b').textContent='01';
     var starts={};result.forEach(function(page,index){if(starts[page.chapter]===undefined)starts[page.chapter]=index;});
-    manualChapterStarts=[0,1,2].map(function(index){return starts[index]===undefined?0:starts[index];});
-    ['controls','history','about'].forEach(function(key,index){
+    manualChapterStarts=manualChapters.map(function(_,index){return starts[index]===undefined?0:starts[index];});
+    ['controls','games','history','make','about'].forEach(function(key,index){
       var entry=document.querySelector('.manual-contents [data-chapter="'+key+'"]');entry.disabled=false;entry.dataset.page=manualChapterStarts[index];
       entry.querySelector('b').textContent=String(manualChapterStarts[index]+1).padStart(2,'0');
     });
-    manualGameStarts={};result.forEach(function(page,index){if(page.game&&manualGameStarts[page.game]===undefined)manualGameStarts[page.game]=index;});
-    var contents=document.getElementById('manual-game-contents');contents.replaceChildren();
-    Object.keys(manualGameStarts).sort(function(a,b){return manualGameNames[a].localeCompare(manualGameNames[b]);}).forEach(function(slug){
-      var row=document.createElement('li'),button=document.createElement('button'),name=document.createElement('span'),leader=document.createElement('i'),number=document.createElement('b');
-      button.type='button';button.dataset.game=slug;button.dataset.page=manualGameStarts[slug];
-      name.textContent=manualGameNumbers[slug]+'  '+manualGameNames[slug];name.appendChild(leader);number.textContent=String(manualGameStarts[slug]+1).padStart(2,'0');
-      button.append(name,number);row.appendChild(button);contents.appendChild(row);
+    // The game and studio indexes: each part's first page, listed by name.
+    manualGameStarts={};manualStudioStarts={};
+    result.forEach(function(page,index){
+      if(page.game&&manualGameStarts[page.game]===undefined)manualGameStarts[page.game]=index;
+      if(page.studio&&manualStudioStarts[page.studio]===undefined)manualStudioStarts[page.studio]=index;
+    });
+    [['manual-game-contents',manualGameStarts,manualGameNames,manualGameNumbers,'game'],['manual-studio-contents',manualStudioStarts,manualStudioNames,manualStudioNumbers,'studio']].forEach(function(kind){
+      var contents=document.getElementById(kind[0]);if(!contents)return;contents.replaceChildren();
+      Object.keys(kind[1]).sort(function(a,b){return kind[3][a].localeCompare(kind[3][b],undefined,{numeric:true});}).forEach(function(slug){
+        var row=document.createElement('li'),button=document.createElement('button'),name=document.createElement('span'),leader=document.createElement('i'),number=document.createElement('b');
+        button.type='button';button.dataset[kind[4]]=slug;button.dataset.page=kind[1][slug];
+        name.textContent=kind[3][slug]+'  '+kind[2][slug];name.appendChild(leader);number.textContent=String(kind[1][slug]+1).padStart(2,'0');
+        button.append(name,number);row.appendChild(button);contents.appendChild(row);
+      });
     });
     return result;
   }).catch(function(error){manualMeasureSize='';manualLoadPromise=null;throw error;}).finally(function(){measure.remove();});
@@ -691,7 +698,7 @@ function manualFill(pages,right) {
   manualOverlay.querySelector('.manual-open-book').dataset.smudge=String((wide?right/2:right)%4);
   manualFitShown();
   manualOverlay.querySelectorAll('.manual-contents button').forEach(function(entry){
-    var shown=[leaf,left].filter(Boolean),current=shown.some(function(page){return entry.dataset.game?entry.dataset.game===page.game:Number(entry.dataset.page)===pages.indexOf(page);});
+    var shown=[leaf,left].filter(Boolean),current=shown.some(function(page){return entry.dataset.game?entry.dataset.game===page.game:entry.dataset.studio?entry.dataset.studio===page.studio:Number(entry.dataset.page)===pages.indexOf(page);});
     entry.toggleAttribute('aria-current',current);if(current)entry.setAttribute('aria-current','page');
   });
 }
@@ -798,7 +805,7 @@ manualOverlay.querySelector('.manual-open-left').addEventListener('click',functi
 new ResizeObserver(function(){
   if(manualOverlay.hidden)return;
   var viewport=document.getElementById('manual-page-content'),size=viewport.clientWidth+'x'+viewport.clientHeight;
-  if(viewport.clientWidth&&size!==manualMeasureSize){var current=manualPages[manualPageIndex];if(current&&current.filler)current=manualPages[manualPageIndex+1]||manualPages[manualPageIndex-1];prepareManualPages().then(function(){showManualPage(current&&current.game?manualGameStarts[current.game]||0:manualChapterStarts[current&&current.chapter>=-1?current.chapter:0]||0,false);});}
+  if(viewport.clientWidth&&size!==manualMeasureSize){var current=manualPages[manualPageIndex];if(current&&current.filler)current=manualPages[manualPageIndex+1]||manualPages[manualPageIndex-1];prepareManualPages().then(function(){showManualPage(current&&current.game?manualGameStarts[current.game]||0:current&&current.studio?manualStudioStarts[current.studio]||0:manualChapterStarts[current&&current.chapter>=-1?current.chapter:0]||0,false);});}
 }).observe(document.getElementById('manual-page-content'));
 document.getElementById('manual-prev').addEventListener('click',function(){turnManualPage(-1);});
 document.getElementById('manual-next').addEventListener('click',function(){turnManualPage(1);});

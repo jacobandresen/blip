@@ -4,7 +4,7 @@ Eleven arcade games in the browser, written in Rust on the small `blip` engine a
 
 **[Play →](https://jacobandresen.github.io/blip/)** · [Home Screen](https://jacobandresen.github.io/blip/home.html) · [API](https://jacobandresen.github.io/blip/api.html)
 
-[![The Blip arcade: Rally between Adder and Bouncer](docs/screenshots/arcade-front.png)](https://jacobandresen.github.io/blip/)
+[![The Blip arcade: Rally between Rounds and Bouncer, the manual in its holder on the top bar](docs/screenshots/arcade-front.png)](https://jacobandresen.github.io/blip/)
 
 ## Games
 
@@ -23,6 +23,14 @@ Eleven arcade games in the browser, written in Rust on the small `blip` engine a
 | [Rounds](https://jacobandresen.github.io/blip/rounds/) | A paper round on a cargo bike, a week of weather |
 
 The arcade is a room of cabinets: insert a coin and play. The Home Screen is the same games as phone apps, free to play. Best scores stay in your browser.
+
+## The manual
+
+Lift the manual from its holder on the top bar. It covers how to play each game, the history of the game it pays tribute to (the people, the studios and a few true stories, with sources and freely licensed photographs), and how to make a game of your own with Blip, by hand or with a coding agent.
+
+[![The manual open at Rally's chapter: the story of Pong](docs/screenshots/manual.png)](https://jacobandresen.github.io/blip/history.html)
+
+Its chapters are plain pages in `web/` (`controls.html`, `games.html`, `history.html`, `make.html`, `about.html`); the arcade sets them as a book and the Home Screen's Guide reads the same text.
 
 ## Build
 

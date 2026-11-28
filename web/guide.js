@@ -15,8 +15,8 @@ var inlineTitle = document.getElementById('detail-inline-title');
 var EMBED = new URLSearchParams(location.search).has('embed');
 // Opened from its own home-screen icon: an app of its own, with nowhere to go back to.
 var OWN_APP = !EMBED && blipStandalone() && !document.referrer;
-var SOURCES = ['controls.html', 'history.html', 'about.html'];
-var GROUPS = ['Getting started', 'Games', 'History', 'About'];
+var SOURCES = ['controls.html', 'games.html', 'history.html', 'make.html', 'about.html'];
+var GROUPS = ['Getting started', 'Games', 'History', 'Make your own', 'About'];
 var topics = [], byId = {};
 
 function sentence(s) {
@@ -41,7 +41,7 @@ function convert(node) {
   if (node.nodeType === 3) return document.createTextNode(node.textContent);
   if (node.nodeType !== 1) return null;
   var tag = node.tagName.toLowerCase();
-  if (/^(script|style|figure|aside)$/.test(tag) || node.matches('.divider, [data-guide="cabinet"], .manual-tip')) return null;
+  if (/^(script|style|aside)$/.test(tag) || (tag === 'figure' && !node.matches('.manual-photo, .manual-code')) || node.matches('.divider, [data-guide="cabinet"], .manual-tip')) return null;
   if (node.matches('.section-label, .thoughts-label, .impl-label')) return el('h3', null, sentence(node.textContent));
   if (tag === 'table' && node.matches('.keytable')) {
     var ul = el('ul', 'group');
@@ -73,7 +73,7 @@ function convert(node) {
     return frag;
   }
   // Wrappers and layout boxes give way to their contents.
-  var keep = /^(p|ul|ol|li|a|b|strong|i|em|kbd|br|q|code|h3|h4|img)$/.test(tag);
+  var keep = /^(p|ul|ol|li|a|b|strong|i|em|kbd|br|q|code|pre|h3|h4|img|figure|figcaption|span)$/.test(tag);
   var out = keep ? document.createElement(tag === 'h4' ? 'h3' : tag) : document.createDocumentFragment();
   if (tag === 'a') {
     var href = node.getAttribute('href') || '';
@@ -122,10 +122,7 @@ function readControls(doc) {
 
 function readGames(controls, history) {
   var origins = {};
-  Array.prototype.forEach.call(history.querySelectorAll('.game-section'), function (s) {
-    var slug = gameSlugByName(text(s, '.game-title'));
-    if (slug) origins[slug] = s;
-  });
+  Array.prototype.forEach.call(history.querySelectorAll('.manual-game-history[data-manual-game]'), function (s) { origins[s.dataset.manualGame] = s; });
   Object.keys(BLIP_GAMES).map(function (slug) { return { slug: slug, name: blipTitleCase(BLIP_GAMES[slug].name) }; })
     .sort(function (a, b) { return a.name.localeCompare(b.name); })
     .forEach(function (g) {
@@ -135,11 +132,11 @@ function readGames(controls, history) {
       if (!left && !right) return;
       add({
         id: 'game-' + g.slug, group: 'Games', title: g.name, slug: g.slug,
-        sub: past ? text(past, '.game-origin') : '',
+        sub: past ? text(past, '.manual-original') : '',
         icon: g.slug + '/icon-192.png?v=27',
         body: function () {
           var box = document.createDocumentFragment();
-          var meta = el('div', 'hero-meta', '<img src="' + g.slug + '/icon-192.png?v=27" alt=""><span><b>' + (past ? text(past, '.game-origin') : g.name) + '</b><span class="row-sub">' +
+          var meta = el('div', 'hero-meta', '<img src="' + g.slug + '/icon-192.png?v=27" alt=""><span><b>' + (past ? 'After ' + text(past, '.manual-original') : g.name) + '</b><span class="row-sub">' +
             (blipTwoPlayer(g.slug) ? '1 or 2 players' : '1 player') + '</span></span>');
           if (!EMBED && !OWN_APP) {
             var play = meta.appendChild(el('a', 'play', 'Play'));
@@ -161,10 +158,8 @@ function readGames(controls, history) {
           }
           if (past) {
             p.appendChild(el('h2', null, 'History'));
-            p.appendChild(el('p', 'eyebrow', text(past, '.game-origin')));
-            var sub = past.querySelector(':scope > h2');
-            if (sub) p.appendChild(el('h3', null, sentence(sub.textContent)));
-            bodyOf(past).forEach(function (n) { var x = convert(n); if (x) p.appendChild(x); });
+            p.appendChild(el('p', 'eyebrow', text(past, '.manual-original') + ' · ' + text(past, '.manual-origin')));
+            Array.prototype.forEach.call(past.children, function (n) { if (n.matches('.manual-opener')) return; var x = convert(n); if (x) p.appendChild(x); });
           }
           box.appendChild(p);
           return box;
@@ -326,9 +321,10 @@ Promise.all(SOURCES.map(function (url) {
 })).then(function (pages) {
   var docs = pages.map(function (html) { return new DOMParser().parseFromString(html, 'text/html'); });
   readControls(docs[0]);
-  readGames(docs[0], docs[1]);
-  readChapter(docs[1], 'History', 'history-intro');
-  readChapter(docs[2], 'About', 'about-intro');
+  readGames(docs[1], docs[1]);
+  readChapter(docs[2], 'History', 'history-intro');
+  readChapter(docs[3], 'Make your own', 'make-intro');
+  readChapter(docs[4], 'About', 'about-intro');
   renderToc('');
   show();
   guide.dataset.ready = '';
